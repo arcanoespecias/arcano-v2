@@ -1,4 +1,4 @@
-// ===================== GITHUB SYNC MODULE v9 =====================
+// ===================== GITHUB SYNC MODULE v10 =====================
 
 const GH_SYNC_KEY = 'arcano_github_config';
 const GH_TOKEN_KEY = 'arcano_gh_token';
@@ -14,6 +14,11 @@ let ghRemoteSha = null;
 let ghPollTimer = null;
 let ghSyncInProgress = false;
 let ghPushErrors = 0;
+
+// v10: Protege cambios locales pendientes de push contra un pull que los sobreescriba.
+// Cuando saveDB() se llama, se guarda una snapshot. Si un pull arrives antes de que
+// el push se complete, los cambios locales se restauran sobre lo descargado.
+let _pendingPushSnapshot = null;
 
 // -------------------- Config --------------------
 
@@ -44,6 +49,7 @@ function saveGhConfig(config) {
 function clearGhConfig() {
   ghConfig = null;
   ghRemoteSha = null;
+  _pendingPushSnapshot = null;
   localStorage.removeItem(GH_TOKEN_KEY);
   localStorage.removeItem(GH_SYNC_KEY);
   try {
@@ -103,6 +109,36 @@ async function ghApiRequest(method, endpoint, body) {
   return res.json();
 }
 
+// -------------------- v10: Fetch fresh SHA before push --------------------
+// Siempre obtiene el SHA actual del archivo remoto ANTES de pushear.
+// Evita conflictos 409 cuando otro dispositivo modifico el archivo.
+
+async function ghFetchSha() {
+  const cfg = getGhConfig();
+  if (!cfg) return null;
+  try {
+    const url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + GH_DATA_PATH + (cfg.branch ? '?ref=' + cfg.branch : '') + '&_t=' + Date.now();
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': 'Bearer ' + cfg.token,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Arcano-PWA'
+      },
+      cache: 'no-store'
+    });
+    if (res.status === 404) return null; // Archivo no existe aun
+    if (!res.ok) {
+      console.warn('[Sync] ghFetchSha error:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    return data.sha;
+  } catch (e) {
+    console.warn('[Sync] ghFetchSha exception:', e.message);
+    return null;
+  }
+}
+
 // -------------------- Pull --------------------
 
 async function ghPull() {
@@ -122,6 +158,27 @@ async function ghPull() {
     const bytes = new Uint8Array(binStr.length);
     for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
     const remoteDB = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+
+    // v10: Si hay cambios locales pendientes de push, protegerlos.
+    // El pull descarga los datos remotos, pero luego restauramos los campos
+    // que fueron modificados localmente ANTES de que el push se completara.
+    if (_pendingPushSnapshot) {
+      try {
+        const pending = JSON.parse(_pendingPushSnapshot);
+        const current = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
+        // Comparar: si el local actual es IGUAL al pending (no fue modificado por otro medio),
+        // entonces mezclar los cambios pendientes sobre el remoto.
+        if (JSON.stringify(current) === _pendingPushSnapshot) {
+          // Restaurar los datos locales sobre lo descargado del remoto
+          Object.assign(remoteDB, pending);
+          console.log('[Sync] Pull + restore pending changes');
+        }
+        _pendingPushSnapshot = null;
+      } catch (e) {
+        console.warn('[Sync] Error restoring pending snapshot:', e.message);
+        _pendingPushSnapshot = null;
+      }
+    }
 
     // Merge config remota con token local (remoto NUNCA tiene token)
     // Limpiar _ghConfig del remoto (siempre usar el hardcodeado)
@@ -150,11 +207,12 @@ async function ghPull() {
   } finally { ghSyncInProgress = false; }
 }
 
-// -------------------- Push --------------------
+// -------------------- v10: Push with retry + fresh SHA --------------------
 
 async function ghPush() {
   if (ghSyncInProgress) return;
   ghSyncInProgress = true;
+
   try {
     const dbRaw = localStorage.getItem(DB_KEY);
     if (!dbRaw) return;
@@ -166,23 +224,59 @@ async function ghPush() {
     if (db._ghConfig && db._ghConfig.token) delete db._ghConfig.token;
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(db, null, 2))));
     const body = { message: 'sync: ' + new Date().toISOString(), content };
-    if (ghRemoteSha) body.sha = ghRemoteSha;
-    const result = await ghApiRequest('PUT', '', body);
-    ghRemoteSha = result.content.sha;
-    ghPushErrors = 0;
-    console.log('[Sync] Push OK - SHA:', ghRemoteSha.slice(0,7));
-    if (typeof updateSyncUI === 'function') updateSyncUI('ok', 'OK');
+
+    // v10: Siempre obtener SHA fresco antes de pushear
+    const freshSha = await ghFetchSha();
+    if (freshSha) {
+      body.sha = freshSha;
+      ghRemoteSha = freshSha;
+    } else {
+      // No hay archivo remoto (primera vez) - no incluir SHA
+      delete body.sha;
+      ghRemoteSha = null;
+    }
+
+    // v10: Reintentar hasta 3 veces con SHA fresco cada vez
+    var maxRetries = 3;
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await ghApiRequest('PUT', '', body);
+        ghRemoteSha = result.content.sha;
+        _pendingPushSnapshot = null; // Push exitoso, limpiar snapshot
+        ghPushErrors = 0;
+        console.log('[Sync] Push OK (attempt ' + attempt + ') - SHA:', ghRemoteSha.slice(0,7));
+        if (typeof updateSyncUI === 'function') updateSyncUI('ok', 'OK');
+        return;
+      } catch (err) {
+        console.warn('[Sync] Push attempt ' + attempt + ' error:', err.message);
+        if (err.message && (err.message.includes('409') || err.message.includes('sha'))) {
+          // Conflicto de SHA: obtener SHA fresco y reintentar
+          if (attempt < maxRetries) {
+            var newSha = await ghFetchSha();
+            if (newSha) {
+              body.sha = newSha;
+              ghRemoteSha = newSha;
+              console.log('[Sync] SHA conflict, retrying with fresh SHA:', newSha.slice(0,7));
+              continue;
+            } else {
+              delete body.sha;
+              ghRemoteSha = null;
+              continue;
+            }
+          }
+        }
+        // Error que no es de SHA - no reintentar
+        throw err;
+      }
+    }
   } catch (err) {
     console.warn('[Sync] Push error:', err.message);
     ghPushErrors++;
     if (typeof updateSyncUI === 'function') updateSyncUI('error', 'Push');
     if (ghPushErrors <= 3 && typeof toast === 'function') toast('Error sync: ' + err.message, 'err');
-    if (err.message && (err.message.includes('409') || err.message.includes('sha'))) {
-      ghRemoteSha = null;
-      const pulled = await ghPull();
-      if (pulled) { ghSyncInProgress = false; return ghPush(); }
-    }
-  } finally { ghSyncInProgress = false; }
+  } finally {
+    ghSyncInProgress = false;
+  }
 }
 
 // -------------------- Sync ID counter --------------------
@@ -313,7 +407,7 @@ function showTokenScreen() {
   if (!pinScreen) return;
   pinScreen.style.display = 'flex';
   pinScreen.innerHTML = `
-    <img src="icons/logo-pin.png?v=9" style="width:70px;height:70px;margin-bottom:8px;object-fit:contain">
+    <img src="icons/logo-pin.png?v=10" style="width:70px;height:70px;margin-bottom:8px;object-fit:contain">
     <div class="pin-logo">Arcano</div>
     <div class="pin-sub">Ingresa tu token de GitHub</div>
     <p style="color:var(--muted);font-size:.78rem;max-width:280px;text-align:center;margin:12px 0">
@@ -331,7 +425,7 @@ function showTokenScreen() {
 async function conectarConToken() {
   const token = (document.getElementById('token-input') || {}).value || '';
   const errEl = document.getElementById('token-err');
-  if (!token.trim()) { if (errEl) errEl.textContent = 'Pegá tu token de GitHub'; return; }
+  if (!token.trim()) { if (errEl) errEl.textContent = 'Pega tu token de GitHub'; return; }
   if (errEl) errEl.textContent = 'Conectando...';
   // Probar conexion
   saveGhConfig({ owner: GH_DEFAULT.owner, repo: GH_DEFAULT.repo, branch: GH_DEFAULT.branch, token: token.trim() });
@@ -349,11 +443,14 @@ async function conectarConToken() {
       if (typeof updateSyncUI === 'function') updateSyncUI('ok', 'OK');
     } else {
       // No hay archivo de datos en GitHub - usar datos locales si existen
+      // v10: Si hay datos locales, subirlos ahora
       startGhPolling();
       document.getElementById('pin-screen').style.display = 'none';
       seedIfEmpty();
       initPin();
       renderGhAjustes();
+      // Hacer un push inicial si no hay datos remotos
+      ghPush();
       if (typeof updateSyncUI === 'function') updateSyncUI('ok', 'Nuevo');
     }
   } else {
