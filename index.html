@@ -13,7 +13,7 @@
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Arcano — Complice del Sabor</title>
-<link rel="manifest" href="manifest.json?v=19">
+<link rel="manifest" href="manifest.json?v=21">
 <link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
@@ -346,37 +346,18 @@
     <div>
       <div class="card mb-16">
         <div class="flex items-center justify-between mb-16">
-          <h3 style="margin:0">Sincronizacion GitHub</h3>
-          <span id="gh-status-badge" class="badge br">Desconectado</span>
+          <h3 style="margin:0">Sincronizacion</h3>
+          <span id="gh-status-badge" class="badge br">Conectando...</span>
         </div>
-        <p class="text-muted text-sm mb-16">Los datos se guardan en un archivo JSON del repositorio. Los cambios se sincronizan automaticamente entre usuarios.</p>
-        <div id="gh-config-form">
-          <div class="fr fr1"><div><label>Personal Access Token</label><input id="gh-token" type="password" placeholder="ghp_xxxx..."></div></div>
-          <div class="flex gap-8 mt-16">
-            <button class="btn btn-gold" style="flex:1" onclick="guardarGhConfigUI()">Conectar</button>
-          </div>
-          <div id="gh-test-result" class="mt-12" style="font-size:.82rem;min-height:20px"></div>
-        </div>
-        <div id="gh-connected-info" style="display:none">
+        <p class="text-muted text-sm mb-16">Los datos se sincronizan en tiempo real entre todos los dispositivos. Sin configuracion adicional necesaria.</p>
+        <div id="gh-connected-info">
           <div class="cost-box mb-16">
-            <div class="cost-row"><span>Repositorio</span><span id="gh-info-repo" class="text-gold fw7"></span></div>
-            <div class="cost-row"><span>Branch</span><span id="gh-info-branch"></span></div>
-            <div class="cost-row"><span>Estado</span><span class="text-green fw7">Sincronizando</span></div>
-          </div>
-          <div class="cost-box mb-16" style="border-color:var(--gold-dim)">
-            <p class="text-sm text-muted mb-12" style="margin:0">Comparti este link con otros usuarios para que se conecten automaticamente sin configurar nada:</p>
-            <div class="flex gap-8 mt-8">
-              <input id="gh-share-link" readonly style="font-size:.75rem;opacity:.7" onclick="this.select()">
-              <button class="btn btn-gold btn-sm" onclick="copiarLinkConexion()">Copiar</button>
-            </div>
+            <div class="cost-row"><span>Motor</span><span class="text-gold fw7">Firebase Realtime</span></div>
+            <div class="cost-row"><span>Estado</span><span id="sync-status-text" class="text-green fw7">Conectando...</span></div>
           </div>
           <div class="flex gap-8">
-            <button class="btn btn-ghost" style="flex:1" onclick="forzarSyncManual()">Forzar sincronizacion</button>
-            <button class="btn btn-red" onclick="desconectarGh()">Desconectar</button>
-          </div>
-          <div style="margin-top:12px">
-            <button class="btn btn-gold btn-full" onclick="forceReloadAllDevices()" style="background:linear-gradient(135deg,#2a7a3a,#4caf50)">Forzar actualizacion en todos los dispositivos</button>
-            <p class="text-muted text-xs mt-8" style="margin:0">Borra cache y recarga la app en todos los celulares/tablets conectados.</p>
+            <button class="btn btn-ghost" style="flex:1" onclick="fbForceReload()">Forzar sincronizacion</button>
+            <button class="btn btn-red" onclick="fbClearRemote()">Borrar datos remotos</button>
           </div>
         </div>
       </div>
@@ -593,10 +574,12 @@
   </div>
 </div>
 
-<script src="js/db.js?v=19"></script>
-<script src="js/github-sync.js?v=19"></script>
-<script src="js/modules1.js?v=19"></script>
-<script src="js/modules2.js?v=19"></script>
+<script src="js/db.js?v=21"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="js/firebase-sync.js?v=21"></script>
+<script src="js/modules1.js?v=21"></script>
+<script src="js/modules2.js?v=21"></script>
 <script>
   // Mostrar/ocultar btn admin en envases
   var _origGoPage = goPage;
@@ -607,28 +590,25 @@
   };
 
   function updateSyncUI(status, detail) {
-    const dot = document.getElementById('sync-dot');
-    const txt = document.getElementById('sync-text');
+    var dot = document.getElementById('sync-dot');
+    var txt = document.getElementById('sync-text');
     if (!dot || !txt) return;
     if (status === 'syncing') { dot.style.background = '#c9963a'; txt.textContent = 'Sync...'; }
     else if (status === 'ok') { dot.style.background = '#4caf50'; txt.textContent = detail || 'OK'; }
-    else if (status === 'error') { dot.style.background = '#e07070'; txt.textContent = detail || 'Err'; }
+    else if (status === 'error') { dot.style.background = '#e07070'; txt.textContent = detail || 'Offline'; }
     else { dot.style.background = '#666'; txt.textContent = '—'; }
   }
 
   function forceSyncNow() {
-    if (typeof ghPull === 'function' && getGhConfig()) {
+    if (typeof fbForceReload === 'function') {
       updateSyncUI('syncing');
-      ghPull().then(updated => {
-        if (updated) { refreshCurrentPage(); updateSyncUI('ok', 'Ahora'); if(currentUser) toast('Datos sincronizados'); }
-        else updateSyncUI('ok', 'Sin cambios');
-      }).catch(err => { updateSyncUI('error', 'Fail'); toast('Error: '+err.message, 'err'); });
-    } else { toast('Sync no configurado', 'err'); }
+      fbForceReload();
+    }
   }
 
   // Service Worker registration
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=19').then(function(reg) {
+    navigator.serviceWorker.register('sw.js?v=21').then(function(reg) {
       reg.addEventListener('updatefound', function() {
         var newWorker = reg.installing;
         newWorker.addEventListener('statechange', function() {
@@ -643,13 +623,28 @@
     });
   }
 
-  async function bootApp() {
-    console.log('[Arcano] v18 - arcano-v2 fresh start');
-    await initGithubSync();
-    seedIfEmpty();
-    if (typeof applyPWAConfig === 'function') applyPWAConfig(getPWAConfig());
-    initPin();
-    renderGhAjustes();
+  function bootApp() {
+    console.log('[Arcano] v21 - Firebase Realtime Sync');
+    updateSyncUI('syncing', '...');
+
+    initFirebase();
+    startFirebaseSync(function(remoteData) {
+      // Firebase listo (con datos, vacio, o con error de permisos)
+      if (remoteData) {
+        console.log('[Arcano] Datos de Firebase cargados');
+      } else {
+        console.log('[Arcano] Sin datos remotos - usando datos locales');
+      }
+      seedIfEmpty();
+      if (typeof applyPWAConfig === 'function') applyPWAConfig(getPWAConfig());
+      initPin();
+      renderGhAjustes();
+      if (fbIsConnected()) {
+        updateSyncUI('ok', 'OK');
+      } else {
+        updateSyncUI('error', 'Ver reglas');
+      }
+    });
   }
   bootApp();
 </script>
