@@ -1,4 +1,4 @@
-const SW_VERSION = 'v18';
+const SW_VERSION = 'v19';
 
 self.addEventListener('install', function(event) {
   console.log('[Arcano SW] Installing ' + SW_VERSION);
