@@ -13,8 +13,8 @@
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Arcano — Complice del Sabor</title>
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.json?v=19">
+<link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
 
@@ -593,10 +593,10 @@
   </div>
 </div>
 
-<script src="js/db.js"></script>
-<script src="js/github-sync.js"></script>
-<script src="js/modules1.js"></script>
-<script src="js/modules2.js"></script>
+<script src="js/db.js?v=19"></script>
+<script src="js/github-sync.js?v=19"></script>
+<script src="js/modules1.js?v=19"></script>
+<script src="js/modules2.js?v=19"></script>
 <script>
   // Mostrar/ocultar btn admin en envases
   var _origGoPage = goPage;
@@ -628,7 +628,7 @@
 
   // Service Worker registration
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(function(reg) {
+    navigator.serviceWorker.register('sw.js?v=19').then(function(reg) {
       reg.addEventListener('updatefound', function() {
         var newWorker = reg.installing;
         newWorker.addEventListener('statechange', function() {
