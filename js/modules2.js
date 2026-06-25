@@ -672,15 +672,25 @@ function copiarLinkConexion() {
   });
 }
 
-function guardarGhConfigUI() {
+async function guardarGhConfigUI() {
   const token = document.getElementById('gh-token').value.trim();
-  if (!token) { toast('Pegá tu token de GitHub', 'err'); return; }
+  if (!token) { toast('Pega tu token de GitHub', 'err'); return; }
   saveGhConfig({ owner: GH_DEFAULT.owner, repo: GH_DEFAULT.repo, branch: GH_DEFAULT.branch, token });
+  toast('Conectando...');
+  renderGhAjustes();
+  // v10: SIEMPRE hacer pull primero. Solo pushear si no hay datos remotos.
+  // Esto evita sobreescribir datos buenos con datos viejos locales.
+  const pulled = await ghPull();
+  if (pulled) {
+    toast('Conectado - datos descargados de GitHub');
+    refreshCurrentPage();
+  } else {
+    // No hay datos remotos - subir los locales
+    await ghPush();
+    toast('Conectado - datos locales subidos a GitHub');
+  }
   startGhPolling();
-  ghPush().then(() => {
-    toast('Conectado, sincronizando...');
-    renderGhAjustes();
-  });
+  renderGhAjustes();
 }
 
 async function probarGhConexion() {
@@ -699,15 +709,16 @@ async function probarGhConexion() {
 }
 
 async function forzarSyncManual() {
-  toast('Sincronizando...');
+  // v10: SOLO descargar. NUNCA pushear desde aqui.
+  // El push automatico se encarga de subir cambios locales.
+  // Esto evita sobreescribir datos del otro dispositivo.
+  toast('Descargando datos de GitHub...');
   const pulled = await ghPull();
   if (pulled) {
     toast('Datos actualizados desde GitHub');
     refreshCurrentPage();
   } else {
-    // Hacer push de lo local
-    await ghPush();
-    toast('Datos locales subidos a GitHub');
+    toast('Sin cambios - los datos ya estan al dia');
   }
 }
 
