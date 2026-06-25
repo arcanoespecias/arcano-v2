@@ -1,0 +1,546 @@
+{
+  "costos": {
+    "envChico": 1780,
+    "envGrande": 1750,
+    "pkgChico": 0,
+    "pkgGrande": 0,
+    "etiqueta": 0,
+    "mo": 0,
+    "otros": 0
+  },
+  "especias": [
+    {
+      "nombre": "Ajo polvo",
+      "precioKg": 17000,
+      "id": 1782412275638,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Ajo escama",
+      "precioKg": 0,
+      "id": 1782412275639,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Ajo grano",
+      "precioKg": 0,
+      "id": 1782412275640,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Cebolla en polvo",
+      "precioKg": 19200,
+      "id": 1782412275641,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Cebolla en escamas",
+      "precioKg": 0,
+      "id": 1782412275642,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Paprika",
+      "precioKg": 17000,
+      "id": 1782412275643,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimenton en escamas",
+      "precioKg": 0,
+      "id": 1782412275644,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Paprika ahumada",
+      "precioKg": 0,
+      "id": 1782412275645,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Oregano",
+      "precioKg": 20000,
+      "id": 1782412275646,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Albahaca",
+      "precioKg": 26400,
+      "id": 1782412275647,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Tomillo",
+      "precioKg": 26500,
+      "id": 1782412275648,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Laurel",
+      "precioKg": 31500,
+      "id": 1782412275649,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Romero",
+      "precioKg": 26500,
+      "id": 1782412275650,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Canela",
+      "precioKg": 95000,
+      "id": 1782412275651,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Canela en polvo",
+      "precioKg": 34000,
+      "id": 1782412275652,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Clavos",
+      "precioKg": 29000,
+      "id": 1782412275653,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Clavos polvo",
+      "precioKg": 32000,
+      "id": 1782412275654,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Jengibre",
+      "precioKg": 19500,
+      "id": 1782412275655,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimienta comun",
+      "precioKg": 39000,
+      "id": 1782412275656,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimienta negra",
+      "precioKg": 53000,
+      "id": 1782412275657,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimienta blanca",
+      "precioKg": 0,
+      "id": 1782412275658,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimienta dulce",
+      "precioKg": 50500,
+      "id": 1782412275659,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Pimienta cayena",
+      "precioKg": 41000,
+      "id": 1782412275660,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Comino",
+      "precioKg": 27000,
+      "id": 1782412275661,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Hinojo",
+      "precioKg": 43500,
+      "id": 1782412275662,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Coreandro",
+      "precioKg": 0,
+      "id": 1782412275663,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Semillas de Cilantro",
+      "precioKg": 28800,
+      "id": 1782412275664,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Fenogreco",
+      "precioKg": 28800,
+      "id": 1782412275665,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Semillas de Mostaza",
+      "precioKg": 32000,
+      "id": 1782412275666,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Cardamomo",
+      "precioKg": 0,
+      "id": 1782412275667,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Curcuma",
+      "precioKg": 16800,
+      "id": 1782412275668,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Nuez moscada",
+      "precioKg": 0,
+      "id": 1782412275669,
+      "stock": 0,
+      "stockMin": 500
+    },
+    {
+      "nombre": "Anis estrellado",
+      "precioKg": 0,
+      "id": 1782412275670,
+      "stock": 0,
+      "stockMin": 500
+    }
+  ],
+  "blends": [
+    {
+      "nombre": "Berbere",
+      "ingredientes": [
+        {
+          "espId": 1782412275643,
+          "nombre": "Paprika",
+          "gramos": 300,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275660,
+          "nombre": "Pimienta cayena",
+          "gramos": 200,
+          "precioKg": 41000
+        },
+        {
+          "espId": 1782412275655,
+          "nombre": "Jengibre",
+          "gramos": 150,
+          "precioKg": 19500
+        },
+        {
+          "espId": 1782412275664,
+          "nombre": "Semillas de Cilantro",
+          "gramos": 150,
+          "precioKg": 28800
+        },
+        {
+          "espId": 1782412275665,
+          "nombre": "Fenogreco",
+          "gramos": 100,
+          "precioKg": 28800
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 50,
+          "precioKg": 53000
+        },
+        {
+          "espId": 1782412275653,
+          "nombre": "Clavos",
+          "gramos": 50,
+          "precioKg": 29000
+        }
+      ],
+      "id": 1782412275671,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    },
+    {
+      "nombre": "Cajun",
+      "ingredientes": [
+        {
+          "espId": 1782412275643,
+          "nombre": "Paprika",
+          "gramos": 350,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275638,
+          "nombre": "Ajo polvo",
+          "gramos": 150,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275641,
+          "nombre": "Cebolla en polvo",
+          "gramos": 150,
+          "precioKg": 19200
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 150,
+          "precioKg": 53000
+        },
+        {
+          "espId": 1782412275648,
+          "nombre": "Tomillo",
+          "gramos": 100,
+          "precioKg": 26500
+        },
+        {
+          "espId": 1782412275660,
+          "nombre": "Pimienta cayena",
+          "gramos": 100,
+          "precioKg": 41000
+        }
+      ],
+      "id": 1782412275672,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    },
+    {
+      "nombre": "Creole",
+      "ingredientes": [
+        {
+          "espId": 1782412275643,
+          "nombre": "Paprika",
+          "gramos": 300,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275646,
+          "nombre": "Oregano",
+          "gramos": 200,
+          "precioKg": 20000
+        },
+        {
+          "espId": 1782412275648,
+          "nombre": "Tomillo",
+          "gramos": 200,
+          "precioKg": 26500
+        },
+        {
+          "espId": 1782412275638,
+          "nombre": "Ajo polvo",
+          "gramos": 150,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 100,
+          "precioKg": 53000
+        },
+        {
+          "espId": 1782412275660,
+          "nombre": "Pimienta cayena",
+          "gramos": 50,
+          "precioKg": 41000
+        }
+      ],
+      "id": 1782412275673,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    },
+    {
+      "nombre": "Jerk Jamaicano",
+      "ingredientes": [
+        {
+          "espId": 1782412275659,
+          "nombre": "Pimienta dulce",
+          "gramos": 350,
+          "precioKg": 50500
+        },
+        {
+          "espId": 1782412275655,
+          "nombre": "Jengibre",
+          "gramos": 200,
+          "precioKg": 19500
+        },
+        {
+          "espId": 1782412275652,
+          "nombre": "Canela en polvo",
+          "gramos": 150,
+          "precioKg": 34000
+        },
+        {
+          "espId": 1782412275648,
+          "nombre": "Tomillo",
+          "gramos": 150,
+          "precioKg": 26500
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 100,
+          "precioKg": 53000
+        },
+        {
+          "espId": 1782412275660,
+          "nombre": "Pimienta cayena",
+          "gramos": 50,
+          "precioKg": 41000
+        }
+      ],
+      "id": 1782412275674,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    },
+    {
+      "nombre": "Piri Piri",
+      "ingredientes": [
+        {
+          "espId": 1782412275660,
+          "nombre": "Pimienta cayena",
+          "gramos": 350,
+          "precioKg": 41000
+        },
+        {
+          "espId": 1782412275643,
+          "nombre": "Paprika",
+          "gramos": 250,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275638,
+          "nombre": "Ajo polvo",
+          "gramos": 200,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275646,
+          "nombre": "Oregano",
+          "gramos": 100,
+          "precioKg": 20000
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 100,
+          "precioKg": 53000
+        }
+      ],
+      "id": 1782412275675,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    },
+    {
+      "nombre": "Vegetales Asados",
+      "ingredientes": [
+        {
+          "espId": 1782412275650,
+          "nombre": "Romero",
+          "gramos": 300,
+          "precioKg": 26500
+        },
+        {
+          "espId": 1782412275648,
+          "nombre": "Tomillo",
+          "gramos": 250,
+          "precioKg": 26500
+        },
+        {
+          "espId": 1782412275638,
+          "nombre": "Ajo polvo",
+          "gramos": 200,
+          "precioKg": 17000
+        },
+        {
+          "espId": 1782412275657,
+          "nombre": "Pimienta negra",
+          "gramos": 150,
+          "precioKg": 53000
+        },
+        {
+          "espId": 1782412275646,
+          "nombre": "Oregano",
+          "gramos": 100,
+          "precioKg": 20000
+        }
+      ],
+      "id": 1782412275676,
+      "pesoChico": 0,
+      "pesoGrande": 0,
+      "pVentaChico": 0,
+      "pVentaGrande": 0,
+      "notas": ""
+    }
+  ],
+  "ventas": [],
+  "usuarios": [
+    {
+      "id": 1,
+      "nombre": "Admin",
+      "pin": "1234",
+      "rol": "admin",
+      "emoji": "👑"
+    },
+    {
+      "id": 2,
+      "nombre": "Operador",
+      "pin": "0000",
+      "rol": "operador",
+      "emoji": "🌿"
+    }
+  ],
+  "movimientos": [],
+  "_lastModified": "2026-06-25T18:31:15.689Z",
+  "_ghConfig": {
+    "owner": "arcanoespecias",
+    "repo": "arcano-v2",
+    "branch": "main"
+  }
+}
