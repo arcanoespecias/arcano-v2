@@ -631,102 +631,21 @@ function renderAjustes() {
   renderGhAjustes();
 }
 
-// ===================== GITHUB SYNC UI =====================
+// ===================== SYNC UI (Firebase) =====================
 
 function renderGhAjustes() {
-  const cfg = getGhConfig();
-  const badge = document.getElementById('gh-status-badge');
-  const form = document.getElementById('gh-config-form');
-  const info = document.getElementById('gh-connected-info');
-
-  if (!badge || !form || !info) return;
-
-  if (cfg) {
-    badge.className = 'badge bg';
-    badge.textContent = 'Conectado';
-    form.style.display = 'none';
-    info.style.display = 'block';
-    const repoEl = document.getElementById('gh-info-repo');
-    const branchEl = document.getElementById('gh-info-branch');
-    const linkEl = document.getElementById('gh-share-link');
-    if (repoEl) repoEl.textContent = cfg.owner + '/' + cfg.repo;
-    if (branchEl) branchEl.textContent = cfg.branch || 'main';
-    if (linkEl) linkEl.value = generarLinkConexion();
-  } else {
-    badge.className = 'badge br';
-    badge.textContent = 'Desconectado';
-    form.style.display = 'block';
-    info.style.display = 'none';
+  var badge = document.getElementById('gh-status-badge');
+  var info = document.getElementById('gh-connected-info');
+  if (badge) {
+    if (typeof fbIsConnected === 'function' && fbIsConnected()) {
+      badge.className = 'badge bg';
+      badge.textContent = 'En linea';
+    } else {
+      badge.className = 'badge br';
+      badge.textContent = 'Desconectado';
+    }
   }
-}
-
-function copiarLinkConexion() {
-  const link = generarLinkConexion();
-  if (!link) { toast('No hay configuración', 'err'); return; }
-  navigator.clipboard.writeText(link).then(() => {
-    toast('Link copiado al portapapeles');
-  }).catch(() => {
-    // Fallback para browsers sin clipboard API
-    const input = document.getElementById('gh-share-link');
-    if (input) { input.select(); document.execCommand('copy'); toast('Link copiado'); }
-  });
-}
-
-async function guardarGhConfigUI() {
-  const token = document.getElementById('gh-token').value.trim();
-  if (!token) { toast('Pega tu token de GitHub', 'err'); return; }
-  saveGhConfig({ owner: GH_DEFAULT.owner, repo: GH_DEFAULT.repo, branch: GH_DEFAULT.branch, token });
-  toast('Conectando...');
-  renderGhAjustes();
-  // v10: SIEMPRE hacer pull primero. Solo pushear si no hay datos remotos.
-  // Esto evita sobreescribir datos buenos con datos viejos locales.
-  const pulled = await ghPull();
-  if (pulled) {
-    toast('Conectado - datos descargados de GitHub');
-    refreshCurrentPage();
-  } else {
-    // No hay datos remotos - subir los locales
-    await ghPush();
-    toast('Conectado - datos locales subidos a GitHub');
-  }
-  startGhPolling();
-  renderGhAjustes();
-}
-
-async function probarGhConexion() {
-  const token = document.getElementById('gh-token').value.trim();
-  const resultEl = document.getElementById('gh-test-result');
-  if (!token) { resultEl.innerHTML = '<span class="text-red">Pegá tu token</span>'; return; }
-  saveGhConfig({ owner: GH_DEFAULT.owner, repo: GH_DEFAULT.repo, branch: GH_DEFAULT.branch, token });
-  resultEl.innerHTML = '<span class="text-muted">Probando...</span>';
-  const result = await ghTestConnection();
-  if (result.ok) {
-    resultEl.innerHTML = '<span class="text-green">' + result.msg + '</span>';
-  } else {
-    resultEl.innerHTML = '<span class="text-red">' + result.msg + '</span>';
-    clearGhConfig();
-  }
-}
-
-async function forzarSyncManual() {
-  // v10: SOLO descargar. NUNCA pushear desde aqui.
-  // El push automatico se encarga de subir cambios locales.
-  // Esto evita sobreescribir datos del otro dispositivo.
-  toast('Descargando datos de GitHub...');
-  const pulled = await ghPull();
-  if (pulled) {
-    toast('Datos actualizados desde GitHub');
-    refreshCurrentPage();
-  } else {
-    toast('Sin cambios - los datos ya estan al dia');
-  }
-}
-
-function desconectarGh() {
-  if (!confirm('¿Desconectar la sincronización con GitHub? Los datos seguirán disponibles localmente.')) return;
-  clearGhConfig();
-  renderGhAjustes();
-  toast('Sincronización desconectada');
+  if (info) info.style.display = 'block';
 }
 
 // ===================== USUARIOS =====================
