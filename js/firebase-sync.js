@@ -161,6 +161,24 @@ function startFirebaseSync(onFirstData) {
   });
 }
 
+// -------------------- Sync ID counter --------------------
+// Mueve _idC (de db.js) al max ID encontrado en los datos remotos.
+// Antes estaba en github-sync.js; ahora vive aqui.
+
+function syncIdCounter(db) {
+  try {
+    var allIds = [
+      (db.especias||[]).map(function(e){return e.id||0}),
+      (db.blends||[]).map(function(b){return b.id||0}),
+      (db.ventas||[]).map(function(v){return v.id||0}),
+      (db.movimientos||[]).map(function(m){return m.id||0}),
+      (db.usuarios||[]).map(function(u){return u.id||0})
+    ].flat();
+    var maxId = Math.max.apply(null, [0].concat(allIds));
+    if (maxId >= _idC) _idC = maxId;
+  } catch(e) { console.warn('[Firebase] syncIdCounter error:', e.message); }
+}
+
 // -------------------- Push --------------------
 
 function fbPush() {
