@@ -20,7 +20,7 @@
       "nombre": "Ajo escama",
       "precioKg": 0,
       "id": 1782412275639,
-      "stock": 0,
+      "stock": 23232323232,
       "stockMin": 500
     },
     {
@@ -536,8 +536,18 @@
       "emoji": "🌿"
     }
   ],
-  "movimientos": [],
-  "_lastModified": "2026-06-25T18:31:15.689Z",
+  "movimientos": [
+    {
+      "id": 1782412275677,
+      "espId": 1782412275639,
+      "tipo": "entrada",
+      "cantidad": 23232323232,
+      "nota": "",
+      "fecha": "2026-06-25T18:38:24.322Z",
+      "usuario": "Admin"
+    }
+  ],
+  "_lastModified": "2026-06-25T18:38:24.323Z",
   "_ghConfig": {
     "owner": "arcanoespecias",
     "repo": "arcano-v2",
