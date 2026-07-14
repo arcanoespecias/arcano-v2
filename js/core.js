@@ -44,6 +44,11 @@ function migrateData() {
     if (!u.rol) { u.rol = 'admin'; changed = true; }
     if (!u.creadoEn) { u.creadoEn = new Date().toISOString(); changed = true; }
   });
+  // Migrate old product types: envase → frasco, packaging → bolsa
+  (db.productos || []).forEach(function(p) {
+    if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
+    if (p.tipo === 'packaging') { p.tipo = 'bolsa'; changed = true; }
+  });
   // Ensure all collections exist
   if (!db.productos) db.productos = [];
   if (!db.compras) db.compras = [];
@@ -85,12 +90,14 @@ function seedIfEmpty() {
     db.productos.push(e);
   });
 
-  // Sample supplies
+  // Sample supplies (frascos, etiquetas, bolsas)
   var insumos = [
-    { nombre: 'Frasco 100gr', tipo: 'envase', unidad: 'unidad', precioCosto: 350, precioVenta: 0, stock: 200, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
-    { nombre: 'Frasco 50gr', tipo: 'envase', unidad: 'unidad', precioCosto: 250, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
-    { nombre: 'Etiqueta Pequeña', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 80, precioVenta: 0, stock: 1000, stockMin: 200, proveedor: 'Imprenta Nacional', notas: '' },
-    { nombre: 'Caja x12', tipo: 'packaging', unidad: 'unidad', precioCosto: 1200, precioVenta: 0, stock: 100, stockMin: 20, proveedor: 'Packaging Pro', notas: 'Cartón kraft' }
+    { nombre: 'Frasco Grande 100gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 350, precioVenta: 0, stock: 200, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
+    { nombre: 'Frasco Pequeño 50gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 250, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
+    { nombre: 'Etiqueta Especia', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 80, precioVenta: 0, stock: 1000, stockMin: 200, proveedor: 'Imprenta Nacional', notas: 'Para frascos de especia' },
+    { nombre: 'Etiqueta Blend', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 100, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Imprenta Nacional', notas: 'Para frascos de blend' },
+    { nombre: 'Bolsa Pequeña', tipo: 'bolsa', unidad: 'unidad', precioCosto: 50, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Packaging Pro', notas: 'Kraft pequeña' },
+    { nombre: 'Bolsa Grande', tipo: 'bolsa', unidad: 'unidad', precioCosto: 90, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Packaging Pro', notas: 'Kraft grande' }
   ];
   insumos.forEach(function(e) {
     e.id = nextId();
@@ -393,7 +400,7 @@ function dismissPWA() {
 (function() {
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=30').catch(function() {});
+    navigator.serviceWorker.register('sw.js?v=31').catch(function() {});
   }
 
   initFirebase();
