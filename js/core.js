@@ -46,17 +46,28 @@ function migrateData() {
   });
   // Migrate old product types: envase → frasco, packaging/bolsa → removed
   if (db.productos) {
-    var before = db.productos.length;
     db.productos = db.productos.filter(function(p) {
       if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
       if (p.tipo === 'packaging' || p.tipo === 'bolsa') { changed = true; return false; }
       return true;
     });
   }
-  // Migrate old blends: add formato and etiquetaId if missing
+  // Migrate old blends: add formato, etiquetaId, gramosPorUnidad if missing
   (db.blends || []).forEach(function(b) {
     if (!b.formato) { b.formato = 'polvo'; changed = true; }
-    if (!b.etiquetaId) { changed = true; } // will be set by admin
+    if (!b.gramosPorUnidad) { b.gramosPorUnidad = 100; changed = true; }
+    // Migrate old recipe from cantidad to porcentaje
+    if (b.receta && b.receta.length > 0 && b.receta[0].porcentaje === undefined) {
+      var totalCant = b.receta.reduce(function(s, r) { return s + (r.cantidad || 0); }, 0);
+      if (totalCant > 0) {
+        b.receta.forEach(function(r) {
+          r.porcentaje = Math.round((r.cantidad / totalCant) * 100 * 100) / 100;
+          delete r.cantidad;
+          delete r.unidad;
+        });
+        changed = true;
+      }
+    }
   });
   // Ensure all collections exist
   if (!db.productos) db.productos = [];
@@ -83,14 +94,14 @@ function seedIfEmpty() {
     creadoEn: new Date().toISOString()
   });
 
-  // Sample products
+  // Sample products — precioCosto para especias = costo por 1000gr
   var especias = [
-    { nombre: 'Cúrcuma', tipo: 'especia', unidad: 'gr', precioCosto: 45, precioVenta: 80, stock: 500, stockMin: 100, proveedor: 'Especias del Oriente', notas: 'Polvo fino' },
-    { nombre: 'Comino', tipo: 'especia', unidad: 'gr', precioCosto: 55, precioVenta: 100, stock: 400, stockMin: 80, proveedor: 'Especias del Oriente', notas: 'Entero' },
-    { nombre: 'Pimienta Negra', tipo: 'especia', unidad: 'gr', precioCosto: 70, precioVenta: 130, stock: 300, stockMin: 60, proveedor: 'Especias del Oriente', notas: '' },
-    { nombre: 'Canela', tipo: 'especia', unidad: 'gr', precioCosto: 90, precioVenta: 160, stock: 200, stockMin: 50, proveedor: 'Especias del Oriente', notas: 'Rama' },
-    { nombre: 'Azafrán', tipo: 'especia', unidad: 'gr', precioCosto: 800, precioVenta: 1500, stock: 30, stockMin: 10, proveedor: 'Importaciones Premium', notas: 'Hebras' },
-    { nombre: 'Chile Ahumado', tipo: 'especia', unidad: 'gr', precioCosto: 60, precioVenta: 110, stock: 350, stockMin: 70, proveedor: 'Especias del Oriente', notas: 'Polvo' }
+    { nombre: 'Cúrcuma', tipo: 'especia', unidad: 'gr', precioCosto: 45000, precioVenta: 80, stock: 500, stockMin: 100, proveedor: 'Especias del Oriente', notas: 'Polvo fino' },
+    { nombre: 'Comino', tipo: 'especia', unidad: 'gr', precioCosto: 55000, precioVenta: 100, stock: 400, stockMin: 80, proveedor: 'Especias del Oriente', notas: 'Entero' },
+    { nombre: 'Pimienta Negra', tipo: 'especia', unidad: 'gr', precioCosto: 70000, precioVenta: 130, stock: 300, stockMin: 60, proveedor: 'Especias del Oriente', notas: '' },
+    { nombre: 'Canela', tipo: 'especia', unidad: 'gr', precioCosto: 90000, precioVenta: 160, stock: 200, stockMin: 50, proveedor: 'Especias del Oriente', notas: 'Rama' },
+    { nombre: 'Azafrán', tipo: 'especia', unidad: 'gr', precioCosto: 800000, precioVenta: 1500, stock: 30, stockMin: 10, proveedor: 'Importaciones Premium', notas: 'Hebras' },
+    { nombre: 'Chile Ahumado', tipo: 'especia', unidad: 'gr', precioCosto: 60000, precioVenta: 110, stock: 350, stockMin: 70, proveedor: 'Especias del Oriente', notas: 'Polvo' }
   ];
   especias.forEach(function(e) {
     e.id = nextId();
@@ -112,19 +123,19 @@ function seedIfEmpty() {
     db.productos.push(e);
   });
 
-  // Sample blend
-  var etiquetaSeedId = 0;
+  // Sample blend — receta con porcentajes (%)
   db.blends.push({
     id: nextId(),
     nombre: 'Curry Arcano',
     descripcion: 'Mezcla especial de la casa con toque ahumado',
     formato: 'polvo',
+    gramosPorUnidad: 100,
     etiquetaId: 0, // Will be set after creating etiqueta
     receta: [
-      { productoId: 1, nombre: 'Cúrcuma', cantidad: 30, unidad: 'gr' },
-      { productoId: 2, nombre: 'Comino', cantidad: 20, unidad: 'gr' },
-      { productoId: 3, nombre: 'Pimienta Negra', cantidad: 10, unidad: 'gr' },
-      { productoId: 6, nombre: 'Chile Ahumado', cantidad: 15, unidad: 'gr' }
+      { productoId: 1, nombre: 'Cúrcuma', porcentaje: 35 },
+      { productoId: 2, nombre: 'Comino', porcentaje: 20 },
+      { productoId: 3, nombre: 'Pimienta Negra', porcentaje: 15 },
+      { productoId: 6, nombre: 'Chile Ahumado', porcentaje: 30 }
     ],
     costoUnitario: 0,
     precioVenta: 5500,
@@ -414,7 +425,7 @@ function dismissPWA() {
 (function() {
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=32').catch(function() {});
+    navigator.serviceWorker.register('sw.js?v=33').catch(function() {});
   }
 
   initFirebase();
