@@ -35,9 +35,29 @@ function closeModal() {
 }
 
 // ============ SEED DATA ============
+function migrateData() {
+  // Patch old-format users (missing activo field)
+  var db = getDB();
+  var changed = false;
+  (db.usuarios || []).forEach(function(u) {
+    if (u.activo === undefined) { u.activo = true; changed = true; }
+    if (!u.rol) { u.rol = 'admin'; changed = true; }
+    if (!u.creadoEn) { u.creadoEn = new Date().toISOString(); changed = true; }
+  });
+  // Ensure all collections exist
+  if (!db.productos) db.productos = [];
+  if (!db.compras) db.compras = [];
+  if (!db.blends) db.blends = [];
+  if (!db.ventas) db.ventas = [];
+  if (!db.movimientos) db.movimientos = [];
+  if (changed) { saveDB(); console.log('[Migrate] Datos viejos migrados'); }
+}
+
 function seedIfEmpty() {
   var db = getDB();
-  if (db.usuarios.length > 0) return false;
+  // Check specifically for an admin user
+  var hasAdmin = (db.usuarios || []).some(function(u) { return u.rol === 'admin'; });
+  if (hasAdmin) return false;
 
   // Create default admin user
   db.usuarios.push({
@@ -132,7 +152,7 @@ function showStorefront() {
 
 function showLogin() {
   var db = getDB();
-  var users = (db.usuarios || []).filter(function(u) { return u.activo && u.rol !== 'vendedor'; });
+  var users = (db.usuarios || []).filter(function(u) { return (u.activo !== false) && u.rol !== 'vendedor'; });
   if (users.length === 0) {
     toast('No hay usuarios registrados', 'err');
     return;
@@ -382,6 +402,7 @@ function dismissPWA() {
     if (remoteData) {
       syncLocalIdCounter(remoteData);
     }
+    migrateData();
     var seeded = seedIfEmpty();
     initPin();
   });
