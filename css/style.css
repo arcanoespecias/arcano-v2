@@ -115,6 +115,7 @@ body { background: var(--bg); color: var(--cream); font-family: var(--font-body)
   color: var(--cream); margin-bottom: 4px;
 }
 .product-card-desc { font-size: .78rem; color: var(--muted); margin-bottom: 14px; flex: 1; }
+.product-card-meta { font-size: .7rem; color: var(--gold-dim); font-style: italic; margin-bottom: 4px; }
 .product-card-footer { display: flex; align-items: center; justify-content: space-between; }
 .product-card-price { font-family: var(--font-head); font-size: 1.3rem; font-weight: 700; color: var(--gold2); }
 .product-card-stock { font-size: .7rem; color: var(--muted); }
