@@ -44,10 +44,19 @@ function migrateData() {
     if (!u.rol) { u.rol = 'admin'; changed = true; }
     if (!u.creadoEn) { u.creadoEn = new Date().toISOString(); changed = true; }
   });
-  // Migrate old product types: envase → frasco, packaging → bolsa
-  (db.productos || []).forEach(function(p) {
-    if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
-    if (p.tipo === 'packaging') { p.tipo = 'bolsa'; changed = true; }
+  // Migrate old product types: envase → frasco, packaging/bolsa → removed
+  if (db.productos) {
+    var before = db.productos.length;
+    db.productos = db.productos.filter(function(p) {
+      if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
+      if (p.tipo === 'packaging' || p.tipo === 'bolsa') { changed = true; return false; }
+      return true;
+    });
+  }
+  // Migrate old blends: add formato and etiquetaId if missing
+  (db.blends || []).forEach(function(b) {
+    if (!b.formato) { b.formato = 'polvo'; changed = true; }
+    if (!b.etiquetaId) { changed = true; } // will be set by admin
   });
   // Ensure all collections exist
   if (!db.productos) db.productos = [];
@@ -90,14 +99,11 @@ function seedIfEmpty() {
     db.productos.push(e);
   });
 
-  // Sample supplies (frascos, etiquetas, bolsas)
+  // Sample supplies (frascos y etiquetas)
   var insumos = [
     { nombre: 'Frasco Grande 100gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 350, precioVenta: 0, stock: 200, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
     { nombre: 'Frasco Pequeño 50gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 250, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
-    { nombre: 'Etiqueta Especia', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 80, precioVenta: 0, stock: 1000, stockMin: 200, proveedor: 'Imprenta Nacional', notas: 'Para frascos de especia' },
-    { nombre: 'Etiqueta Blend', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 100, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Imprenta Nacional', notas: 'Para frascos de blend' },
-    { nombre: 'Bolsa Pequeña', tipo: 'bolsa', unidad: 'unidad', precioCosto: 50, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Packaging Pro', notas: 'Kraft pequeña' },
-    { nombre: 'Bolsa Grande', tipo: 'bolsa', unidad: 'unidad', precioCosto: 90, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Packaging Pro', notas: 'Kraft grande' }
+    { nombre: 'Etiqueta Curry Arcano', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 100, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Imprenta Nacional', notas: 'Etiqueta para Curry Arcano' }
   ];
   insumos.forEach(function(e) {
     e.id = nextId();
@@ -107,22 +113,30 @@ function seedIfEmpty() {
   });
 
   // Sample blend
+  var etiquetaSeedId = 0;
   db.blends.push({
     id: nextId(),
     nombre: 'Curry Arcano',
     descripcion: 'Mezcla especial de la casa con toque ahumado',
+    formato: 'polvo',
+    etiquetaId: 0, // Will be set after creating etiqueta
     receta: [
       { productoId: 1, nombre: 'Cúrcuma', cantidad: 30, unidad: 'gr' },
       { productoId: 2, nombre: 'Comino', cantidad: 20, unidad: 'gr' },
       { productoId: 3, nombre: 'Pimienta Negra', cantidad: 10, unidad: 'gr' },
       { productoId: 6, nombre: 'Chile Ahumado', cantidad: 15, unidad: 'gr' }
     ],
-    costoUnitario: 0, // Will be calculated
+    costoUnitario: 0,
     precioVenta: 5500,
     stock: 0,
     creadoEn: new Date().toISOString(),
     actualizadoEn: new Date().toISOString()
   });
+  // Link etiqueta to blend (etiqueta is the last product created)
+  var lastEtiqueta = db.productos.slice().reverse().find(function(p) { return p.tipo === 'etiqueta'; });
+  if (lastEtiqueta) {
+    db.blends[db.blends.length - 1].etiquetaId = lastEtiqueta.id;
+  }
 
   saveDB();
   console.log('[Seed] Datos iniciales creados - Admin PIN: 1234');
@@ -400,7 +414,7 @@ function dismissPWA() {
 (function() {
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=31').catch(function() {});
+    navigator.serviceWorker.register('sw.js?v=32').catch(function() {});
   }
 
   initFirebase();
