@@ -105,9 +105,9 @@ function fmtDateTime(iso) {
 // Product types for selects
 var PRODUCT_TYPES = [
   { val: 'especia', label: 'Especia' },
-  { val: 'envase', label: 'Envase' },
+  { val: 'frasco', label: 'Frasco' },
   { val: 'etiqueta', label: 'Etiqueta' },
-  { val: 'packaging', label: 'Packaging' }
+  { val: 'bolsa', label: 'Bolsa' }
 ];
 
 var UNITS = ['gr', 'kg', 'ml', 'L', 'unidad', 'cm', 'mt', 'rollo'];
