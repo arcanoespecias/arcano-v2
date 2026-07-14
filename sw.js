@@ -1,4 +1,4 @@
-const CACHE = 'arcano-v30';
+const CACHE = 'arcano-v31';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
