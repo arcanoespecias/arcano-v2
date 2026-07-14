@@ -422,20 +422,66 @@ function dismissPWA() {
 }
 
 // ============ BOOT ============
+function setBootStatus(msg) {
+  var el = document.getElementById('boot-status');
+  if (el) el.textContent = msg;
+}
+
+function bootApp() {
+  try {
+    if (typeof migrateData === 'function') migrateData();
+    if (typeof seedIfEmpty === 'function') seedIfEmpty();
+    if (typeof initPin === 'function') initPin();
+  } catch(e) {
+    console.error('[Boot] Error:', e);
+    setBootStatus('Error al iniciar. Recarga la página.');
+  }
+}
+
 (function() {
+  // Safety net: if boot hasn't completed in 8s, force it
+  var bootDone = false;
+  var safetyTimer = setTimeout(function() {
+    if (!bootDone) {
+      console.warn('[Boot] Safety timeout - forcing boot');
+      bootApp();
+    }
+  }, 8000);
+
+  // Mark boot as done wrapper
+  var originalInitPin = (typeof initPin === 'function') ? initPin : null;
+  window.initPin = function() {
+    bootDone = true;
+    clearTimeout(safetyTimer);
+    if (originalInitPin) originalInitPin();
+  };
+
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=33').catch(function() {});
+    navigator.serviceWorker.register('sw.js?v=34').catch(function() {});
   }
 
-  initFirebase();
+  try {
+    initFirebase();
+  } catch(e) {
+    console.error('[Boot] Firebase init error:', e);
+  }
 
-  startFirebaseSync(function(remoteData) {
-    if (remoteData) {
-      syncLocalIdCounter(remoteData);
-    }
-    migrateData();
-    var seeded = seedIfEmpty();
-    initPin();
-  });
+  try {
+    startFirebaseSync(function(remoteData) {
+      try {
+        if (remoteData) {
+          syncLocalIdCounter(remoteData);
+        }
+        setBootStatus('Preparando datos...');
+        bootApp();
+      } catch(e) {
+        console.error('[Boot] Sync callback error:', e);
+        bootApp();
+      }
+    });
+  } catch(e) {
+    console.error('[Boot] Firebase sync error:', e);
+    bootApp();
+  }
 })();
