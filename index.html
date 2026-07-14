@@ -4,649 +4,125 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#1b0b07">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arcano">
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Arcano — Complice del Sabor</title>
-<link rel="manifest" href="manifest.json?v=21">
-<link rel="stylesheet" href="css/style.css?v=19">
+<title>Arcano — Cómplice del Sabor</title>
+<link rel="manifest" href="manifest.json?v=30">
+<link rel="stylesheet" href="css/style.css?v=30">
 </head>
 <body>
 
-<!-- PIN SCREEN -->
-<div id="pin-screen" style="display:flex"></div>
+<!-- ========== STOREFRONT (public) ========== -->
+<div id="storefront" style="display:none">
+  <header id="store-header">
+    <div class="store-header-inner">
+      <div class="store-brand">
+        <span class="store-logo-text">ARCANO</span>
+        <span class="store-sub">Cómplice del Sabor</span>
+      </div>
+      <div class="store-actions">
+        <button class="btn btn-ghost btn-sm" onclick="showLogin()" id="store-login-btn">Ingresar</button>
+        <button class="btn btn-gold btn-sm cart-toggle" onclick="toggleCart()" id="cart-btn">
+          Carrito <span id="cart-count" class="cart-count" style="display:none">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <nav id="store-nav">
+    <button class="store-nav-btn active" data-cat="todos">Todos</button>
+    <button class="store-nav-btn" data-cat="especias">Especias</button>
+    <button class="store-nav-btn" data-cat="blends">Blends</button>
+  </nav>
+  <div id="store-hero">
+    <h1 class="hero-title">ARCANO</h1>
+    <p class="hero-sub">Especias y blends artesanales</p>
+  </div>
+  <main id="store-main">
+    <div id="store-products" class="products-grid"></div>
+    <div id="store-empty" class="empty" style="display:none">
+      <div class="empty-icon">🧂</div>
+      <p>No hay productos disponibles aún</p>
+    </div>
+  </main>
 
-<!-- PWA INSTALL BANNER -->
+  <!-- Cart Drawer -->
+  <div id="cart-overlay" class="cart-overlay" onclick="toggleCart()"></div>
+  <div id="cart-drawer" class="cart-drawer">
+    <div class="cart-header">
+      <h3>Tu Carrito</h3>
+      <button class="modal-close" onclick="toggleCart()">&times;</button>
+    </div>
+    <div id="cart-items" class="cart-items"></div>
+    <div id="cart-footer" class="cart-footer" style="display:none">
+      <div class="cart-total">Total: <strong id="cart-total-val">$0</strong></div>
+      <button class="btn btn-gold btn-full" onclick="showCheckout()">Finalizar Compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PIN SCREEN ========== -->
+<div id="pin-screen" style="display:flex">
+  <div id="pin-content"></div>
+</div>
+
+<!-- ========== ADMIN APP ========== -->
+<div id="admin-app" style="display:none">
+  <header id="app-header">
+    <div class="header-logo">
+      <img src="icons/logo-header.png" alt="Arcano" onerror="this.style.display='none'">
+      <div>
+        <div class="header-brand">ARCANO</div>
+        <div class="header-sub">Cómplice del Sabor</div>
+      </div>
+    </div>
+    <div class="header-pin">
+      <span id="gh-status-badge" class="badge bg">Conectado</span>
+      <div class="user-chip" onclick="handleLogout()" id="user-chip" title="Cerrar sesión"></div>
+    </div>
+  </header>
+  <nav id="app-nav"></nav>
+  <main id="app-main">
+    <div id="page-dashboard" class="page"></div>
+    <div id="page-compras" class="page"></div>
+    <div id="page-productos" class="page"></div>
+    <div id="page-blends" class="page"></div>
+    <div id="page-ventas" class="page"></div>
+    <div id="page-usuarios" class="page"></div>
+    <div id="page-ajustes" class="page"></div>
+  </main>
+</div>
+
+<!-- ========== MODAL ========== -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
+  <div class="modal" id="modal-body" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div id="toast"></div>
+
+<!-- ========== PWA BANNER ========== -->
 <div id="pwa-banner" style="display:none">
   <div class="pwa-banner-inner">
     <img src="icons/icon-192.png" alt="" style="width:40px;height:40px;border-radius:8px">
     <div class="pwa-banner-text">
       <div class="fw7 text-sm">Instalar Arcano</div>
-      <div class="text-xs text-muted">Acceso rapido desde tu pantalla de inicio</div>
+      <div class="text-xs text-muted">Acceso rápido desde tu pantalla de inicio</div>
     </div>
-    <button class="btn btn-gold btn-sm" id="pwa-install-btn" onclick="installPWA()">Instalar</button>
+    <button class="btn btn-gold btn-sm" onclick="installPWA()">Instalar</button>
     <button class="btn btn-ghost btn-sm" onclick="dismissPWA()" style="padding:5px 8px;font-size:.9rem">x</button>
   </div>
 </div>
 
-<!-- TOAST -->
-<div id="toast"></div>
-
-<!-- HEADER -->
-<div id="app-header">
-  <div class="header-logo">
-    <img src="icons/logo-header.png" alt="Arcano" style="width:34px;height:34px;border-radius:50%;object-fit:cover">
-    <div>
-      <div class="header-brand">Arcano</div>
-      <div class="header-sub">Complice del Sabor</div>
-    </div>
-  </div>
-  <div class="header-pin">
-    <div id="sync-indicator" onclick="forceSyncNow()" title="Click para forzar sync" style="cursor:pointer;font-size:.7rem;margin-right:8px;display:flex;align-items:center;gap:4px">
-      <span id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#666;display:inline-block"></span>
-      <span id="sync-text" style="color:var(--muted);font-size:.6rem">—</span>
-    </div>
-    <div class="user-chip" id="user-chip" onclick="logoutUser()">— Salir</div>
-  </div>
-</div>
-
-<!-- NAV -->
-<nav id="app-nav">
-  <button class="nav-btn active" onclick="goPage('dashboard',this)">Dashboard</button>
-  <button class="nav-btn" onclick="goPage('costos',this)">Costos</button>
-  <button class="nav-btn" onclick="goPage('especias',this)">Especias</button>
-  <button class="nav-btn" onclick="goPage('blends',this)">Blends</button>
-  <button class="nav-btn" onclick="goPage('envases',this)">Envases</button>
-  <button class="nav-btn" onclick="goPage('ventas',this)">Ventas</button>
-  <button class="nav-btn" onclick="goPage('reportes',this)">Reportes</button>
-  <button class="nav-btn" id="nav-ajustes" onclick="goPage('ajustes',this)">⚙ Ajustes</button>
-</nav>
-
-<main>
-
-<!-- DASHBOARD -->
-<div id="page-dashboard" class="page active">
-  <div class="page-title">Dashboard</div>
-  <div class="g4 mb-20" id="dash-stats"></div>
-  <div class="g2 mb-20">
-    <div class="card">
-      <h3>Ventas ultimos 7 dias</h3>
-      <div class="bar-chart" id="chart-7d"></div>
-    </div>
-    <div class="card">
-      <h3>Stock bajo — alerta</h3>
-      <div id="dash-stock-bajo"></div>
-    </div>
-  </div>
-  <div class="g2">
-    <div class="card">
-      <h3>Ultimas ventas</h3>
-      <div class="tw"><table>
-        <thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Estado</th></tr></thead>
-        <tbody id="dash-ventas-tabla"></tbody>
-      </table></div>
-    </div>
-    <div class="card">
-      <h3>Productos mas vendidos</h3>
-      <div id="dash-top"></div>
-    </div>
-  </div>
-</div>
-
-<!-- COSTOS -->
-<div id="page-costos" class="page">
-  <div class="page-title">Costos</div>
-  <div class="g2 mb-20">
-    <div class="card">
-      <h3>Envases</h3>
-      <div class="fr">
-        <div><label>Envase Chico ($/u)</label><input type="number" id="c-env-c" oninput="saveCostos()"></div>
-        <div><label>Envase Grande ($/u)</label><input type="number" id="c-env-g" oninput="saveCostos()"></div>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Packaging</h3>
-      <div class="fr">
-        <div><label>Packaging Chico</label><input type="number" id="c-pkg-c" oninput="saveCostos()"></div>
-        <div><label>Packaging Grande</label><input type="number" id="c-pkg-g" oninput="saveCostos()"></div>
-      </div>
-    </div>
-  </div>
-  <div class="card mb-20">
-    <h3>Otros costos fijos por unidad</h3>
-    <div class="fr3">
-      <div><label>Etiqueta</label><input type="number" id="c-etiq" oninput="saveCostos()"></div>
-      <div><label>Mano de obra</label><input type="number" id="c-mo" oninput="saveCostos()"></div>
-      <div><label>Otros</label><input type="number" id="c-otros" oninput="saveCostos()"></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3>Resumen de costos fijos por unidad</h3>
-    <div class="g2 mt-12" id="resumen-costos"></div>
-  </div>
-</div>
-
-<!-- ESPECIAS -->
-<div id="page-especias" class="page">
-  <div class="flex items-center justify-between mb-20">
-    <div class="page-title" style="margin:0">Especias</div>
-    <button class="btn btn-gold" onclick="openModalEspecia()">+ Nueva especia</button>
-  </div>
-  <div class="search-wrap">
-    <input id="search-esp" placeholder="Buscar especia..." oninput="renderEspecias()">
-  </div>
-  <div class="card">
-    <div class="tw">
-      <table>
-        <thead><tr><th>Nombre</th><th>Precio/kg</th><th>Precio/100g</th><th>Stock</th><th>Minimo</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="tabla-especias"></tbody>
-      </table></div>
-    </div>
-</div>
-
-<!-- BLENDS -->
-<div id="page-blends" class="page">
-  <div class="flex items-center justify-between mb-20">
-    <div class="page-title" style="margin:0">Blends</div>
-    <div class="flex gap-8">
-      <button class="btn btn-ghost btn-sm" id="btn-export-blends" onclick="exportBlendsExcel()" style="display:none">📥 Exportar Excel</button>
-      <button class="btn btn-gold" onclick="openModalBlend()">+ Nuevo blend</button>
-    </div>
-  </div>
-  <div id="lista-blends"></div>
-</div>
-
-<!-- ENVASES -->
-<div id="page-envases" class="page">
-  <div class="flex items-center justify-between mb-20">
-    <div class="page-title" style="margin:0">Envases</div>
-    <button class="btn btn-gold" id="btn-new-envase" onclick="openModalEnvase()" style="display:none">+ Nuevo envase</button>
-  </div>
-  <div id="lista-envases"></div>
-</div>
-
-<!-- VENTAS -->
-<div id="page-ventas" class="page">
-  <div class="flex items-center justify-between mb-20">
-    <div class="page-title" style="margin:0">Ventas</div>
-    <button class="btn btn-gold" onclick="openModalVenta()">+ Nueva venta</button>
-  </div>
-  <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
-    <div class="search-wrap" style="flex:1;min-width:200px;margin-bottom:0">
-      <input id="search-ventas" placeholder="Buscar..." oninput="renderVentas()">
-    </div>
-    <select id="filter-estado" onchange="renderVentas()" style="width:auto">
-      <option value="">Todos los estados</option>
-      <option value="completada">Completada</option>
-      <option value="pendiente">Pendiente</option>
-      <option value="cancelada">Cancelada</option>
-      <option value="entregada">Entregada</option>
-    </select>
-  </div>
-  <div class="card">
-    <div class="tw">
-      <table>
-        <thead><tr><th>Fecha</th><th>Productos</th><th>Subtotal</th><th>Desc.</th><th>Total</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="tabla-ventas"></tbody>
-      </table></div>
-    </div>
-  </div>
-</div>
-
-<!-- REPORTES -->
-<div id="page-reportes" class="page">
-  <div class="page-title">Reportes</div>
-  <div class="g3 mb-20" id="rep-stats"></div>
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('rep-mes')">Por mes</button>
-    <button class="tab" onclick="showTab('rep-prod')">Por producto</button>
-    <button class="tab" onclick="showTab('rep-rent')">Rentabilidad</button>
-  </div>
-  <div id="rep-mes" class="card">
-    <h3>Ventas por mes</h3>
-    <div class="tw"><table>
-      <thead><tr><th>Mes</th><th>Ventas</th><th>Ingresos</th><th>Prom./venta</th></tr></thead>
-      <tbody id="rep-mes-tabla"></tbody>
-    </table></div>
-  </div>
-  <div id="rep-prod" class="card" style="display:none">
-    <h3>Rendimiento por producto</h3>
-    <div class="tw"><table>
-      <thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th><th>% del total</th></tr></thead>
-      <tbody id="rep-prod-tabla"></tbody>
-    </table></div>
-  </div>
-  <div id="rep-rent" class="card" style="display:none">
-    <h3>Rentabilidad por blend</h3>
-    <div class="tw"><table>
-      <thead><tr><th>Blend</th><th>Costo/kg</th><th>Unidad Chica</th><th>Unidad Grande</th></tr></thead>
-      <tbody id="rep-rent-tabla"></tbody>
-    </table></div>
-  </div>
-</div>
-
-<!-- AJUSTES -->
-<div id="page-ajustes" class="page">
-  <div class="page-title">Ajustes</div>
-
-  <!-- PWA CONFIG -->
-  <div class="card mb-20" id="pwa-config-card">
-    <div class="flex items-center justify-between mb-16">
-      <h3 style="margin:0">Apariencia y PWA</h3>
-      <div class="flex gap-8">
-        <span id="pwa-status-badge" class="badge by">—</span>
-        <button class="btn btn-gold btn-sm" id="pwa-install-btn-settings" onclick="installPWA()" style="display:none">Instalar app</button>
-      </div>
-    </div>
-
-    <!-- IDENTIDAD -->
-    <div class="section-title mb-12">Identidad</div>
-    <div class="g2 mb-16">
-      <div><label>Nombre de la app</label><input id="pwa-cfg-name" placeholder="Arcano — Complice del Sabor" oninput="previewPWA()"></div>
-      <div><label>Nombre corto</label><input id="pwa-cfg-short" placeholder="Arcano" oninput="previewPWA()"></div>
-    </div>
-    <div class="g2 mb-16">
-      <div><label>Descripcion</label><input id="pwa-cfg-desc" placeholder="Gestion de especias y blends"></div>
-      <div><label>Orientacion</label>
-        <select id="pwa-cfg-orient" onchange="previewPWA()">
-          <option value="portrait-primary">Vertical</option>
-          <option value="landscape-primary">Horizontal</option>
-          <option value="any">Libre</option>
-        </select>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- COLORES -->
-    <div class="section-title mb-12">Colores</div>
-    <div class="g2 mb-12">
-      <div><label>Fondo principal</label>
-        <div class="flex gap-8"><input id="pwa-cfg-bg" type="color" value="#1b0b07" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-bg-text" value="#1b0b07" maxlength="7" oninput="syncColorInput('bg')" style="flex:1"></div>
-      </div>
-      <div><label>Fondo header / nav</label>
-        <div class="flex gap-8"><input id="pwa-cfg-bg2" type="color" value="#221108" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-bg2-text" value="#221108" maxlength="7" oninput="syncColorInput('bg2')" style="flex:1"></div>
-      </div>
-    </div>
-    <div class="g2 mb-12">
-      <div><label>Superficie (tarjetas)</label>
-        <div class="flex gap-8"><input id="pwa-cfg-surface" type="color" value="#2a150e" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-surface-text" value="#2a150e" maxlength="7" oninput="syncColorInput('surface')" style="flex:1"></div>
-      </div>
-      <div><label>Superficie 2 (inputs)</label>
-        <div class="flex gap-8"><input id="pwa-cfg-surface2" type="color" value="#331e12" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-surface2-text" value="#331e12" maxlength="7" oninput="syncColorInput('surface2')" style="flex:1"></div>
-      </div>
-    </div>
-    <div class="g2 mb-12">
-      <div><label>Color accent (dorado)</label>
-        <div class="flex gap-8"><input id="pwa-cfg-gold" type="color" value="#c9963a" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-gold-text" value="#c9963a" maxlength="7" oninput="syncColorInput('gold')" style="flex:1"></div>
-      </div>
-      <div><label>Color accent claro</label>
-        <div class="flex gap-8"><input id="pwa-cfg-gold2" type="color" value="#e8b84b" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-gold2-text" value="#e8b84b" maxlength="7" oninput="syncColorInput('gold2')" style="flex:1"></div>
-      </div>
-    </div>
-    <div class="g2 mb-16">
-      <div><label>Texto principal</label>
-        <div class="flex gap-8"><input id="pwa-cfg-cream" type="color" value="#f0e8d0" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-cream-text" value="#f0e8d0" maxlength="7" oninput="syncColorInput('cream')" style="flex:1"></div>
-      </div>
-      <div><label>Texto secundario</label>
-        <div class="flex gap-8"><input id="pwa-cfg-muted" type="color" value="#7a6a50" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-muted-text" value="#7a6a50" maxlength="7" oninput="syncColorInput('muted')" style="flex:1"></div>
-      </div>
-    </div>
-    <div class="mb-16"><label>Color tema (barra del celular)</label>
-      <div class="flex gap-8"><input id="pwa-cfg-theme" type="color" value="#1b0b07" style="width:44px;height:36px;padding:2px;cursor:pointer" oninput="previewPWA()"><input id="pwa-cfg-theme-text" value="#1b0b07" maxlength="7" oninput="syncColorInput('theme')" style="flex:1"></div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- TIPOGRAFIA -->
-    <div class="section-title mb-12">Tipografia</div>
-    <div class="g2 mb-16">
-      <div>
-        <label>Tamano fuente base <span id="pwa-cfg-fs-base-val" class="text-gold">15px</span></label>
-        <input id="pwa-cfg-fs-base" type="range" min="11" max="20" step="1" value="15" oninput="previewPWA()">
-      </div>
-      <div>
-        <label>Tamano titulos <span id="pwa-cfg-fs-title-val" class="text-gold">1.9rem</span></label>
-        <input id="pwa-cfg-fs-title" type="range" min="1.0" max="3.0" step="0.1" value="1.9" oninput="previewPWA()">
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- VISTA PREVIA + BOTONES -->
-    <div class="cost-box mb-16" id="pwa-preview-box">
-      <div class="text-xs text-muted mb-12">Vista previa</div>
-      <div class="flex items-center gap-8">
-        <img src="icons/icon-192.png?v=13" style="width:36px;height:36px;border-radius:8px">
-        <div>
-          <div class="fw7 text-sm" id="pwa-preview-name">Arcano</div>
-          <div class="text-xs text-muted" id="pwa-preview-desc">Complice del Sabor</div>
-        </div>
-      </div>
-    </div>
-    <div class="flex gap-8">
-      <button class="btn btn-gold" style="flex:1" onclick="guardarPWAConfig()">Guardar configuracion</button>
-      <button class="btn btn-ghost" style="flex:1" onclick="resetPWAConfig()">Restaurar valores</button>
-    </div>
-  </div>
-
-  <div class="g2">
-    <div class="card">
-      <div class="flex items-center justify-between mb-16">
-        <h3 style="margin:0">Usuarios</h3>
-        <button class="btn btn-gold btn-sm" onclick="openModalUsuario()">+ Nuevo</button>
-      </div>
-      <div id="ajustes-usuarios"></div>
-    </div>
-    <div>
-      <div class="card mb-16">
-        <div class="flex items-center justify-between mb-16">
-          <h3 style="margin:0">Sincronizacion</h3>
-          <span id="gh-status-badge" class="badge br">Conectando...</span>
-        </div>
-        <p class="text-muted text-sm mb-16">Los datos se sincronizan en tiempo real entre todos los dispositivos. Sin configuracion adicional necesaria.</p>
-        <div id="gh-connected-info">
-          <div class="cost-box mb-16">
-            <div class="cost-row"><span>Motor</span><span class="text-gold fw7">Firebase Realtime</span></div>
-            <div class="cost-row"><span>Estado</span><span id="sync-status-text" class="text-green fw7">Conectando...</span></div>
-          </div>
-          <div class="flex gap-8">
-            <button class="btn btn-ghost" style="flex:1" onclick="fbForceReload()">Forzar sincronizacion</button>
-            <button class="btn btn-red" onclick="fbClearRemote()">Borrar datos remotos</button>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Zona de peligro</h3>
-        <p class="text-muted text-sm mb-16">Borra todos los datos localmente.</p>
-        <button class="btn btn-red" onclick="borrarTodo()">Borrar todo</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-</main>
-
-<!-- MODAL ESPECIA -->
-<div class="modal-overlay" id="modal-esp">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-esp-titulo">Nueva especia</span>
-      <button class="modal-close" onclick="closeModal('modal-esp')">x</button>
-    </div>
-    <div id="alert-esp" class="alert"></div>
-    <div class="fr fr1"><div><label>Nombre *</label><input id="esp-nombre" placeholder="Ej: Comino"></div></div>
-    <div class="fr">
-      <div><label>Precio por kg ($) *</label><input id="esp-precio" type="number" min="0" oninput="calcEsp100()"></div>
-      <div><label>Precio por 100g</label><input id="esp-100" readonly></div>
-    </div>
-    <div class="fr">
-      <div><label>Stock actual (g)</label><input id="esp-stock" type="number" min="0" value="0"></div>
-      <div><label>Stock minimo (g)</label><input id="esp-stockmin" type="number" min="0" value="500"></div>
-    </div>
-    <button class="btn btn-gold btn-full mt-16" onclick="guardarEspecia()">Guardar</button>
-  </div>
-</div>
-
-<!-- MODAL STOCK -->
-<div class="modal-overlay" id="modal-stock">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="ms-nombre">Stock</span>
-      <button class="modal-close" onclick="closeModal('modal-stock')">x</button>
-    </div>
-    <div id="alert-stock" class="alert"></div>
-    <input type="hidden" id="ms-esp-id">
-    <div class="cost-box mb-16">
-      <div class="cost-row"><span>Stock actual</span><span class="fw7 text-gold" id="ms-stock-actual">—</span></div>
-    </div>
-    <div class="fr">
-      <div>
-        <label>Tipo</label>
-        <select id="ms-tipo">
-          <option value="entrada">Entrada (compra)</option>
-          <option value="salida">Salida (uso/merma)</option>
-        </select>
-      </div>
-      <div><label>Cantidad (gramos)</label><input id="ms-cantidad" type="number" min="0" placeholder="0"></div>
-    </div>
-    <div class="fr fr1"><div><label>Nota (opcional)</label><input id="ms-nota-stock" placeholder="Ej: Compra proveedor X"></div></div>
-    <button class="btn btn-gold btn-full mb-16" onclick="guardarMovimiento()">Registrar movimiento</button>
-    <h3>Ultimos movimientos</h3>
-    <div id="ms-historial"></div>
-  </div>
-</div>
-
-<!-- MODAL BLEND -->
-<div class="modal-overlay" id="modal-blend">
-  <div class="modal" style="max-width:620px">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-blend-titulo">Nuevo Blend</span>
-      <button class="modal-close" onclick="closeModal('modal-blend')">x</button>
-    </div>
-    <div id="alert-blend" class="alert"></div>
-    <div class="fr fr1"><div><label>Nombre *</label><input id="bl-nombre" placeholder="Ej: Garam Masala"></div></div>
-    <div class="fr">
-      <div><label>Peso envase chico (g)</label><input id="bl-peso-c" type="number" min="0" oninput="calcBlendModal()"></div>
-      <div><label>Peso envase grande (g)</label><input id="bl-peso-g" type="number" min="0" oninput="calcBlendModal()"></div>
-    </div>
-    <div class="fr">
-      <div><label>Precio venta chico ($)</label><input id="bl-pventa-c" type="number" min="0"></div>
-      <div><label>Precio venta grande ($)</label><input id="bl-pventa-g" type="number" min="0"></div>
-    </div>
-    <div class="fr fr1"><div><label>Notas / instrucciones</label><textarea id="bl-notas" placeholder="Ej: Mezclar en seco."></textarea></div></div>
-    <div class="divider"></div>
-    <h3>Ingredientes — formula para 1kg</h3>
-    <div id="blend-ings-rows"></div>
-    <button class="btn btn-ghost btn-sm mt-12" onclick="addIngRow()">+ Agregar especia</button>
-    <div class="cost-box mt-16">
-      <div class="fr" style="margin-bottom:0">
-        <div>
-          <div class="cost-row"><span>Costo blend /kg</span><span id="bc-kg">$0</span></div>
-          <div class="cost-row"><span>Costo blend /100g</span><span id="bc-100">$0</span></div>
-          <div class="text-xs mt-12" id="bc-grams" style="text-align:center"></div>
-        </div>
-        <div>
-          <div class="cost-row total"><span>Total u. chica</span><span id="bc-tot-c">$0</span></div>
-          <div class="cost-row text-xs"><span class="text-muted">MP chico</span><span id="bc-mp-c">$0</span></div>
-          <div class="cost-row text-xs"><span class="text-muted">Fijos chico</span><span id="bc-fij-c">$0</span></div>
-          <div class="cost-row total" style="margin-top:8px"><span>Total u. grande</span><span id="bc-tot-g">$0</span></div>
-          <div class="cost-row text-xs"><span class="text-muted">MP grande</span><span id="bc-mp-g">$0</span></div>
-          <div class="cost-row text-xs"><span class="text-muted">Fijos grande</span><span id="bc-fij-g">$0</span></div>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-gold btn-full mt-16" onclick="guardarBlend()">Guardar blend</button>
-  </div>
-</div>
-
-<!-- MODAL VENTA -->
-<div class="modal-overlay" id="modal-venta">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-venta-titulo">Nueva venta</span>
-      <button class="modal-close" onclick="closeModal('modal-venta')">x</button>
-    </div>
-    <div id="alert-venta" class="alert"></div>
-    <div class="mb-16">
-      <label>Agregar producto</label>
-      <div class="flex gap-8 mb-12">
-        <select id="v-prod-sel" style="flex:1"></select>
-        <input id="v-qty" type="number" min="1" value="1" style="width:65px">
-        <button class="btn btn-ghost btn-sm" onclick="agregarItemVenta()">+ Add</button>
-      </div>
-      <div id="v-items-lista" style="background:var(--surface2);border-radius:8px;padding:10px;min-height:48px"></div>
-    </div>
-    <div class="fr">
-      <div><label>Descuento ($)</label><input id="v-desc" type="number" min="0" value="0" oninput="recalcVenta()"></div>
-      <div style="display:flex;flex-direction:column;justify-content:flex-end">
-        <label>Total</label>
-        <div class="fw7 text-gold" style="font-size:1.3rem;padding:8px 0" id="v-total">$0</div>
-      </div>
-    </div>
-    <div class="fr">
-      <div><label>Estado</label>
-        <select id="v-estado">
-          <option value="completada">Completada</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="entregada">Entregada</option>
-          <option value="cancelada">Cancelada</option>
-        </select>
-      </div>
-      <div><label>Nota</label><input id="v-nota" placeholder="Ej: Pago en cuotas..."></div>
-    </div>
-    <button class="btn btn-gold btn-full mt-16" onclick="guardarVenta()">Guardar venta</button>
-  </div>
-</div>
-
-<!-- MODAL USUARIO -->
-<div class="modal-overlay" id="modal-usuario">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-usr-titulo">Nuevo usuario</span>
-      <button class="modal-close" onclick="closeModal('modal-usuario')">x</button>
-    </div>
-    <div id="alert-usr" class="alert"></div>
-    <div class="fr">
-      <div><label>Nombre *</label><input id="usr-nombre" placeholder="Ej: Maria"></div>
-      <div><label>Emoji / avatar</label><input id="usr-emoji" placeholder="🌶" maxlength="2"></div>
-    </div>
-    <div class="fr">
-      <div><label>PIN (min. 4 digitos) *</label><input id="usr-pin" type="password" maxlength="8" placeholder="...."></div>
-      <div><label>Rol</label>
-        <select id="usr-rol">
-          <option value="admin">Admin</option>
-          <option value="operador">Operador</option>
-        </select>
-      </div>
-    </div>
-    <button class="btn btn-gold btn-full mt-16" onclick="guardarUsuario()">Guardar usuario</button>
-  </div>
-</div>
-
-<!-- MODAL ENVASE -->
-<div class="modal-overlay" id="modal-env">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-env-titulo">Nuevo envase</span>
-      <button class="modal-close" onclick="closeModal('modal-env')">x</button>
-    </div>
-    <div id="alert-env" class="alert"></div>
-    <div class="fr fr1"><div><label>Nombre *</label><input id="env-nombre" placeholder="Ej: Frasco 100ml"></div></div>
-    <div class="fr">
-      <div><label>Tipo</label><select id="env-tipo"><option value="chico">Pequeno</option><option value="grande">Grande</option></select></div>
-      <div><label>Peso (g)</label><input id="env-peso" type="number" min="0"></div>
-    </div>
-    <div class="fr">
-      <div><label>Stock (unidades)</label><input id="env-stock" type="number" min="0" value="0"></div>
-      <div><label>Stock minimo</label><input id="env-stockmin" type="number" min="0" value="20"></div>
-    </div>
-    <div class="fr fr1"><div><label>Precio ($/u)</label><input id="env-precio" type="number" min="0" value="0"></div></div>
-    <button class="btn btn-gold btn-full mt-16" onclick="guardarEnvase()">Guardar envase</button>
-  </div>
-</div>
-
-<!-- MODAL STOCK ENVASE -->
-<div class="modal-overlay" id="modal-env-stock">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="me-nombre">Stock envase</span>
-      <button class="modal-close" onclick="closeModal('modal-env-stock')">x</button>
-    </div>
-    <div id="alert-env-stock" class="alert"></div>
-    <input type="hidden" id="me-env-id">
-    <div class="cost-box mb-16">
-      <div class="cost-row"><span>Stock actual</span><span class="fw7 text-gold" id="me-stock-actual">—</span></div>
-    </div>
-    <div class="fr">
-      <div><label>Tipo</label><select id="me-tipo"><option value="entrada">Entrada (compra)</option><option value="salida">Salida (uso/merma)</option></select></div>
-      <div><label>Cantidad (unidades)</label><input id="me-cantidad" type="number" min="0" placeholder="0"></div>
-    </div>
-    <div class="fr fr1"><div><label>Nota</label><input id="me-nota" placeholder="Ej: Compra proveedor"></div></div>
-    <button class="btn btn-gold btn-full mb-16" onclick="guardarMovEnvase()">Registrar movimiento</button>
-    <h3>Historial</h3>
-    <div id="me-historial"></div>
-  </div>
-</div>
-
-<script src="js/db.js?v=21"></script>
+<!-- ========== SCRIPTS ========== -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/firebase-sync.js?v=21"></script>
-<script src="js/modules1.js?v=21"></script>
-<script src="js/modules2.js?v=21"></script>
-<script>
-  // Mostrar/ocultar btn admin en envases
-  var _origGoPage = goPage;
-  goPage = function(name, btn) {
-    _origGoPage(name, btn);
-    var bEnv = document.getElementById('btn-new-envase');
-    if(bEnv) bEnv.style.display = (currentUser && currentUser.rol === 'admin' && name === 'envases') ? '' : 'none';
-  };
-
-  function updateSyncUI(status, detail) {
-    var dot = document.getElementById('sync-dot');
-    var txt = document.getElementById('sync-text');
-    if (!dot || !txt) return;
-    if (status === 'syncing') { dot.style.background = '#c9963a'; txt.textContent = 'Sync...'; }
-    else if (status === 'ok') { dot.style.background = '#4caf50'; txt.textContent = detail || 'OK'; }
-    else if (status === 'error') { dot.style.background = '#e07070'; txt.textContent = detail || 'Offline'; }
-    else { dot.style.background = '#666'; txt.textContent = '—'; }
-  }
-
-  function forceSyncNow() {
-    if (typeof fbForceReload === 'function') {
-      updateSyncUI('syncing');
-      fbForceReload();
-    }
-  }
-
-  // Service Worker registration
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=21').then(function(reg) {
-      reg.addEventListener('updatefound', function() {
-        var newWorker = reg.installing;
-        newWorker.addEventListener('statechange', function() {
-          if (newWorker.state === 'activated' && !sessionStorage.getItem('_sw_reloaded')) {
-            sessionStorage.setItem('_sw_reloaded', '1');
-            window.location.reload();
-          }
-        });
-      });
-    }).catch(function(err) {
-      console.warn('[Arcano] SW registro fallo:', err);
-    });
-  }
-
-  function bootApp() {
-    console.log('[Arcano] v21 - Firebase Realtime Sync');
-    updateSyncUI('syncing', '...');
-
-    initFirebase();
-    startFirebaseSync(function(remoteData) {
-      // Firebase listo (con datos, vacio, o con error de permisos)
-      if (remoteData) {
-        console.log('[Arcano] Datos de Firebase cargados');
-      } else {
-        console.log('[Arcano] Sin datos remotos - usando datos locales');
-      }
-      seedIfEmpty();
-      if (typeof applyPWAConfig === 'function') applyPWAConfig(getPWAConfig());
-      initPin();
-      renderGhAjustes();
-      if (fbIsConnected()) {
-        updateSyncUI('ok', 'OK');
-      } else {
-        updateSyncUI('error', 'Ver reglas');
-      }
-    });
-  }
-  bootApp();
-</script>
+<script src="js/db.js?v=30"></script>
+<script src="js/firebase-sync.js?v=30"></script>
+<script src="js/core.js?v=30"></script>
+<script src="js/pages.js?v=30"></script>
 </body>
 </html>
