@@ -11,8 +11,8 @@
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Arcano — Cómplice del Sabor</title>
-<link rel="manifest" href="manifest.json?v=33">
-<link rel="stylesheet" href="css/style.css?v=33">
+<link rel="manifest" href="manifest.json?v=34">
+<link rel="stylesheet" href="css/style.css?v=34">
 </head>
 <body>
 
@@ -68,7 +68,14 @@
 
 <!-- ========== PIN SCREEN ========== -->
 <div id="pin-screen" style="display:flex">
-  <div id="pin-content"></div>
+  <div id="pin-content">
+    <div id="boot-loader" style="text-align:center;padding:60px 20px">
+      <div style="width:40px;height:40px;border:3px solid var(--gold-dim);border-top-color:var(--gold2);border-radius:50%;margin:0 auto 20px;animation:spin .8s linear infinite"></div>
+      <div style="color:var(--gold2);font-family:var(--font-head);font-size:1.4rem;letter-spacing:.08em">ARCANO</div>
+      <div style="color:var(--muted);font-size:.75rem;margin-top:6px" id="boot-status">Cargando...</div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  </div>
 </div>
 
 <!-- ========== ADMIN APP ========== -->
@@ -123,9 +130,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="js/db.js?v=33"></script>
-<script src="js/firebase-sync.js?v=33"></script>
-<script src="js/core.js?v=33"></script>
-<script src="js/pages.js?v=33"></script>
+<script src="js/db.js?v=34"></script>
+<script src="js/firebase-sync.js?v=34"></script>
+<script src="js/core.js?v=34"></script>
+<script src="js/pages.js?v=34"></script>
 </body>
 </html>
