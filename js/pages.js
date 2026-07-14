@@ -689,21 +689,25 @@ function renderProductos() {
     filtered = filtered.filter(function(p) { return p.nombre.toLowerCase().indexOf(q) !== -1 || (p.proveedor || '').toLowerCase().indexOf(q) !== -1; });
   }
 
+  // Determine costo header based on current filter
+  var costoHeader = (productosFilter === 'especia' || productosFilter === 'todos') ? 'Costo/1000gr' : 'Costo Unit.';
+
   if (filtered.length === 0) {
     html += '<div class="empty"><div class="empty-icon">\u25CF</div><p>No hay productos</p></div>';
   } else {
     html += '<div class="card"><div class="tw"><table>' +
-      '<tr><th>Nombre</th><th>Tipo</th><th>Categoría</th><th>Stock</th><th>Costo</th><th>Venta</th><th>Proveedor</th><th></th></tr>';
+      '<tr><th>Nombre</th><th>Tipo</th><th>Stock</th><th>' + costoHeader + '</th><th>Venta</th><th>Proveedor</th><th></th></tr>';
     filtered.forEach(function(p) {
       var stockClass = p.stock <= p.stockMin ? 'stock-low' : 'stock-ok';
+      var costoLabel = p.tipo === 'especia' ? fmt(p.precioCosto) + '/1Kg' : fmt(p.precioCosto);
       html += '<tr><td class="fw7">' + esc(p.nombre) + '</td>' +
         '<td><span class="badge ba">' + esc(p.tipo) + '</span></td>' +
-        '<td class="text-sm text-muted">' + esc(p.categoria || '-') + '</td>' +
         '<td class="' + stockClass + '">' + p.stock + ' ' + esc(p.unidad) + '</td>' +
-        '<td>' + fmt(p.precioCosto) + '</td>' +
+        '<td>' + costoLabel + '</td>' +
         '<td class="text-gold">' + (p.precioVenta ? fmt(p.precioVenta) : '-') + '</td>' +
         '<td class="text-muted text-sm">' + esc(p.proveedor || '-') + '</td>' +
-        '<td class="tr"><button class="btn btn-ghost btn-sm" onclick="modalEditarProducto(' + p.id + ')">Editar</button></td></tr>';
+        '<td class="tr"><button class="btn btn-ghost btn-sm" onclick="modalEditarProducto(' + p.id + ')">Editar</button>' +
+        '<button class="btn btn-red btn-sm" onclick="eliminarProducto(' + p.id + ')" style="margin-left:4px">x</button></td></tr>';
     });
     html += '</table></div></div>';
   }
@@ -714,13 +718,17 @@ function renderProductos() {
 function productoFormHTML(p) {
   var isEdit = !!p;
   p = p || {};
+  var tipo = p.tipo || 'especia';
+  var costoLabel = tipo === 'especia' ? 'Precio Costo por 1000gr' : 'Precio Costo Unitario';
+  var costoPlaceholder = tipo === 'especia' ? 'Ej: 45000' : '0';
+  var ventaLabel = tipo === 'especia' ? 'Precio Venta por gr' : 'Precio Venta (opcional)';
   return '<div class="fr">' +
     '<div><label>Nombre</label><input id="prod-nombre" value="' + esc(p.nombre || '') + '" placeholder="Nombre del producto"></div>' +
-    '<div><label>Tipo</label><select id="prod-tipo">' + optHtml(PRODUCT_TYPES, p.tipo || 'especia') + '</select></div></div>' +
+    '<div><label>Tipo</label><select id="prod-tipo" onchange="productoTipoCambiado()">' + optHtml(PRODUCT_TYPES, tipo) + '</select></div></div>' +
     '<div class="fr3">' +
       '<div><label>Unidad</label><select id="prod-unidad">' + unitOptions(p.unidad || 'gr') + '</select></div>' +
-      '<div><label>Precio Costo</label><input type="number" id="prod-costo" value="' + (p.precioCosto || '') + '" min="0" step="any" placeholder="0"></div>' +
-      '<div><label>Precio Venta</label><input type="number" id="prod-venta" value="' + (p.precioVenta || '') + '" min="0" step="any" placeholder="0 (solo especias)"></div></div>' +
+      '<div><label id="prod-costo-label">' + costoLabel + '</label><input type="number" id="prod-costo" value="' + (p.precioCosto || '') + '" min="0" step="any" placeholder="' + costoPlaceholder + '"></div>' +
+      '<div><label id="prod-venta-label">' + ventaLabel + '</label><input type="number" id="prod-venta" value="' + (p.precioVenta || '') + '" min="0" step="any" placeholder="0"></div></div>' +
     '<div class="fr">' +
       '<div><label>Stock Actual</label><input type="number" id="prod-stock" value="' + (p.stock || 0) + '" min="0" step="any"></div>' +
       '<div><label>Stock Mínimo</label><input type="number" id="prod-stockmin" value="' + (p.stockMin || 0) + '" min="0" step="any"></div></div>' +
@@ -728,6 +736,41 @@ function productoFormHTML(p) {
     '<div class="fr1" style="margin-bottom:12px"><label>Notas</label><textarea id="prod-notas" rows="2">' + esc(p.notas || '') + '</textarea></div>' +
     '<div id="prod-alert" class="alert alert-err"></div>' +
     '<button class="btn btn-gold btn-full" onclick="guardarProducto(' + (p.id || 0) + ')">' + (isEdit ? 'Actualizar' : 'Crear') + ' Producto</button>';
+}
+
+function productoTipoCambiado() {
+  var tipo = document.getElementById('prod-tipo').value;
+  var costoLabel = document.getElementById('prod-costo-label');
+  var ventaLabel = document.getElementById('prod-venta-label');
+  var costoInput = document.getElementById('prod-costo');
+  if (tipo === 'especia') {
+    costoLabel.textContent = 'Precio Costo por 1000gr';
+    costoInput.placeholder = 'Ej: 45000';
+    ventaLabel.textContent = 'Precio Venta por gr';
+  } else {
+    costoLabel.textContent = 'Precio Costo Unitario';
+    costoInput.placeholder = '0';
+    ventaLabel.textContent = 'Precio Venta (opcional)';
+  }
+}
+
+function eliminarProducto(id) {
+  if (!confirm('Eliminar este producto?')) return;
+  var db = getDB();
+  var prod = db.productos.find(function(p) { return p.id === id; });
+  if (!prod) return;
+  // Check if used in any blend recipe
+  var usadoEn = (db.blends || []).some(function(b) {
+    return (b.receta || []).some(function(r) { return r.productoId === id; });
+  });
+  if (usadoEn) {
+    if (!confirm('Esta especia está usada en recetas de blends. Eliminar de todas formas?')) return;
+  }
+  db.productos = db.productos.filter(function(p) { return p.id !== id; });
+  addMovimiento('ajuste', 'productos', id, prod.nombre, 0, 'Producto eliminado');
+  saveDB();
+  renderProductos();
+  toast('Producto eliminado');
 }
 
 function modalNuevoProducto() {
@@ -802,15 +845,16 @@ function renderBlends() {
   html += '<div class="actions-row"><button class="btn btn-gold" onclick="modalNuevoBlend()">+ Nuevo Blend</button></div>';
 
   if (blends.length === 0) {
-    html += '<div class="empty"><div class="empty-icon">\u2726</div><p>No hay blends creados</p><p class="text-xs mt-12">Los blends son mezclas de especias con una receta definida</p></div>';
+    html += '<div class="empty"><div class="empty-icon">\u2726</div><p>No hay blends creados</p><p class="text-xs mt-12">Los blends son mezclas de especias. Cada ingrediente lleva un % de la receta y el costo se calcula automáticamente.</p></div>';
   } else {
     blends.forEach(function(b) {
-      // Calculate cost from recipe
+      // Calculate cost from percentages
       var costo = calcBlendCost(b);
       b.costoUnitario = costo;
       var profit = b.precioVenta - costo;
       var profitClass = profit >= 0 ? 'profit' : 'loss';
       var estadoBadge = b.stock > 0 ? 'bg' : 'by';
+      var gramosPorUnidad = b.gramosPorUnidad || 100;
 
       // Calculate effective stock considering frascos and etiquetas
       var etiquetaProd = b.etiquetaId ? (db.productos || []).find(function(p) { return p.id === b.etiquetaId; }) : null;
@@ -819,9 +863,13 @@ function renderBlends() {
       var maxFrascoStock = frascosDisp.length > 0 ? Math.max.apply(null, frascosDisp.map(function(f) { return f.stock; })) : 0;
       var stockEfectivo = Math.min(b.stock || 0, maxFrascoStock, etiquetaStk);
 
+      // Calculate total percentage
+      var totalPct = (b.receta || []).reduce(function(s, r) { return s + (r.porcentaje || 0); }, 0);
+
       html += '<div class="blend-card"><div class="blend-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">' +
         '<div><div class="blend-name">' + esc(b.nombre) + '</div>' +
         '<div class="text-xs text-muted mt-12">' + esc(b.descripcion || 'Sin descripción') + ' &bull; <span class="badge ba">' + esc(b.formato || 'polvo') + '</span>' +
+        ' &bull; ' + gramosPorUnidad + 'gr/unidad' +
         (etiquetaProd ? ' &bull; Etiqueta: ' + etiquetaProd.stock : ' &bull; <span class="text-red">Sin etiqueta</span>') +
         '</div></div>' +
         '<div class="flex items-center gap-12">' +
@@ -829,16 +877,17 @@ function renderBlends() {
           (stockEfectivo < b.stock ? '<span class="text-xs text-yellow" title="Limitado por frascos/etiquetas">Vendible: ' + stockEfectivo + '</span>' : '') +
           '<span class="text-gold fw7">' + fmt(b.precioVenta) + '</span></div></div>' +
         '<div class="blend-body"><div class="blend-inner">' +
-          '<h3>Receta (' + (b.receta || []).length + ' ingredientes)</h3>';
+          '<h3>Receta (' + (b.receta || []).length + ' ingredientes &mdash; Total: ' + totalPct.toFixed(1) + '%)</h3>';
 
       if (b.receta && b.receta.length > 0) {
         html += '<div class="card mb-16">';
         b.receta.forEach(function(r) {
           var prod = (db.productos || []).find(function(p) { return p.id === r.productoId; });
           var stockInfo = prod ? (prod.stock + ' ' + prod.unidad) : '?';
-          html += '<div class="mov-row"><span class="text-gold">' + r.cantidad + ' ' + esc(r.unidad) + '</span>' +
+          var gramosNeeded = Math.round((r.porcentaje || 0) / 100 * gramosPorUnidad * 10) / 10;
+          html += '<div class="mov-row"><span class="text-gold">' + (r.porcentaje || 0) + '%</span>' +
             '<span>' + esc(r.nombre) + '</span>' +
-            '<span class="text-xs text-muted">(disponible: ' + stockInfo + ')</span></div>';
+            '<span class="text-xs text-muted">(' + gramosNeeded + 'gr por unidad &bull; disponible: ' + stockInfo + ')</span></div>';
         });
         html += '</div>';
       }
@@ -861,9 +910,9 @@ function renderBlends() {
       }
 
       html += '<div class="cost-box mb-16">' +
-        '<div class="cost-row"><span>Costo unitario (especias)</span><span>' + fmt(costo) + '</span></div>' +
+        '<div class="cost-row"><span>Costo por unidad (' + gramosPorUnidad + 'gr)</span><span>' + fmt(costo) + '</span></div>' +
         '<div class="cost-row"><span>Precio venta</span><span>' + fmt(b.precioVenta) + '</span></div>' +
-        '<div class="cost-row ' + profitClass + '"><span>Ganancia</span><span>' + fmt(profit) + '</span></div></div>' +
+        '<div class="cost-row ' + profitClass + '"><span>Ganancia por unidad</span><span>' + fmt(profit) + '</span></div></div>' +
         '<div class="flex gap-8">' +
           '<button class="btn btn-gold btn-sm" onclick="modalEditarBlend(' + b.id + ')">Editar</button>' +
           '<button class="btn btn-green btn-sm" onclick="modalProducirBlend(' + b.id + ')">Producir</button>' +
@@ -875,20 +924,19 @@ function renderBlends() {
   el.innerHTML = html;
 }
 
+// Calculate blend cost per unit based on % and costo/1000gr of especias
 function calcBlendCost(blend) {
   if (!blend || !blend.receta) return 0;
   var db = getDB();
+  var gramosPorUnidad = blend.gramosPorUnidad || 100;
   var costo = 0;
   blend.receta.forEach(function(r) {
     var prod = (db.productos || []).find(function(p) { return p.id === r.productoId; });
-    if (prod) {
-      // Convert to same unit for cost calc (simplified: assumes recipe unit matches product unit)
-      var unitCost = prod.precioCosto / 1; // cost per base unit
-      // If product is in kg and recipe in gr, convert
-      var factor = 1;
-      if (prod.unidad === 'kg' && r.unidad === 'gr') factor = 0.001;
-      else if (prod.unidad === 'L' && r.unidad === 'ml') factor = 0.001;
-      costo += r.cantidad * unitCost * factor;
+    if (prod && r.porcentaje) {
+      // gramos de esta especia por unidad = (porcentaje / 100) * gramosPorUnidad
+      // costo = gramos * (precioCosto / 1000)
+      var gramos = (r.porcentaje / 100) * gramosPorUnidad;
+      costo += gramos * (prod.precioCosto / 1000);
     }
   });
   return Math.round(costo);
@@ -906,7 +954,7 @@ function modalEditarBlend(id) {
   if (!b) return;
   var body = blendFormHTML(b);
   openModal('Editar Blend', body);
-  // Load existing recipe
+  // Load existing recipe rows
   (b.receta || []).forEach(function(r) {
     addBlendRecetaRow(r);
   });
@@ -916,17 +964,23 @@ function blendFormHTML(b) {
   b = b || {};
   var db = getDB();
   var etiquetas = (db.productos || []).filter(function(p) { return p.tipo === 'etiqueta'; });
+  var gramos = b.gramosPorUnidad || 100;
   return '<div class="fr1" style="margin-bottom:12px"><label>Nombre</label><input id="bl-nombre" value="' + esc(b.nombre || '') + '" placeholder="Nombre del blend"></div>' +
     '<div class="fr1" style="margin-bottom:12px"><label>Descripción</label><textarea id="bl-desc" rows="2">' + esc(b.descripcion || '') + '</textarea></div>' +
     '<div class="fr"><div><label>Formato</label><select id="bl-formato">' + optHtml(BLEND_FORMATOS, b.formato || 'polvo') + '</select></div>' +
-    '<div><label>Etiqueta</label><select id="bl-etiqueta"><option value="0">Sin etiqueta</option>' +
+    '<div><label>Gramos por Unidad</label><input type="number" id="bl-gramos" value="' + gramos + '" min="1" step="any" onchange="calcBlendCostEst()"></div></div>' +
+    '<div class="fr"><div><label>Etiqueta</label><select id="bl-etiqueta"><option value="0">Sin etiqueta</option>' +
     etiquetas.map(function(e) { return '<option value="' + e.id + '"' + ((b.etiquetaId || 0) === e.id ? ' selected' : '') + '>' + esc(e.nombre) + ' (stock: ' + e.stock + ')</option>'; }).join('') +
     '</select></div></div>' +
-    '<h3>Receta (especias)</h3><div id="bl-receta-container"></div>' +
+    '<h3>Receta (% de cada especia)</h3>' +
+    '<div class="text-xs text-muted mb-8">Los porcentajes deben sumar 100%. El costo se calcula automáticamente.</div>' +
+    '<div id="bl-receta-container"></div>' +
     '<button class="btn btn-ghost btn-sm mb-12" onclick="addBlendRecetaRow()">+ Ingrediente</button>' +
+    '<div id="bl-pct-total" class="text-xs mb-12" style="color:var(--muted)">Total: 0%</div>' +
     '<hr class="divider">' +
-    '<div class="fr"><div><label>Precio Venta</label><input type="number" id="bl-precio" value="' + (b.precioVenta || '') + '" min="0" step="any"></div>' +
-    '<div style="display:flex;align-items:flex-end;padding-bottom:2px"><div class="cost-box" style="width:100%"><div class="cost-row"><span>Costo estimado</span><span id="bl-costo-est">$0</span></div></div></div></div>' +
+    '<div class="fr"><div><label>Precio Venta por Unidad</label><input type="number" id="bl-precio" value="' + (b.precioVenta || '') + '" min="0" step="any" oninput="calcBlendCostEst()"></div>' +
+    '<div style="display:flex;align-items:flex-end;padding-bottom:2px"><div class="cost-box" style="width:100%"><div class="cost-row"><span>Costo por unidad</span><span id="bl-costo-est">$0</span></div>' +
+    '<div class="cost-row"><span>Ganancia</span><span id="bl-ganancia-est" class="profit">$0</span></div></div></div></div>' +
     '<div id="bl-alert" class="alert alert-err"></div>' +
     '<button class="btn btn-gold btn-full" onclick="guardarBlend(' + (b.id || 0) + ')">' + (b.id ? 'Actualizar' : 'Crear') + ' Blend</button>';
 }
@@ -938,40 +992,63 @@ function addBlendRecetaRow(data) {
   var row = document.createElement('div');
   row.className = 'ing-row';
   row.innerHTML =
-    '<select onchange="calcBlendCostEst()" style="font-size:.82rem">' +
+    '<select onchange="calcBlendCostEst()" style="font-size:.82rem;flex:2">' +
       '<option value="">Especia</option>' +
       (getDB().productos || []).filter(function(p) { return p.tipo === 'especia'; }).map(function(p) {
-        return '<option value="' + p.id + '"' + (data.productoId === p.id ? ' selected' : '') + '>' + esc(p.nombre) + '</option>';
+        return '<option value="' + p.id + '"' + (data.productoId === p.id ? ' selected' : '') + '>' + esc(p.nombre) + ' (' + fmt(p.precioCosto) + '/Kg)</option>';
       }).join('') +
     '</select>' +
-    '<input type="number" placeholder="Cant" min="0.01" step="any" value="' + (data.cantidad || '') + '" onchange="calcBlendCostEst()" style="font-size:.82rem">' +
-    '<select onchange="calcBlendCostEst()" style="font-size:.82rem">' + unitOptions(data.unidad || 'gr') + '</select>' +
+    '<input type="number" placeholder="%" min="0.1" max="100" step="0.1" value="' + (data.porcentaje || '') + '" onchange="calcBlendCostEst()" style="font-size:.82rem;flex:1">' +
+    '<div class="ing-cost text-xs" style="min-width:50px;font-size:.75rem;color:var(--muted)">%</div>' +
     '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove();calcBlendCostEst()" style="padding:5px 8px;font-size:.9rem">x</button>';
   container.appendChild(row);
+  calcBlendCostEst();
 }
 
 function calcBlendCostEst() {
   var rows = document.querySelectorAll('#bl-receta-container .ing-row');
   var costo = 0;
+  var totalPct = 0;
   var db = getDB();
+  var gramosPorUnidad = parseFloat((document.getElementById('bl-gramos') || {}).value) || 100;
+
   rows.forEach(function(row) {
     var select = row.querySelector('select');
-    var qtyInput = row.querySelectorAll('input')[0];
-    var unitSelect = row.querySelectorAll('select')[1];
+    var pctInput = row.querySelectorAll('input')[0];
+    var costDisplay = row.querySelector('.ing-cost');
     var productId = parseInt(select.value);
-    var qty = parseFloat(qtyInput.value) || 0;
-    var unit = unitSelect ? unitSelect.value : 'gr';
+    var pct = parseFloat(pctInput.value) || 0;
+    totalPct += pct;
 
     var prod = db.productos.find(function(p) { return p.id === productId; });
-    if (prod) {
-      var factor = 1;
-      if (prod.unidad === 'kg' && unit === 'gr') factor = 0.001;
-      else if (prod.unidad === 'L' && unit === 'ml') factor = 0.001;
-      costo += qty * prod.precioCosto * factor;
+    if (prod && pct > 0) {
+      var gramos = (pct / 100) * gramosPorUnidad;
+      var ingredientCost = gramos * (prod.precioCosto / 1000);
+      costo += ingredientCost;
+      if (costDisplay) costDisplay.textContent = fmt(Math.round(ingredientCost));
+    } else {
+      if (costDisplay) costDisplay.textContent = '';
     }
   });
+
   var el = document.getElementById('bl-costo-est');
   if (el) el.textContent = fmt(Math.round(costo));
+
+  var gananciaEl = document.getElementById('bl-ganancia-est');
+  var precioInput = (document.getElementById('bl-precio') || {});
+  var precio = parseFloat(precioInput.value) || 0;
+  if (gananciaEl) {
+    var ganancia = precio - Math.round(costo);
+    gananciaEl.textContent = fmt(ganancia);
+    gananciaEl.className = ganancia >= 0 ? 'profit' : 'loss';
+  }
+
+  var pctEl = document.getElementById('bl-pct-total');
+  if (pctEl) {
+    var pctColor = Math.abs(totalPct - 100) < 0.5 ? 'var(--green)' : 'var(--red)';
+    pctEl.innerHTML = 'Total: <span style="color:' + pctColor + ';font-weight:700">' + totalPct.toFixed(1) + '%</span>' +
+      (Math.abs(totalPct - 100) >= 0.5 ? ' <span style="color:var(--red)">(debe ser 100%)</span>' : ' \u2713');
+  }
 }
 
 function guardarBlend(existingId) {
@@ -979,6 +1056,7 @@ function guardarBlend(existingId) {
   var desc = document.getElementById('bl-desc').value.trim();
   var formato = document.getElementById('bl-formato').value;
   var etiquetaId = parseInt(document.getElementById('bl-etiqueta').value) || 0;
+  var gramosPorUnidad = parseFloat(document.getElementById('bl-gramos').value) || 100;
   var precio = parseFloat(document.getElementById('bl-precio').value) || 0;
   var alertEl = document.getElementById('bl-alert');
 
@@ -991,33 +1069,55 @@ function guardarBlend(existingId) {
   var db = getDB();
   var rows = document.querySelectorAll('#bl-receta-container .ing-row');
   var receta = [];
+  var totalPct = 0;
   rows.forEach(function(row) {
     var select = row.querySelector('select');
-    var qtyInput = row.querySelectorAll('input')[0];
-    var unitSelect = row.querySelectorAll('select')[1];
+    var pctInput = row.querySelectorAll('input')[0];
     var productId = parseInt(select.value);
-    var qty = parseFloat(qtyInput.value) || 0;
-    var unit = unitSelect ? unitSelect.value : 'gr';
-    if (productId && qty > 0) {
+    var pct = parseFloat(pctInput.value) || 0;
+    if (productId && pct > 0) {
       var prod = db.productos.find(function(p) { return p.id === productId; });
-      receta.push({ productoId: productId, nombre: prod ? prod.nombre : '?', cantidad: qty, unidad: unit });
+      receta.push({ productoId: productId, nombre: prod ? prod.nombre : '?', porcentaje: pct });
+      totalPct += pct;
     }
   });
 
+  if (receta.length === 0) {
+    alertEl.textContent = 'Agrega al menos un ingrediente con %';
+    alertEl.className = 'alert alert-err show';
+    return;
+  }
+
+  if (Math.abs(totalPct - 100) >= 1) {
+    alertEl.textContent = 'Los porcentajes deben sumar 100% (actual: ' + totalPct.toFixed(1) + '%)';
+    alertEl.className = 'alert alert-err show';
+    return;
+  }
+
+  // Normalize to exactly 100% if close
+  if (totalPct > 0 && receta.length > 0) {
+    var diff = 100 - totalPct;
+    receta[receta.length - 1].porcentaje = Math.round((receta[receta.length - 1].porcentaje + diff) * 100) / 100;
+  }
+
   var now = new Date().toISOString();
+  var blendData = { receta: receta, gramosPorUnidad: gramosPorUnidad };
+  var costoCalculado = calcBlendCost(blendData);
 
   if (existingId) {
     var blend = db.blends.find(function(b) { return b.id === existingId; });
     if (blend) {
       blend.nombre = nombre; blend.descripcion = desc; blend.receta = receta;
       blend.formato = formato; blend.etiquetaId = etiquetaId;
-      blend.precioVenta = precio; blend.costoUnitario = calcBlendCost({ receta: receta });
+      blend.gramosPorUnidad = gramosPorUnidad;
+      blend.precioVenta = precio; blend.costoUnitario = costoCalculado;
       blend.actualizadoEn = now;
     }
   } else {
     db.blends.push({
       id: nextId(), nombre: nombre, descripcion: desc, formato: formato, etiquetaId: etiquetaId,
-      receta: receta, costoUnitario: calcBlendCost({ receta: receta }), precioVenta: precio,
+      gramosPorUnidad: gramosPorUnidad,
+      receta: receta, costoUnitario: costoCalculado, precioVenta: precio,
       stock: 0, creadoEn: now, actualizadoEn: now
     });
   }
@@ -1033,35 +1133,69 @@ function modalProducirBlend(id) {
   var b = db.blends.find(function(x) { return x.id === id; });
   if (!b) return;
 
-  // Check if there's enough stock for all ingredients
+  var gramosPorUnidad = b.gramosPorUnidad || 100;
+
+  // Check if there's enough stock for 1 unit
   var canProduce = true;
   var stockInfo = '';
   (b.receta || []).forEach(function(r) {
     var prod = db.productos.find(function(p) { return p.id === r.productoId; });
-    if (!prod || prod.stock < r.cantidad) {
+    var gramosPerUnit = (r.porcentaje / 100) * gramosPorUnidad;
+    if (!prod || prod.stock < gramosPerUnit) {
       canProduce = false;
-      stockInfo += '<div class="mov-row"><span class="text-red">' + esc(r.nombre) + ': necesita ' + r.cantidad + ', disponible ' + (prod ? prod.stock : 0) + '</span></div>';
+      stockInfo += '<div class="mov-row"><span class="text-red">' + esc(r.nombre) + ': necesita ' + gramosPerUnit.toFixed(1) + 'gr por unidad, disponible ' + (prod ? prod.stock : 0) + 'gr</span></div>';
     }
   });
 
-  var body = '<div class="mb-12"><label>Blend</label><div style="padding:9px 0" class="fw7 text-gold">' + esc(b.nombre) + '</div></div>';
+  var body = '<div class="mb-12"><label>Blend</label><div style="padding:9px 0" class="fw7 text-gold">' + esc(b.nombre) + ' (' + gramosPorUnidad + 'gr/unidad)</div></div>';
 
   if (!canProduce) {
-    body += '<div class="alert alert-err show mb-12">Stock insuficiente para producir</div>' + stockInfo;
+    body += '<div class="alert alert-err show mb-12">Stock insuficiente para producir siquiera 1 unidad</div>' + stockInfo;
     body += '<hr class="divider"><button class="btn btn-ghost btn-full" onclick="closeModal()">Cerrar</button>';
   } else {
-    body += '<div class="card mb-16"><h3>Ingredientes necesarios</h3>';
+    body += '<div class="card mb-16"><h3>Ingredientes por unidad</h3>';
     (b.receta || []).forEach(function(r) {
       var prod = db.productos.find(function(p) { return p.id === r.productoId; });
-      body += '<div class="mov-row"><span>' + r.cantidad + ' ' + esc(r.unidad) + '</span><span>' + esc(r.nombre) + '</span>' +
-        '<span class="text-xs text-muted">(stock: ' + (prod ? prod.stock : 0) + ')</span></div>';
+      var gramosPerUnit = Math.round((r.porcentaje / 100) * gramosPorUnidad * 10) / 10;
+      body += '<div class="mov-row"><span class="text-gold">' + r.porcentaje + '% = ' + gramosPerUnit + 'gr</span><span>' + esc(r.nombre) + '</span>' +
+        '<span class="text-xs text-muted">(stock: ' + (prod ? prod.stock : 0) + 'gr)</span></div>';
     });
     body += '</div>';
-    body += '<div class="fr" style="margin-bottom:12px"><div><label>Cantidad a producir</label><input type="number" id="bl-prod-cant" value="1" min="1"></div></div>';
-    body += '<button class="btn btn-gold btn-full" onclick="ejecutarProduccion(' + b.id + ')">Producir</button>';
+    body += '<div class="fr" style="margin-bottom:12px"><div><label>Cantidad a producir (unidades)</label><input type="number" id="bl-prod-cant" value="1" min="1" onchange="recalcProduccion(' + id + ')"></div>' +
+      '<div style="display:flex;align-items:flex-end"><div class="cost-box" style="width:100%"><div class="cost-row"><span>Costo total especias</span><span id="bl-prod-costo">$0</span></div></div></div></div>';
+    body += '<div id="bl-prod-detail"></div>';
+    body += '<button class="btn btn-gold btn-full mt-12" onclick="ejecutarProduccion(' + b.id + ')">Producir</button>';
   }
 
   openModal('Producir Blend', body);
+  // Auto-calc for 1 unit
+  setTimeout(function() { recalcProduccion(id); }, 50);
+}
+
+function recalcProduccion(blendId) {
+  var db = getDB();
+  var b = db.blends.find(function(x) { return x.id === blendId; });
+  if (!b) return;
+  var cant = parseInt((document.getElementById('bl-prod-cant') || {}).value) || 1;
+  var gramosPorUnidad = b.gramosPorUnidad || 100;
+  var costoTotal = 0;
+  var detalle = '';
+
+  (b.receta || []).forEach(function(r) {
+    var prod = db.productos.find(function(p) { return p.id === r.productoId; });
+    var gramosNeeded = (r.porcentaje / 100) * gramosPorUnidad * cant;
+    if (prod) {
+      costoTotal += gramosNeeded * (prod.precioCosto / 1000);
+      var cls = prod.stock >= gramosNeeded ? '' : ' style="color:var(--red)"';
+      detalle += '<div class="mov-row text-xs"' + cls + '><span>' + esc(r.nombre) + '</span><span>' + gramosNeeded.toFixed(1) + 'gr</span><span>de ' + prod.stock + 'gr</span></div>';
+    }
+  });
+
+  var costoEl = document.getElementById('bl-prod-costo');
+  if (costoEl) costoEl.textContent = fmt(Math.round(costoTotal));
+
+  var detailEl = document.getElementById('bl-prod-detail');
+  if (detailEl) detailEl.innerHTML = detalle ? '<div class="card mt-8">' + detalle + '</div>' : '';
 }
 
 function ejecutarProduccion(blendId) {
@@ -1072,24 +1206,28 @@ function ejecutarProduccion(blendId) {
   var b = db.blends.find(function(x) { return x.id === blendId; });
   if (!b) return;
 
-  // Check stock for multiplied recipe
+  var gramosPorUnidad = b.gramosPorUnidad || 100;
+
+  // Check stock for all ingredients
+  var canProduce = true;
   (b.receta || []).forEach(function(r) {
-    var needed = r.cantidad * cant;
+    var needed = (r.porcentaje / 100) * gramosPorUnidad * cant;
     var prod = db.productos.find(function(p) { return p.id === r.productoId; });
     if (!prod || prod.stock < needed) {
-      toast('Stock insuficiente de ' + r.nombre, 'err');
-      return;
+      toast('Stock insuficiente de ' + r.nombre + ' (necesita ' + needed.toFixed(1) + 'gr)', 'err');
+      canProduce = false;
     }
   });
+  if (!canProduce) return;
 
   // Deduct stock from ingredients
   (b.receta || []).forEach(function(r) {
-    var needed = r.cantidad * cant;
+    var needed = (r.porcentaje / 100) * gramosPorUnidad * cant;
     var prod = db.productos.find(function(p) { return p.id === r.productoId; });
     if (prod) {
       prod.stock -= needed;
       prod.actualizadoEn = new Date().toISOString();
-      addMovimiento('blend', 'blends', b.id, r.nombre, -needed, 'Producción: ' + b.nombre + ' x' + cant);
+      addMovimiento('blend', 'blends', b.id, r.nombre, -needed, 'Producción: ' + b.nombre + ' x' + cant + ' (' + needed.toFixed(1) + 'gr)');
     }
   });
 
