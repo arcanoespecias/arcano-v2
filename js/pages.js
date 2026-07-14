@@ -29,27 +29,36 @@ function renderStoreProducts() {
   var container = document.getElementById('store-products');
   var empty = document.getElementById('store-empty');
 
-  // Get sellable especias
+  // Get sellable especias (with precioVenta > 0 and stock > 0)
   var especias = (db.productos || []).filter(function(p) {
     return p.tipo === 'especia' && p.precioVenta > 0 && p.stock > 0;
   });
   especias.forEach(function(p) {
-    products.push({ id: p.id, nombre: p.nombre, tipo: 'Especia', desc: p.notas || '', precio: p.precioVenta, stock: p.stock, unidad: p.unidad, blend: false });
+    // Filter by storeCategory
+    if (storeCategory !== 'todos' && storeCategory !== 'blends') {
+      if ((p.categoria || '') !== storeCategory) return;
+    }
+    products.push({
+      id: p.id, nombre: p.nombre, tipo: p.categoria || 'Especia',
+      desc: (p.usoPrincipal || p.notas || ''), precio: p.precioVenta,
+      stock: p.stock, unidad: p.unidad, blend: false,
+      origen: p.origen || '', perfil: p.perfil || ''
+    });
   });
 
-  // Get blends with stock > 0
-  var blends = (db.blends || []).filter(function(b) {
-    return b.stock > 0 && b.precioVenta > 0;
-  });
-  blends.forEach(function(b) {
-    products.push({ id: b.id, nombre: b.nombre, tipo: 'Blend', desc: b.descripcion || '', precio: b.precioVenta, stock: b.stock, unidad: 'unidad', blend: true });
-  });
-
-  // Filter by category
-  if (storeCategory === 'especias') {
-    products = products.filter(function(p) { return !p.blend; });
-  } else if (storeCategory === 'blends') {
-    products = products.filter(function(p) { return p.blend; });
+  // Get blends with stock > 0 (only when "todos" or "blends" selected)
+  if (storeCategory === 'todos' || storeCategory === 'blends') {
+    var blends = (db.blends || []).filter(function(b) {
+      return b.stock > 0 && b.precioVenta > 0;
+    });
+    blends.forEach(function(b) {
+      products.push({
+        id: b.id, nombre: b.nombre, tipo: 'Blend',
+        desc: b.descripcion || '', precio: b.precioVenta,
+        stock: b.stock, unidad: 'unidad', blend: true,
+        origen: '', perfil: ''
+      });
+    });
   }
 
   if (products.length === 0) {
@@ -62,8 +71,9 @@ function renderStoreProducts() {
   var html = '';
   products.forEach(function(p) {
     html += '<div class="product-card">' +
-      '<div class="product-card-type">' + esc(p.tipo) + '</div>' +
+      '<div class="product-card-type">' + esc(p.tipo) + (p.origen ? ' &mdash; ' + esc(p.origen) : '') + '</div>' +
       '<div class="product-card-name">' + esc(p.nombre) + '</div>' +
+      (p.perfil ? '<div class="product-card-meta">' + esc(p.perfil) + '</div>' : '') +
       (p.desc ? '<div class="product-card-desc">' + esc(p.desc) + '</div>' : '<div class="product-card-desc" style="opacity:.3">Sin descripción</div>') +
       '<div class="product-card-footer">' +
         '<div><div class="product-card-price">' + fmt(p.precio) + '</div>' +
@@ -579,11 +589,12 @@ function renderProductos() {
     html += '<div class="empty"><div class="empty-icon">\u25CF</div><p>No hay productos</p></div>';
   } else {
     html += '<div class="card"><div class="tw"><table>' +
-      '<tr><th>Nombre</th><th>Tipo</th><th>Stock</th><th>Costo</th><th>Venta</th><th>Proveedor</th><th></th></tr>';
+      '<tr><th>Nombre</th><th>Tipo</th><th>Categoría</th><th>Stock</th><th>Costo</th><th>Venta</th><th>Proveedor</th><th></th></tr>';
     filtered.forEach(function(p) {
       var stockClass = p.stock <= p.stockMin ? 'stock-low' : 'stock-ok';
       html += '<tr><td class="fw7">' + esc(p.nombre) + '</td>' +
         '<td><span class="badge ba">' + esc(p.tipo) + '</span></td>' +
+        '<td class="text-sm text-muted">' + esc(p.categoria || '-') + '</td>' +
         '<td class="' + stockClass + '">' + p.stock + ' ' + esc(p.unidad) + '</td>' +
         '<td>' + fmt(p.precioCosto) + '</td>' +
         '<td class="text-gold">' + (p.precioVenta ? fmt(p.precioVenta) : '-') + '</td>' +
@@ -1367,6 +1378,22 @@ function renderAjustes() {
       '<button class="btn btn-ghost btn-sm" onclick="fbForceReload()">Forzar Sincronización</button>' +
       '<button class="btn btn-red btn-sm" onclick="fbClearRemote()">Borrar Datos Remotos</button></div></div>';
 
+  // Import / Export
+  html += '<div class="section-title mb-12">Importar / Exportar Excel</div>';
+  html += '<div class="card mb-20">';
+  html += '<div class="mb-12"><label style="margin-bottom:8px">Importar catálogo desde Excel</label>' +
+    '<div class="text-xs text-muted mb-8">Columnas esperadas: Blend (nombre), Categoría, Origen, Uso Principal, Perfil. Los productos se crean como tipo "especia" con precio $0. Luego editás los precios y stock.</div>' +
+    '<input type="file" id="import-excel-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelImport(this)">' +
+    '<button class="btn btn-gold btn-sm" onclick="document.getElementById(\'import-excel-input\').click()">Seleccionar Archivo Excel</button></div>';
+  html += '<hr class="divider">';
+  html += '<div class="flex gap-8" style="flex-wrap:wrap">';
+  html += '<button class="btn btn-ghost btn-sm" onclick="exportarExcel(\'productos\')">Exportar Productos</button>';
+  html += '<button class="btn btn-ghost btn-sm" onclick="exportarExcel(\'blends\')">Exportar Blends</button>';
+  html += '<button class="btn btn-ghost btn-sm" onclick="exportarExcel(\'ventas\')">Exportar Ventas</button>';
+  html += '<button class="btn btn-ghost btn-sm" onclick="exportarExcel(\'stock\')">Exportar Stock</button>';
+  html += '<button class="btn btn-ghost btn-sm" onclick="exportarExcel(\'todo\')">Exportar Todo</button>';
+  html += '</div></div>';
+
   // Data summary
   html += '<div class="section-title mb-12">Resumen de Datos</div>';
   html += '<div class="card mb-20">';
@@ -1394,6 +1421,312 @@ function renderAjustes() {
   }
 
   el.innerHTML = html;
+}
+
+// =====================================================
+//  EXCEL IMPORT
+// =====================================================
+function handleExcelImport(input) {
+  var file = input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, { type: 'array' });
+      var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+      if (rows.length === 0) {
+        toast('El archivo está vacío', 'err');
+        return;
+      }
+
+      // Detect column mapping
+      var headers = Object.keys(rows[0]);
+      var colMap = detectColumnMap(headers);
+
+      if (!colMap.nombre) {
+        toast('No se encontró columna de nombre (Blend/Nombre/Producto)', 'err');
+        return;
+      }
+
+      // Show preview before importing
+      showImportPreview(rows, colMap);
+
+    } catch(err) {
+      toast('Error al leer el archivo: ' + err.message, 'err');
+      console.error('[Import]', err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = ''; // Reset so same file can be re-selected
+}
+
+function detectColumnMap(headers) {
+  var map = { nombre: null, categoria: null, origen: null, uso: null, perfil: null, precioCosto: null, precioVenta: null, stock: null, unidad: null };
+
+  headers.forEach(function(h) {
+    var hl = h.toLowerCase().trim();
+    if (['blend', 'nombre', 'producto', 'name', 'especia', 'item'].indexOf(hl) !== -1) map.nombre = h;
+    else if (['categoría', 'categoria', 'category', 'tipo', 'type'].indexOf(hl) !== -1) map.categoria = h;
+    else if (['origen', 'origin', 'país', 'pais', 'procedencia'].indexOf(hl) !== -1) map.origen = h;
+    else if (['uso principal', 'uso', 'use', 'aplicación', 'aplicacion'].indexOf(hl) !== -1) map.uso = h;
+    else if (['perfil', 'profile', 'sabor', 'flavor'].indexOf(hl) !== -1) map.perfil = h;
+    else if (['precio costo', 'costo', 'precio_compra', 'cost', 'precio de costo'].indexOf(hl) !== -1) map.precioCosto = h;
+    else if (['precio venta', 'venta', 'precio', 'price', 'precio de venta'].indexOf(hl) !== -1) map.precioVenta = h;
+    else if (['stock', 'cantidad', 'inventario', 'inventory', 'existencia'].indexOf(hl) !== -1) map.stock = h;
+    else if (['unidad', 'unit', 'medida', 'um'].indexOf(hl) !== -1) map.unidad = h;
+  });
+
+  return map;
+}
+
+function showImportPreview(rows, colMap) {
+  var previewRows = rows.slice(0, 8);
+  var html = '<p class="text-sm text-muted mb-12">Se encontraron <strong class="text-gold">' + rows.length + '</strong> filas. Columnas detectadas:' +
+    '<br>Nombre: <strong>' + esc(colMap.nombre || '-') + '</strong>' +
+    (colMap.categoria ? ' | Categoría: <strong>' + esc(colMap.categoria) + '</strong>' : '') +
+    (colMap.origen ? ' | Origen: <strong>' + esc(colMap.origen) + '</strong>' : '') +
+    (colMap.uso ? ' | Uso: <strong>' + esc(colMap.uso) + '</strong>' : '') +
+    (colMap.perfil ? ' | Perfil: <strong>' + esc(colMap.perfil) + '</strong>' : '') +
+    (colMap.precioCosto ? ' | Costo: <strong>' + esc(colMap.precioCosto) + '</strong>' : '') +
+    (colMap.precioVenta ? ' | Venta: <strong>' + esc(colMap.precioVenta) + '</strong>' : '') +
+    (colMap.stock ? ' | Stock: <strong>' + esc(colMap.stock) + '</strong>' : '') +
+    '</p>';
+
+  html += '<div class="tw mb-16"><table><tr><th>Nombre</th><th>Categoría</th><th>Origen</th><th>Uso</th><th>Perfil</th></tr>';
+  previewRows.forEach(function(r) {
+    html += '<tr><td>' + esc(r[colMap.nombre] || '') + '</td>' +
+      '<td>' + esc(r[colMap.categoria] || '') + '</td>' +
+      '<td>' + esc(r[colMap.origen] || '') + '</td>' +
+      '<td>' + esc(r[colMap.uso] || '') + '</td>' +
+      '<td>' + esc(r[colMap.perfil] || '') + '</td></tr>';
+  });
+  if (rows.length > 8) html += '<tr><td colspan="5" class="text-muted text-center">... y ' + (rows.length - 8) + ' más</td></tr>';
+  html += '</table></div>';
+
+  html += '<div class="fr1" style="margin-bottom:12px"><label>Tipo de producto</label>' +
+    '<select id="import-tipo">' + optHtml(PRODUCT_TYPES, 'especia') + '</select></div>';
+
+  html += '<div class="fr"><label>Si el producto ya existe (por nombre):</label></div>';
+  html += '<div class="fr mb-12"><label></label>' +
+    '<select id="import-dupes"><option value="skip">Ignorar duplicados</option>' +
+    '<option value="update">Actualizar existentes</option>' +
+    '<option value="overwrite">Reemplazar todo</option></select></div>';
+
+  html += '<div id="import-alert" class="alert alert-err"></div>';
+  html += '<button class="btn btn-gold btn-full" onclick="executeImport()">Importar ' + rows.length + ' Productos</button>';
+
+  // Store for later use
+  window._importRows = rows;
+  window._importColMap = colMap;
+
+  openModal('Vista Previa de Importación', html);
+}
+
+function executeImport() {
+  var rows = window._importRows;
+  var colMap = window._importColMap;
+  var tipo = document.getElementById('import-tipo').value;
+  var dupeAction = document.getElementById('import-dupes').value;
+  var alertEl = document.getElementById('import-alert');
+
+  if (!rows || rows.length === 0) return;
+
+  var db = getDB();
+  var now = new Date().toISOString();
+  var imported = 0, updated = 0, skipped = 0;
+
+  // If overwrite, clear existing products of this type
+  if (dupeAction === 'overwrite') {
+    var before = db.productos.length;
+    db.productos = db.productos.filter(function(p) { return p.tipo !== tipo; });
+    toast('Eliminados ' + (before - db.productos.length) + ' productos de tipo ' + tipo);
+  }
+
+  rows.forEach(function(r) {
+    var nombre = String(r[colMap.nombre] || '').trim();
+    if (!nombre) return;
+
+    var existing = db.productos.find(function(p) {
+      return p.nombre.toLowerCase() === nombre.toLowerCase() && p.tipo === tipo;
+    });
+
+    if (existing) {
+      if (dupeAction === 'skip') { skipped++; return; }
+      // Update existing
+      if (colMap.categoria) existing.categoria = String(r[colMap.categoria] || '').trim();
+      if (colMap.origen) existing.origen = String(r[colMap.origen] || '').trim();
+      if (colMap.uso) existing.usoPrincipal = String(r[colMap.uso] || '').trim();
+      if (colMap.perfil) existing.perfil = String(r[colMap.perfil] || '').trim();
+      if (colMap.precioCosto) existing.precioCosto = parseFloat(r[colMap.precioCosto]) || existing.precioCosto;
+      if (colMap.precioVenta) existing.precioVenta = parseFloat(r[colMap.precioVenta]) || existing.precioVenta;
+      if (colMap.stock) existing.stock = parseFloat(r[colMap.stock]) || existing.stock;
+      if (colMap.unidad) existing.unidad = String(r[colMap.unidad] || '').trim();
+      existing.actualizadoEn = now;
+      updated++;
+    } else {
+      var notas = [];
+      if (colMap.uso) notas.push('Uso: ' + String(r[colMap.uso] || '').trim());
+      if (colMap.perfil) notas.push('Perfil: ' + String(r[colMap.perfil] || '').trim());
+
+      var prod = {
+        id: nextId(),
+        nombre: nombre,
+        tipo: tipo,
+        unidad: colMap.unidad ? String(r[colMap.unidad] || 'gr').trim() : 'gr',
+        precioCosto: colMap.precioCosto ? (parseFloat(r[colMap.precioCosto]) || 0) : 0,
+        precioVenta: colMap.precioVenta ? (parseFloat(r[colMap.precioVenta]) || 0) : 0,
+        stock: colMap.stock ? (parseFloat(r[colMap.stock]) || 0) : 0,
+        stockMin: 0,
+        proveedor: '',
+        notas: notas.join(' | '),
+        categoria: colMap.categoria ? String(r[colMap.categoria] || '').trim() : '',
+        origen: colMap.origen ? String(r[colMap.origen] || '').trim() : '',
+        usoPrincipal: colMap.uso ? String(r[colMap.uso] || '').trim() : '',
+        perfil: colMap.perfil ? String(r[colMap.perfil] || '').trim() : '',
+        creadoEn: now,
+        actualizadoEn: now
+      };
+      db.productos.push(prod);
+      imported++;
+    }
+  });
+
+  saveDB();
+  closeModal();
+  renderAjustes();
+  toast('Importados: ' + imported + ' | Actualizados: ' + updated + ' | Ignorados: ' + skipped);
+}
+
+// =====================================================
+//  EXCEL EXPORT
+// =====================================================
+function exportarExcel(tipo) {
+  var db = getDB();
+  var wb = XLSX.utils.book_new();
+  var fecha = new Date().toISOString().split('T')[0];
+
+  if (tipo === 'productos' || tipo === 'todo') {
+    var prods = (db.productos || []).map(function(p) {
+      return {
+        'ID': p.id,
+        'Nombre': p.nombre,
+        'Tipo': p.tipo,
+        'Categoría': p.categoria || '',
+        'Origen': p.origen || '',
+        'Uso Principal': p.usoPrincipal || '',
+        'Perfil': p.perfil || '',
+        'Unidad': p.unidad,
+        'Precio Costo': p.precioCosto || 0,
+        'Precio Venta': p.precioVenta || 0,
+        'Stock': p.stock || 0,
+        'Stock Mínimo': p.stockMin || 0,
+        'Proveedor': p.proveedor || '',
+        'Notas': p.notas || ''
+      };
+    });
+    var wsProd = XLSX.utils.json_to_sheet(prods);
+    wsProd['!cols'] = [{ wch: 6 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 24 }, { wch: 18 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsProd, 'Productos');
+  }
+
+  if (tipo === 'blends' || tipo === 'todo') {
+    var blends = (db.blends || []).map(function(b) {
+      var recetaStr = (b.receta || []).map(function(r) { return r.nombre + ' (' + r.cantidad + r.unidad + ')'; }).join(', ');
+      return {
+        'ID': b.id,
+        'Nombre': b.nombre,
+        'Descripción': b.descripcion || '',
+        'Receta': recetaStr,
+        'Costo Unitario': b.costoUnitario || calcBlendCost(b),
+        'Precio Venta': b.precioVenta || 0,
+        'Stock': b.stock || 0
+      };
+    });
+    var wsBlend = XLSX.utils.json_to_sheet(blends);
+    wsBlend['!cols'] = [{ wch: 6 }, { wch: 30 }, { wch: 30 }, { wch: 60 }, { wch: 16 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsBlend, 'Blends');
+  }
+
+  if (tipo === 'ventas' || tipo === 'todo') {
+    var ventas = (db.ventas || []).map(function(v) {
+      var itemsStr = (v.items || []).map(function(i) { return i.nombre + ' x' + i.cantidad + ' (' + fmt(i.subtotal) + ')'; }).join(', ');
+      return {
+        'ID': v.id,
+        'Fecha': fmtDateTime(v.fecha || v.creadoEn),
+        'Tipo': v.tipo === 'tienda' ? 'Tienda' : 'Mostrador',
+        'Cliente': v.clienteNombre || '',
+        'Teléfono': v.clienteTelefono || '',
+        'Dirección': v.clienteDireccion || '',
+        'Items': itemsStr,
+        'Total': v.total || 0,
+        'Estado': v.estado || '',
+        'Creado Por': v.creadoPor || ''
+      };
+    });
+    var wsVentas = XLSX.utils.json_to_sheet(ventas);
+    wsVentas['!cols'] = [{ wch: 6 }, { wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 16 }, { wch: 24 }, { wch: 60 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsVentas, 'Ventas');
+  }
+
+  if (tipo === 'stock' || tipo === 'todo') {
+    var stockRows = [];
+    (db.productos || []).forEach(function(p) {
+      var estado = p.stock <= (p.stockMin || 0) ? 'BAJO' : 'OK';
+      stockRows.push({
+        'Nombre': p.nombre,
+        'Tipo': p.tipo,
+        'Categoría': p.categoria || '',
+        'Stock Actual': p.stock || 0,
+        'Unidad': p.unidad,
+        'Stock Mínimo': p.stockMin || 0,
+        'Estado': estado,
+        'Precio Venta': p.precioVenta || 0,
+        'Valor en Stock': (p.stock || 0) * (p.precioCosto || 0)
+      });
+    });
+    (db.blends || []).forEach(function(b) {
+      stockRows.push({
+        'Nombre': b.nombre,
+        'Tipo': 'Blend',
+        'Categoría': '',
+        'Stock Actual': b.stock || 0,
+        'Unidad': 'unidad',
+        'Stock Mínimo': 0,
+        'Estado': b.stock > 0 ? 'OK' : 'SIN STOCK',
+        'Precio Venta': b.precioVenta || 0,
+        'Valor en Stock': (b.stock || 0) * (b.costoUnitario || 0)
+      });
+    });
+    var wsStock = XLSX.utils.json_to_sheet(stockRows);
+    wsStock['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsStock, 'Stock');
+  }
+
+  if (tipo === 'todo') {
+    // Also add a summary sheet
+    var totalVentas = (db.ventas || []).filter(function(v) { return v.estado !== 'cancelada'; }).reduce(function(s, v) { return s + (v.total || 0); }, 0);
+    var totalCompras = (db.compras || []).filter(function(c) { return c.estado === 'recibida'; }).reduce(function(s, c) { return s + (c.total || 0); }, 0);
+    var summary = [
+      { 'Métrica': 'Total Productos', 'Valor': (db.productos || []).length },
+      { 'Métrica': 'Total Blends', 'Valor': (db.blends || []).length },
+      { 'Métrica': 'Total Ventas', 'Valor': (db.ventas || []).length },
+      { 'Métrica': 'Total Compras', 'Valor': (db.compras || []).length },
+      { 'Métrica': 'Ventas ($)', 'Valor': totalVentas },
+      { 'Métrica': 'Compras ($)', 'Valor': totalCompras },
+      { 'Métrica': 'Fecha Exportación', 'Valor': fecha }
+    ];
+    var wsSum = XLSX.utils.json_to_sheet(summary);
+    wsSum['!cols'] = [{ wch: 24 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsSum, 'Resumen');
+  }
+
+  var fileName = 'Arcano_' + tipo + '_' + fecha + '.xlsx';
+  XLSX.writeFile(wb, fileName);
+  toast('Excel descargado: ' + fileName);
 }
 
 function resetearMovimientos() {
