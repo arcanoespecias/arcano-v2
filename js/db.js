@@ -106,8 +106,12 @@ function fmtDateTime(iso) {
 var PRODUCT_TYPES = [
   { val: 'especia', label: 'Especia' },
   { val: 'frasco', label: 'Frasco' },
-  { val: 'etiqueta', label: 'Etiqueta' },
-  { val: 'bolsa', label: 'Bolsa' }
+  { val: 'etiqueta', label: 'Etiqueta' }
+];
+
+var BLEND_FORMATOS = [
+  { val: 'polvo', label: 'Polvo' },
+  { val: 'escamas', label: 'Escamas' }
 ];
 
 var UNITS = ['gr', 'kg', 'ml', 'L', 'unidad', 'cm', 'mt', 'rollo'];
