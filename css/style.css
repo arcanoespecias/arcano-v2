@@ -1398,6 +1398,453 @@ textarea {
 }
 
 /* ============================================
+   Icon Button
+   ============================================ */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--cream);
+  font-size: 1.1rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  background: var(--surface2);
+  border-color: var(--gold-dim);
+}
+
+/* ============================================
+   Page Header
+   ============================================ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-header h2 {
+  font-family: var(--font-head);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--cream);
+  letter-spacing: .02em;
+}
+
+/* ============================================
+   Button Variants
+   ============================================ */
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .85rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  text-decoration: underline;
+  padding: 4px 0;
+}
+
+.btn-link:hover {
+  color: var(--gold2);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.btn-outline:hover {
+  border-color: var(--gold-dim);
+  color: var(--cream);
+  opacity: 1;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-warn {
+  background: var(--yellow);
+  color: #1a0e00;
+  border-color: var(--yellow);
+}
+
+/* ============================================
+   Table Wrap (alias for .tw)
+   ============================================ */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrap th {
+  font-size: .72rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.table-wrap td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(61, 42, 24, .4);
+  font-size: .85rem;
+  vertical-align: middle;
+}
+
+.table-wrap tr:hover td {
+  background: rgba(201, 150, 58, .04);
+}
+
+/* ============================================
+   Tab Buttons (alias for .tab)
+   ============================================ */
+.tab-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-body);
+  white-space: nowrap;
+  transition: color .2s, border-color .2s;
+}
+
+.tab-btn:hover {
+  color: var(--cream);
+}
+
+.tab-btn.active {
+  color: var(--gold2);
+  border-bottom-color: var(--gold2);
+}
+
+/* ============================================
+   Forms
+   ============================================ */
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  margin-bottom: 2px;
+}
+
+.form-group label {
+  margin-bottom: 4px;
+}
+
+/* ============================================
+   Alerts
+   ============================================ */
+.alert-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  font-size: .85rem;
+}
+
+.alert-warn {
+  border-color: var(--yellow);
+  background: rgba(200, 160, 48, .08);
+}
+
+.alert-msg {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: .82rem;
+  background: rgba(192, 64, 64, .15);
+  color: var(--red);
+  border: 1px solid rgba(192, 64, 64, .3);
+  display: none;
+}
+
+.alert-msg[style*="block"],
+.alert-msg.show {
+  display: block;
+}
+
+/* ============================================
+   Movement List (Products page etc)
+   ============================================ */
+.mov-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mov-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mov-info strong {
+  display: block;
+  font-size: .88rem;
+  margin-bottom: 2px;
+}
+
+.mov-info br {
+  display: block;
+  content: "";
+  margin-top: 2px;
+}
+
+.mov-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Compra Item Row
+   ============================================ */
+.compra-item-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.compra-item-row select {
+  flex: 2;
+  min-width: 120px;
+}
+
+.compra-item-row input {
+  flex: 1;
+  min-width: 80px;
+}
+
+.subtotal-display {
+  min-width: 70px;
+  text-align: right;
+  font-size: .82rem;
+  color: var(--gold);
+}
+
+/* ============================================
+   Frasco Selector
+   ============================================ */
+.frasco-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.frasco-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.frasco-option:hover {
+  border-color: var(--gold-dim);
+}
+
+/* ============================================
+   Cart Detail (modal)
+   ============================================ */
+.cart-detail {
+  padding: 4px 0;
+}
+
+.total-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1rem;
+  font-weight: 700;
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================
+   PIN Screen — User Selection & Numpad
+   ============================================ */
+.pin-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pin-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: .9rem;
+  transition: all .15s;
+  width: 100%;
+}
+
+.pin-user-btn:hover {
+  border-color: var(--gold-dim);
+  background: var(--surface2);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pin-label {
+  font-size: .9rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-dim);
+  transition: all .15s;
+}
+
+.dot.filled {
+  background: var(--gold2);
+  border-color: var(--gold2);
+  transform: scale(1.1);
+}
+
+.pin-error {
+  color: var(--red);
+  font-size: .82rem;
+  min-height: 1.2em;
+  margin-bottom: 8px;
+}
+
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+.numpad-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--cream);
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  transition: all .15s;
+  margin: 0 auto;
+}
+
+.numpad-btn:hover {
+  background: var(--surface2);
+  border-color: var(--gold-dim);
+}
+
+.numpad-btn:active {
+  transform: scale(.95);
+}
+
+.numpad-blank {
+  background: transparent;
+  border-color: transparent;
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+
+.numpad-blank:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.numpad-cancel {
+  background: rgba(192, 64, 64, .2);
+  border-color: rgba(192, 64, 64, .4);
+  color: var(--red);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.numpad-cancel:hover {
+  background: rgba(192, 64, 64, .35);
+  border-color: var(--red);
+}
+
+/* ============================================
+   Misc Spacing
+   ============================================ */
+.mt-2 {
+  margin-top: 8px;
+}
+
+/* ============================================
    Responsive
    ============================================ */
 @media (max-width: 600px) {
@@ -1453,5 +1900,28 @@ textarea {
   .products-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 12px;
+  }
+
+  .numpad-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 1.1rem;
+  }
+
+  .compra-item-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compra-item-row select,
+  .compra-item-row input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .frasco-option {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
 }
