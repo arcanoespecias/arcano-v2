@@ -808,6 +808,14 @@ textarea {
 }
 
 /* ============================================
+   Admin App Shell
+   ============================================ */
+#admin-app {
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ============================================
    Header (Admin)
    ============================================ */
 #app-header {
@@ -1353,6 +1361,10 @@ textarea {
   margin-bottom: 12px;
 }
 
+.cart-toggle {
+  position: relative;
+}
+
 .cart-count {
   position: absolute;
   top: -6px;
@@ -1368,6 +1380,25 @@ textarea {
   align-items: center;
   justify-content: center;
   line-height: 1;
+}
+
+/* ============================================
+   Checkbox Label (override global label)
+   ============================================ */
+.chk-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+  color: var(--cream);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.chk-label input {
+  width: auto;
 }
 
 /* ============================================
