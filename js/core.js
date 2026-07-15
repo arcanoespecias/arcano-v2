@@ -209,7 +209,7 @@ function showLogin() {
   hideBootLoader();
   var db = getDB();
   var users = db.usuarios.filter(function(u) {
-    return u.rol !== 'vendedor' && u.activo;
+    return u.rol !== 'vendedor' && u.activo !== false;
   });
   var ps = document.getElementById('pin-screen');
   if (!ps) return;
