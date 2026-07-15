@@ -1,252 +1,273 @@
-// ===================== CORE MODULE =====================
-// Auth (PIN), routing, toast, modal, seed data, PWA.
+// ===================== ARCANO ERP — CORE =====================
 
+// ---------- 1. Global State ----------
 var currentUser = null;
 var currentPage = 'dashboard';
-var cart = []; // Storefront cart
+var cart = [];
 
-// ============ TOAST ============
-var _toastTimer = null;
+// ---------- 2. Toast Notification ----------
 function toast(msg, type) {
   var el = document.getElementById('toast');
   if (!el) return;
   el.textContent = msg;
-  el.style.display = 'block';
-  if (type === 'err') {
-    el.style.background = 'var(--red)';
-    el.style.color = '#fff';
-  } else {
-    el.style.background = 'linear-gradient(135deg, var(--gold), var(--gold2))';
-    el.style.color = '#1a0e00';
-  }
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(function() { el.style.display = 'none'; }, 3000);
+  el.style.background = (type === 'err')
+    ? '#c0392b'
+    : 'linear-gradient(135deg, #c8952e, #e8c547)';
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function() { el.classList.remove('show'); }, 3000);
 }
 
-// ============ MODAL ============
+// ---------- 3. Modal ----------
 function openModal(title, bodyHTML) {
-  var overlay = document.getElementById('modal-overlay');
   var body = document.getElementById('modal-body');
-  body.innerHTML = '<div class="modal-header"><div class="modal-title">' + title + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' + bodyHTML;
-  overlay.classList.add('open');
-}
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
+  if (!body) return;
+  body.innerHTML =
+    '<div class="modal-header"><h3>' + esc(title) + '</h3>' +
+    '<button class="btn-icon" onclick="closeModal()">&times;</button></div>' +
+    '<div class="modal-content">' + bodyHTML + '</div>';
+  document.getElementById('modal-overlay').classList.add('open');
 }
 
-// ============ SEED DATA ============
+function closeModal() {
+  var ov = document.getElementById('modal-overlay');
+  if (ov) ov.classList.remove('open');
+}
+
+// ---------- 4. Escape HTML ----------
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------- 5. Select Options Helper ----------
+function optHtml(items, selected) {
+  if (!items) return '';
+  return items.map(function(item) {
+    var val, label;
+    if (typeof item === 'string') { val = item; label = item; }
+    else { val = item.val; label = item.label; }
+    var sel = (val === selected) ? ' selected' : '';
+    return '<option value="' + esc(val) + '"' + sel + '>' + esc(label) + '</option>';
+  }).join('');
+}
+
+// ---------- 6. Migration ----------
 function migrateData() {
-  // Patch old-format users (missing activo field)
   var db = getDB();
   var changed = false;
-  (db.usuarios || []).forEach(function(u) {
+
+  // Patch users missing activo, rol, creadoEn
+  db.usuarios.forEach(function(u) {
     if (u.activo === undefined) { u.activo = true; changed = true; }
-    if (!u.rol) { u.rol = 'admin'; changed = true; }
+    if (!u.rol) { u.rol = 'operador'; changed = true; }
     if (!u.creadoEn) { u.creadoEn = new Date().toISOString(); changed = true; }
   });
-  // Migrate old product types: envase → frasco, packaging/bolsa → removed
-  if (db.productos) {
-    db.productos = db.productos.filter(function(p) {
-      if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
-      if (p.tipo === 'packaging' || p.tipo === 'bolsa') { changed = true; return false; }
-      return true;
-    });
-  }
-  // Migrate old blends: add formato, etiquetaId, gramosPorUnidad if missing
-  (db.blends || []).forEach(function(b) {
+
+  // Filter out bolsa/packaging, rename envase -> frasco
+  var before = db.productos.length;
+  db.productos = db.productos.filter(function(p) {
+    return p.tipo !== 'bolsa' && p.tipo !== 'packaging';
+  });
+  if (db.productos.length !== before) changed = true;
+  db.productos.forEach(function(p) {
+    if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
+  });
+
+  // Blends: add formato/gramosPorUnidad, migrate old cantidad -> porcentaje
+  db.blends.forEach(function(b) {
     if (!b.formato) { b.formato = 'polvo'; changed = true; }
     if (!b.gramosPorUnidad) { b.gramosPorUnidad = 100; changed = true; }
-    // Migrate old recipe from cantidad to porcentaje
     if (b.receta && b.receta.length > 0 && b.receta[0].porcentaje === undefined) {
-      var totalCant = b.receta.reduce(function(s, r) { return s + (r.cantidad || 0); }, 0);
+      var totalCant = b.receta.reduce(function(a, r) { return a + (r.cantidad || 0); }, 0);
       if (totalCant > 0) {
         b.receta.forEach(function(r) {
-          r.porcentaje = Math.round((r.cantidad / totalCant) * 100 * 100) / 100;
+          r.porcentaje = Math.round((r.cantidad / totalCant) * 100);
           delete r.cantidad;
-          delete r.unidad;
         });
         changed = true;
       }
     }
   });
-  // Ensure all collections exist
-  if (!db.productos) db.productos = [];
-  if (!db.compras) db.compras = [];
-  if (!db.blends) db.blends = [];
-  if (!db.ventas) db.ventas = [];
-  if (!db.movimientos) db.movimientos = [];
-  if (changed) { saveDB(); console.log('[Migrate] Datos viejos migrados'); }
+
+  if (changed) saveDB();
 }
 
+// ---------- 7. Seed Data ----------
 function seedIfEmpty() {
   var db = getDB();
-  // Check specifically for an admin user
-  var hasAdmin = (db.usuarios || []).some(function(u) { return u.rol === 'admin'; });
-  if (hasAdmin) return false;
+  var hasAdmin = db.usuarios.some(function(u) { return u.rol === 'admin'; });
+  if (hasAdmin) return;
 
-  // Create default admin user
+  // Admin user
   db.usuarios.push({
-    id: nextId(),
-    nombre: 'Admin',
-    pin: '1234',
-    rol: 'admin',
-    activo: true,
-    creadoEn: new Date().toISOString()
+    id: nextId(), nombre: 'Admin', pin: '1234',
+    rol: 'admin', activo: true, creadoEn: new Date().toISOString()
   });
 
-  // Sample products — precioCosto para especias = costo por 1000gr
+  // 6 especias
   var especias = [
-    { nombre: 'Cúrcuma', tipo: 'especia', unidad: 'gr', precioCosto: 45000, precioVenta: 80, stock: 500, stockMin: 100, proveedor: 'Especias del Oriente', notas: 'Polvo fino' },
-    { nombre: 'Comino', tipo: 'especia', unidad: 'gr', precioCosto: 55000, precioVenta: 100, stock: 400, stockMin: 80, proveedor: 'Especias del Oriente', notas: 'Entero' },
-    { nombre: 'Pimienta Negra', tipo: 'especia', unidad: 'gr', precioCosto: 70000, precioVenta: 130, stock: 300, stockMin: 60, proveedor: 'Especias del Oriente', notas: '' },
-    { nombre: 'Canela', tipo: 'especia', unidad: 'gr', precioCosto: 90000, precioVenta: 160, stock: 200, stockMin: 50, proveedor: 'Especias del Oriente', notas: 'Rama' },
-    { nombre: 'Azafrán', tipo: 'especia', unidad: 'gr', precioCosto: 800000, precioVenta: 1500, stock: 30, stockMin: 10, proveedor: 'Importaciones Premium', notas: 'Hebras' },
-    { nombre: 'Chile Ahumado', tipo: 'especia', unidad: 'gr', precioCosto: 60000, precioVenta: 110, stock: 350, stockMin: 70, proveedor: 'Especias del Oriente', notas: 'Polvo' }
+    { nombre: 'Curcuma',    costoPor1000gr: 45000,  stock: 400, stockMin: 100, categoria: 'Gastronomia',    precioVenta: 55,   proveedor: 'Especias del Oriente' },
+    { nombre: 'Comino',     costoPor1000gr: 55000,  stock: 350, stockMin: 100, categoria: 'Gastronomia',    precioVenta: 65,   proveedor: 'Especias del Oriente' },
+    { nombre: 'Pimienta Negra', costoPor1000gr: 70000, stock: 300, stockMin: 80, categoria: 'Gastronomia', precioVenta: 80, proveedor: 'Especias del Oriente' },
+    { nombre: 'Canela',     costoPor1000gr: 90000,  stock: 250, stockMin: 60,  categoria: 'Infusion',       precioVenta: 100,  proveedor: 'Especias del Oriente' },
+    { nombre: 'Azafran',    costoPor1000gr: 800000, stock: 200, stockMin: 50,  categoria: 'Cocteleria',     precioVenta: 900,  proveedor: 'Especias del Oriente' },
+    { nombre: 'Chile Ahumado', costoPor1000gr: 60000, stock: 500, stockMin: 120, categoria: 'Gastronomia', precioVenta: 75, proveedor: 'Especias del Oriente' }
   ];
   especias.forEach(function(e) {
-    e.id = nextId();
-    e.creadoEn = new Date().toISOString();
-    e.actualizadoEn = e.creadoEn;
-    db.productos.push(e);
+    db.productos.push({
+      id: nextId(), nombre: e.nombre, tipo: 'especia',
+      unidad: 'gr', stock: e.stock, stockMin: e.stockMin,
+      costoPor1000gr: e.costoPor1000gr,
+      precioCosto: Math.round(e.costoPor1000gr / 1000),
+      precioVenta: e.precioVenta,
+      categoria: e.categoria, proveedor: e.proveedor
+    });
   });
 
-  // Sample supplies (frascos y etiquetas)
-  var insumos = [
-    { nombre: 'Frasco Grande 100gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 350, precioVenta: 0, stock: 200, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
-    { nombre: 'Frasco Pequeño 50gr', tipo: 'frasco', unidad: 'unidad', precioCosto: 250, precioVenta: 0, stock: 300, stockMin: 50, proveedor: 'Envases Colombia', notas: 'Vidrio ámbar' },
-    { nombre: 'Etiqueta Curry Arcano', tipo: 'etiqueta', unidad: 'unidad', precioCosto: 100, precioVenta: 0, stock: 500, stockMin: 100, proveedor: 'Imprenta Nacional', notas: 'Etiqueta para Curry Arcano' }
+  // 2 frascos
+  db.productos.push({
+    id: nextId(), nombre: 'Frasco Grande 100gr', tipo: 'frasco',
+    unidad: 'unidad', stock: 200, stockMin: 50,
+    precioCosto: 350, precioVenta: 0, proveedor: ''
+  });
+  db.productos.push({
+    id: nextId(), nombre: 'Frasco Pequeno 50gr', tipo: 'frasco',
+    unidad: 'unidad', stock: 300, stockMin: 50,
+    precioCosto: 250, precioVenta: 0, proveedor: ''
+  });
+
+  // 2 etiquetas
+  var etqCurryId = nextId();
+  db.productos.push({
+    id: etqCurryId, nombre: 'Etiqueta Curry Arcano', tipo: 'etiqueta',
+    unidad: 'unidad', stock: 500, stockMin: 100,
+    precioCosto: 100, precioVenta: 0, proveedor: ''
+  });
+  db.productos.push({
+    id: nextId(), nombre: 'Etiqueta Mezcla Ahumada', tipo: 'etiqueta',
+    unidad: 'unidad', stock: 500, stockMin: 100,
+    precioCosto: 100, precioVenta: 0, proveedor: ''
+  });
+
+  // 1 sample blend
+  var receta = [
+    { productoId: 1, nombre: 'Curcuma',         porcentaje: 35 },
+    { productoId: 2, nombre: 'Comino',           porcentaje: 20 },
+    { productoId: 3, nombre: 'Pimienta Negra',   porcentaje: 15 },
+    { productoId: 6, nombre: 'Chile Ahumado',    porcentaje: 30 }
   ];
-  insumos.forEach(function(e) {
-    e.id = nextId();
-    e.creadoEn = new Date().toISOString();
-    e.actualizadoEn = e.creadoEn;
-    db.productos.push(e);
-  });
-
-  // Sample blend — receta con porcentajes (%)
   db.blends.push({
-    id: nextId(),
-    nombre: 'Curry Arcano',
-    descripcion: 'Mezcla especial de la casa con toque ahumado',
-    formato: 'polvo',
-    gramosPorUnidad: 100,
-    etiquetaId: 0, // Will be set after creating etiqueta
-    receta: [
-      { productoId: 1, nombre: 'Cúrcuma', porcentaje: 35 },
-      { productoId: 2, nombre: 'Comino', porcentaje: 20 },
-      { productoId: 3, nombre: 'Pimienta Negra', porcentaje: 15 },
-      { productoId: 6, nombre: 'Chile Ahumado', porcentaje: 30 }
-    ],
-    costoUnitario: 0,
-    precioVenta: 5500,
-    stock: 0,
-    creadoEn: new Date().toISOString(),
-    actualizadoEn: new Date().toISOString()
+    id: nextId(), nombre: 'Curry Arcano', formato: 'polvo',
+    gramosPorUnidad: 100, precioVenta: 5500,
+    costoUnitario: 0, etiquetaId: etqCurryId, receta: receta
   });
-  // Link etiqueta to blend (etiqueta is the last product created)
-  var lastEtiqueta = db.productos.slice().reverse().find(function(p) { return p.tipo === 'etiqueta'; });
-  if (lastEtiqueta) {
-    db.blends[db.blends.length - 1].etiquetaId = lastEtiqueta.id;
-  }
 
   saveDB();
-  console.log('[Seed] Datos iniciales creados - Admin PIN: 1234');
-  return true;
+  console.log('[Seed] Datos iniciales creados');
 }
 
-// ============ AUTH ============
-function initPin() {
+// ---------- 8. Auth System ----------
+function initApp() {
   var saved = sessionStorage.getItem('arcano_user');
   if (saved) {
     try {
-      currentUser = JSON.parse(saved);
+      var user = JSON.parse(saved);
       var db = getDB();
-      var match = db.usuarios.find(function(u) { return u.id === currentUser.id; });
-      if (match && match.activo) {
-        currentUser = match;
+      var found = db.usuarios.find(function(u) { return u.id === user.id; });
+      if (found && found.activo) {
+        currentUser = found;
         enterApp();
         return;
       }
     } catch(e) {}
-    sessionStorage.removeItem('arcano_user');
-    currentUser = null;
   }
-  // No saved session -> show storefront
   showStorefront();
 }
 
 function showStorefront() {
-  document.getElementById('storefront').style.display = 'block';
-  document.getElementById('admin-app').style.display = 'none';
-  document.getElementById('pin-screen').style.display = 'none';
-  renderStorefront();
+  var sf = document.getElementById('storefront');
+  var aa = document.getElementById('admin-app');
+  var ps = document.getElementById('pin-screen');
+  if (sf) sf.style.display = 'block';
+  if (aa) aa.style.display = 'none';
+  if (ps) ps.style.display = 'none';
+  if (typeof renderStorefront === 'function') renderStorefront();
 }
 
 function showLogin() {
   var db = getDB();
-  var users = (db.usuarios || []).filter(function(u) { return (u.activo !== false) && u.rol !== 'vendedor'; });
-  if (users.length === 0) {
-    toast('No hay usuarios registrados', 'err');
-    return;
-  }
-
-  var html = '<div class="pin-logo">ARCANO</div><div class="pin-sub">Selecciona usuario</div><div class="user-list">';
-  users.forEach(function(u) {
-    var roleLabel = u.rol === 'admin' ? 'Admin' : 'Operador';
-    html += '<button class="user-btn" onclick="startPinEntry(' + u.id + ')">' +
-      '<div class="user-avatar">' + u.nombre.charAt(0) + '</div>' +
-      '<div><div>' + esc(u.nombre) + '</div><div style="font-size:.7rem;color:var(--muted)">' + roleLabel + '</div></div></button>';
+  var users = db.usuarios.filter(function(u) {
+    return u.rol !== 'vendedor' && u.activo;
   });
-  html += '</div>';
-  html += '<button class="btn btn-ghost btn-sm mt-16" onclick="showStorefront()" style="margin-top:16px">Volver a la tienda</button>';
-
-  document.getElementById('pin-screen').style.display = 'flex';
-  document.getElementById('admin-app').style.display = 'none';
+  var ps = document.getElementById('pin-screen');
+  if (!ps) return;
+  var html = '<div class="pin-users">';
+  users.forEach(function(u) {
+    var badgeClass = u.rol === 'admin' ? 'badge bg' : 'badge bo';
+    html += '<button class="pin-user-btn" onclick="startPinEntry(' + u.id + ')">' +
+      '<div class="avatar">' + esc(u.nombre.charAt(0).toUpperCase()) + '</div>' +
+      '<div><strong>' + esc(u.nombre) + '</strong><br>' +
+      '<span class="' + badgeClass + '">' + esc(u.rol) + '</span></div></button>';
+  });
+  html += '</div><button class="btn btn-link mt-2" onclick="showStorefront()">Volver a la tienda</button>';
+  ps.innerHTML = html;
+  ps.style.display = 'flex';
   document.getElementById('storefront').style.display = 'none';
-  document.getElementById('pin-content').innerHTML = html;
+  document.getElementById('admin-app').style.display = 'none';
 }
 
 function startPinEntry(userId) {
-  var db = getDB();
-  var user = db.usuarios.find(function(u) { return u.id === userId; });
-  if (!user) return;
-
-  var pinVal = '';
-  var html = '<div class="pin-logo">ARCANO</div>' +
-    '<div class="pin-sub">' + esc(user.nombre) + ' &mdash; Ingresa tu PIN</div>' +
-    '<div class="pin-display mb-16">';
-  for (var i = 0; i < 4; i++) html += '<div class="pin-dot" id="pd-' + i + '"></div>';
-  html += '</div><div class="pin-pad">';
-  for (var n = 1; n <= 9; n++) html += '<button class="pin-digit" onclick="pinDigit(\'' + n + '\')">' + n + '</button>';
-  html += '<button class="pin-digit pin-back" onclick="pinBack()">&larr;</button>';
-  html += '<button class="pin-digit" onclick="pinDigit(\'0\')">0</button>';
-  html += '<button class="pin-digit pin-back" onclick="pinEntryCancel()">X</button>';
-  html += '</div>';
-
-  document.getElementById('pin-content').innerHTML = html;
   window._pinTarget = userId;
   window._pinVal = '';
+  var ps = document.getElementById('pin-screen');
+  if (!ps) return;
+  var html = '<div class="pin-card">' +
+    '<p class="pin-label">Ingrese su PIN</p>' +
+    '<div class="pin-dots" id="pin-dots">' +
+      '<span class="dot"></span><span class="dot"></span>' +
+      '<span class="dot"></span><span class="dot"></span>' +
+    '</div>' +
+    '<p class="pin-error" id="pin-error"></p>' +
+    '<div class="numpad">';
+  for (var i = 1; i <= 9; i++) {
+    html += '<button class="numpad-btn" onclick="pinDigit(\'' + i + '\')">' + i + '</button>';
+  }
+  html += '<button class="numpad-btn numpad-blank" onclick="pinBack()">&#9003;</button>' +
+    '<button class="numpad-btn" onclick="pinDigit(\'0\')">0</button>' +
+    '<button class="numpad-btn numpad-cancel" onclick="pinEntryCancel()">X</button>';
+  html += '</div></div>';
+  ps.innerHTML = html;
+  ps.style.display = 'flex';
+  updatePinDots();
+}
+
+function updatePinDots() {
+  var dots = document.querySelectorAll('#pin-dots .dot');
+  var len = (window._pinVal || '').length;
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle('filled', i < len);
+  }
 }
 
 function pinDigit(d) {
-  window._pinVal = (window._pinVal || '') + d;
-  var len = window._pinVal.length;
-  for (var i = 0; i < 4; i++) {
-    var dot = document.getElementById('pd-' + i);
-    if (dot) dot.className = 'pin-dot' + (i < len ? ' filled' : '');
-  }
-  if (len === 4) {
-    setTimeout(function() { verifyPin(window._pinTarget, window._pinVal); }, 200);
+  if (!window._pinVal) window._pinVal = '';
+  if (window._pinVal.length >= 4) return;
+  window._pinVal += d;
+  updatePinDots();
+  if (window._pinVal.length === 4) {
+    verifyPin(window._pinTarget, window._pinVal);
   }
 }
 
 function pinBack() {
-  window._pinVal = (window._pinVal || '').slice(0, -1);
-  var len = window._pinVal.length;
-  for (var i = 0; i < 4; i++) {
-    var dot = document.getElementById('pd-' + i);
-    if (dot) dot.className = 'pin-dot' + (i < len ? ' filled' : '');
-  }
+  if (!window._pinVal) return;
+  window._pinVal = window._pinVal.slice(0, -1);
+  updatePinDots();
 }
 
 function pinEntryCancel() {
@@ -256,232 +277,159 @@ function pinEntryCancel() {
 function verifyPin(userId, pin) {
   var db = getDB();
   var user = db.usuarios.find(function(u) { return u.id === userId; });
-  if (!user) { toast('Usuario no encontrado', 'err'); showLogin(); return; }
-
-  if (user.pin === pin) {
+  if (user && user.pin === pin) {
     currentUser = user;
     sessionStorage.setItem('arcano_user', JSON.stringify(user));
-    toast('Bienvenido, ' + user.nombre);
     enterApp();
   } else {
-    toast('PIN incorrecto', 'err');
+    var errEl = document.getElementById('pin-error');
+    if (errEl) errEl.textContent = 'PIN incorrecto';
     window._pinVal = '';
-    for (var i = 0; i < 4; i++) {
-      var dot = document.getElementById('pd-' + i);
-      if (dot) dot.className = 'pin-dot';
-    }
+    updatePinDots();
   }
 }
 
 function handleLogout() {
-  if (!confirm('Cerrar sesión?')) return;
+  if (!confirm('Cerrar sesion?')) return;
   currentUser = null;
   sessionStorage.removeItem('arcano_user');
+  cart = [];
   showStorefront();
 }
 
-// ============ ENTER APP ============
-function enterApp() {
-  document.getElementById('pin-screen').style.display = 'none';
-  document.getElementById('storefront').style.display = 'none';
-  document.getElementById('admin-app').style.display = 'block';
-
-  buildNav();
-  updateUserChip();
-
-  // Navigate based on role
-  if (currentUser.rol === 'admin') {
-    navigateTo('dashboard');
-  } else if (currentUser.rol === 'operador') {
-    navigateTo('ventas');
-  } else {
-    showStorefront();
-  }
-}
-
-// ============ NAVIGATION ============
+// ---------- 9. Navigation ----------
 var NAV_ITEMS = {
   admin: [
-    { id: 'dashboard', label: 'Dashboard', icon: '\u2302' },
-    { id: 'compras', label: 'Compras', icon: '\u2191' },
-    { id: 'productos', label: 'Productos', icon: '\u25CF' },
-    { id: 'blends', label: 'Blends', icon: '\u2726' },
-    { id: 'ventas', label: 'Ventas', icon: '\u2193' },
-    { id: 'usuarios', label: 'Usuarios', icon: '\u263A' },
-    { id: 'ajustes', label: 'Ajustes', icon: '\u2699' }
+    { id: 'dashboard',  label: 'Dashboard'  },
+    { id: 'compras',    label: 'Compras'    },
+    { id: 'productos',  label: 'Especias'   },
+    { id: 'blends',     label: 'Blends'     },
+    { id: 'produccion', label: 'Produccion' },
+    { id: 'ventas',     label: 'Ventas'     },
+    { id: 'usuarios',   label: 'Usuarios'   },
+    { id: 'ajustes',    label: 'Ajustes'    }
   ],
   operador: [
-    { id: 'ventas', label: 'Ventas', icon: '\u2193' },
-    { id: 'productos', label: 'Productos', icon: '\u25CF' },
-    { id: 'ajustes', label: 'Ajustes', icon: '\u2699' }
+    { id: 'ventas',   label: 'Ventas'   },
+    { id: 'productos', label: 'Especias' },
+    { id: 'ajustes',  label: 'Ajustes'  }
   ]
 };
 
+function enterApp() {
+  var ps = document.getElementById('pin-screen');
+  var sf = document.getElementById('storefront');
+  var aa = document.getElementById('admin-app');
+  if (ps) ps.style.display = 'none';
+  if (sf) sf.style.display = 'none';
+  if (aa) aa.style.display = 'flex';
+  buildNav();
+  updateUserChip();
+  var startPage = (currentUser && currentUser.rol === 'operador') ? 'ventas' : 'dashboard';
+  navigateTo(startPage);
+}
+
 function buildNav() {
   var nav = document.getElementById('app-nav');
-  var items = NAV_ITEMS[currentUser.rol] || NAV_ITEMS.operador;
+  if (!nav || !currentUser) return;
+  var items = NAV_ITEMS[currentUser.rol] || [];
   var html = '';
   items.forEach(function(item) {
-    html += '<button class="nav-btn' + (item.id === currentPage ? ' active' : '') + '" onclick="navigateTo(\'' + item.id + '\')">' + item.label + '</button>';
+    var cls = (item.id === currentPage) ? ' nav-btn active' : ' nav-btn';
+    html += '<button class="' + cls + '" data-page="' + item.id + '" onclick="navigateTo(\'' + item.id + '\')">' + esc(item.label) + '</button>';
   });
   nav.innerHTML = html;
 }
 
 function navigateTo(page) {
   currentPage = page;
-  // Update nav active state
-  var btns = document.querySelectorAll('#app-nav .nav-btn');
-  btns.forEach(function(btn) {
-    btn.classList.toggle('active', btn.textContent.toLowerCase().replace(/[^a-z]/g,'') === page.replace(/[^a-z]/g,'') ||
-      NAV_ITEMS[currentUser.rol].some(function(n) { return n.id === page && n.label === btn.textContent; }));
-  });
-  // Actually match by page id stored in onclick
-  btns.forEach(function(btn) {
-    var match = btn.getAttribute('onclick');
-    btn.classList.toggle('active', match && match.indexOf("'" + page + "'") !== -1);
-  });
-
-  // Hide all pages
-  document.querySelectorAll('#app-main .page').forEach(function(p) { p.classList.remove('active'); });
-
-  // Show target page
-  var target = document.getElementById('page-' + page);
-  if (target) {
-    target.classList.add('active');
-    renderPage(page);
+  var nav = document.getElementById('app-nav');
+  if (nav) {
+    var btns = nav.querySelectorAll('.nav-btn');
+    btns.forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-page') === page);
+    });
   }
+  var pages = document.querySelectorAll('.page');
+  pages.forEach(function(p) { p.style.display = 'none'; });
+  var target = document.getElementById('page-' + page);
+  if (target) target.style.display = 'block';
+  renderPage(page);
 }
 
-function refreshCurrentPage() {
-  if (currentPage && currentUser) {
-    renderPage(currentPage);
-  } else if (!currentUser) {
-    renderStorefront();
-  }
+function refreshPage() {
+  renderPage(currentPage);
 }
 
 function updateUserChip() {
   var chip = document.getElementById('user-chip');
   if (!chip || !currentUser) return;
-  var roleLabel = currentUser.rol === 'admin' ? 'Admin' : 'Operador';
-  chip.innerHTML = currentUser.nombre + ' <span class="badge ba">' + roleLabel + '</span>';
+  var badgeClass = currentUser.rol === 'admin' ? 'badge bg' : 'badge bo';
+  chip.innerHTML = esc(currentUser.nombre) +
+    ' <span class="' + badgeClass + '">' + esc(currentUser.rol) + '</span>' +
+    ' <button class="btn-icon" onclick="handleLogout()" title="Salir">&#x2190;</button>';
 }
 
-// ============ RENDER PAGE DISPATCHER ============
 function renderPage(page) {
-  switch(page) {
-    case 'dashboard': renderDashboard(); break;
-    case 'compras': renderCompras(); break;
-    case 'productos': renderProductos(); break;
-    case 'blends': renderBlends(); break;
-    case 'ventas': renderVentas(); break;
-    case 'usuarios': renderUsuarios(); break;
-    case 'ajustes': renderAjustes(); break;
+  switch (page) {
+    case 'dashboard':  if (typeof renderDashboard  === 'function') renderDashboard();  break;
+    case 'compras':    if (typeof renderCompras    === 'function') renderCompras();    break;
+    case 'productos':  if (typeof renderProductos  === 'function') renderProductos();  break;
+    case 'blends':     if (typeof renderBlends     === 'function') renderBlends();     break;
+    case 'produccion': if (typeof renderProduccion === 'function') renderProduccion(); break;
+    case 'ventas':     if (typeof renderVentas     === 'function') renderVentas();     break;
+    case 'usuarios':   if (typeof renderUsuarios   === 'function') renderUsuarios();   break;
+    case 'ajustes':    if (typeof renderAjustes    === 'function') renderAjustes();    break;
   }
 }
 
-// ============ ESCAPE HTML ============
-function esc(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ============ SELECT OPTIONS HELPER ============
-function optHtml(items, selected) {
-  return items.map(function(it) {
-    var val = typeof it === 'string' ? it : it.val;
-    var lbl = typeof it === 'string' ? it : it.label;
-    return '<option value="' + esc(val) + '"' + (val === selected ? ' selected' : '') + '>' + esc(lbl) + '</option>';
-  }).join('');
-}
-
-function unitOptions(sel) {
-  return UNITS.map(function(u) {
-    return '<option value="' + u + '"' + (u === sel ? ' selected' : '') + '>' + u + '</option>';
-  }).join('');
-}
-
-// ============ PWA ============
+// ---------- 10. PWA ----------
 var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   deferredPrompt = e;
   var banner = document.getElementById('pwa-banner');
-  if (banner) banner.style.display = 'block';
+  if (banner) banner.style.display = 'flex';
 });
+
 function installPWA() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function() {
     deferredPrompt = null;
-    dismissPWA();
-  }
+    var banner = document.getElementById('pwa-banner');
+    if (banner) banner.style.display = 'none';
+  });
 }
+
 function dismissPWA() {
   var banner = document.getElementById('pwa-banner');
   if (banner) banner.style.display = 'none';
 }
 
-// ============ BOOT ============
-function setBootStatus(msg) {
-  var el = document.getElementById('boot-status');
-  if (el) el.textContent = msg;
-}
-
-function bootApp() {
-  try {
-    if (typeof migrateData === 'function') migrateData();
-    if (typeof seedIfEmpty === 'function') seedIfEmpty();
-    if (typeof initPin === 'function') initPin();
-  } catch(e) {
-    console.error('[Boot] Error:', e);
-    setBootStatus('Error al iniciar. Recarga la página.');
-  }
-}
-
+// ---------- 11. BOOT SEQUENCE (IIFE) ----------
 (function() {
-  // Safety net: if boot hasn't completed in 8s, force it
-  var bootDone = false;
-  var safetyTimer = setTimeout(function() {
-    if (!bootDone) {
-      console.warn('[Boot] Safety timeout - forcing boot');
-      bootApp();
+  var statusEl = document.getElementById('boot-status');
+  if (statusEl) statusEl.textContent = 'Conectando...';
+
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js?v=1').catch(function() {});
     }
-  }, 8000);
+  } catch(e) {}
 
-  // Mark boot as done wrapper
-  var originalInitPin = (typeof initPin === 'function') ? initPin : null;
-  window.initPin = function() {
-    bootDone = true;
-    clearTimeout(safetyTimer);
-    if (originalInitPin) originalInitPin();
-  };
+  try { initFirebase(); } catch(e) {}
 
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=34').catch(function() {});
-  }
+  var booted = false;
+  setTimeout(function() {
+    if (!booted) { console.warn('[Boot] Timeout'); initApp(); booted = true; }
+  }, 6000);
 
   try {
-    initFirebase();
-  } catch(e) {
-    console.error('[Boot] Firebase init error:', e);
-  }
-
-  try {
-    startFirebaseSync(function(remoteData) {
-      try {
-        if (remoteData) {
-          syncLocalIdCounter(remoteData);
-        }
-        setBootStatus('Preparando datos...');
-        bootApp();
-      } catch(e) {
-        console.error('[Boot] Sync callback error:', e);
-        bootApp();
-      }
+    startSync(function() {
+      if (!booted) { initApp(); booted = true; }
     });
   } catch(e) {
-    console.error('[Boot] Firebase sync error:', e);
-    bootApp();
+    if (!booted) { initApp(); booted = true; }
   }
 })();
