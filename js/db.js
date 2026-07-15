@@ -1,76 +1,92 @@
-// ===================== DB LAYER =====================
-// Local DB using localStorage + Firebase sync integration.
+// ===================== ARCANO ERP — DB LAYER =====================
+// localStorage + Firebase sync. 6 collections.
 
-var DB_KEY = 'arcano_db_v3';
-var _idC = 0; // Global ID counter
+var DB_KEY = 'arcano_erp_v1';
+var _idC = 0;
 
+// ---------- Schema constants ----------
+var PRODUCT_TYPES = [
+  { val: 'especia', label: 'Especia' },
+  { val: 'frasco',  label: 'Frasco'  },
+  { val: 'etiqueta',label: 'Etiqueta' }
+];
+
+var BLEND_FORMATOS = [
+  { val: 'polvo',   label: 'Polvo'   },
+  { val: 'escamas', label: 'Escamas' }
+];
+
+var UNITS = ['gr','kg','ml','L','unidad','cm','mt','rollo'];
+
+var COMPRA_ESTADOS = [
+  { val: 'pendiente', label: 'Pendiente' },
+  { val: 'recibida',  label: 'Recibida'  },
+  { val: 'cancelada', label: 'Cancelada' }
+];
+
+var VENTA_ESTADOS = [
+  { val: 'pendiente',  label: 'Pendiente'  },
+  { val: 'completada', label: 'Completada' },
+  { val: 'cancelada',  label: 'Cancelada'  }
+];
+
+var ROLES = [
+  { val: 'admin',    label: 'Admin'    },
+  { val: 'operador', label: 'Operador' },
+  { val: 'vendedor', label: 'Vendedor' }
+];
+
+// ---------- Core DB functions ----------
 function getDB() {
   try {
     var raw = localStorage.getItem(DB_KEY);
     if (raw) {
       var db = JSON.parse(raw);
-      // Ensure all collections exist
-      if (!db.productos) db.productos = [];
-      if (!db.compras) db.compras = [];
-      if (!db.blends) db.blends = [];
-      if (!db.ventas) db.ventas = [];
-      if (!db.usuarios) db.usuarios = [];
+      if (!db.productos)   db.productos   = [];
+      if (!db.compras)     db.compras     = [];
+      if (!db.blends)      db.blends      = [];
+      if (!db.ventas)      db.ventas      = [];
+      if (!db.usuarios)    db.usuarios    = [];
       if (!db.movimientos) db.movimientos = [];
       return db;
     }
-  } catch(e) { console.warn('[DB] Error reading:', e.message); }
+  } catch(e) { console.warn('[DB] Read error:', e.message); }
   return emptyDB();
 }
 
 function saveDB() {
   var db = getDB();
   db._idC = _idC;
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-  // Debounced Firebase push
-  clearTimeout(saveDB._timer);
-  saveDB._timer = setTimeout(function() {
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+  } catch(e) { console.warn('[DB] Write error:', e.message); }
+  clearTimeout(saveDB._t);
+  saveDB._t = setTimeout(function() {
     if (typeof fbPush === 'function') fbPush();
   }, 800);
 }
 
 function emptyDB() {
-  return {
-    productos: [],
-    compras: [],
-    blends: [],
-    ventas: [],
-    usuarios: [],
-    movimientos: [],
-    _idC: 0
-  };
+  return { productos:[], compras:[], blends:[], ventas:[], usuarios:[], movimientos:[], _idC:0 };
 }
 
-function nextId() {
-  _idC++;
-  return _idC;
+function nextId() { _idC++; return _idC; }
+
+function syncIdCounter(db) {
+  var ids = [
+    (db.productos||[]),(db.compras||[]),(db.blends||[]),
+    (db.ventas||[]),(db.usuarios||[]),(db.movimientos||[])
+  ].reduce(function(a,c){ return a.concat(c.map(function(x){return x.id||0})); }, []);
+  var mx = Math.max.apply(null,[0].concat(ids));
+  if (mx >= _idC) _idC = mx;
 }
 
-function syncLocalIdCounter(db) {
-  var allIds = [
-    (db.productos||[]).map(function(p){return p.id||0}),
-    (db.compras||[]).map(function(c){return c.id||0}),
-    (db.blends||[]).map(function(b){return b.id||0}),
-    (db.ventas||[]).map(function(v){return v.id||0}),
-    (db.usuarios||[]).map(function(u){return u.id||0}),
-    (db.movimientos||[]).map(function(m){return m.id||0})
-  ].flat();
-  var maxId = Math.max.apply(null, [0].concat(allIds));
-  if (maxId >= _idC) _idC = maxId;
-}
-
-// CRUD helpers
-function addMovimiento(tipo, collection, itemId, productoNombre, cantidad, detalle) {
+function addMovimiento(tipo, itemId, productoNombre, cantidad, detalle) {
   var db = getDB();
   if (!db.movimientos) db.movimientos = [];
   db.movimientos.push({
     id: nextId(),
-    tipo: tipo,        // 'compra' | 'venta' | 'blend' | 'ajuste'
-    coleccion: collection, // 'compras' | 'ventas' | 'blends'
+    tipo: tipo,
     itemId: itemId,
     producto: productoNombre,
     cantidad: cantidad,
@@ -81,55 +97,20 @@ function addMovimiento(tipo, collection, itemId, productoNombre, cantidad, detal
   saveDB();
 }
 
-function fmt(n) {
-  return '$' + Number(n||0).toLocaleString('es-CO');
-}
+// ---------- Formatters ----------
+function fmt(n) { return '$' + Number(n||0).toLocaleString('es-CO'); }
 
 function fmtDate(iso) {
   if (!iso) return '-';
-  try {
-    var d = new Date(iso);
-    return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
-  } catch(e) { return iso; }
+  try { return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+  catch(e) { return iso; }
 }
 
 function fmtDateTime(iso) {
   if (!iso) return '-';
   try {
     var d = new Date(iso);
-    return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short' }) + ' ' +
-           d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' });
+    return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) + ' ' +
+           d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
   } catch(e) { return iso; }
 }
-
-// Product types for selects
-var PRODUCT_TYPES = [
-  { val: 'especia', label: 'Especia' },
-  { val: 'frasco', label: 'Frasco' },
-  { val: 'etiqueta', label: 'Etiqueta' }
-];
-
-var BLEND_FORMATOS = [
-  { val: 'polvo', label: 'Polvo' },
-  { val: 'escamas', label: 'Escamas' }
-];
-
-var UNITS = ['gr', 'kg', 'ml', 'L', 'unidad', 'cm', 'mt', 'rollo'];
-
-var COMPRA_ESTADOS = [
-  { val: 'pendiente', label: 'Pendiente' },
-  { val: 'recibida', label: 'Recibida' },
-  { val: 'cancelada', label: 'Cancelada' }
-];
-
-var VENTA_ESTADOS = [
-  { val: 'pendiente', label: 'Pendiente' },
-  { val: 'completada', label: 'Completada' },
-  { val: 'cancelada', label: 'Cancelada' }
-];
-
-var ROLES = [
-  { val: 'admin', label: 'Admin' },
-  { val: 'operador', label: 'Operador' },
-  { val: 'vendedor', label: 'Vendedor' }
-];
