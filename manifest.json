@@ -1,7 +1,7 @@
 {
-  "name": "Arcano — Complice del Sabor",
+  "name": "Arcano ERP",
   "short_name": "Arcano",
-  "description": "Gestion de especias y blends para Arcano",
+  "description": "ERP para gestión de especias y blends - Arcano",
   "start_url": "/arcano-v2/",
   "display": "standalone",
   "background_color": "#1b0b07",
