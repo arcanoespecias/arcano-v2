@@ -52,10 +52,11 @@ function setupStoreNav() {
 
 function renderStoreProducts() {
   var container = document.getElementById('store-products');
+  var emptyEl = document.getElementById('store-empty');
   if (!container) return;
 
   var db = getDB();
-  var html = '<div class="store-grid">';
+  var html = '';
   var hasProducts = false;
 
   // --- Especias ---
@@ -65,22 +66,25 @@ function renderStoreProducts() {
     if (storeCategory !== 'todos' && storeCategory !== p.categoria) return;
 
     hasProducts = true;
-    html += '<div class="store-card">' +
-      '<span class="badge ba">Especia</span>' +
-      '<h3>' + esc(p.nombre) + '</h3>' +
-      '<p class="store-card-desc">' + esc(p.categoria || '') + '</p>' +
-      '<p class="store-price">' + fmt(p.precioVenta) + ' / gr</p>' +
-      '<p class="store-stock">Stock: ' + p.stock + ' gr</p>' +
-      '<button class="btn btn-primary" onclick="addToCart(false,' + p.id + ',\'' + jsEsc(p.nombre) + '\',' + p.precioVenta + ',\'' + esc(p.unidad) + '\',' + p.stock + ')">Agregar</button>' +
+    html += '<div class="product-card">' +
+      '<div class="product-card-type">Especia</div>' +
+      '<div class="product-card-name">' + esc(p.nombre) + '</div>' +
+      '<div class="product-card-desc">' + esc(p.categoria || '') + '</div>' +
+      '<div class="product-card-footer">' +
+        '<div>' +
+          '<div class="product-card-price">' + fmt(p.precioVenta) + '/gr</div>' +
+          '<div class="product-card-stock">' + p.stock + ' gr disponibles</div>' +
+        '</div>' +
+        '<button class="btn-add-cart" onclick="addToCart(false,' + p.id + ',\'' + jsEsc(p.nombre) + '\',' + p.precioVenta + ',\'' + esc(p.unidad) + '\',' + p.stock + ')">Agregar</button>' +
+      '</div>' +
       '</div>';
   });
 
   // --- Blends ---
   if (storeCategory === 'todos' || storeCategory === 'blends') {
     db.blends.forEach(function(b) {
-      if (b.precioVenta <= 0 || b.stock <= 0) return;
+      if (b.precioVenta <= 0 || (b.stock || 0) <= 0) return;
 
-      // Effective stock: min of blend stock, max frasco stock, etiqueta stock
       var maxFrascoStock = 0;
       db.productos.forEach(function(p) {
         if (p.tipo === 'frasco' && p.stock > 0 && p.stock > maxFrascoStock) {
@@ -95,28 +99,27 @@ function renderStoreProducts() {
         });
       }
 
-      var efectivo = Math.min(b.stock, maxFrascoStock, etiquetaStock);
+      var efectivo = Math.min(b.stock || 0, maxFrascoStock, etiquetaStock);
       if (efectivo <= 0) return;
 
       hasProducts = true;
-      html += '<div class="store-card">' +
-        '<span class="badge bb">Blend</span>' +
-        '<h3>' + esc(b.nombre) + '</h3>' +
-        '<p class="store-card-desc">' + esc(b.formato || 'polvo') + ' - ' + (b.gramosPorUnidad || 100) + 'gr</p>' +
-        '<p class="store-price">' + fmt(b.precioVenta) + ' / unidad</p>' +
-        '<p class="store-stock">Stock: ' + efectivo + ' unidades</p>' +
-        '<button class="btn btn-primary" onclick="mostrarSelectorFrasco(' + b.id + ',\'carrito\',\'' + jsEsc(b.nombre) + '\',' + b.precioVenta + ',' + efectivo + ')">Agregar</button>' +
+      html += '<div class="product-card">' +
+        '<div class="product-card-type" style="color:#e55">Blend</div>' +
+        '<div class="product-card-name">' + esc(b.nombre) + '</div>' +
+        '<div class="product-card-desc">' + esc(b.formato || 'polvo') + ' - ' + (b.gramosPorUnidad || 100) + 'gr</div>' +
+        '<div class="product-card-footer">' +
+          '<div>' +
+            '<div class="product-card-price">' + fmt(b.precioVenta) + '/und</div>' +
+            '<div class="product-card-stock">' + efectivo + ' unidades</div>' +
+          '</div>' +
+          '<button class="btn-add-cart" onclick="mostrarSelectorFrasco(' + b.id + ',\'carrito\',\'' + jsEsc(b.nombre) + '\',' + b.precioVenta + ',' + efectivo + ')">Agregar</button>' +
+        '</div>' +
         '</div>';
     });
   }
 
-  html += '</div>';
-
-  if (!hasProducts) {
-    html = '<p class="empty-msg">No hay productos disponibles en esta categoria</p>';
-  }
-
   container.innerHTML = html;
+  if (emptyEl) emptyEl.style.display = hasProducts ? 'none' : 'block';
 }
 
 function addToCart(isBlend, id, nombre, precio, unidad, stock) {
@@ -248,10 +251,12 @@ function confirmarFrasco(blendId, frascoId, contexto, precio, stock) {
 
 function updateCartUI() {
   var countEl = document.getElementById('cart-count');
-  if (!countEl) return;
   var total = 0;
   cart.forEach(function(item) { total += item.qty; });
-  countEl.textContent = total;
+  if (countEl) {
+    countEl.textContent = total;
+    countEl.style.display = total > 0 ? 'inline' : 'none';
+  }
 }
 
 function cartQty(idx, delta) {
@@ -264,15 +269,61 @@ function cartQty(idx, delta) {
     toast('Stock maximo alcanzado', 'err');
   }
   updateCartUI();
-  showCheckout();
+  renderCartDrawer();
 }
 
 function toggleCart() {
+  var overlay = document.getElementById('cart-overlay');
+  var drawer = document.getElementById('cart-drawer');
+  if (!overlay || !drawer) return;
+
+  var isOpen = drawer.classList.contains('open');
+  if (isOpen) {
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+  } else {
+    // Populate drawer content
+    renderCartDrawer();
+    drawer.classList.add('open');
+    overlay.classList.add('open');
+  }
+}
+
+function renderCartDrawer() {
+  var itemsEl = document.getElementById('cart-items');
+  var footerEl = document.getElementById('cart-footer');
+  if (!itemsEl) return;
+
   if (cart.length === 0) {
-    toast('El carrito esta vacio', 'err');
+    itemsEl.innerHTML = '<p style="padding:24px;text-align:center;color:var(--muted)">El carrito esta vacio</p>';
+    if (footerEl) footerEl.style.display = 'none';
     return;
   }
-  showCheckout();
+
+  var html = '';
+  var total = 0;
+  cart.forEach(function(item, idx) {
+    var subtotal = item.precio * item.qty;
+    total += subtotal;
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="flex:1">' +
+        '<div style="font-weight:700;font-size:.88rem">' + esc(item.nombre) + '</div>' +
+        '<div style="font-size:.75rem;color:var(--muted)">' + fmt(item.precio) + ' x ' + item.qty + ' = ' + fmt(subtotal) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+        '<button class="btn-icon" onclick="cartQty(' + idx + ',-1)" style="width:28px;height:28px;font-size:1rem">-</button>' +
+        '<span style="min-width:20px;text-align:center;font-weight:700">' + item.qty + '</span>' +
+        '<button class="btn-icon" onclick="cartQty(' + idx + ',1)" style="width:28px;height:28px;font-size:1rem">+</button>' +
+        '<button class="btn-icon" onclick="cart.splice(' + idx + ',1);updateCartUI();toggleCart()" style="width:28px;height:28px;font-size:1rem;color:var(--red)">&times;</button>' +
+      '</div></div>';
+  });
+
+  itemsEl.innerHTML = html;
+  if (footerEl) {
+    footerEl.style.display = 'block';
+    var totalEl = document.getElementById('cart-total-val');
+    if (totalEl) totalEl.textContent = fmt(total);
+  }
 }
 
 function showCheckout() {
@@ -392,7 +443,11 @@ function submitOrder() {
 
   cart = [];
   saveDB();
-  closeModal();
+  // Close drawer if open
+  var drawer = document.getElementById('cart-drawer');
+  var overlay = document.getElementById('cart-overlay');
+  if (drawer) drawer.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
   toast('Pedido #' + venta.id + ' creado exitosamente');
   renderStorefront();
 }
