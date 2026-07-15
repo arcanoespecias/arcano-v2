@@ -173,6 +173,7 @@ function seedIfEmpty() {
 
 // ---------- 8. Auth System ----------
 function initApp() {
+  hideBootLoader();
   var saved = sessionStorage.getItem('arcano_user');
   if (saved) {
     try {
@@ -199,7 +200,13 @@ function showStorefront() {
   if (typeof renderStorefront === 'function') renderStorefront();
 }
 
+function hideBootLoader() {
+  var loader = document.getElementById('boot-loader');
+  if (loader) loader.style.display = 'none';
+}
+
 function showLogin() {
+  hideBootLoader();
   var db = getDB();
   var users = db.usuarios.filter(function(u) {
     return u.rol !== 'vendedor' && u.activo;
@@ -317,6 +324,7 @@ var NAV_ITEMS = {
 };
 
 function enterApp() {
+  hideBootLoader();
   var ps = document.getElementById('pin-screen');
   var sf = document.getElementById('storefront');
   var aa = document.getElementById('admin-app');
