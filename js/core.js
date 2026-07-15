@@ -78,19 +78,19 @@ function migrateData() {
     if (p.tipo === 'envase') { p.tipo = 'frasco'; changed = true; }
   });
 
-  // Blends: add formato/gramosPorUnidad, migrate old cantidad -> porcentaje
+  // Blends: add formato/gramosPorUnidad, migrate old porcentaje -> gramos
   db.blends.forEach(function(b) {
     if (!b.formato) { b.formato = 'polvo'; changed = true; }
     if (!b.gramosPorUnidad) { b.gramosPorUnidad = 100; changed = true; }
-    if (b.receta && b.receta.length > 0 && b.receta[0].porcentaje === undefined) {
-      var totalCant = b.receta.reduce(function(a, r) { return a + (r.cantidad || 0); }, 0);
-      if (totalCant > 0) {
-        b.receta.forEach(function(r) {
-          r.porcentaje = Math.round((r.cantidad / totalCant) * 100);
-          delete r.cantidad;
-        });
-        changed = true;
-      }
+    // Migrate porcentaje -> gramos
+    if (b.receta && b.receta.length > 0 && b.receta[0].porcentaje !== undefined && b.receta[0].gramos === undefined) {
+      b.receta.forEach(function(r) {
+        if (r.porcentaje !== undefined && r.gramos === undefined) {
+          r.gramos = Math.round((r.porcentaje / 100) * (b.gramosPorUnidad || 100) * 10) / 10;
+          delete r.porcentaje;
+          changed = true;
+        }
+      });
     }
   });
 
@@ -156,10 +156,10 @@ function seedIfEmpty() {
 
   // 1 sample blend
   var receta = [
-    { productoId: 1, nombre: 'Curcuma',         porcentaje: 35 },
-    { productoId: 2, nombre: 'Comino',           porcentaje: 20 },
-    { productoId: 3, nombre: 'Pimienta Negra',   porcentaje: 15 },
-    { productoId: 6, nombre: 'Chile Ahumado',    porcentaje: 30 }
+    { productoId: 1, nombre: 'Curcuma',         gramos: 35 },
+    { productoId: 2, nombre: 'Comino',           gramos: 20 },
+    { productoId: 3, nombre: 'Pimienta Negra',   gramos: 15 },
+    { productoId: 6, nombre: 'Chile Ahumado',    gramos: 30 }
   ];
   db.blends.push({
     id: nextId(), nombre: 'Curry Arcano', formato: 'polvo',
@@ -309,8 +309,8 @@ var NAV_ITEMS = {
   admin: [
     { id: 'dashboard',  label: 'Dashboard'  },
     { id: 'compras',    label: 'Compras'    },
+    { id: 'especias',   label: 'Especias'   },
     { id: 'blends',     label: 'Blends'     },
-    { id: 'produccion', label: 'Produccion' },
     { id: 'ventas',     label: 'Ventas'     },
     { id: 'usuarios',   label: 'Usuarios'   },
     { id: 'ajustes',    label: 'Ajustes'    }
@@ -381,7 +381,7 @@ function renderPage(page) {
   switch (page) {
     case 'dashboard':  if (typeof renderDashboard  === 'function') renderDashboard();  break;
     case 'compras':    if (typeof renderCompras    === 'function') renderCompras();    break;
-    case 'productos':  if (typeof renderProductos  === 'function') renderProductos();  break;
+    case 'especias':  if (typeof renderEspecias  === 'function') renderEspecias();  break;
     case 'blends':     if (typeof renderBlends     === 'function') renderBlends();     break;
     case 'produccion': if (typeof renderProduccion === 'function') renderProduccion(); break;
     case 'ventas':     if (typeof renderVentas     === 'function') renderVentas();     break;

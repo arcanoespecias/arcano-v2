@@ -1,5 +1,6 @@
-// ===================== ARCANO ERP — PAGES (PART 1) =====================
-// Storefront, Dashboard, Compras, Productos
+// ===================== ARCANO ERP — PAGES =====================
+// Storefront, Dashboard, Compras, Especias, Blends, Produccion, Ventas, Usuarios, Ajustes
+// ES5 ONLY: var, function(){}, .forEach(), NO arrow/let/const/template/destructuring
 
 // ---------- Helpers ----------
 function jsEsc(s) {
@@ -11,7 +12,6 @@ function jsEsc(s) {
 var storeCategory = 'todos';
 
 function renderStorefront() {
-  // Build category list from active especias
   var db = getDB();
   var categories = ['todos', 'blends'];
   db.productos.forEach(function(p) {
@@ -22,7 +22,6 @@ function renderStorefront() {
     }
   });
 
-  // Update category nav in the static HTML
   var storeNav = document.getElementById('store-nav');
   if (storeNav) {
     var navHtml = '';
@@ -59,7 +58,6 @@ function renderStoreProducts() {
   var html = '';
   var hasProducts = false;
 
-  // --- Especias ---
   db.productos.forEach(function(p) {
     if (p.tipo !== 'especia') return;
     if (p.precioVenta <= 0 || p.stock <= 0) return;
@@ -80,7 +78,6 @@ function renderStoreProducts() {
       '</div>';
   });
 
-  // --- Blends ---
   if (storeCategory === 'todos' || storeCategory === 'blends') {
     db.blends.forEach(function(b) {
       if (b.precioVenta <= 0 || (b.stock || 0) <= 0) return;
@@ -95,7 +92,7 @@ function renderStoreProducts() {
       var etiquetaStock = 999999;
       if (b.etiquetaId) {
         db.productos.forEach(function(p) {
-          if (p.id === b.etiquetaId) etiquetaStock = p.stock;
+          if (p.id == b.etiquetaId) etiquetaStock = p.stock;
         });
       }
 
@@ -165,15 +162,15 @@ function mostrarSelectorFrasco(blendId, contexto, nombre, precio, stock) {
     return;
   }
 
-  var html = '<p class="mb-2">Seleccione un frasco para <strong>' + esc(nombre) + '</strong></p>' +
-    '<p>Precio: ' + fmt(precio) + ' / unidad</p><div class="frasco-list">';
+  var html = '<p class="mb-12">Seleccione un frasco para <strong>' + esc(nombre) + '</strong></p>' +
+    '<p class="mb-12">Precio: ' + fmt(precio) + ' / unidad</p><div class="frasco-list">';
 
   frascos.forEach(function(f) {
     var disponible = Math.min(stock, f.stock);
     if (disponible <= 0) return;
     html += '<div class="frasco-option">' +
       '<div><strong>' + esc(f.nombre) + '</strong><br>Disponible: ' + disponible + ' unidades</div>' +
-      '<button class="btn btn-primary btn-sm" onclick="confirmarFrasco(' + blendId + ',' + f.id + ',\'' + jsEsc(contexto) + '\',' + precio + ',' + stock + ')">Seleccionar</button>' +
+      '<button class="btn btn-sm" onclick="confirmarFrasco(' + blendId + ',' + f.id + ',\'' + jsEsc(contexto) + '\',' + precio + ',' + stock + ')">Seleccionar</button>' +
       '</div>';
   });
 
@@ -194,7 +191,7 @@ function confirmarFrasco(blendId, frascoId, contexto, precio, stock) {
   var etiquetaStock = 999999;
   if (blend.etiquetaId) {
     db.productos.forEach(function(p) {
-      if (p.id === blend.etiquetaId) etiquetaStock = p.stock;
+      if (p.id == blend.etiquetaId) etiquetaStock = p.stock;
     });
   }
 
@@ -282,7 +279,6 @@ function toggleCart() {
     drawer.classList.remove('open');
     overlay.classList.remove('open');
   } else {
-    // Populate drawer content
     renderCartDrawer();
     drawer.classList.add('open');
     overlay.classList.add('open');
@@ -326,42 +322,6 @@ function renderCartDrawer() {
   }
 }
 
-function showCheckout() {
-  var html = '<div class="cart-detail">';
-  var total = 0;
-
-  if (cart.length === 0) {
-    html += '<p class="empty-msg">El carrito esta vacio</p>';
-  } else {
-    html += '<div class="cart-items">';
-    cart.forEach(function(item, idx) {
-      var subtotal = item.precio * item.qty;
-      total += subtotal;
-      html += '<div class="cart-item">' +
-        '<div class="cart-item-info">' +
-        '<strong>' + esc(item.nombre) + '</strong>' +
-        (item.isBlend && item.frascoNombre ? ' <span class="text-sm text-muted">(' + esc(item.frascoNombre) + ')</span>' : '') +
-        '<br><span class="text-sm">' + fmt(item.precio) + ' x ' + item.qty + ' = ' + fmt(subtotal) + '</span>' +
-        '</div>' +
-        '<div class="cart-item-actions">' +
-        '<button class="btn-icon" onclick="cartQty(' + idx + ',-1)">-</button>' +
-        '<span class="cart-qty-num">' + item.qty + '</span>' +
-        '<button class="btn-icon" onclick="cartQty(' + idx + ',1)">+</button>' +
-        '<button class="btn-icon text-danger" onclick="cart.splice(' + idx + ',1);updateCartUI();showCheckout()">&times;</button>' +
-        '</div></div>';
-    });
-    html += '</div>';
-  }
-
-  html += '<div class="cart-total"><strong>Total:</strong> ' + fmt(total) + '</div>';
-  if (cart.length > 0) {
-    html += '<button class="btn btn-primary btn-block" onclick="submitOrder()">Confirmar Pedido</button>';
-  }
-  html += '</div>';
-
-  openModal('Carrito', html);
-}
-
 function submitOrder() {
   if (!cart || cart.length === 0) {
     toast('El carrito esta vacio', 'err');
@@ -382,18 +342,23 @@ function submitOrder() {
       precio: ci.precio,
       unidad: ci.unidad,
       qty: ci.qty,
+      cantidad: ci.qty,
       frascoId: ci.frascoId || null,
       frascoNombre: ci.frascoNombre || '',
       etiquetaId: ci.etiquetaId || null,
+      tipo: ci.isBlend ? 'blend' : 'especia',
+      blendId: ci.isBlend ? ci.id : null,
+      productoId: ci.isBlend ? null : ci.id,
       subtotal: subtotal
     });
   });
 
   var venta = {
     id: nextId(),
-    estado: 'pendiente',
+    estado: 'completada',
     tipo: 'tienda',
     creadoPor: null,
+    creadoPorNombre: 'Tienda Online',
     fecha: new Date().toISOString(),
     cliente: 'Tienda Online',
     items: items,
@@ -402,25 +367,21 @@ function submitOrder() {
   };
   db.ventas.push(venta);
 
-  // Process stock deductions
   cart.forEach(function(ci) {
     if (!ci.isBlend) {
-      // Especia: deduct stock from product
       db.productos.forEach(function(p) {
         if (p.id === ci.id) {
-          p.stock -= ci.qty;
+          p.stock = Math.round((p.stock - ci.qty) * 100) / 100;
           addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Venta tienda #' + venta.id);
         }
       });
     } else {
-      // Blend: deduct blend stock
       db.blends.forEach(function(b) {
         if (b.id === ci.id) {
-          b.stock -= ci.qty;
+          b.stock = (b.stock || 0) - ci.qty;
           addMovimiento('venta', b.id, b.nombre, -ci.qty, 'Venta tienda blend #' + venta.id);
         }
       });
-      // Deduct frasco stock
       if (ci.frascoId) {
         db.productos.forEach(function(p) {
           if (p.id === ci.frascoId) {
@@ -429,7 +390,6 @@ function submitOrder() {
           }
         });
       }
-      // Deduct etiqueta stock
       if (ci.etiquetaId) {
         db.productos.forEach(function(p) {
           if (p.id === ci.etiquetaId) {
@@ -443,7 +403,6 @@ function submitOrder() {
 
   cart = [];
   saveDB();
-  // Close drawer if open
   var drawer = document.getElementById('cart-drawer');
   var overlay = document.getElementById('cart-overlay');
   if (drawer) drawer.classList.remove('open');
@@ -468,64 +427,69 @@ function renderDashboard() {
 
   var db = getDB();
 
-  // KPI 1: Ventas Totales (non-cancelled)
   var ventasTotal = 0;
   db.ventas.forEach(function(v) {
     if (v.estado !== 'cancelada') ventasTotal += (v.total || 0);
   });
 
-  // KPI 2: Compras (recibidas)
   var comprasTotal = 0;
   db.compras.forEach(function(c) {
     if (c.estado === 'recibida') comprasTotal += (c.total || 0);
   });
 
-  // KPI 3: Especias count + total items
   var especiaCount = 0;
-  var totalItems = 0;
+  var insumoCount = 0;
   db.productos.forEach(function(p) {
     if (p.tipo === 'especia') especiaCount++;
-    totalItems++;
+    else insumoCount++;
   });
 
-  // KPI 4: Blends count
   var blendCount = db.blends.length;
+  var blendStock = 0;
+  db.blends.forEach(function(b) { blendStock += (b.stock || 0); });
 
-  // Alerts
   var pendientes = 0;
   db.ventas.forEach(function(v) { if (v.estado === 'pendiente') pendientes++; });
 
-  var lowStock = [];
+  var lowStockEspecias = [];
   db.productos.forEach(function(p) {
     if (p.tipo === 'especia' && p.stock <= (p.stockMin || 0)) {
-      lowStock.push(p);
+      lowStockEspecias.push(p);
     }
   });
 
-  // Build HTML
+  var lowStockBlends = [];
+  db.blends.forEach(function(b) {
+    if ((b.stock || 0) <= 0) {
+      lowStockBlends.push(b);
+    }
+  });
+
   var html = '<div class="g4">' +
     statCard('Ventas Totales', fmt(ventasTotal), 'Ingreso total') +
     statCard('Compras', fmt(comprasTotal), 'Recibidas') +
-    statCard('Especias', String(especiaCount), totalItems + ' productos total') +
-    statCard('Blends', String(blendCount), 'Mezclas activas') +
+    statCard('Especias', String(especiaCount), insumoCount + ' insumos') +
+    statCard('Blends', String(blendCount), blendStock + ' uds stock') +
     '</div>';
 
-  // Alerts section
   html += '<div class="alerts-section">';
   if (pendientes > 0) {
     html += '<div class="alert-card"><div><strong>' + pendientes + ' ventas pendientes</strong></div>' +
-      '<button class="btn btn-primary btn-sm" onclick="navigateTo(\'ventas\')">Ver Ventas</button></div>';
+      '<button class="btn btn-sm" onclick="navigateTo(\'ventas\')">Ver Ventas</button></div>';
   }
-  if (lowStock.length > 0) {
-    html += '<div class="alert-card alert-warn"><div><strong>' + lowStock.length + ' productos con stock bajo</strong></div>' +
-      '<button class="btn btn-warn btn-sm" onclick="navigateTo(\'compras\')">Ver Compras</button></div>';
+  if (lowStockEspecias.length > 0) {
+    html += '<div class="alert-card alert-warn"><div><strong>' + lowStockEspecias.length + ' especias con stock bajo</strong></div>' +
+      '<button class="btn btn-sm" onclick="navigateTo(\'especias\')">Ver Especias</button></div>';
   }
-  if (pendientes === 0 && lowStock.length === 0) {
+  if (lowStockBlends.length > 0) {
+    html += '<div class="alert-card alert-warn"><div><strong>' + lowStockBlends.length + ' blends sin stock</strong></div>' +
+      '<button class="btn btn-sm" onclick="navigateTo(\'blends\')">Ver Blends</button></div>';
+  }
+  if (pendientes === 0 && lowStockEspecias.length === 0 && lowStockBlends.length === 0) {
     html += '<div class="alert-card"><div>Todo al dia</div></div>';
   }
   html += '</div>';
 
-  // Recent ventas table (latest 5)
   var sortedVentas = db.ventas.slice().sort(function(a, b) {
     return new Date(b.fecha) - new Date(a.fecha);
   });
@@ -542,7 +506,7 @@ function renderDashboard() {
       var badgeCls = v.estado === 'completada' ? 'badge bg' : v.estado === 'cancelada' ? 'badge br' : 'badge by';
       html += '<tr>' +
         '<td>' + fmtDateTime(v.fecha) + '</td>' +
-        '<td>' + esc(v.cliente || 'Tienda') + '</td>' +
+        '<td>' + esc(v.cliente || 'Mostrador') + '</td>' +
         '<td>' + fmt(v.total) + '</td>' +
         '<td><span class="' + badgeCls + '">' + esc(v.estado) + '</span></td>' +
         '</tr>';
@@ -550,7 +514,6 @@ function renderDashboard() {
     html += '</tbody></table></div>';
   }
 
-  // Recent movimientos (latest 8)
   var sortedMovs = db.movimientos.slice().sort(function(a, b) {
     return new Date(b.fecha) - new Date(a.fecha);
   });
@@ -587,13 +550,11 @@ function renderCompras() {
 
   var db = getDB();
 
-  // Filter
   var filtered = db.compras;
   if (comprasFilter !== 'todos') {
     filtered = db.compras.filter(function(c) { return c.estado === comprasFilter; });
   }
 
-  // Sort by date desc
   filtered = filtered.slice().sort(function(a, b) {
     return new Date(b.fecha) - new Date(a.fecha);
   });
@@ -601,11 +562,9 @@ function renderCompras() {
   var html = '<div class="page-header">' +
     '<h2>Compras</h2>' +
     '<div style="display:flex;gap:8px">' +
-    '<button class="btn btn-ghost btn-sm" onclick="openModal(\'Nuevo Insumo\', productoFormHTML(null))">+ Nuevo Insumo</button>' +
     '<button class="btn btn-gold btn-sm" onclick="modalNuevaCompra()">+ Nueva Compra</button>' +
     '</div></div>';
 
-  // Tabs
   html += '<div class="tabs">';
   var tabs = [
     { val: 'todos', label: 'Todas' },
@@ -619,7 +578,6 @@ function renderCompras() {
   });
   html += '</div>';
 
-  // Table
   if (filtered.length === 0) {
     html += '<p class="empty-msg">No hay compras</p>';
   } else {
@@ -653,12 +611,15 @@ function modalNuevaCompra() {
     '<input type="text" id="cmp-proveedor" placeholder="Nombre del proveedor"></div>' +
     '<div class="form-group"><label>Notas</label>' +
     '<input type="text" id="cmp-notas" placeholder="Notas opcionales"></div>' +
-    '<div class="form-group"><label>Productos</label>' +
+    '<div class="form-group"><label>Items de la compra</label>' +
     '<div id="compra-items"></div>' +
-    '<button class="btn btn-sm btn-outline" onclick="addCompraItemRow()">+ Agregar Item</button></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="btn btn-sm btn-ghost" onclick="addCompraItemRow()">+ Producto existente</button>' +
+    '<button class="btn btn-sm btn-ghost" onclick="addCompraItemRowNuevo()">+ Nuevo insumo</button>' +
+    '</div></div>' +
     '<div class="form-group"><label class="chk-label"><input type="checkbox" id="cmp-recibida"> Marcar como recibida</label></div>' +
     '<p><strong>Total:</strong> <span id="compra-total">$0</span></p>' +
-    '<button class="btn btn-primary" onclick="guardarCompra()">Guardar Compra</button>' +
+    '<button class="btn btn-gold btn-full" onclick="guardarCompra()">Guardar Compra</button>' +
     '</div>';
 
   openModal('Nueva Compra', html);
@@ -670,7 +631,7 @@ function addCompraItemRow() {
   if (!container) return;
 
   var db = getDB();
-  var opts = '<option value="">-- Producto --</option>';
+  var opts = '<option value="">-- Seleccionar --</option>';
   db.productos.forEach(function(p) {
     var tipoLabel = p.tipo === 'especia' ? 'Especia' : p.tipo === 'frasco' ? 'Frasco' : 'Etiqueta';
     opts += '<option value="' + p.id + '">' + esc(p.nombre) + ' (' + tipoLabel + ')</option>';
@@ -678,8 +639,9 @@ function addCompraItemRow() {
 
   var row = document.createElement('div');
   row.className = 'compra-item-row';
+  row.setAttribute('data-nuevo', 'false');
   row.innerHTML = '<select onchange="cmpItemChanged(this)">' + opts + '</select>' +
-    '<input type="number" min="0" step="any" placeholder="Cant." onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<input type="number" min="0" step="any" placeholder="Cantidad" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
     '<input type="number" min="0" step="any" placeholder="$ Unitario" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
     '<span class="subtotal-display">$0</span>' +
     '<button class="btn-icon" onclick="this.parentElement.remove();calcCompraTotal()">&times;</button>';
@@ -687,13 +649,39 @@ function addCompraItemRow() {
   container.appendChild(row);
 }
 
+function addCompraItemRowNuevo() {
+  var container = document.getElementById('compra-items');
+  if (!container) return;
+
+  var row = document.createElement('div');
+  row.className = 'compra-item-row';
+  row.setAttribute('data-nuevo', 'true');
+  row.innerHTML = '<select onchange="cmpTipoChanged(this)">' +
+    '<option value="especia">Nueva Especia</option>' +
+    '<option value="frasco">Nuevo Frasco</option>' +
+    '<option value="etiqueta">Nueva Etiqueta</option>' +
+    '</select>' +
+    '<input type="text" placeholder="Nombre del insumo" class="cmp-nuevo-nombre">' +
+    '<input type="number" min="0" step="any" placeholder="Cantidad" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<input type="number" min="0" step="any" placeholder="$ Unitario" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<span class="subtotal-display">$0</span>' +
+    '<button class="btn-icon" onclick="this.parentElement.remove();calcCompraTotal()">&times;</button>';
+
+  container.appendChild(row);
+}
+
+function cmpTipoChanged(sel) {
+  // Just visual feedback, the type is stored in the select value
+  cmpItemChanged(sel);
+}
+
 function cmpItemChanged(el) {
   var row = el.parentElement;
   if (!row) return;
 
-  var inputs = row.querySelectorAll('input');
-  var cantidad = Number(inputs[0].value) || 0;
-  var precioUnit = Number(inputs[1].value) || 0;
+  var inputs = row.querySelectorAll('input[type="number"]');
+  var cantidad = inputs[0] ? Number(inputs[0].value) || 0 : 0;
+  var precioUnit = inputs[1] ? Number(inputs[1].value) || 0 : 0;
   var subtotal = cantidad * precioUnit;
 
   var subtotalSpan = row.querySelector('.subtotal-display');
@@ -708,9 +696,9 @@ function calcCompraTotal() {
 
   var total = 0;
   container.querySelectorAll('.compra-item-row').forEach(function(row) {
-    var inputs = row.querySelectorAll('input');
-    var cantidad = Number(inputs[0].value) || 0;
-    var precioUnit = Number(inputs[1].value) || 0;
+    var inputs = row.querySelectorAll('input[type="number"]');
+    var cantidad = inputs[0] ? Number(inputs[0].value) || 0 : 0;
+    var precioUnit = inputs[1] ? Number(inputs[1].value) || 0 : 0;
     total += cantidad * precioUnit;
   });
 
@@ -719,10 +707,12 @@ function calcCompraTotal() {
 }
 
 function guardarCompra() {
-  var fecha = document.getElementById('cmp-fecha').value;
+  var fechaRaw = document.getElementById('cmp-fecha').value;
   var proveedor = (document.getElementById('cmp-proveedor').value || '').trim();
   var notas = (document.getElementById('cmp-notas').value || '').trim();
   var esRecibida = document.getElementById('cmp-recibida').checked;
+
+  var fecha = fechaRaw ? new Date(fechaRaw + 'T12:00:00').toISOString() : new Date().toISOString();
 
   var container = document.getElementById('compra-items');
   var rows = container.querySelectorAll('.compra-item-row');
@@ -732,22 +722,85 @@ function guardarCompra() {
   var db = getDB();
 
   rows.forEach(function(row) {
-    var select = row.querySelector('select');
-    var inputs = row.querySelectorAll('input');
-    var productId = Number(select.value);
-    var cantidad = Number(inputs[0].value) || 0;
-    var precioUnit = Number(inputs[1].value) || 0;
+    var esNuevo = row.getAttribute('data-nuevo') === 'true';
 
-    if (productId && cantidad > 0) {
+    if (esNuevo) {
+      // Nuevo insumo
+      var tipoSel = row.querySelector('select');
+      var nombreInput = row.querySelector('.cmp-nuevo-nombre');
+      var numInputs = row.querySelectorAll('input[type="number"]');
+      var tipo = tipoSel ? tipoSel.value : 'especia';
+      var nombre = nombreInput ? (nombreInput.value || '').trim() : '';
+      var cantidad = numInputs[0] ? Number(numInputs[0].value) || 0 : 0;
+      var precioUnit = numInputs[1] ? Number(numInputs[1].value) || 0 : 0;
+
+      if (!nombre || cantidad <= 0 || precioUnit <= 0) return;
+
+      var subtotal = cantidad * precioUnit;
+      total += subtotal;
+
+      // Create the product if it doesn't exist
+      var existingProduct = null;
+      db.productos.forEach(function(p) {
+        if (p.nombre.toLowerCase() === nombre.toLowerCase() && p.tipo === tipo) existingProduct = p;
+      });
+
+      var productId;
+      if (existingProduct) {
+        productId = existingProduct.id;
+      } else {
+        productId = nextId();
+        var newProduct = {
+          id: productId,
+          nombre: nombre,
+          tipo: tipo,
+          unidad: 'unidad',
+          stock: 0,
+          stockMin: 0,
+          creadoEn: new Date().toISOString()
+        };
+        if (tipo === 'especia') {
+          newProduct.unidad = 'gr';
+          newProduct.costoPor1000gr = Math.round(precioUnit * 1000 / cantidad * 100) / 100;
+          newProduct.precioCosto = Math.round(precioUnit / cantidad * 100) / 100;
+          newProduct.precioVenta = 0;
+          newProduct.categoria = '';
+        } else {
+          newProduct.precioCosto = precioUnit;
+          newProduct.precioVenta = 0;
+        }
+        newProduct.proveedor = proveedor;
+        db.productos.push(newProduct);
+      }
+
+      items.push({
+        productoId: productId,
+        productoNombre: nombre,
+        tipo: tipo,
+        cantidad: cantidad,
+        precioUnitario: precioUnit,
+        subtotal: subtotal
+      });
+    } else {
+      // Existing product
+      var select = row.querySelector('select');
+      var inputs = row.querySelectorAll('input[type="number"]');
+      var productIdVal = select ? Number(select.value) : 0;
+      var cantidad = inputs[0] ? Number(inputs[0].value) || 0 : 0;
+      var precioUnit = inputs[1] ? Number(inputs[1].value) || 0 : 0;
+
+      if (!productIdVal || cantidad <= 0) return;
+
       var producto = null;
-      db.productos.forEach(function(p) { if (p.id === productId) producto = p; });
+      db.productos.forEach(function(p) { if (p.id == productIdVal) producto = p; });
       if (!producto) return;
 
       var subtotal = cantidad * precioUnit;
       total += subtotal;
       items.push({
-        productoId: productId,
+        productoId: producto.id,
         productoNombre: producto.nombre,
+        tipo: producto.tipo,
         cantidad: cantidad,
         precioUnitario: precioUnit,
         subtotal: subtotal
@@ -756,13 +809,13 @@ function guardarCompra() {
   });
 
   if (items.length === 0) {
-    toast('Agregue al menos un producto valido', 'err');
+    toast('Agregue al menos un item valido', 'err');
     return;
   }
 
   var compra = {
     id: nextId(),
-    fecha: fecha || new Date().toISOString(),
+    fecha: fecha,
     proveedor: proveedor,
     notas: notas,
     estado: esRecibida ? 'recibida' : 'pendiente',
@@ -774,12 +827,14 @@ function guardarCompra() {
 
   db.compras.push(compra);
 
-  // If received, add stock to each product
   if (esRecibida) {
     items.forEach(function(item) {
       db.productos.forEach(function(p) {
-        if (p.id === item.productoId) {
-          p.stock += item.cantidad;
+        if (p.id == item.productoId) {
+          p.stock = (p.stock || 0) + item.cantidad;
+          if (p.tipo === 'especia') {
+            p.stock = Math.round(p.stock * 100) / 100;
+          }
           addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida');
         }
       });
@@ -800,7 +855,7 @@ function modalVerCompra(id) {
 
   var badgeCls = compra.estado === 'recibida' ? 'badge bg' : compra.estado === 'cancelada' ? 'badge br' : 'badge by';
 
-  var html = '<div class="compra-detail">';
+  var html = '<div>';
   html += '<p><strong>Fecha:</strong> ' + fmtDate(compra.fecha) + '</p>';
   html += '<p><strong>Proveedor:</strong> ' + esc(compra.proveedor || '-') + '</p>';
   html += '<p><strong>Estado:</strong> <span class="' + badgeCls + '">' + esc(compra.estado) + '</span></p>';
@@ -808,12 +863,13 @@ function modalVerCompra(id) {
     html += '<p><strong>Notas:</strong> ' + esc(compra.notas) + '</p>';
   }
 
-  html += '<div class="table-wrap mt-2"><table><thead><tr>' +
-    '<th>Producto</th><th>Cant.</th><th>P. Unit.</th><th>Subtotal</th>' +
+  html += '<div class="table-wrap mt-12"><table><thead><tr>' +
+    '<th>Producto</th><th>Tipo</th><th>Cant.</th><th>P. Unit.</th><th>Subtotal</th>' +
     '</tr></thead><tbody>';
   (compra.items || []).forEach(function(item) {
     html += '<tr>' +
       '<td>' + esc(item.productoNombre) + '</td>' +
+      '<td>' + esc(item.tipo || '') + '</td>' +
       '<td>' + item.cantidad + '</td>' +
       '<td>' + fmt(item.precioUnitario) + '</td>' +
       '<td>' + fmt(item.subtotal) + '</td>' +
@@ -822,15 +878,14 @@ function modalVerCompra(id) {
   html += '</tbody></table></div>';
   html += '<p class="total-line"><strong>Total:</strong> ' + fmt(compra.total) + '</p>';
 
-  // Estado change buttons
-  html += '<div class="btn-row mt-2">';
+  html += '<div class="actions-row mt-12">';
   if (compra.estado === 'pendiente') {
-    html += '<button class="btn btn-primary" onclick="cambiarEstadoCompra(' + id + ',\'recibida\')">Marcar Recibida</button> ';
-    html += '<button class="btn btn-danger" onclick="cambiarEstadoCompra(' + id + ',\'cancelada\')">Cancelar</button>';
+    html += '<button class="btn btn-sm" onclick="cambiarEstadoCompra(' + id + ',\'recibida\')">Marcar Recibida</button> ';
+    html += '<button class="btn btn-sm btn-danger" onclick="cambiarEstadoCompra(' + id + ',\'cancelada\')">Cancelar</button>';
   } else if (compra.estado === 'recibida') {
-    html += '<button class="btn btn-danger" onclick="cambiarEstadoCompra(' + id + ',\'cancelada\')">Cancelar</button>';
+    html += '<button class="btn btn-sm btn-danger" onclick="cambiarEstadoCompra(' + id + ',\'cancelada\')">Cancelar</button>';
   } else if (compra.estado === 'cancelada') {
-    html += '<button class="btn btn-primary" onclick="cambiarEstadoCompra(' + id + ',\'pendiente\')">Reactivar</button>';
+    html += '<button class="btn btn-sm" onclick="cambiarEstadoCompra(' + id + ',\'pendiente\')">Reactivar</button>';
   }
   html += '</div>';
 
@@ -847,24 +902,24 @@ function cambiarEstadoCompra(id, nuevoEstado) {
   var oldEstado = compra.estado;
   if (oldEstado === nuevoEstado) return;
 
-  // Changing TO recibida: add stock to products
   if (nuevoEstado === 'recibida' && oldEstado !== 'recibida') {
     (compra.items || []).forEach(function(item) {
       db.productos.forEach(function(p) {
-        if (p.id === item.productoId) {
-          p.stock += item.cantidad;
+        if (p.id == item.productoId) {
+          p.stock = (p.stock || 0) + item.cantidad;
+          if (p.tipo === 'especia') p.stock = Math.round(p.stock * 100) / 100;
           addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida');
         }
       });
     });
   }
 
-  // Changing FROM recibida to something else: reverse stock addition
   if (oldEstado === 'recibida' && nuevoEstado !== 'recibida') {
     (compra.items || []).forEach(function(item) {
       db.productos.forEach(function(p) {
-        if (p.id === item.productoId) {
-          p.stock -= item.cantidad;
+        if (p.id == item.productoId) {
+          p.stock = (p.stock || 0) - item.cantidad;
+          if (p.tipo === 'especia') p.stock = Math.round(p.stock * 100) / 100;
           addMovimiento('ajuste', p.id, p.nombre, -item.cantidad, 'Reversion compra #' + compra.id);
         }
       });
@@ -878,285 +933,167 @@ function cambiarEstadoCompra(id, nuevoEstado) {
   renderCompras();
 }
 
-// ==================== 4. PRODUCTOS ====================
+// ==================== 4. ESPECIAS ====================
 
-var productosFilter = 'todos';
-
-function renderProductos() {
-  var el = document.getElementById('page-productos');
+function renderEspecias() {
+  var el = document.getElementById('page-especias');
   if (!el) return;
 
   var db = getDB();
-
-  // Filter
-  var filtered = db.productos;
-  if (productosFilter !== 'todos') {
-    filtered = db.productos.filter(function(p) { return p.tipo === productosFilter; });
-  }
+  var especias = [];
+  db.productos.forEach(function(p) {
+    if (p.tipo === 'especia') especias.push(p);
+  });
 
   var html = '<div class="page-header">' +
-    '<h2>Productos</h2>' +
-    '<button class="btn btn-primary" onclick="openModal(\'Nuevo Producto\', productoFormHTML(null))">+ Nuevo Producto</button>' +
+    '<h2>Especias</h2>' +
+    '<div class="text-muted text-sm">Stock de especias disponibles</div>' +
     '</div>';
 
-  // Tabs
-  html += '<div class="tabs">';
-  var tabs = [
-    { val: 'todos', label: 'Todos' },
-    { val: 'especia', label: 'Especia' },
-    { val: 'frasco', label: 'Frasco' },
-    { val: 'etiqueta', label: 'Etiqueta' }
-  ];
-  tabs.forEach(function(t) {
-    var cls = (t.val === productosFilter) ? ' tab-btn active' : ' tab-btn';
-    html += '<button class="' + cls + '" onclick="productosFilter=\'' + t.val + '\';renderProductos()">' + esc(t.label) + '</button>';
-  });
-  html += '</div>';
-
-  // Products list
-  if (filtered.length === 0) {
-    html += '<p class="empty-msg">No hay productos</p>';
-  } else {
-    html += '<div class="mov-list">';
-    filtered.forEach(function(p) {
-      var badgeCls = p.tipo === 'especia' ? 'ba' : p.tipo === 'frasco' ? 'bg' : 'by';
-      var badgeLabel = p.tipo === 'especia' ? 'Especia' : p.tipo === 'frasco' ? 'Frasco' : 'Etiqueta';
-
-      html += '<div class="mov-row">';
-      html += '<div class="mov-info">' +
-        '<strong>' + esc(p.nombre) + '</strong> ' +
-        '<span class="badge ' + badgeCls + '">' + badgeLabel + '</span>';
-
-      if (p.tipo === 'especia') {
-        html += '<br>Costo: ' + fmt(p.costoPor1000gr) + '/1000gr';
-        html += ' | Stock: ' + p.stock + ' gr';
-        html += ' | Min: ' + (p.stockMin || 0) + ' gr';
-        if (p.precioVenta) html += ' | Venta: ' + fmt(p.precioVenta) + '/gr';
-      } else {
-        html += '<br>Costo: ' + fmt(p.precioCosto) + '/unidad';
-        html += ' | Stock: ' + p.stock + ' unidades';
-        html += ' | Min: ' + (p.stockMin || 0);
-      }
-
-      html += '</div>';
-      html += '<div class="mov-actions">' +
-        '<button class="btn btn-sm" onclick="editarProducto(' + p.id + ')">Editar</button> ' +
-        '<button class="btn btn-sm btn-danger" onclick="eliminarProducto(' + p.id + ')">Eliminar</button>' +
-        '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
+  if (especias.length === 0) {
+    html += '<div class="empty"><div class="empty-icon">&#127798;</div>' +
+      '<p>No hay especias registradas</p>' +
+      '<p class="text-muted text-sm mt-8">Cargalas desde el panel de Compras</p></div>';
+    el.innerHTML = html;
+    return;
   }
+
+  // Summary stats
+  var totalStock = 0;
+  var lowCount = 0;
+  especias.forEach(function(e) {
+    totalStock += (e.stock || 0);
+    if (e.stock <= (e.stockMin || 0)) lowCount++;
+  });
+
+  html += '<div class="g3 mb-16">' +
+    '<div class="stat-card"><div class="stat-value">' + especias.length + '</div><div class="stat-label">Especias</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + Math.round(totalStock) + ' gr</div><div class="stat-label">Stock total</div></div>' +
+    '<div class="stat-card"><div class="stat-value" style="color:' + (lowCount > 0 ? 'var(--red)' : 'var(--green)') + '">' + lowCount + '</div><div class="stat-label">Stock bajo</div></div>' +
+    '</div>';
+
+  // List
+  especias.forEach(function(p) {
+    var stockClamp = Math.round((p.stock || 0) * 100) / 100;
+    var stockMin = p.stockMin || 0;
+    var stockColor = 'var(--green)';
+    if (stockClamp <= stockMin) stockColor = 'var(--red)';
+    else if (stockClamp <= stockMin * 1.5) stockColor = 'var(--yellow)';
+
+    var costoPorGr = p.costoPor1000gr ? Math.round(p.costoPor1000gr / 10) / 10 : 0;
+
+    html += '<div class="card">' +
+      '<div class="flex justify-between items-center mb-8">' +
+        '<div>' +
+          '<strong class="text-gold" style="font-size:1.05rem">' + esc(p.nombre) + '</strong>' +
+          (p.categoria ? ' <span class="badge ba" style="margin-left:6px">' + esc(p.categoria) + '</span>' : '') +
+        '</div>' +
+        '<button class="btn btn-sm" onclick="modalEditarEspecia(' + p.id + ')">Editar</button>' +
+      '</div>' +
+      '<div class="g3 mb-8">' +
+        '<div><span class="text-muted text-xs">Stock actual</span><br><strong style="font-size:1.1rem;color:' + stockColor + '">' + stockClamp + ' gr</strong></div>' +
+        '<div><span class="text-muted text-xs">Stock minimo</span><br>' + stockMin + ' gr</div>' +
+        '<div><span class="text-muted text-xs">Costo/1000gr</span><br>' + fmt(p.costoPor1000gr) + '</div>' +
+      '</div>' +
+      '<div class="g3">' +
+        '<div><span class="text-muted text-xs">Costo/gr</span><br>' + fmt(costoPorGr) + '</div>' +
+        '<div><span class="text-muted text-xs">Precio venta/gr</span><br>' + fmt(p.precioVenta || 0) + '</div>' +
+        '<div><span class="text-muted text-xs">Proveedor</span><br>' + esc(p.proveedor || '-') + '</div>' +
+      '</div>' +
+      '</div>';
+  });
 
   el.innerHTML = html;
 }
 
-function productoFormHTML(producto) {
-  var nombre = producto ? producto.nombre || '' : '';
-  var tipo = producto ? producto.tipo || 'especia' : 'especia';
-  var costoPor1000gr = producto ? producto.costoPor1000gr || '' : '';
-  var precioVenta = producto ? producto.precioVenta || '' : '';
-  var categoria = producto ? producto.categoria || '' : '';
-  var precioCosto = producto ? producto.precioCosto || '' : '';
-  var stock = producto ? producto.stock || '' : '';
-  var stockMin = producto ? producto.stockMin || '' : '';
-  var proveedor = producto ? producto.proveedor || '' : '';
-  var notas = producto ? producto.notas || '' : '';
+function modalEditarEspecia(id) {
+  var db = getDB();
+  var p = null;
+  db.productos.forEach(function(pr) { if (pr.id === id) pr.tipo === 'especia' && (p = pr); });
+  if (!p) return;
 
-  var isEspecia = tipo === 'especia';
-  var especiaDisplay = isEspecia ? 'block' : 'none';
-  var insumoDisplay = isEspecia ? 'none' : 'block';
-
-  var html = '<div class="form-stack">';
-
-  // Nombre
-  html += '<div class="form-group"><label>Nombre *</label>' +
-    '<input type="text" id="pf-nombre" value="' + esc(nombre) + '" required></div>';
-
-  // Tipo
-  html += '<div class="form-group"><label>Tipo</label>' +
-    '<select id="pf-tipo" onchange="updateProductoFormFields()">' +
-    optHtml(PRODUCT_TYPES, tipo) + '</select></div>';
-
-  // --- Especia-specific fields ---
-  html += '<div id="pf-especia-fields" style="display:' + especiaDisplay + '">' +
-    '<div class="form-group"><label>Costo por 1000gr ($)</label>' +
-    '<input type="number" id="pf-costoPor1000gr" value="' + costoPor1000gr + '" placeholder="Ej: 45000" min="0"></div>' +
-    '<div class="form-group"><label>Precio venta por gr ($)</label>' +
-    '<input type="number" id="pf-precioVenta" value="' + precioVenta + '" min="0"></div>' +
-    '<div class="form-group"><label>Categoria</label>' +
-    '<input type="text" id="pf-categoria" value="' + esc(categoria) + '" placeholder="Gastronomia, Infusion, Cocteleria"></div>' +
-    '<div class="form-group"><label>Stock (gr)</label>' +
-    '<input type="number" name="pf-stock" value="' + stock + '" min="0"></div>' +
-    '<div class="form-group"><label>Stock minimo (gr)</label>' +
-    '<input type="number" name="pf-stock-min" value="' + stockMin + '" min="0"></div>' +
+  var html = '<div class="form-stack">' +
+    '<div class="form-group"><label>Nombre</label>' +
+    '<input type="text" id="esp-nombre" value="' + esc(p.nombre) + '"></div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Costo por 1000gr ($)</label>' +
+      '<input type="number" id="esp-costo" value="' + (p.costoPor1000gr || '') + '" min="0"></div>' +
+      '<div class="form-group"><label>Precio venta por gr ($)</label>' +
+      '<input type="number" id="esp-precio" value="' + (p.precioVenta || '') + '" min="0"></div>' +
+    '</div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Categoria</label>' +
+      '<input type="text" id="esp-cat" value="' + esc(p.categoria || '') + '" placeholder="Gastronomia, Infusion, Cocteleria"></div>' +
+      '<div class="form-group"><label>Proveedor</label>' +
+      '<input type="text" id="esp-prov" value="' + esc(p.proveedor || '') + '"></div>' +
+    '</div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Stock minimo (gr)</label>' +
+      '<input type="number" id="esp-min" value="' + (p.stockMin || '') + '" min="0"></div>' +
+      '<div class="form-group"><label>Stock actual (gr) - solo ajuste manual</label>' +
+      '<input type="number" id="esp-stock" value="' + Math.round((p.stock || 0) * 100) / 100 + '" min="0"></div>' +
+    '</div>' +
+    '<div class="alert alert-err" id="esp-alert"></div>' +
+    '<button class="btn btn-gold btn-full" onclick="guardarEspecia(' + id + ')">Guardar</button>' +
     '</div>';
 
-  // --- Frasco / Etiqueta fields ---
-  html += '<div id="pf-insumo-fields" style="display:' + insumoDisplay + '">' +
-    '<div class="form-group"><label>Precio costo por unidad ($)</label>' +
-    '<input type="number" id="pf-precioCosto" value="' + precioCosto + '" min="0"></div>' +
-    '<div class="form-group"><label>Stock (unidades)</label>' +
-    '<input type="number" name="pf-stock" value="' + stock + '" min="0"></div>' +
-    '<div class="form-group"><label>Stock minimo</label>' +
-    '<input type="number" name="pf-stock-min" value="' + stockMin + '" min="0"></div>' +
-    '</div>';
-
-  // --- Common fields ---
-  html += '<div class="form-group"><label>Proveedor</label>' +
-    '<input type="text" id="pf-proveedor" value="' + esc(proveedor) + '"></div>';
-  html += '<div class="form-group"><label>Notas</label>' +
-    '<textarea id="pf-notas">' + esc(notas) + '</textarea></div>';
-
-  // Alert div
-  html += '<div id="pf-alert" class="alert-msg" style="display:none"></div>';
-
-  // Save button
-  var editId = producto ? producto.id : null;
-  html += '<button class="btn btn-primary" onclick="guardarProducto(' + editId + ')">Guardar</button>';
-
-  html += '</div>';
-  return html;
+  openModal('Editar Especia', html);
 }
 
-function updateProductoFormFields() {
-  var tipoEl = document.getElementById('pf-tipo');
-  if (!tipoEl) return;
-  var val = tipoEl.value;
-
-  var especiaFields = document.getElementById('pf-especia-fields');
-  var insumoFields = document.getElementById('pf-insumo-fields');
-
-  if (val === 'especia') {
-    if (especiaFields) especiaFields.style.display = 'block';
-    if (insumoFields) insumoFields.style.display = 'none';
-  } else {
-    if (especiaFields) especiaFields.style.display = 'none';
-    if (insumoFields) insumoFields.style.display = 'block';
-  }
-}
-
-function guardarProducto(existingId) {
-  var nombre = (document.getElementById('pf-nombre').value || '').trim();
+function guardarEspecia(id) {
+  var nombre = (document.getElementById('esp-nombre').value || '').trim();
   if (!nombre) {
-    var alertEl = document.getElementById('pf-alert');
-    if (alertEl) { alertEl.textContent = 'El nombre es obligatorio'; alertEl.style.display = 'block'; }
+    var a = document.getElementById('esp-alert');
+    if (a) { a.textContent = 'El nombre es obligatorio'; a.classList.add('show'); }
     return;
   }
 
-  var tipo = document.getElementById('pf-tipo').value;
   var db = getDB();
+  var p = null;
+  db.productos.forEach(function(pr) { if (pr.id === id && pr.tipo === 'especia') p = pr; });
+  if (!p) return;
 
-  var data = {
-    nombre: nombre,
-    tipo: tipo,
-    proveedor: (document.getElementById('pf-proveedor').value || '').trim(),
-    notas: (document.getElementById('pf-notas').value || '').trim(),
-    actualizadoEn: new Date().toISOString()
-  };
+  var oldStock = p.stock || 0;
+  p.nombre = nombre;
+  p.costoPor1000gr = Number(document.getElementById('esp-costo').value) || 0;
+  p.precioVenta = Number(document.getElementById('esp-precio').value) || 0;
+  p.precioCosto = p.costoPor1000gr ? Math.round(p.costoPor1000gr / 10) / 10 : 0;
+  p.categoria = (document.getElementById('esp-cat').value || '').trim();
+  p.proveedor = (document.getElementById('esp-prov').value || '').trim();
+  p.stockMin = Number(document.getElementById('esp-min').value) || 0;
+  p.unidad = 'gr';
 
-  if (tipo === 'especia') {
-    var costo = Number(document.getElementById('pf-costoPor1000gr').value) || 0;
-    if (costo <= 0) {
-      var alertEl = document.getElementById('pf-alert');
-      if (alertEl) { alertEl.textContent = 'El costo por 1000gr debe ser mayor a 0'; alertEl.style.display = 'block'; }
-      return;
+  var newStock = Number(document.getElementById('esp-stock').value) || 0;
+  if (newStock !== oldStock) {
+    var diff = newStock - oldStock;
+    p.stock = newStock;
+    if (diff !== 0) {
+      addMovimiento('ajuste', p.id, p.nombre, diff, 'Ajuste manual de stock');
     }
-    data.costoPor1000gr = costo;
-    data.precioVenta = Number(document.getElementById('pf-precioVenta').value) || 0;
-    data.precioCosto = Math.round(costo / 1000);
-    data.categoria = (document.getElementById('pf-categoria').value || '').trim();
-    data.unidad = 'gr';
-
-    var secE = document.getElementById('pf-especia-fields');
-    if (secE) {
-      var siE = secE.querySelector('[name="pf-stock"]');
-      var smiE = secE.querySelector('[name="pf-stock-min"]');
-      data.stock = siE ? Number(siE.value) || 0 : 0;
-      data.stockMin = smiE ? Number(smiE.value) || 0 : 0;
-    }
-  } else {
-    data.precioCosto = Number(document.getElementById('pf-precioCosto').value) || 0;
-    data.precioVenta = 0;
-    data.unidad = 'unidad';
-
-    var secI = document.getElementById('pf-insumo-fields');
-    if (secI) {
-      var siI = secI.querySelector('[name="pf-stock"]');
-      var smiI = secI.querySelector('[name="pf-stock-min"]');
-      data.stock = siI ? Number(siI.value) || 0 : 0;
-      data.stockMin = smiI ? Number(smiI.value) || 0 : 0;
-    }
-  }
-
-  if (existingId) {
-    // Update existing product
-    var found = false;
-    db.productos.forEach(function(p) {
-      if (p.id === existingId) {
-        var keys = Object.keys(data);
-        keys.forEach(function(key) { p[key] = data[key]; });
-        found = true;
-      }
-    });
-    if (!found) {
-      toast('Producto no encontrado', 'err');
-      return;
-    }
-  } else {
-    // Create new product
-    data.id = nextId();
-    data.creadoEn = new Date().toISOString();
-    db.productos.push(data);
   }
 
   saveDB();
   closeModal();
-  toast(existingId ? 'Producto actualizado' : 'Producto creado');
-  if (currentPage === 'compras') renderCompras();
-  else renderProductos();
+  toast('Especia actualizada');
+  renderEspecias();
 }
 
-function editarProducto(id) {
-  var db = getDB();
-  var producto = null;
-  db.productos.forEach(function(p) { if (p.id === id) producto = p; });
-  if (!producto) return;
-  openModal('Editar Producto', productoFormHTML(producto));
-}
-
-function eliminarProducto(id) {
-  if (!confirm('¿Eliminar este producto?')) return;
-  var db = getDB();
-  db.productos = db.productos.filter(function(p) { return p.id !== id; });
-  saveDB();
-  toast('Producto eliminado');
-  renderProductos();
-}
-
-// === END PART 1 ===// ===================== ARCANO ERP — PAGES (PART 2) =====================
-// Blends + Produccion + Ventas + Usuarios + Ajustes
-// ES5 ONLY: var, function(){}, .forEach(), NO arrow/let/const/template/destructuring
-
-// =====================================================================
-//  5. BLENDS
-// =====================================================================
+// ==================== 5. BLENDS ====================
 
 function calcBlendCostFromReceta(receta, gramosPorUnidad) {
   var db = getDB();
   var total = 0;
   if (!receta || !receta.length) return 0;
   receta.forEach(function(ing) {
-    var spice = db.productos.find(function(p) { return p.id === ing.productoId; });
+    var spice = null;
+    db.productos.forEach(function(p) { if (p.id == ing.productoId) spice = p; });
     if (spice) {
-      var gramos = (ing.porcentaje / 100) * gramosPorUnidad;
+      var gramos = ing.gramos || 0;
       total += gramos * (spice.costoPor1000gr / 1000);
     }
   });
   return total;
 }
-
-var blendsFilter = 'todos';
 
 function renderBlends() {
   var el = document.getElementById('page-blends');
@@ -1164,10 +1101,12 @@ function renderBlends() {
   var db = getDB();
   var blends = db.blends || [];
 
-  var html = '<div class="flex justify-between items-center mb-16">' +
-    '<h2 class="page-title mb-0">Blends</h2>' +
+  var html = '<div class="page-header">' +
+    '<h2>Blends</h2>' +
+    '<div style="display:flex;gap:8px">' +
     '<button class="btn btn-gold btn-sm" onclick="openModal(\'Nuevo Blend\', blendFormHTML(null))">+ Nuevo Blend</button>' +
-    '</div>';
+    '<button class="btn btn-sm" onclick="navigateTo(\'produccion\')">Produccion</button>' +
+    '</div></div>';
 
   if (!blends.length) {
     html += '<div class="empty"><div class="empty-icon">&#9878;</div><p>No hay blends creados</p></div>';
@@ -1188,7 +1127,7 @@ function renderBlends() {
     var recetaHtml = '';
     if (blend.receta && blend.receta.length) {
       blend.receta.forEach(function(ing) {
-        recetaHtml += '<span class="badge ba">' + esc(ing.nombre || '?') + ' ' + Number(ing.porcentaje) + '%</span> ';
+        recetaHtml += '<span class="badge ba">' + esc(ing.nombre || '?') + ' ' + Number(ing.gramos || 0) + 'gr</span> ';
       });
     } else {
       recetaHtml = '<span class="text-muted">Sin receta</span>';
@@ -1201,9 +1140,9 @@ function renderBlends() {
       '</div>' +
       '<div class="g2 mb-8">' +
         '<div><span class="text-muted text-xs">Gramos/unidad</span><br>' + Number(blend.gramosPorUnidad || 100) + ' gr</div>' +
-        '<div><span class="text-muted text-xs">Stock</span><br>' + Number(blend.stock || 0) + ' unidades</div>' +
+        '<div><span class="text-muted text-xs">Stock producido</span><br>' + Number(blend.stock || 0) + ' unidades</div>' +
       '</div>' +
-      '<div class="mb-8"><span class="text-muted text-xs">Receta</span><br>' + recetaHtml + '</div>' +
+      '<div class="mb-8"><span class="text-muted text-xs">Receta (por unidad)</span><br>' + recetaHtml + '</div>' +
       '<div class="cost-box mb-8">' +
         '<div class="cost-row"><span>Costo por unidad</span><span>' + fmt(costoUnitario) + '</span></div>' +
         '<div class="cost-row"><span>Precio venta</span><span>' + fmt(blend.precioVenta) + '</span></div>' +
@@ -1222,8 +1161,10 @@ function renderBlends() {
 
 function blendFormHTML(blend) {
   var db = getDB();
-  var especias = db.productos.filter(function(p) { return p.tipo === 'especia'; });
-  var etiquetas = db.productos.filter(function(p) { return p.tipo === 'etiqueta'; });
+  var especias = [];
+  db.productos.forEach(function(p) { if (p.tipo === 'especia') especias.push(p); });
+  var etiquetas = [];
+  db.productos.forEach(function(p) { if (p.tipo === 'etiqueta') etiquetas.push(p); });
 
   var isEdit = !!blend;
   var nombre = blend ? esc(blend.nombre) : '';
@@ -1239,21 +1180,21 @@ function blendFormHTML(blend) {
     '</div>' +
     '<div class="g2 mb-12">' +
       '<div><label>Formato</label><select id="bl-formato">' + optHtml(BLEND_FORMATOS, formato) + '</select></div>' +
-      '<div><label>Gramos por unidad</label><input type="number" id="bl-gramos" value="' + gramos + '" min="1" step="1"></div>' +
+      '<div><label>Gramos por unidad</label><input type="number" id="bl-gramos" value="' + gramos + '" min="1" step="1" onchange="recalcBlendCost()" oninput="recalcBlendCost()"></div>' +
     '</div>' +
     '<div class="g2 mb-12">' +
       '<div><label>Etiqueta</label><select id="bl-etiqueta"><option value="">-- Sin etiqueta --</option>';
   etiquetas.forEach(function(et) {
-    var sel = (etiquetaId === et.id) ? ' selected' : '';
+    var sel = (etiquetaId == et.id) ? ' selected' : '';
     html += '<option value="' + et.id + '"' + sel + '>' + esc(et.nombre) + '</option>';
   });
   html += '</select></div>' +
-      '<div><label>Precio venta</label><input type="number" id="bl-precio" value="' + precioVenta + '" min="0" step="50"></div>' +
+      '<div><label>Precio venta</label><input type="number" id="bl-precio" value="' + precioVenta + '" min="0" step="50" onchange="recalcBlendCost()" oninput="recalcBlendCost()"></div>' +
     '</div>';
 
   html += '<hr class="divider mb-12">' +
     '<div class="flex justify-between items-center mb-8">' +
-      '<span class="section-title mb-0">Receta</span>' +
+      '<span class="section-title mb-0">Receta (gramos por unidad)</span>' +
       '<button class="btn btn-sm btn-ghost" onclick="addIngredienteRow(null)">+ Agregar Ingrediente</button>' +
     '</div>' +
     '<div id="bl-receta-container"></div>';
@@ -1261,14 +1202,13 @@ function blendFormHTML(blend) {
   html += '<div class="cost-box mb-12 mt-8">' +
     '<div class="cost-row"><span>Costo estimado por unidad</span><span id="bl-costo-est">' + fmt(0) + '</span></div>' +
     '<div class="cost-row"><span>Ganancia estimada</span><span id="bl-ganancia-est" class="profit">' + fmt(0) + '</span></div>' +
-    '<div class="cost-row"><span>Total porcentaje</span><span id="bl-pct-total" class="text-red">0%</span></div>' +
-  '</div>';
+    '<div class="cost-row"><span>Total gramos</span><span id="bl-gr-total" class="text-red">0gr</span></div>' +
+    '</div>';
 
   html += '<div class="alert alert-err mb-12" id="bl-alert"></div>';
 
   html += '<button class="btn btn-gold btn-full" onclick="guardarBlend(' + (isEdit ? blend.id : 'null') + ')">Guardar</button>';
 
-  // Pre-populate recipe rows if editing
   if (blend && blend.receta && blend.receta.length) {
     setTimeout(function() {
       blend.receta.forEach(function(ing) {
@@ -1285,24 +1225,27 @@ function addIngredienteRow(data) {
   if (!container) return;
 
   var db = getDB();
-  var especias = db.productos.filter(function(p) { return p.tipo === 'especia'; });
+  var especias = [];
+  db.productos.forEach(function(p) { if (p.tipo === 'especia') especias.push(p); });
 
   var row = document.createElement('div');
   row.className = 'ing-row';
 
   var selectId = 'ing-sel-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-  var pctId = 'ing-pct-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+  var grId = 'ing-gr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var costId = 'ing-cost-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
 
   var selectHtml = '<select id="' + selectId + '" onchange="recalcBlendCost()"><option value="">-- Especia --</option>';
   especias.forEach(function(sp) {
-    var sel = (data && data.productoId === sp.id) ? ' selected' : '';
+    var sel = (data && data.productoId == sp.id) ? ' selected' : '';
     selectHtml += '<option value="' + sp.id + '" data-costo="' + (sp.costoPor1000gr || 0) + '"' + sel + '>' + esc(sp.nombre) + ' (' + fmt(sp.costoPor1000gr) + '/kg)</option>';
   });
   selectHtml += '</select>';
 
+  var gramosVal = data ? (data.gramos || '') : '';
+
   row.innerHTML = selectHtml +
-    '<input type="number" id="' + pctId + '" value="' + (data ? Number(data.porcentaje) : '') + '" placeholder="%" min="0" max="100" step="0.1" onchange="recalcBlendCost()" oninput="recalcBlendCost()">' +
+    '<input type="number" id="' + grId + '" value="' + gramosVal + '" placeholder="gr" min="0" max="10000" step="1" onchange="recalcBlendCost()" oninput="recalcBlendCost()">' +
     '<span class="ing-cost" id="' + costId + '">-</span>' +
     '<button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();recalcBlendCost()" title="Quitar">&times;</button>';
 
@@ -1322,24 +1265,23 @@ function recalcBlendCost() {
   var db = getDB();
   var rows = container.querySelectorAll('.ing-row');
   var totalCost = 0;
-  var totalPct = 0;
+  var totalGr = 0;
 
   rows.forEach(function(row) {
     var sel = row.querySelector('select');
-    var pctInput = row.querySelector('input[type="number"]');
+    var grInput = row.querySelector('input[type="number"]');
     var costSpan = row.querySelector('.ing-cost');
-    if (!sel || !pctInput || !costSpan) return;
+    if (!sel || !grInput || !costSpan) return;
 
     var productId = Number(sel.value);
-    var pct = Number(pctInput.value) || 0;
+    var gramos = Number(grInput.value) || 0;
     var opt = sel.options[sel.selectedIndex];
     var costoPorKg = opt ? Number(opt.getAttribute('data-costo')) || 0 : 0;
 
-    if (productId && pct > 0) {
-      var gramos = (pct / 100) * gramosPorUnidad;
+    if (productId && gramos > 0) {
       var cost = gramos * (costoPorKg / 1000);
       totalCost += cost;
-      totalPct += pct;
+      totalGr += gramos;
       costSpan.textContent = fmt(cost);
     } else {
       costSpan.textContent = '-';
@@ -1348,18 +1290,18 @@ function recalcBlendCost() {
 
   var costoEst = document.getElementById('bl-costo-est');
   var gananciaEst = document.getElementById('bl-ganancia-est');
-  var pctTotal = document.getElementById('bl-pct-total');
+  var grTotal = document.getElementById('bl-gr-total');
 
   if (costoEst) costoEst.textContent = fmt(totalCost);
   if (gananciaEst) {
     var ganancia = precioVenta - totalCost;
     gananciaEst.textContent = fmt(ganancia);
-    gananciaEst.className = ganancia >= 0 ? 'ing-cost profit' : 'ing-cost loss';
+    gananciaEst.className = ganancia >= 0 ? 'ing-cost text-green' : 'ing-cost text-red';
   }
-  if (pctTotal) {
-    var pctVal = Math.round(totalPct * 10) / 10;
-    pctTotal.textContent = pctVal.toFixed(1) + '%';
-    pctTotal.className = (totalPct >= 99 && totalPct <= 101) ? 'ing-cost text-green' : 'ing-cost text-red';
+  if (grTotal) {
+    var diff = Math.abs(totalGr - gramosPorUnidad);
+    grTotal.textContent = totalGr + 'gr' + (diff > 0.5 ? ' (diff: ' + (totalGr - gramosPorUnidad) + 'gr)' : '');
+    grTotal.className = diff <= 0.5 ? 'ing-cost text-green' : 'ing-cost text-red';
   }
 }
 
@@ -1379,48 +1321,43 @@ function guardarBlend(existingId) {
     return;
   }
 
-  // Gather receta
   var receta = [];
-  var totalPct = 0;
+  var totalGr = 0;
   var rows = container.querySelectorAll('.ing-row');
   rows.forEach(function(row) {
     var sel = row.querySelector('select');
-    var pctInput = row.querySelector('input[type="number"]');
-    if (!sel || !pctInput) return;
+    var grInput = row.querySelector('input[type="number"]');
+    if (!sel || !grInput) return;
     var productId = Number(sel.value);
-    var pct = Number(pctInput.value) || 0;
-    if (productId && pct > 0) {
+    var gramos = Number(grInput.value) || 0;
+    if (productId && gramos > 0) {
       var db = getDB();
-      var spice = db.productos.find(function(p) { return p.id === productId; });
+      var spice = null;
+      db.productos.forEach(function(p) { if (p.id == productId) spice = p; });
       receta.push({
         productoId: productId,
         nombre: spice ? spice.nombre : '?',
-        porcentaje: pct
+        gramos: gramos
       });
-      totalPct += pct;
+      totalGr += gramos;
     }
   });
 
   if (receta.length === 0) {
     var alertEl3 = document.getElementById('bl-alert');
-    if (alertEl3) { alertEl3.textContent = 'Agrega al menos un ingrediente con porcentaje'; alertEl3.classList.add('show'); }
+    if (alertEl3) { alertEl3.textContent = 'Agrega al menos un ingrediente con gramos'; alertEl3.classList.add('show'); }
     return;
   }
 
-  if (totalPct < 99 || totalPct > 101) {
+  var gramosPorUnidad = Number((document.getElementById('bl-gramos') || {}).value) || 100;
+  var diff = Math.abs(totalGr - gramosPorUnidad);
+  if (diff > 1) {
     var alertEl4 = document.getElementById('bl-alert');
-    if (alertEl4) { alertEl4.textContent = 'El total de porcentajes debe ser 100% (actual: ' + totalPct.toFixed(1) + '%)'; alertEl4.classList.add('show'); }
+    if (alertEl4) { alertEl4.textContent = 'El total de gramos (' + totalGr + 'gr) debe ser igual a gramos por unidad (' + gramosPorUnidad + 'gr). Diferencia: ' + (totalGr - gramosPorUnidad).toFixed(1) + 'gr'; alertEl4.classList.add('show'); }
     return;
-  }
-
-  // Normalize to exactly 100%
-  if (totalPct !== 100 && receta.length > 0) {
-    var diff = 100 - totalPct;
-    receta[0].porcentaje = Math.round((receta[0].porcentaje + diff) * 10) / 10;
   }
 
   var formato = (document.getElementById('bl-formato') || {}).value || 'polvo';
-  var gramosPorUnidad = Number((document.getElementById('bl-gramos') || {}).value) || 100;
   var etiquetaId = Number((document.getElementById('bl-etiqueta') || {}).value) || 0;
   if (!etiquetaId) etiquetaId = null;
   var precioVenta = Number((document.getElementById('bl-precio') || {}).value) || 0;
@@ -1430,7 +1367,8 @@ function guardarBlend(existingId) {
 
   var db = getDB();
   if (existingId) {
-    var blend = db.blends.find(function(b) { return b.id === existingId; });
+    var blend = null;
+    db.blends.forEach(function(b) { if (b.id === existingId) blend = b; });
     if (blend) {
       blend.nombre = nombre;
       blend.descripcion = descripcion;
@@ -1465,7 +1403,8 @@ function guardarBlend(existingId) {
 
 function editarBlend(id) {
   var db = getDB();
-  var blend = db.blends.find(function(b) { return b.id === id; });
+  var blend = null;
+  db.blends.forEach(function(b) { if (b.id === id) blend = b; });
   if (!blend) return;
   openModal('Editar Blend', blendFormHTML(blend));
 }
@@ -1479,16 +1418,17 @@ function eliminarBlend(id) {
   toast('Blend eliminado');
 }
 
-// =====================================================================
-//  6. PRODUCCION
-// =====================================================================
+// ==================== 6. PRODUCCION ====================
 
 function renderProduccion() {
   var el = document.getElementById('page-produccion');
   if (!el) return;
 
-  var html = '<h2 class="page-title">Produccion</h2>' +
-    '<p class="text-muted mb-16">Producir blends a partir de especias.</p>';
+  var html = '<div class="page-header">' +
+    '<h2>Produccion</h2>' +
+    '<button class="btn btn-sm" onclick="navigateTo(\'blends\')">Volver a Blends</button>' +
+    '</div>' +
+    '<p class="text-muted mb-16">Producir blends a partir de especias en stock.</p>';
 
   var db = getDB();
   var blends = db.blends || [];
@@ -1510,7 +1450,7 @@ function renderProduccion() {
     if (blend.receta && blend.receta.length) {
       var parts = [];
       blend.receta.forEach(function(ing) {
-        parts.push(esc(ing.nombre || '?') + ' ' + Number(ing.porcentaje) + '%');
+        parts.push(esc(ing.nombre || '?') + ' ' + Number(ing.gramos || 0) + 'gr');
       });
       recetaPreview = parts.join(' | ');
     } else {
@@ -1537,33 +1477,34 @@ function renderProduccion() {
 
 function modalProducir(id) {
   var db = getDB();
-  var blend = db.blends.find(function(b) { return b.id === id; });
+  var blend = null;
+  db.blends.forEach(function(b) { if (b.id === id) blend = b; });
   if (!blend) return;
 
   var gramosPorUnidad = blend.gramosPorUnidad || 100;
   var receta = blend.receta || [];
 
-  // Check if any ingredient is missing or has insufficient stock for 1 unit
   var hasError = false;
   var errorMsg = '';
 
   var rowsHtml = '';
   receta.forEach(function(ing) {
-    var spice = db.productos.find(function(p) { return p.id === ing.productoId; });
+    var spice = null;
+    db.productos.forEach(function(p) { if (p.id == ing.productoId) spice = p; });
     if (!spice) {
       hasError = true;
       errorMsg = 'Especia no encontrada: ' + (ing.nombre || ing.productoId);
       return;
     }
-    var gramos = (ing.porcentaje / 100) * gramosPorUnidad;
+    var gramos = ing.gramos || 0;
     var stock = spice.stock || 0;
     if (stock < gramos) {
       hasError = true;
     }
     rowsHtml += '<div class="cost-row">' +
-      '<span>' + esc(spice.nombre) + ' (' + Number(ing.porcentaje) + '% = ' + gramos.toFixed(1) + 'gr)</span>' +
+      '<span>' + esc(spice.nombre) + ' (' + gramos + 'gr)</span>' +
       '<span>Stock: ' + Number(stock).toFixed(0) + ' gr</span>' +
-    '</div>';
+      '</div>';
   });
 
   if (hasError) {
@@ -1592,13 +1533,13 @@ function modalProducir(id) {
 
   openModal('Producir: ' + blend.nombre, bodyHtml);
 
-  // Initial cost calc
   setTimeout(function() { recalcProduccion(id); }, 30);
 }
 
 function recalcProduccion(id) {
   var db = getDB();
-  var blend = db.blends.find(function(b) { return b.id === id; });
+  var blend = null;
+  db.blends.forEach(function(b) { if (b.id === id) blend = b; });
   if (!blend) return;
 
   var cantidadInput = document.getElementById('prod-cantidad');
@@ -1610,9 +1551,10 @@ function recalcProduccion(id) {
   var allOk = true;
 
   (blend.receta || []).forEach(function(ing) {
-    var spice = db.productos.find(function(p) { return p.id === ing.productoId; });
+    var spice = null;
+    db.productos.forEach(function(p) { if (p.id == ing.productoId) spice = p; });
     if (!spice) return;
-    var needed = (ing.porcentaje / 100) * gramosPorUnidad * cantidad;
+    var needed = (ing.gramos || 0) * cantidad;
     var available = spice.stock || 0;
     var ok = available >= needed;
     if (!ok) allOk = false;
@@ -1621,7 +1563,7 @@ function recalcProduccion(id) {
     detailHtml += '<div class="cost-row">' +
       '<span>' + esc(spice.nombre) + ': ' + needed.toFixed(1) + 'gr' + (ok ? '' : ' <span class="text-red">(falta ' + (needed - available).toFixed(1) + 'gr)</span>') + '</span>' +
       '<span>' + fmt(cost) + '</span>' +
-    '</div>';
+      '</div>';
   });
 
   var costoEl = document.getElementById('prod-costo-total');
@@ -1634,14 +1576,14 @@ function recalcProduccion(id) {
       : '';
   }
 
-  // Enable/disable button
   var btn = document.querySelector('#modal-body .btn-gold.btn-full');
   if (btn) btn.disabled = !allOk || cantidad < 1;
 }
 
 function ejecutarProduccion(id) {
   var db = getDB();
-  var blend = db.blends.find(function(b) { return b.id === id; });
+  var blend = null;
+  db.blends.forEach(function(b) { if (b.id === id) blend = b; });
   if (!blend) return;
 
   var cantidadInput = document.getElementById('prod-cantidad');
@@ -1651,15 +1593,14 @@ function ejecutarProduccion(id) {
     return;
   }
 
-  var gramosPorUnidad = blend.gramosPorUnidad || 100;
   var receta = blend.receta || [];
   var allOk = true;
 
-  // Validate stock
   receta.forEach(function(ing) {
-    var spice = db.productos.find(function(p) { return p.id === ing.productoId; });
+    var spice = null;
+    db.productos.forEach(function(p) { if (p.id == ing.productoId) spice = p; });
     if (!spice) { allOk = false; return; }
-    var needed = (ing.porcentaje / 100) * gramosPorUnidad * cantidad;
+    var needed = (ing.gramos || 0) * cantidad;
     if ((spice.stock || 0) < needed) allOk = false;
   });
 
@@ -1669,18 +1610,16 @@ function ejecutarProduccion(id) {
     return;
   }
 
-  // Deduct stock and record movimientos
   receta.forEach(function(ing) {
-    var spice = db.productos.find(function(p) { return p.id === ing.productoId; });
+    var spice = null;
+    db.productos.forEach(function(p) { if (p.id == ing.productoId) spice = p; });
     if (!spice) return;
-    var needed = (ing.porcentaje / 100) * gramosPorUnidad * cantidad;
-    spice.stock = (spice.stock || 0) - needed;
-    spice.stock = Math.round(spice.stock * 100) / 100;
+    var needed = (ing.gramos || 0) * cantidad;
+    spice.stock = Math.round(((spice.stock || 0) - needed) * 100) / 100;
     addMovimiento('produccion', spice.id, spice.nombre, -needed,
       'Produccion: ' + blend.nombre + ' x' + cantidad + ' (' + needed.toFixed(1) + 'gr)');
   });
 
-  // Add blend stock
   blend.stock = (blend.stock || 0) + cantidad;
 
   saveDB();
@@ -1689,19 +1628,21 @@ function ejecutarProduccion(id) {
   toast('Producidas ' + cantidad + ' unidades de ' + blend.nombre);
 }
 
-// =====================================================================
-//  7. VENTAS (POS)
-// =====================================================================
+// ==================== 7. VENTAS (POS) ====================
 
 var ventasFilter = 'todos';
 var ventaActual = null;
 
 function dbFindProduct(id) {
-  return (getDB().productos || []).find(function(p) { return p.id === id; });
+  var found = null;
+  (getDB().productos || []).forEach(function(p) { if (p.id == id) found = p; });
+  return found;
 }
 
 function dbFindBlend(id) {
-  return (getDB().blends || []).find(function(b) { return b.id === id; });
+  var found = null;
+  (getDB().blends || []).forEach(function(b) { if (b.id === id) found = b; });
+  return found;
 }
 
 function renderVentas() {
@@ -1716,12 +1657,10 @@ function renderVentas() {
       '<button class="btn btn-sm" onclick="toggleTiendaOrders()">Pedidos de Tienda</button>' +
     '</div>';
 
-  // Active venta
   if (ventaActual) {
     html += renderVentaActiva();
   }
 
-  // Tabs
   var tabs = [
     { val: 'todos', label: 'Todas' },
     { val: 'pendiente', label: 'Pendiente' },
@@ -1731,24 +1670,23 @@ function renderVentas() {
 
   html += '<div class="tabs mb-12">';
   tabs.forEach(function(t) {
-    var cls = (ventasFilter === t.val) ? 'tab active' : 'tab';
+    var cls = (ventasFilter === t.val) ? 'tab-btn active' : 'tab-btn';
     html += '<button class="' + cls + '" onclick="ventasFilter=\'' + t.val + '\';refreshPage()">' + esc(t.label) + '</button>';
   });
   html += '</div>';
 
-  // Filter ventas
   var filtered = ventas;
   if (ventasFilter !== 'todos') {
     filtered = ventas.filter(function(v) { return v.estado === ventasFilter; });
   }
 
   if (!filtered.length) {
-    html += '<div class="empty"><p>No hay ventas ' + (ventasFilter === 'todos' ? '' : ventasFilter) + 's</p></div>';
+    html += '<div class="empty"><p>No hay ventas ' + (ventasFilter === 'todos' ? '' : ventasFilter + 's') + '</p></div>';
     el.innerHTML = html;
     return;
   }
 
-  html += '<div class="tw"><table>' +
+  html += '<div class="table-wrap"><table>' +
     '<thead><tr>' +
       '<th>Fecha</th><th>Items</th><th>Total</th><th>Estado</th><th>Acciones</th>' +
     '</tr></thead><tbody>';
@@ -1759,18 +1697,13 @@ function renderVentas() {
     if (v.estado === 'cancelada') estadoClass = 'br';
     if (v.estado === 'pendiente') estadoClass = 'by';
 
-    var total = 0;
-    (v.items || []).forEach(function(item) {
-      total += (item.subtotal || 0);
-    });
-
     html += '<tr>' +
       '<td class="text-xs">' + fmtDateTime(v.fecha) + '</td>' +
       '<td>' + (v.items || []).length + '</td>' +
-      '<td class="fw7">' + fmt(total) + '</td>' +
+      '<td class="fw7">' + fmt(v.total) + '</td>' +
       '<td><span class="badge ' + estadoClass + '">' + esc(v.estado || '') + '</span></td>' +
       '<td><button class="btn btn-sm" onclick="modalVerVenta(' + v.id + ')">Ver</button></td>' +
-    '</tr>';
+      '</tr>';
   });
 
   html += '</tbody></table></div>';
@@ -1791,7 +1724,7 @@ function renderVentaActiva() {
       '</div>' +
       '<span class="fw7">' + fmt(item.subtotal) + '</span>' +
       '<button class="btn-icon" onclick="removeVentaItem(' + idx + ')" title="Quitar">&times;</button>' +
-    '</div>';
+      '</div>';
   });
 
   return '<div class="card-gold mb-16">' +
@@ -1805,18 +1738,20 @@ function renderVentaActiva() {
       '<span class="fw7">Total: ' + fmt(total) + '</span>' +
       '<button class="btn btn-gold btn-sm" onclick="completarVenta()">Completar</button>' +
     '</div>' +
-  '</div>';
+    '</div>';
 }
 
 function iniciarNuevaVenta() {
   ventaActual = { items: [] };
 
   var db = getDB();
-  var especias = db.productos.filter(function(p) {
-    return p.tipo === 'especia' && p.precioVenta > 0 && (p.stock || 0) > 0;
+  var especias = [];
+  db.productos.forEach(function(p) {
+    if (p.tipo === 'especia' && p.precioVenta > 0 && (p.stock || 0) > 0) especias.push(p);
   });
-  var blends = db.blends.filter(function(b) {
-    return (b.stock || 0) > 0;
+  var blends = [];
+  db.blends.forEach(function(b) {
+    if ((b.stock || 0) > 0) blends.push(b);
   });
 
   var html = '<div class="section-title mb-12">Especias</div>';
@@ -1825,7 +1760,7 @@ function iniciarNuevaVenta() {
   } else {
     especias.forEach(function(sp) {
       html += '<button class="btn btn-ghost btn-sm mb-8" style="width:100%;text-align:left" onclick="agregarAVenta(\'especia\',' + sp.id + ')">' +
-        esc(sp.nombre) + ' <span class="text-muted text-xs">' + fmt(sp.precioVenta) + ' | Stock: ' + Number(sp.stock || 0) + ' ' + esc(sp.unidad || 'gr') + '</span></button>';
+        esc(sp.nombre) + ' <span class="text-muted text-xs">' + fmt(sp.precioVenta) + '/gr | Stock: ' + Number(sp.stock || 0) + ' gr</span></button>';
     });
   }
 
@@ -1840,7 +1775,7 @@ function iniciarNuevaVenta() {
   }
 
   html += '<hr class="divider">' +
-    '<button class="btn btn-gold btn-full mt-8" onclick="closeModal()">Cerrar (Venta en curso)</button>';
+    '<button class="btn btn-ghost btn-full mt-12" onclick="closeModal()">Cerrar (Venta en curso)</button>';
 
   openModal('Agregar productos', html);
   refreshPage();
@@ -1852,9 +1787,10 @@ function agregarAVenta(tipo, id) {
   if (tipo === 'especia') {
     var product = dbFindProduct(id);
     if (!product) return;
-    // Check if already added, increase qty
-    var existing = ventaActual.items.find(function(item) {
-      return item.tipo === 'especia' && item.productoId === id;
+
+    var existing = null;
+    ventaActual.items.forEach(function(item) {
+      if (item.tipo === 'especia' && item.productoId === id) existing = item;
     });
     if (existing) {
       existing.cantidad += 1;
@@ -1874,11 +1810,9 @@ function agregarAVenta(tipo, id) {
     iniciarNuevaVenta();
     refreshPage();
   } else if (tipo === 'blend') {
-    // This calls mostrarSelectorFrasco from part 1
     if (typeof mostrarSelectorFrasco === 'function') {
       mostrarSelectorFrasco(id, 'venta');
     } else {
-      // Fallback: add blend without frasco
       var bl = dbFindBlend(id);
       if (!bl) return;
       agregarBlendAVenta(id, null, bl.nombre, bl.precioVenta, bl.stock);
@@ -1889,8 +1823,9 @@ function agregarAVenta(tipo, id) {
 function agregarBlendAVenta(blendId, frascoId, nombre, precio, disponible) {
   if (!ventaActual) ventaActual = { items: [] };
 
-  var existing = ventaActual.items.find(function(item) {
-    return item.tipo === 'blend' && item.blendId === blendId && item.frascoId === frascoId;
+  var existing = null;
+  ventaActual.items.forEach(function(item) {
+    if (item.tipo === 'blend' && item.blendId === blendId && item.frascoId === frascoId) existing = item;
   });
   if (existing) {
     existing.cantidad += 1;
@@ -1960,13 +1895,11 @@ function completarVenta() {
     fecha: new Date().toISOString()
   };
 
-  // Process each item
   ventaActual.items.forEach(function(item) {
     if (item.tipo === 'especia') {
       var product = dbFindProduct(item.productoId);
       if (product) {
-        product.stock = (product.stock || 0) - item.cantidad;
-        product.stock = Math.round(product.stock * 100) / 100;
+        product.stock = Math.round(((product.stock || 0) - item.cantidad) * 100) / 100;
         addMovimiento('venta', product.id, product.nombre, -item.cantidad,
           'Venta mostrador #' + venta.id);
       }
@@ -1977,7 +1910,6 @@ function completarVenta() {
         addMovimiento('venta', blend.id, blend.nombre, -item.cantidad,
           'Venta mostrador #' + venta.id);
       }
-      // Deduct frasco stock
       if (item.frascoId) {
         var frasco = dbFindProduct(item.frascoId);
         if (frasco) {
@@ -1986,7 +1918,6 @@ function completarVenta() {
             'Frasco para venta #' + venta.id);
         }
       }
-      // Deduct etiqueta stock if blend has one
       if (blend && blend.etiquetaId) {
         var etiqueta = dbFindProduct(blend.etiquetaId);
         if (etiqueta) {
@@ -2007,7 +1938,8 @@ function completarVenta() {
 
 function modalVerVenta(id) {
   var db = getDB();
-  var venta = (db.ventas || []).find(function(v) { return v.id === id; });
+  var venta = null;
+  db.ventas.forEach(function(v) { if (v.id === id) venta = v; });
   if (!venta) return;
 
   var estadoClass = 'ba';
@@ -2021,7 +1953,7 @@ function modalVerVenta(id) {
       '<div style="flex:1">' +
         '<strong>' + esc(item.nombre) + '</strong>' +
         '<span class="text-muted text-xs" style="margin-left:6px">' +
-          fmt(item.precio) + ' x ' + item.cantidad +
+          fmt(item.precio) + ' x ' + (item.cantidad || item.qty || 0) +
           (item.frascoNombre ? ' (' + esc(item.frascoNombre) + ')' : '') +
         '</span>' +
       '</div>' +
@@ -2055,40 +1987,45 @@ function modalVerVenta(id) {
 
 function cambiarEstadoVenta(id, nuevoEstado) {
   var db = getDB();
-  var venta = (db.ventas || []).find(function(v) { return v.id === id; });
+  var venta = null;
+  db.ventas.forEach(function(v) { if (v.id === id) venta = v; });
   if (!venta) return;
 
-  // If completing a tienda order, deduct stock
   if (nuevoEstado === 'completada' && venta.estado === 'pendiente' && venta.tipo === 'tienda') {
     (venta.items || []).forEach(function(item) {
-      if (item.tipo === 'especia') {
-        var product = dbFindProduct(item.productoId);
+      if (item.tipo === 'especia' || (!item.tipo && !item.isBlend)) {
+        var productId = item.productoId || item.id;
+        var product = dbFindProduct(productId);
         if (product) {
-          product.stock = (product.stock || 0) - item.cantidad;
-          product.stock = Math.round(product.stock * 100) / 100;
-          addMovimiento('venta', product.id, product.nombre, -item.cantidad,
+          var qty = item.cantidad || item.qty || 0;
+          product.stock = Math.round(((product.stock || 0) - qty) * 100) / 100;
+          addMovimiento('venta', product.id, product.nombre, -qty,
             'Venta tienda #' + venta.id);
         }
-      } else if (item.tipo === 'blend') {
-        var blend = dbFindBlend(item.blendId);
+      } else if (item.tipo === 'blend' || item.isBlend) {
+        var blendId = item.blendId || item.id;
+        var blend = dbFindBlend(blendId);
         if (blend) {
-          blend.stock = (blend.stock || 0) - item.cantidad;
-          addMovimiento('venta', blend.id, blend.nombre, -item.cantidad,
+          var qty = item.cantidad || item.qty || 0;
+          blend.stock = (blend.stock || 0) - qty;
+          addMovimiento('venta', blend.id, blend.nombre, -qty,
             'Venta tienda #' + venta.id);
         }
         if (item.frascoId) {
           var frasco = dbFindProduct(item.frascoId);
           if (frasco) {
-            frasco.stock = (frasco.stock || 0) - item.cantidad;
-            addMovimiento('venta', frasco.id, frasco.nombre, -item.cantidad,
+            var qty = item.cantidad || item.qty || 0;
+            frasco.stock = (frasco.stock || 0) - qty;
+            addMovimiento('venta', frasco.id, frasco.nombre, -qty,
               'Frasco para venta tienda #' + venta.id);
           }
         }
         if (blend && blend.etiquetaId) {
           var etiqueta = dbFindProduct(blend.etiquetaId);
           if (etiqueta) {
-            etiqueta.stock = (etiqueta.stock || 0) - item.cantidad;
-            addMovimiento('venta', etiqueta.id, etiqueta.nombre, -item.cantidad,
+            var qty = item.cantidad || item.qty || 0;
+            etiqueta.stock = (etiqueta.stock || 0) - qty;
+            addMovimiento('venta', etiqueta.id, etiqueta.nombre, -qty,
               'Etiqueta para venta tienda #' + venta.id);
           }
         }
@@ -2096,36 +2033,41 @@ function cambiarEstadoVenta(id, nuevoEstado) {
     });
   }
 
-  // If cancelling a completed venta, restore stock
   if (nuevoEstado === 'cancelada' && venta.estado === 'completada') {
     (venta.items || []).forEach(function(item) {
-      if (item.tipo === 'especia') {
-        var product = dbFindProduct(item.productoId);
+      if (item.tipo === 'especia' || (!item.tipo && !item.isBlend)) {
+        var productId = item.productoId || item.id;
+        var product = dbFindProduct(productId);
         if (product) {
-          product.stock = (product.stock || 0) + item.cantidad;
-          addMovimiento('devolucion', product.id, product.nombre, item.cantidad,
+          var qty = item.cantidad || item.qty || 0;
+          product.stock = Math.round(((product.stock || 0) + qty) * 100) / 100;
+          addMovimiento('devolucion', product.id, product.nombre, qty,
             'Cancelacion venta #' + venta.id);
         }
-      } else if (item.tipo === 'blend') {
-        var blend = dbFindBlend(item.blendId);
+      } else if (item.tipo === 'blend' || item.isBlend) {
+        var blendId = item.blendId || item.id;
+        var blend = dbFindBlend(blendId);
         if (blend) {
-          blend.stock = (blend.stock || 0) + item.cantidad;
-          addMovimiento('devolucion', blend.id, blend.nombre, item.cantidad,
+          var qty = item.cantidad || item.qty || 0;
+          blend.stock = (blend.stock || 0) + qty;
+          addMovimiento('devolucion', blend.id, blend.nombre, qty,
             'Cancelacion venta #' + venta.id);
         }
         if (item.frascoId) {
           var frasco = dbFindProduct(item.frascoId);
           if (frasco) {
-            frasco.stock = (frasco.stock || 0) + item.cantidad;
-            addMovimiento('devolucion', frasco.id, frasco.nombre, item.cantidad,
-            'Cancelacion venta #' + venta.id);
+            var qty = item.cantidad || item.qty || 0;
+            frasco.stock = (frasco.stock || 0) + qty;
+            addMovimiento('devolucion', frasco.id, frasco.nombre, qty,
+              'Cancelacion venta #' + venta.id);
           }
         }
         if (blend && blend.etiquetaId) {
           var etiqueta = dbFindProduct(blend.etiquetaId);
           if (etiqueta) {
-            etiqueta.stock = (etiqueta.stock || 0) + item.cantidad;
-            addMovimiento('devolucion', etiqueta.id, etiqueta.nombre, item.cantidad,
+            var qty = item.cantidad || item.qty || 0;
+            etiqueta.stock = (etiqueta.stock || 0) + qty;
+            addMovimiento('devolucion', etiqueta.id, etiqueta.nombre, qty,
               'Cancelacion venta #' + venta.id);
           }
         }
@@ -2141,9 +2083,9 @@ function cambiarEstadoVenta(id, nuevoEstado) {
 }
 
 function toggleTiendaOrders() {
-  ventasFilter = 'tienda';
   var db = getDB();
-  var tiendaOrders = (db.ventas || []).filter(function(v) { return v.tipo === 'tienda'; });
+  var tiendaOrders = [];
+  db.ventas.forEach(function(v) { if (v.tipo === 'tienda') tiendaOrders.push(v); });
 
   var html = '<div class="section-title mb-12">Pedidos de Tienda</div>';
 
@@ -2158,11 +2100,11 @@ function toggleTiendaOrders() {
 
       var itemsPreview = '';
       (v.items || []).forEach(function(item) {
-        itemsPreview += esc(item.nombre) + ' x' + item.cantidad + ', ';
+        itemsPreview += esc(item.nombre) + ' x' + (item.cantidad || item.qty || 1) + ', ';
       });
       itemsPreview = itemsPreview.replace(/, $/, '');
 
-      html += '<div class="card" style="cursor:pointer" onclick="modalVerVenta(' + v.id + ');ventasFilter=\'todos\'">' +
+      html += '<div class="card" style="cursor:pointer" onclick="modalVerVenta(' + v.id + ')">' +
         '<div class="flex justify-between items-center mb-8">' +
           '<span class="text-xs text-muted">' + fmtDateTime(v.fecha) + '</span>' +
           '<span class="badge ' + estadoClass + '">' + esc(v.estado) + '</span>' +
@@ -2173,14 +2115,12 @@ function toggleTiendaOrders() {
     });
   }
 
-  html += '<hr class="divider mt-12"><button class="btn btn-ghost btn-full mt-12" onclick="ventasFilter=\'todos\';refreshPage()">Volver</button>';
+  html += '<hr class="divider mt-12"><button class="btn btn-ghost btn-full mt-12" onclick="refreshPage()">Volver</button>';
 
   openModal('Pedidos de Tienda', html);
 }
 
-// =====================================================================
-//  8. USUARIOS
-// =====================================================================
+// ==================== 8. USUARIOS ====================
 
 function renderUsuarios() {
   var el = document.getElementById('page-usuarios');
@@ -2194,8 +2134,8 @@ function renderUsuarios() {
   var db = getDB();
   var usuarios = db.usuarios || [];
 
-  var html = '<div class="flex justify-between items-center mb-16">' +
-    '<h2 class="page-title mb-0">Usuarios</h2>' +
+  var html = '<div class="page-header">' +
+    '<h2>Usuarios</h2>' +
     '<button class="btn btn-gold btn-sm" onclick="modalNuevoUsuario(null)">+ Nuevo Usuario</button>' +
     '</div>';
 
@@ -2205,7 +2145,7 @@ function renderUsuarios() {
     return;
   }
 
-  html += '<div class="tw"><table>' +
+  html += '<div class="table-wrap"><table>' +
     '<thead><tr>' +
       '<th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th>Acciones</th>' +
     '</tr></thead><tbody>';
@@ -2231,7 +2171,7 @@ function renderUsuarios() {
         '</button> ' +
         '<button class="btn btn-sm btn-danger" onclick="eliminarUsuario(' + u.id + ')">Eliminar</button>' +
       '</td>' +
-    '</tr>';
+      '</tr>';
   });
 
   html += '</tbody></table></div>';
@@ -2241,7 +2181,7 @@ function renderUsuarios() {
 function modalNuevoUsuario(existingId) {
   var user = null;
   if (existingId) {
-    user = (getDB().usuarios || []).find(function(u) { return u.id === existingId; });
+    (getDB().usuarios || []).forEach(function(u) { if (u.id === existingId) user = u; });
   }
 
   var nombre = user ? esc(user.nombre) : '';
@@ -2289,7 +2229,8 @@ function guardarUsuario(existingId) {
   var db = getDB();
 
   if (existingId) {
-    var user = db.usuarios.find(function(u) { return u.id === existingId; });
+    var user = null;
+    db.usuarios.forEach(function(u) { if (u.id === existingId) user = u; });
     if (user) {
       user.nombre = nombre;
       user.rol = rol;
@@ -2314,7 +2255,8 @@ function guardarUsuario(existingId) {
 
 function toggleUsuarioActivo(id) {
   var db = getDB();
-  var user = db.usuarios.find(function(u) { return u.id === id; });
+  var user = null;
+  db.usuarios.forEach(function(u) { if (u.id === id) user = u; });
   if (!user) return;
   if (user.id === (currentUser ? currentUser.id : 0)) {
     toast('No puedes desactivarte a ti mismo', 'err');
@@ -2339,9 +2281,7 @@ function eliminarUsuario(id) {
   toast('Usuario eliminado');
 }
 
-// =====================================================================
-//  9. AJUSTES
-// =====================================================================
+// ==================== 9. AJUSTES ====================
 
 function renderAjustes() {
   var el = document.getElementById('page-ajustes');
@@ -2374,7 +2314,7 @@ function renderAjustes() {
       '</div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="text-xs text-muted">Arcano ERP v1.0.0 &mdash; Complice del Sabor</div>' +
+      '<div class="text-xs text-muted">Arcano ERP v2.0.0</div>' +
     '</div>';
 
   el.innerHTML = html;
@@ -2389,83 +2329,58 @@ function exportarExcel() {
   var db = getDB();
   var wb = XLSX.utils.book_new();
 
-  // Productos sheet
   var productosData = (db.productos || []).map(function(p) {
     return {
-      ID: p.id,
-      Nombre: p.nombre,
-      Tipo: p.tipo,
-      Unidad: p.unidad || '',
-      Stock: p.stock || 0,
-      StockMin: p.stockMin || 0,
-      CostoPor1000gr: p.costoPor1000gr || 0,
-      PrecioCosto: p.precioCosto || 0,
-      PrecioVenta: p.precioVenta || 0,
-      Categoria: p.categoria || '',
-      Proveedor: p.proveedor || ''
+      ID: p.id, Nombre: p.nombre, Tipo: p.tipo, Unidad: p.unidad || '',
+      Stock: p.stock || 0, StockMin: p.stockMin || 0,
+      CostoPor1000gr: p.costoPor1000gr || 0, PrecioCosto: p.precioCosto || 0,
+      PrecioVenta: p.precioVenta || 0, Categoria: p.categoria || '', Proveedor: p.proveedor || ''
     };
   });
   var wsProductos = XLSX.utils.json_to_sheet(productosData);
   XLSX.utils.book_append_sheet(wb, wsProductos, 'Productos');
 
-  // Blends sheet
   var blendsData = (db.blends || []).map(function(b) {
     var recetaStr = '';
     if (b.receta && b.receta.length) {
       recetaStr = b.receta.map(function(r) {
-        return (r.nombre || '') + ':' + r.porcentaje + '%';
+        return (r.nombre || '') + ':' + (r.gramos || r.porcentaje || 0) + (r.gramos ? 'gr' : '%');
       }).join('; ');
     }
     return {
-      ID: b.id,
-      Nombre: b.nombre,
-      Descripcion: b.descripcion || '',
-      Formato: b.formato || '',
-      GramosPorUnidad: b.gramosPorUnidad || 100,
-      PrecioVenta: b.precioVenta || 0,
-      CostoUnitario: b.costoUnitario || 0,
-      Stock: b.stock || 0,
-      Receta: recetaStr,
-      EtiquetaID: b.etiquetaId || ''
+      ID: b.id, Nombre: b.nombre, Descripcion: b.descripcion || '',
+      Formato: b.formato || '', GramosPorUnidad: b.gramosPorUnidad || 100,
+      PrecioVenta: b.precioVenta || 0, CostoUnitario: b.costoUnitario || 0,
+      Stock: b.stock || 0, Receta: recetaStr, EtiquetaID: b.etiquetaId || ''
     };
   });
   var wsBlends = XLSX.utils.json_to_sheet(blendsData);
   XLSX.utils.book_append_sheet(wb, wsBlends, 'Blends');
 
-  // Compras sheet
   var comprasData = (db.compras || []).map(function(c) {
+    var itemsStr = '';
+    if (c.items && c.items.length) {
+      itemsStr = c.items.map(function(i) { return (i.productoNombre || '') + ' x' + i.cantidad; }).join('; ');
+    }
     return {
-      ID: c.id,
-      ProductoID: c.productoId || '',
-      ProductoNombre: c.productoNombre || '',
-      Proveedor: c.proveedor || '',
-      Cantidad: c.cantidad || 0,
-      Unidad: c.unidad || '',
-      CostoTotal: c.costoTotal || 0,
-      Estado: c.estado || '',
-      Fecha: c.fecha || '',
-      Notas: c.notas || ''
+      ID: c.id, Fecha: c.fecha || '', Proveedor: c.proveedor || '',
+      Items: itemsStr, Total: c.total || 0, Estado: c.estado || '', Notas: c.notas || ''
     };
   });
   var wsCompras = XLSX.utils.json_to_sheet(comprasData);
   XLSX.utils.book_append_sheet(wb, wsCompras, 'Compras');
 
-  // Ventas sheet
   var ventasData = (db.ventas || []).map(function(v) {
     var itemsStr = '';
     if (v.items && v.items.length) {
       itemsStr = v.items.map(function(item) {
-        return (item.nombre || '') + ' x' + item.cantidad + ' ' + (item.subtotal || 0);
+        return (item.nombre || '') + ' x' + (item.cantidad || item.qty || 0) + ' ' + (item.subtotal || 0);
       }).join('; ');
     }
     return {
-      ID: v.id,
-      Tipo: v.tipo || 'mostrador',
-      Items: itemsStr,
-      Total: v.total || 0,
-      Estado: v.estado || '',
-      CreadoPor: v.creadoPorNombre || '',
-      Fecha: v.fecha || ''
+      ID: v.id, Tipo: v.tipo || 'mostrador', Items: itemsStr,
+      Total: v.total || 0, Estado: v.estado || '',
+      CreadoPor: v.creadoPorNombre || '', Fecha: v.fecha || ''
     };
   });
   var wsVentas = XLSX.utils.json_to_sheet(ventasData);
@@ -2499,14 +2414,14 @@ function importarExcel() {
         var added = 0;
         var updated = 0;
 
-        // Import productos
         var wsProductos = workbook.Sheets['Productos'];
         if (wsProductos) {
           var rows = XLSX.utils.sheet_to_json(wsProductos);
           rows.forEach(function(row) {
             var nombre = (row.Nombre || '').trim();
             if (!nombre) return;
-            var existing = db.productos.find(function(p) { return p.nombre === nombre; });
+            var existing = null;
+            db.productos.forEach(function(p) { if (p.nombre === nombre) existing = p; });
             if (existing) {
               if (row.Tipo) existing.tipo = row.Tipo;
               if (row.Unidad) existing.unidad = row.Unidad;
@@ -2520,17 +2435,13 @@ function importarExcel() {
               updated++;
             } else {
               db.productos.push({
-                id: nextId(),
-                nombre: nombre,
-                tipo: row.Tipo || 'especia',
-                unidad: row.Unidad || 'gr',
-                stock: Number(row.Stock) || 0,
+                id: nextId(), nombre: nombre, tipo: row.Tipo || 'especia',
+                unidad: row.Unidad || 'gr', stock: Number(row.Stock) || 0,
                 stockMin: Number(row.StockMin) || 0,
                 costoPor1000gr: Number(row.CostoPor1000gr) || 0,
                 precioCosto: Number(row.PrecioCosto) || 0,
                 precioVenta: Number(row.PrecioVenta) || 0,
-                categoria: row.Categoria || '',
-                proveedor: row.Proveedor || ''
+                categoria: row.Categoria || '', proveedor: row.Proveedor || ''
               });
               added++;
             }
@@ -2545,7 +2456,6 @@ function importarExcel() {
       }
     };
     reader.readAsArrayBuffer(file);
-    // Reset input so same file can be re-imported
     input.value = '';
   };
 

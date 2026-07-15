@@ -1679,6 +1679,11 @@ textarea {
   min-width: 80px;
 }
 
+.compra-item-row input[type="text"].cmp-nuevo-nombre {
+  flex: 2;
+  min-width: 120px;
+}
+
 .subtotal-display {
   min-width: 70px;
   text-align: right;
