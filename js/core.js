@@ -309,7 +309,6 @@ var NAV_ITEMS = {
   admin: [
     { id: 'dashboard',  label: 'Dashboard'  },
     { id: 'compras',    label: 'Compras'    },
-    { id: 'productos',  label: 'Especias'   },
     { id: 'blends',     label: 'Blends'     },
     { id: 'produccion', label: 'Produccion' },
     { id: 'ventas',     label: 'Ventas'     },
@@ -318,7 +317,7 @@ var NAV_ITEMS = {
   ],
   operador: [
     { id: 'ventas',   label: 'Ventas'   },
-    { id: 'productos', label: 'Especias' },
+    { id: 'blends',   label: 'Blends'  },
     { id: 'ajustes',  label: 'Ajustes'  }
   ]
 };
