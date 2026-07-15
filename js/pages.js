@@ -11,12 +11,8 @@ function jsEsc(s) {
 var storeCategory = 'todos';
 
 function renderStorefront() {
-  var el = document.getElementById('storefront');
-  if (!el) return;
-
-  var db = getDB();
-
   // Build category list from active especias
+  var db = getDB();
   var categories = ['todos', 'blends'];
   db.productos.forEach(function(p) {
     if (p.tipo === 'especia' && p.precioVenta > 0 && p.stock > 0 && p.categoria) {
@@ -26,24 +22,19 @@ function renderStorefront() {
     }
   });
 
-  // Category nav
-  var navHtml = '';
-  categories.forEach(function(cat) {
-    var label = cat === 'todos' ? 'Todos' : cat === 'blends' ? 'Blends' : cat;
-    var cls = (cat === storeCategory) ? ' store-nav-btn active' : ' store-nav-btn';
-    navHtml += '<button class="' + cls + '" data-cat="' + esc(cat) + '">' + esc(label) + '</button>';
-  });
+  // Update category nav in the static HTML
+  var storeNav = document.getElementById('store-nav');
+  if (storeNav) {
+    var navHtml = '';
+    categories.forEach(function(cat) {
+      var label = cat === 'todos' ? 'Todos' : cat === 'blends' ? 'Blends' : cat;
+      var cls = (cat === storeCategory) ? ' store-nav-btn active' : ' store-nav-btn';
+      navHtml += '<button class="' + cls + '" data-cat="' + esc(cat) + '">' + esc(label) + '</button>';
+    });
+    storeNav.innerHTML = navHtml;
+    setupStoreNav();
+  }
 
-  var html = '<div class="store-header">' +
-    '<h1 class="store-title">Arcano Spice Shop</h1>' +
-    '<button class="btn btn-icon cart-toggle" id="cart-toggle-btn" onclick="toggleCart()">' +
-    '&#128722; <span id="cart-count">0</span></button>' +
-    '</div>' +
-    '<div class="store-nav" id="store-nav">' + navHtml + '</div>' +
-    '<div class="store-products" id="store-products"></div>';
-
-  el.innerHTML = html;
-  setupStoreNav();
   renderStoreProducts();
   updateCartUI();
 }
@@ -244,6 +235,12 @@ function confirmarFrasco(blendId, frascoId, contexto, precio, stock) {
 
     updateCartUI();
     toast(blend.nombre + ' agregado al carrito');
+  } else if (contexto === 'venta') {
+    if (typeof agregarBlendAVenta === 'function') {
+      agregarBlendAVenta(blendId, frascoId, blend.nombre, precio, disponible);
+    }
+    closeModal();
+    return;
   }
 
   closeModal();
@@ -1104,7 +1101,7 @@ function calcBlendCostFromReceta(receta, gramosPorUnidad) {
 var blendsFilter = 'todos';
 
 function renderBlends() {
-  var el = document.getElementById('page-blends-content');
+  var el = document.getElementById('page-blends');
   if (!el) return;
   var db = getDB();
   var blends = db.blends || [];
@@ -1429,7 +1426,7 @@ function eliminarBlend(id) {
 // =====================================================================
 
 function renderProduccion() {
-  var el = document.getElementById('page-produccion-content');
+  var el = document.getElementById('page-produccion');
   if (!el) return;
 
   var html = '<h2 class="page-title">Produccion</h2>' +
@@ -1650,7 +1647,7 @@ function dbFindBlend(id) {
 }
 
 function renderVentas() {
-  var el = document.getElementById('page-ventas-content');
+  var el = document.getElementById('page-ventas');
   if (!el) return;
   var db = getDB();
   var ventas = (db.ventas || []).slice().reverse();
@@ -2128,7 +2125,7 @@ function toggleTiendaOrders() {
 // =====================================================================
 
 function renderUsuarios() {
-  var el = document.getElementById('page-usuarios-content');
+  var el = document.getElementById('page-usuarios');
   if (!el) return;
 
   if (!currentUser || currentUser.rol !== 'admin') {
@@ -2289,7 +2286,7 @@ function eliminarUsuario(id) {
 // =====================================================================
 
 function renderAjustes() {
-  var el = document.getElementById('page-ajustes-content');
+  var el = document.getElementById('page-ajustes');
   if (!el) return;
 
   var isOnline = fbIsOnline();
