@@ -10,9 +10,9 @@
 <meta name="apple-mobile-web-app-title" content="Arcano">
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Arcano — Cómplice del Sabor</title>
-<link rel="manifest" href="manifest.json?v=34">
-<link rel="stylesheet" href="css/style.css?v=34">
+<title>Arcano — ERP Especias</title>
+<link rel="manifest" href="manifest.json?v=1">
+<link rel="stylesheet" href="css/style.css?v=1">
 </head>
 <body>
 
@@ -50,8 +50,6 @@
       <p>No hay productos disponibles aún</p>
     </div>
   </main>
-
-  <!-- Cart Drawer -->
   <div id="cart-overlay" class="cart-overlay" onclick="toggleCart()"></div>
   <div id="cart-drawer" class="cart-drawer">
     <div class="cart-header">
@@ -70,9 +68,9 @@
 <div id="pin-screen" style="display:flex">
   <div id="pin-content">
     <div id="boot-loader" style="text-align:center;padding:60px 20px">
-      <div style="width:40px;height:40px;border:3px solid var(--gold-dim);border-top-color:var(--gold2);border-radius:50%;margin:0 auto 20px;animation:spin .8s linear infinite"></div>
-      <div style="color:var(--gold2);font-family:var(--font-head);font-size:1.4rem;letter-spacing:.08em">ARCANO</div>
-      <div style="color:var(--muted);font-size:.75rem;margin-top:6px" id="boot-status">Cargando...</div>
+      <div style="width:40px;height:40px;border:3px solid #7a5a20;border-top-color:#e8b84b;border-radius:50%;margin:0 auto 20px;animation:spin .8s linear infinite"></div>
+      <div style="color:#e8b84b;font-family:'Cormorant Garamond',Georgia,serif;font-size:1.6rem;font-weight:700;letter-spacing:.1em">ARCANO</div>
+      <div style="color:#7a6a50;font-size:.78rem;margin-top:8px" id="boot-status">Cargando...</div>
     </div>
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   </div>
@@ -89,7 +87,7 @@
       </div>
     </div>
     <div class="header-pin">
-      <span id="gh-status-badge" class="badge bg">Conectado</span>
+      <span id="sync-badge" class="badge bg">Online</span>
       <div class="user-chip" onclick="handleLogout()" id="user-chip" title="Cerrar sesión"></div>
     </div>
   </header>
@@ -99,6 +97,7 @@
     <div id="page-compras" class="page"></div>
     <div id="page-productos" class="page"></div>
     <div id="page-blends" class="page"></div>
+    <div id="page-produccion" class="page"></div>
     <div id="page-ventas" class="page"></div>
     <div id="page-usuarios" class="page"></div>
     <div id="page-ajustes" class="page"></div>
@@ -130,9 +129,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="js/db.js?v=34"></script>
-<script src="js/firebase-sync.js?v=34"></script>
-<script src="js/core.js?v=34"></script>
-<script src="js/pages.js?v=34"></script>
+<script src="js/db.js?v=1"></script>
+<script src="js/firebase-sync.js?v=1"></script>
+<script src="js/core.js?v=1"></script>
+<script src="js/pages.js?v=1"></script>
 </body>
 </html>
