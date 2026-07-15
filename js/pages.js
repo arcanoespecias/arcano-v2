@@ -518,7 +518,7 @@ function renderDashboard() {
   }
   if (lowStock.length > 0) {
     html += '<div class="alert-card alert-warn"><div><strong>' + lowStock.length + ' productos con stock bajo</strong></div>' +
-      '<button class="btn btn-warn btn-sm" onclick="navigateTo(\'productos\')">Ver Stock</button></div>';
+      '<button class="btn btn-warn btn-sm" onclick="navigateTo(\'compras\')">Ver Compras</button></div>';
   }
   if (pendientes === 0 && lowStock.length === 0) {
     html += '<div class="alert-card"><div>Todo al dia</div></div>';
@@ -600,8 +600,10 @@ function renderCompras() {
 
   var html = '<div class="page-header">' +
     '<h2>Compras</h2>' +
-    '<button class="btn btn-primary" onclick="modalNuevaCompra()">+ Nueva Compra</button>' +
-    '</div>';
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-ghost btn-sm" onclick="openModal(\'Nuevo Insumo\', productoFormHTML(null))">+ Nuevo Insumo</button>' +
+    '<button class="btn btn-gold btn-sm" onclick="modalNuevaCompra()">+ Nueva Compra</button>' +
+    '</div></div>';
 
   // Tabs
   html += '<div class="tabs">';
@@ -654,7 +656,7 @@ function modalNuevaCompra() {
     '<div class="form-group"><label>Productos</label>' +
     '<div id="compra-items"></div>' +
     '<button class="btn btn-sm btn-outline" onclick="addCompraItemRow()">+ Agregar Item</button></div>' +
-    '<div class="form-group"><label><input type="checkbox" id="cmp-recibida"> Marcar como recibida</label></div>' +
+    '<div class="form-group"><label class="chk-label"><input type="checkbox" id="cmp-recibida"> Marcar como recibida</label></div>' +
     '<p><strong>Total:</strong> <span id="compra-total">$0</span></p>' +
     '<button class="btn btn-primary" onclick="guardarCompra()">Guardar Compra</button>' +
     '</div>';
@@ -1111,7 +1113,8 @@ function guardarProducto(existingId) {
   saveDB();
   closeModal();
   toast(existingId ? 'Producto actualizado' : 'Producto creado');
-  renderProductos();
+  if (currentPage === 'compras') renderCompras();
+  else renderProductos();
 }
 
 function editarProducto(id) {
