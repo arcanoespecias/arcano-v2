@@ -1,7 +1,6 @@
 /* ===================== ARCANO V2 — DATA LAYER =====================
    Single source of truth. DB_KEY = 'arcano_v2' everywhere.
    Firebase-first: every write goes to Firebase RTDB, then mirrors to localStorage.
-   On load: Firebase wins. localStorage is only an offline fallback.
    ===================== */
 
 const DB_KEY = 'arcano_v2';
@@ -18,200 +17,151 @@ const FIREBASE_CONFIG = {
 };
 
 /* ---------- State ---------- */
-let _db = null;         // current in-memory data
-let _ready = false;     // whether initial load is complete
-let _saveTimer = null;  // debounce timer for Firebase writes
-let _listeners = [];    // change callbacks
+var _db = null;
+var _ready = false;
+var _saveTimer = null;
+var _listeners = [];
 
-/* ---------- Default empty database ---------- */
-function _emptyDB() {
-  return {
-    especias: {},
-    blends: {},
-    producciones: {},
-    compras: {},
-    ventas: {},
-    usuarios: {
-      admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
-    },
-    meta: {
-      nextId: { especias: 1, blends: 1, producciones: 1, compras: 1, ventas: 1, usuarios: 1 }
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, compras: 1, ventas: 1, usuarios: 1, etiquetas: 1 };
+
+/* ---------- Ensure DB structure is valid ---------- */
+function _ensureStructure() {
+  if (!_db) _db = {};
+  if (!_db.meta || !_db.meta.nextId) {
+    _db.meta = { nextId: Object.assign({}, DEFAULT_IDS) };
+  } else {
+    // Fill any missing ID counters
+    for (var k in DEFAULT_IDS) {
+      if (typeof _db.meta.nextId[k] !== 'number') {
+        _db.meta.nextId[k] = DEFAULT_IDS[k];
+      }
     }
-  };
+  }
+  if (!_db.especias) _db.especias = {};
+  if (!_db.blends) _db.blends = {};
+  if (!_db.producciones) _db.producciones = {};
+  if (!_db.compras) _db.compras = {};
+  if (!_db.ventas) _db.ventas = {};
+  if (!_db.usuarios) _db.usuarios = { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } };
+  if (!_db.etiquetas) _db.etiquetas = {};
 }
 
-/* ---------- Firebase init ---------- */
-let _firebaseApp = null;
-let _firebaseDb = null;
+function _emptyDB() {
+  var db = {
+    especias: {}, blends: {}, producciones: {}, compras: {}, ventas: {}, etiquetas: {},
+    usuarios: { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } },
+    meta: { nextId: Object.assign({}, DEFAULT_IDS) }
+  };
+  return db;
+}
+
+/* ---------- Firebase ---------- */
+var _firebaseApp = null;
+var _firebaseDb = null;
 
 function _initFirebase() {
   if (_firebaseDb) return;
   try {
-    if (typeof firebase === 'undefined') {
-      console.warn('[DB] Firebase SDK not loaded');
-      return;
-    }
+    if (typeof firebase === 'undefined') { console.warn('[DB] Firebase SDK not loaded'); return; }
     _firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDb = firebase.database();
     console.log('[DB] Firebase initialized');
-  } catch (e) {
-    console.error('[DB] Firebase init error:', e);
-  }
+  } catch (e) { console.error('[DB] Firebase init error:', e); }
 }
 
-/* ---------- Get Firebase DB ref ---------- */
 function _fbRef() {
   if (!_firebaseDb) _initFirebase();
   return _firebaseDb ? _firebaseDb.ref(FB_PATH) : null;
 }
 
-/* ---------- Save to Firebase (debounced) ---------- */
 function _saveToFirebase() {
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
-    const ref = _fbRef();
-    if (!ref) {
-      console.warn('[DB] No Firebase, saving to localStorage only');
+  _saveTimer = setTimeout(function() {
+    _ensureStructure();
+    var ref = _fbRef();
+    if (!ref) { _saveToLocal(); return; }
+    ref.set(_db).then(function() {
+      console.log('[DB] Saved to Firebase');
       _saveToLocal();
-      return;
-    }
-    ref.set(_db)
-      .then(() => {
-        console.log('[DB] Saved to Firebase');
-        _saveToLocal(); // also mirror locally
-      })
-      .catch(err => {
-        console.error('[DB] Firebase save error:', err);
-        _saveToLocal(); // fallback
-      });
+    }).catch(function(err) {
+      console.error('[DB] Firebase save error:', err);
+      _saveToLocal();
+    });
   }, 300);
 }
 
-/* ---------- Save to localStorage ---------- */
 function _saveToLocal() {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(_db));
-  } catch (e) {
-    console.error('[DB] localStorage save error:', e);
-  }
+  try { localStorage.setItem(DB_KEY, JSON.stringify(_db)); } catch (e) {}
 }
 
-/* ---------- Load from Firebase ---------- */
 function _loadFromFirebase() {
-  return new Promise((resolve) => {
-    const ref = _fbRef();
-    if (!ref) {
-      console.warn('[DB] No Firebase, loading from localStorage');
+  return new Promise(function(resolve) {
+    var ref = _fbRef();
+    if (!ref) { resolve(_loadFromLocal()); return; }
+    ref.once('value').then(function(snap) {
+      if (snap.exists() && snap.val()) {
+        _db = snap.val();
+        console.log('[DB] Loaded from Firebase');
+      } else {
+        _db = _emptyDB();
+      }
+      _ensureStructure();
+      _saveToLocal();
+      resolve(_db);
+    }).catch(function(err) {
+      console.error('[DB] Firebase load error:', err);
       resolve(_loadFromLocal());
-      return;
-    }
-    ref.once('value')
-      .then(snap => {
-        if (snap.exists() && snap.val()) {
-          _db = snap.val();
-          console.log('[DB] Loaded from Firebase');
-        } else {
-          console.log('[DB] Firebase empty, using defaults');
-          _db = _emptyDB();
-        }
-        // Ensure meta structure exists
-        if (!_db.meta || !_db.meta.nextId) {
-          _db.meta = { nextId: { especias: 1, blends: 1, producciones: 1, compras: 1, ventas: 1, usuarios: 1 } };
-        }
-        if (!_db.especias) _db.especias = {};
-        if (!_db.blends) _db.blends = {};
-        if (!_db.producciones) _db.producciones = {};
-        if (!_db.compras) _db.compras = {};
-        if (!_db.ventas) _db.ventas = {};
-        if (!_db.usuarios) _db.usuarios = {};
-        _saveToLocal(); // sync local cache
-        resolve(_db);
-      })
-      .catch(err => {
-        console.error('[DB] Firebase load error:', err);
-        resolve(_loadFromLocal());
-      });
+    });
   });
 }
 
-/* ---------- Load from localStorage ---------- */
 function _loadFromLocal() {
   try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (raw) {
-      _db = JSON.parse(raw);
-      console.log('[DB] Loaded from localStorage');
-    } else {
-      _db = _emptyDB();
-      console.log('[DB] No local data, using defaults');
-    }
-    // Ensure structure
-    if (!_db.meta || !_db.meta.nextId) {
-      _db.meta = { nextId: { especias: 1, blends: 1, producciones: 1, compras: 1, ventas: 1, usuarios: 1 } };
-    }
-    if (!_db.especias) _db.especias = {};
-    if (!_db.blends) _db.blends = {};
-    if (!_db.producciones) _db.producciones = {};
-    if (!_db.compras) _db.compras = {};
-    if (!_db.ventas) _db.ventas = {};
-    if (!_db.usuarios) _db.usuarios = {};
-    return _db;
-  } catch (e) {
-    console.error('[DB] localStorage load error:', e);
-    _db = _emptyDB();
-    return _db;
-  }
+    var raw = localStorage.getItem(DB_KEY);
+    if (raw) { _db = JSON.parse(raw); } else { _db = _emptyDB(); }
+  } catch (e) { _db = _emptyDB(); }
+  _ensureStructure();
+  return _db;
 }
 
-/* ---------- Notify listeners ---------- */
-function _notify(changeType, collection, id) {
-  _listeners.forEach(fn => {
-    try { fn(changeType, collection, id); } catch (e) { console.error('[DB] listener error:', e); }
-  });
+function _notify(type, col, id) {
+  _listeners.forEach(function(fn) { try { fn(type, col, id); } catch (e) {} });
 }
 
 /* ==================== PUBLIC API ==================== */
 
-/** Initialize the database. MUST be called before any other operation. */
 async function initDB() {
   if (_ready) return _db;
   _initFirebase();
   await _loadFromFirebase();
   _ready = true;
-
-  // Listen for remote changes and overwrite local state
-  const ref = _fbRef();
+  var ref = _fbRef();
   if (ref) {
-    ref.on('value', (snap) => {
+    ref.on('value', function(snap) {
       if (snap.exists() && snap.val()) {
         _db = snap.val();
+        _ensureStructure();
         _saveToLocal();
         _notify('remote_change', '*', '*');
-        console.log('[DB] Remote change received');
       }
     });
   }
-
   return _db;
 }
 
-/** Get a reference to the current DB (read-only snapshot). */
 function getDB() {
-  if (!_db) throw new Error('DB not initialized. Call initDB() first.');
-  return JSON.parse(JSON.stringify(_db)); // deep clone
+  if (!_db) throw new Error('DB not initialized');
+  return JSON.parse(JSON.stringify(_db));
 }
 
-/** Register a change listener. Returns unsubscribe function. */
 function onDBChange(fn) {
   _listeners.push(fn);
-  return () => { _listeners = _listeners.filter(l => l !== fn); };
+  return function() { _listeners = _listeners.filter(function(l) { return l !== fn; }); };
 }
 
-/** Generate next ID for a collection. */
 function nextId(collection) {
-  const validCols = ['especias', 'blends', 'producciones', 'compras', 'ventas', 'usuarios'];
-  if (!validCols.includes(collection)) throw new Error('Invalid collection: ' + collection);
-  const id = String(_db.meta.nextId[collection] || 1);
+  _ensureStructure(); // CRITICAL: prevents undefined meta
+  var id = String(_db.meta.nextId[collection] || 1);
   _db.meta.nextId[collection] = (_db.meta.nextId[collection] || 0) + 1;
   _saveToFirebase();
   return id;
@@ -220,30 +170,23 @@ function nextId(collection) {
 /* ==================== ESPECIAS ==================== */
 
 function getEspecias() {
-  return Object.values(getDB().especias).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return Object.values(getDB().especias).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
-
-function getEspecia(id) {
-  return getDB().especias[id] || null;
-}
+function getEspecia(id) { return getDB().especias[id] || null; }
 
 function saveEspecia(data) {
-  const isNew = !data.id;
+  _ensureStructure();
+  var isNew = !data.id;
   if (isNew) {
     data.id = nextId('especias');
     data.creado = new Date().toISOString();
-    data.stock = Number(data.stock) || 0;
-    data.precioChico = Number(data.precioChico) || 0;
-    data.precioGrande = Number(data.precioGrande) || 0;
   }
-  // Ensure numeric fields
   data.stock = Number(data.stock) || 0;
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   _db.especias[data.id] = data;
   _saveToFirebase();
   _notify(isNew ? 'create' : 'update', 'especias', data.id);
-  console.log(`[DB] Especia ${isNew ? 'created' : 'updated'}: ${data.id} - ${data.nombre}`);
   return data;
 }
 
@@ -258,21 +201,16 @@ function deleteEspecia(id) {
 /* ==================== BLENDS ==================== */
 
 function getBlends() {
-  return Object.values(getDB().blends).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return Object.values(getDB().blends).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
-
-function getBlend(id) {
-  return getDB().blends[id] || null;
-}
+function getBlend(id) { return getDB().blends[id] || null; }
 
 function saveBlend(data) {
-  const isNew = !data.id;
+  _ensureStructure();
+  var isNew = !data.id;
   if (isNew) {
     data.id = nextId('blends');
     data.creado = new Date().toISOString();
-    data.stock = Number(data.stock) || 0;
-    data.precioChico = Number(data.precioChico) || 0;
-    data.precioGrande = Number(data.precioGrande) || 0;
     data.ingredientes = data.ingredientes || [];
   }
   data.stock = Number(data.stock) || 0;
@@ -281,34 +219,35 @@ function saveBlend(data) {
   _db.blends[data.id] = data;
   _saveToFirebase();
   _notify(isNew ? 'create' : 'update', 'blends', data.id);
-  console.log(`[DB] Blend ${isNew ? 'created' : 'updated'}: ${data.id} - ${data.nombre}`);
   return data;
 }
 
-/** Produce blend: consume especias stock, add blend stock, create produccion record (etiqueta). */
+/** Produce blend: consume especias + etiquetas fisicas, add blend stock. */
 function producirBlend(blendId, cantidad) {
-  const blend = _db.blends[blendId];
-  if (!blend) throw new Error('Blend no encontrado: ' + blendId);
+  _ensureStructure();
+  var blend = _db.blends[blendId];
+  if (!blend) throw new Error('Blend no encontrado');
   cantidad = Number(cantidad) || 0;
   if (cantidad <= 0) throw new Error('Cantidad debe ser mayor a 0');
 
-  const ingredientes = blend.ingredientes || [];
-  const detalleIngredientes = [];
+  var ingredientes = blend.ingredientes || [];
+  var detalleIngredientes = [];
+  var detalleEtiqueta = null;
 
-  // Check especias stock
-  for (const ing of ingredientes) {
-    const esp = _db.especias[ing.especiaId];
+  // 1. Check & consume especias stock
+  for (var i = 0; i < ingredientes.length; i++) {
+    var ing = ingredientes[i];
+    var esp = _db.especias[ing.especiaId];
     if (!esp) throw new Error('Especia no encontrada: ' + ing.especiaId);
-    const needed = (ing.cantidad || 0) * cantidad;
+    var needed = (ing.cantidad || 0) * cantidad;
     if (esp.stock < needed) {
       throw new Error('Stock insuficiente de "' + esp.nombre + '". Necesario: ' + needed + ', Disponible: ' + esp.stock);
     }
   }
-
-  // All checks passed — consume especias stock and record
-  for (const ing of ingredientes) {
-    const esp = _db.especias[ing.especiaId];
-    const needed = (ing.cantidad || 0) * cantidad;
+  for (var i = 0; i < ingredientes.length; i++) {
+    var ing = ingredientes[i];
+    var esp = _db.especias[ing.especiaId];
+    var needed = (ing.cantidad || 0) * cantidad;
     esp.stock -= needed;
     detalleIngredientes.push({
       especiaId: ing.especiaId,
@@ -318,18 +257,28 @@ function producirBlend(blendId, cantidad) {
     });
   }
 
-  // Add blend stock (etiquetas producidas)
+  // 2. Check & consume etiqueta fisica (por nombre del blend)
+  var etiqueta = _findEtiquetaByNombre(blend.nombre);
+  if (etiqueta) {
+    if (etiqueta.stock < cantidad) {
+      throw new Error('Stock insuficiente de ETIQUETAS "' + blend.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etiqueta.stock);
+    }
+    etiqueta.stock -= cantidad;
+    detalleEtiqueta = { etiquetaNombre: etiqueta.nombre, cantidadConsumida: cantidad, stockRestante: etiqueta.stock };
+  } else {
+    throw new Error('No hay etiquetas fisicas registradas para "' + blend.nombre + '". Compra las etiquetas primero en Compras.');
+  }
+
+  // 3. Add blend stock
   blend.stock += cantidad;
 
-  // Create produccion record
-  const prodId = nextId('producciones');
-  const produccion = {
-    id: prodId,
-    blendId: blendId,
-    blendNombre: blend.nombre,
-    categoria: blend.categoria || '',
-    cantidad: cantidad,
+  // 4. Create produccion record
+  var prodId = nextId('producciones');
+  var produccion = {
+    id: prodId, blendId: blendId, blendNombre: blend.nombre,
+    categoria: blend.categoria || '', cantidad: cantidad,
     ingredientesUsados: detalleIngredientes,
+    etiquetaUsada: detalleEtiqueta,
     fecha: new Date().toISOString().slice(0, 10),
     creado: new Date().toISOString()
   };
@@ -338,8 +287,8 @@ function producirBlend(blendId, cantidad) {
   _saveToFirebase();
   _notify('create', 'producciones', prodId);
   _notify('update', 'blends', blendId);
-  console.log('[DB] Etiquetas producidas: ' + blend.nombre + ' x' + cantidad + ' (prod #' + prodId + ')');
-  return { blend, produccion };
+  console.log('[DB] Produccion: ' + blend.nombre + ' x' + cantidad + ' (etiqueta consumida)');
+  return { blend: blend, produccion: produccion };
 }
 
 function deleteBlend(id) {
@@ -350,10 +299,35 @@ function deleteBlend(id) {
   return true;
 }
 
-/* ==================== PRODUCCIONES (ETIQUETAS) ==================== */
+/* ==================== ETIQUETAS FISICAS (compradas) ==================== */
+
+function _findEtiquetaByNombre(nombre) {
+  if (!_db.etiquetas) return null;
+  var keys = Object.keys(_db.etiquetas);
+  for (var i = 0; i < keys.length; i++) {
+    if (_db.etiquetas[keys[i]].nombre === nombre) return _db.etiquetas[keys[i]];
+  }
+  return null;
+}
+
+function getEtiquetasStock() {
+  var db = getDB();
+  return Object.values(db.etiquetas).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+}
+
+/** Find or create an etiqueta entry by nombre, return it. */
+function _getOrCreateEtiqueta(nombre) {
+  if (!_db.etiquetas) _db.etiquetas = {};
+  var existing = _findEtiquetaByNombre(nombre);
+  if (existing) return existing;
+  var id = nextId('etiquetas');
+  var nueva = { id: id, nombre: nombre, stock: 0, creado: new Date().toISOString() };
+  _db.etiquetas[id] = nueva;
+  return nueva;
+}
 
 function getProducciones() {
-  return Object.values(getDB().producciones).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return Object.values(getDB().producciones).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function deleteProduccion(id) {
@@ -364,30 +338,25 @@ function deleteProduccion(id) {
   return true;
 }
 
-/** Get current labeled stock — blends with stock > 0, organized as etiquetas. */
-function getEtiquetas() {
-  const db = getDB();
-  return Object.values(db.blends)
-    .filter(b => b.stock > 0)
-    .map(b => ({
-      blendId: b.id,
-      nombre: b.nombre,
-      categoria: b.categoria || '',
-      stock: b.stock,
-      precioChico: b.precioChico || 0,
-      precioGrande: b.precioGrande || 0
-    }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+/** Get blends with stock > 0 (etiquetas producidas listas para vender). */
+function getEtiquetasProducidas() {
+  return Object.values(getDB().blends)
+    .filter(function(b) { return b.stock > 0; })
+    .map(function(b) {
+      return { blendId: b.id, nombre: b.nombre, categoria: b.categoria || '', stock: b.stock, precioChico: b.precioChico || 0, precioGrande: b.precioGrande || 0 };
+    })
+    .sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
 /* ==================== COMPRAS ==================== */
 
 function getCompras() {
-  return Object.values(getDB().compras).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return Object.values(getDB().compras).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function saveCompra(data) {
-  const isNew = !data.id;
+  _ensureStructure();
+  var isNew = !data.id;
   if (isNew) {
     data.id = nextId('compras');
     data.creado = new Date().toISOString();
@@ -395,10 +364,15 @@ function saveCompra(data) {
     data.items = data.items || [];
     data.total = Number(data.total) || 0;
   }
-  // Add stock from compra items to especias
   if (isNew) {
-    for (const item of data.items) {
-      if (item.especiaId && _db.especias[item.especiaId]) {
+    for (var i = 0; i < data.items.length; i++) {
+      var item = data.items[i];
+      if (item.tipo === 'etiqueta') {
+        // Add stock to etiquetas fisicas
+        var etq = _getOrCreateEtiqueta(item.etiquetaNombre);
+        etq.stock += Number(item.cantidad) || 0;
+      } else if (item.especiaId && _db.especias[item.especiaId]) {
+        // Add stock to especias
         _db.especias[item.especiaId].stock += Number(item.cantidad) || 0;
       }
     }
@@ -406,7 +380,6 @@ function saveCompra(data) {
   _db.compras[data.id] = data;
   _saveToFirebase();
   _notify(isNew ? 'create' : 'update', 'compras', data.id);
-  console.log(`[DB] Compra ${isNew ? 'created' : 'updated'}: ${data.id}`);
   return data;
 }
 
@@ -421,11 +394,12 @@ function deleteCompra(id) {
 /* ==================== VENTAS ==================== */
 
 function getVentas() {
-  return Object.values(getDB().ventas).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return Object.values(getDB().ventas).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function saveVenta(data) {
-  const isNew = !data.id;
+  _ensureStructure();
+  var isNew = !data.id;
   if (isNew) {
     data.id = nextId('ventas');
     data.creado = new Date().toISOString();
@@ -433,16 +407,15 @@ function saveVenta(data) {
     data.items = data.items || [];
     data.total = Number(data.total) || 0;
   }
-  // Consume stock from venta items — descuenta etiquetas con nombre
   if (isNew) {
-    for (const item of data.items) {
-      const producto = item.tipo === 'especia' ? _db.especias[item.productoId] : _db.blends[item.productoId];
+    for (var i = 0; i < data.items.length; i++) {
+      var item = data.items[i];
+      var producto = item.tipo === 'especia' ? _db.especias[item.productoId] : _db.blends[item.productoId];
       if (!producto) throw new Error('Producto no encontrado: ' + item.tipo + '/' + item.productoId);
-      const cant = Number(item.cantidad) || 0;
+      var cant = Number(item.cantidad) || 0;
       if (producto.stock < cant) {
         throw new Error('Stock insuficiente de "' + producto.nombre + '". Solicitado: ' + cant + ', Disponible: ' + producto.stock);
       }
-      // Store the product name (etiqueta) in the venta item
       item.productoNombre = producto.nombre;
       producto.stock -= cant;
     }
@@ -450,7 +423,6 @@ function saveVenta(data) {
   _db.ventas[data.id] = data;
   _saveToFirebase();
   _notify(isNew ? 'create' : 'update', 'ventas', data.id);
-  console.log(`[DB] Venta ${isNew ? 'created' : 'updated'}: ${data.id}`);
   return data;
 }
 
@@ -464,16 +436,12 @@ function deleteVenta(id) {
 
 /* ==================== USUARIOS ==================== */
 
-function getUsuarios() {
-  return Object.values(getDB().usuarios);
-}
-
-function getUsuario(id) {
-  return getDB().usuarios[id] || null;
-}
+function getUsuarios() { return Object.values(getDB().usuarios); }
+function getUsuario(id) { return getDB().usuarios[id] || null; }
 
 function saveUsuario(data) {
-  const isNew = !data.id;
+  _ensureStructure();
+  var isNew = !data.id;
   if (isNew) {
     data.id = nextId('usuarios');
     data.creado = new Date().toISOString();
@@ -486,7 +454,7 @@ function saveUsuario(data) {
 }
 
 function deleteUsuario(id) {
-  if (id === 'admin') return false; // can't delete admin
+  if (id === 'admin') return false;
   if (!_db.usuarios[id]) return false;
   delete _db.usuarios[id];
   _saveToFirebase();
@@ -495,77 +463,62 @@ function deleteUsuario(id) {
 }
 
 function authenticateUser(pin) {
-  const db = getDB();
-  const users = Object.values(db.usuarios);
-  const found = users.find(u => u.pin === String(pin) && u.activo !== false);
-  if (found) {
-    sessionStorage.setItem(DB_KEY + '_session', JSON.stringify(found));
-    return found;
-  }
+  var users = Object.values(getDB().usuarios);
+  var found = users.find(function(u) { return u.pin === String(pin) && u.activo !== false; });
+  if (found) { sessionStorage.setItem(DB_KEY + '_session', JSON.stringify(found)); return found; }
   return null;
 }
 
 function getCurrentUser() {
-  try {
-    const raw = sessionStorage.getItem(DB_KEY + '_session');
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  try { var r = sessionStorage.getItem(DB_KEY + '_session'); return r ? JSON.parse(r) : null; } catch(e) { return null; }
 }
-
-function logoutUser() {
-  sessionStorage.removeItem(DB_KEY + '_session');
-}
+function logoutUser() { sessionStorage.removeItem(DB_KEY + '_session'); }
 
 /* ==================== DASHBOARD STATS ==================== */
 
 function getStats() {
-  const db = getDB();
-  const especias = Object.values(db.especias);
-  const blends = Object.values(db.blends);
-  const ventas = Object.values(db.ventas);
-  const compras = Object.values(db.compras);
+  var db = getDB();
+  var especias = Object.values(db.especias);
+  var blends = Object.values(db.blends);
+  var ventas = Object.values(db.ventas);
+  var compras = Object.values(db.compras);
+  var etiquetas = Object.values(db.etiquetas || {});
 
-  const today = new Date().toISOString().slice(0, 10);
-  const ventasHoy = ventas.filter(v => v.fecha === today);
-  const ventasMes = ventas.filter(v => {
-    const mes = new Date().toISOString().slice(0, 7);
-    return v.fecha && v.fecha.startsWith(mes);
-  });
+  var today = new Date().toISOString().slice(0, 10);
+  var mes = new Date().toISOString().slice(0, 7);
+  var ventasHoy = ventas.filter(function(v) { return v.fecha === today; });
+  var ventasMes = ventas.filter(function(v) { return v.fecha && v.fecha.startsWith(mes); });
+  var comprasMes = compras.filter(function(c) { return c.fecha && c.fecha.startsWith(mes); });
 
-  const totalVentasHoy = ventasHoy.reduce((s, v) => s + (Number(v.total) || 0), 0);
-  const totalVentasMes = ventasMes.reduce((s, v) => s + (Number(v.total) || 0), 0);
-  const totalComprasMes = compras.filter(v => {
-    const mes = new Date().toISOString().slice(0, 7);
-    return v.fecha && v.fecha.startsWith(mes);
-  }).reduce((s, c) => s + (Number(c.total) || 0), 0);
-
-  const especiasBajoStock = especias.filter(e => e.stock <= 3);
-  const blendsBajoStock = blends.filter(b => b.stock <= 3);
+  var etqBajoStock = etiquetas.filter(function(e) { return e.stock <= 5; });
 
   return {
     totalEspecias: especias.length,
     totalBlends: blends.length,
+    totalEtiquetas: etiquetas.length,
     totalVentas: ventas.length,
     totalCompras: compras.length,
     ventasHoy: ventasHoy.length,
-    totalVentasHoy,
+    totalVentasHoy: ventasHoy.reduce(function(s, v) { return s + (Number(v.total) || 0); }, 0),
     ventasMes: ventasMes.length,
-    totalVentasMes,
-    totalComprasMes,
-    especiasBajoStock,
-    blendsBajoStock
+    totalVentasMes: ventasMes.reduce(function(s, v) { return s + (Number(v.total) || 0); }, 0),
+    totalComprasMes: comprasMes.reduce(function(s, c) { return s + (Number(c.total) || 0); }, 0),
+    especiasBajoStock: especias.filter(function(e) { return e.stock <= 3; }),
+    blendsBajoStock: blends.filter(function(b) { return b.stock <= 3; }),
+    etiquetasBajoStock: etqBajoStock
   };
 }
 
-/* ---------- Export for global scope ---------- */
+/* ---------- Export ---------- */
 window.ArcanoDB = {
-  initDB, getDB, onDBChange, nextId,
-  getEspecias, getEspecia, saveEspecia, deleteEspecia,
-  getBlends, getBlend, saveBlend, deleteBlend, producirBlend,
-  getProducciones, deleteProduccion, getEtiquetas,
-  getCompras, saveCompra, deleteCompra,
-  getVentas, saveVenta, deleteVenta,
-  getUsuarios, getUsuario, saveUsuario, deleteUsuario,
-  authenticateUser, getCurrentUser, logoutUser,
-  getStats, DB_KEY, FB_PATH
+  initDB: initDB, getDB: getDB, onDBChange: onDBChange, nextId: nextId,
+  getEspecias: getEspecias, getEspecia: getEspecia, saveEspecia: saveEspecia, deleteEspecia: deleteEspecia,
+  getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend, producirBlend: producirBlend,
+  getProducciones: getProducciones, deleteProduccion: deleteProduccion,
+  getEtiquetasStock: getEtiquetasStock, getEtiquetasProducidas: getEtiquetasProducidas,
+  getCompras: getCompras, saveCompra: saveCompra, deleteCompra: deleteCompra,
+  getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
+  getUsuarios: getUsuarios, getUsuario: getUsuario, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
+  authenticateUser: authenticateUser, getCurrentUser: getCurrentUser, logoutUser: logoutUser,
+  getStats: getStats, DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };
