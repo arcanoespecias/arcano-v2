@@ -1,1 +1,54 @@
-Y29uc3QgQ0FDSEVfTkFNRSA9ICdhcmNhbm8tdjItMSc7CmNvbnN0IEFTU0VUUyA9IFsKICAnLycsCiAgJy9pbmRleC5odG1sJywKICAnL2Nzcy9zdHlsZS5jc3MnLAogICcvanMvZGIuanMnLAogICcvanMvcGFnZXMuanMnLAogICcvanMvY29yZS5qcycsCiAgJy9tYW5pZmVzdC5qc29uJywKICAnL2ljb25zL2Zhdmljb24ucG5nJywKICAnL2ljb25zL2ljb24tMTkyLnBuZycsCiAgJy9pY29ucy9pY29uLTUxMi5wbmcnCl07CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2luc3RhbGwnLCBlID0+IHsKICBlLndhaXRVbnRpbChjYWNoZXMub3BlbihDQUNIRV9OQU1FKS50aGVuKGMgPT4gYy5hZGRBbGwoQVNTRVRTKSkpOwogIHNlbGYuc2tpcFdhaXRpbmcoKTsKfSk7CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2FjdGl2YXRlJywgZSA9PiB7CiAgZS53YWl0VW50aWwoCiAgICBjYWNoZXMua2V5cygpLnRoZW4oa2V5cyA9PgogICAgICBQcm9taXNlLmFsbChrZXlzLmZpbHRlcihrID0+IGsgIT09IENBQ0hFX05BTUUpLm1hcChrID0+IGNhY2hlcy5kZWxldGUoaykpKQogICAgKQogICk7CiAgc2VsZi5jbGllbnRzLmNsYWltKCk7Cn0pOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGUgPT4gewogIGlmIChlLnJlcXVlc3QubWV0aG9kICE9PSAnR0VUJykgcmV0dXJuOwogIC8vIEZpcmViYXNlOiBhbHdheXMgbmV0d29yay1maXJzdAogIGlmIChlLnJlcXVlc3QudXJsLmluY2x1ZGVzKCdmaXJlYmFzZWlvLmNvbScpKSB7CiAgICBlLnJlc3BvbmRXaXRoKAogICAgICBmZXRjaChlLnJlcXVlc3QpCiAgICAgICAgLnRoZW4ociA9PiB7CiAgICAgICAgICBjb25zdCBjbG9uZSA9IHIuY2xvbmUoKTsKICAgICAgICAgIGNhY2hlcy5vcGVuKENBQ0hFX05BTUUpLnRoZW4oYyA9PiBjLnB1dChlLnJlcXVlc3QsIGNsb25lKSk7CiAgICAgICAgICByZXR1cm4gcjsKICAgICAgICB9KQogICAgICAgIC5jYXRjaCgoKSA9PiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KSkKICAgICk7CiAgICByZXR1cm47CiAgfQogIC8vIEFwcCBhc3NldHM6IGNhY2hlLWZpcnN0CiAgZS5yZXNwb25kV2l0aCgKICAgIGNhY2hlcy5tYXRjaChlLnJlcXVlc3QpLnRoZW4ociA9PiByIHx8IGZldGNoKGUucmVxdWVzdCkudGhlbihyZXNwID0+IHsKICAgICAgaWYgKHJlc3Auc3RhdHVzID09PSAyMDApIHsKICAgICAgICBjb25zdCBjbG9uZSA9IHJlc3AuY2xvbmUoKTsKICAgICAgICBjYWNoZXMub3BlbihDQUNIRV9OQU1FKS50aGVuKGMgPT4gYy5wdXQoZS5yZXF1ZXN0LCBjbG9uZSkpOwogICAgICB9CiAgICAgIHJldHVybiByZXNwOwogICAgfSkpCiAgKTsKfSk7
+const CACHE_NAME = 'arcano-v2-1';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/css/style.css',
+  '/js/db.js',
+  '/js/pages.js',
+  '/js/core.js',
+  '/manifest.json',
+  '/icons/favicon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  // Firebase: always network-first
+  if (e.request.url.includes('firebaseio.com')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(r => {
+          const clone = r.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          return r;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // App assets: cache-first
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+      if (resp.status === 200) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    }))
+  );
+});

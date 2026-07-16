@@ -1,1 +1,208 @@
-LyogPT09PT09PT09PT09PT09PT09PT09IEFSQ0FOTyBWMiDigJQgQ09SRSAoQXV0aCwgUm91dGluZywgU2hlbGwpID09PT09PT09PT09PT09PT09PT09PSAqLwoKY29uc3QgQXBwID0gewogIGN1cnJlbnRQYWdlOiAnZGFzaGJvYXJkJywKICBzaWRlYmFyT3BlbjogdHJ1ZSwKCiAgLyogLS0tLS0tLS0tLSBJbml0aWFsaXphdGlvbiAtLS0tLS0tLS0tICovCiAgYXN5bmMgaW5pdCgpIHsKICAgIHRoaXMuc2hvd1NwbGFzaCgpOwogICAgdHJ5IHsKICAgICAgYXdhaXQgQXJjYW5vREIuaW5pdERCKCk7CiAgICAgIGNvbnNvbGUubG9nKCdbQ29yZV0gREIgaW5pdGlhbGl6ZWQnKTsKICAgIH0gY2F0Y2ggKGUpIHsKICAgICAgY29uc29sZS5lcnJvcignW0NvcmVdIERCIGluaXQgZmFpbGVkOicsIGUpOwogICAgfQoKICAgIGNvbnN0IHVzZXIgPSBBcmNhbm9EQi5nZXRDdXJyZW50VXNlcigpOwogICAgaWYgKHVzZXIpIHsKICAgICAgdGhpcy5lbnRlckFwcCgpOwogICAgfSBlbHNlIHsKICAgICAgdGhpcy5zaG93TG9naW4oKTsKICAgIH0KICB9LAoKICAvKiAtLS0tLS0tLS0tIFNwbGFzaCBTY3JlZW4gLS0tLS0tLS0tLSAqLwogIHNob3dTcGxhc2goKSB7CiAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXBwLXJvb3QnKS5pbm5lckhUTUwgPSBgCiAgICAgIDxkaXYgY2xhc3M9InNwbGFzaCI+CiAgICAgICAgPGRpdiBjbGFzcz0ic3BsYXNoLWxvZ28iPkE8L2Rpdj4KICAgICAgICA8ZGl2IGNsYXNzPSJzcGxhc2gtdGV4dCI+QVJDQU5PPC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0ic3BsYXNoLXN1YiI+RXNwZWNpYXMgJiBCbGVuZHM8L2Rpdj4KICAgICAgICA8ZGl2IGNsYXNzPSJzcGxhc2gtbG9hZGVyIj48ZGl2IGNsYXNzPSJsb2FkZXIiPjwvZGl2PjwvZGl2PgogICAgICA8L2Rpdj5gOwogIH0sCgogIC8qIC0tLS0tLS0tLS0gTG9naW4gLS0tLS0tLS0tLSAqLwogIHNob3dMb2dpbigpIHsKICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhcHAtcm9vdCcpLmlubmVySFRNTCA9IGAKICAgICAgPGRpdiBjbGFzcz0ibG9naW4tc2NyZWVuIj4KICAgICAgICA8ZGl2IGNsYXNzPSJsb2dpbi1jYXJkIj4KICAgICAgICAgIDxkaXYgY2xhc3M9ImxvZ2luLWxvZ28iPkE8L2Rpdj4KICAgICAgICAgIDxoMSBjbGFzcz0ibG9naW4tdGl0bGUiPkFSQ0FOTzwvaDE+CiAgICAgICAgICA8cCBjbGFzcz0ibG9naW4tc3ViIj5Fc3BlY2lhcyAmIEJsZW5kczwvcD4KICAgICAgICAgIDxkaXYgY2xhc3M9ImxvZ2luLWZvcm0iPgogICAgICAgICAgICA8bGFiZWw+SW5ncmVzYXIgUElOPC9sYWJlbD4KICAgICAgICAgICAgPGlucHV0IHR5cGU9InBhc3N3b3JkIiBpZD0icGluLWlucHV0IiBtYXhsZW5ndGg9IjEwIiBwbGFjZWhvbGRlcj0iUElOIGRlIGFjY2VzbyIgCiAgICAgICAgICAgICAgICAgICBvbmtleWRvd249ImlmKGV2ZW50LmtleT09PSdFbnRlcicpQXBwLmRvTG9naW4oKSI+CiAgICAgICAgICAgIDxidXR0b24gY2xhc3M9ImJ0biBidG4tZ29sZCBidG4tYmxvY2siIG9uY2xpY2s9IkFwcC5kb0xvZ2luKCkiPkluZ3Jlc2FyPC9idXR0b24+CiAgICAgICAgICAgIDxwIGlkPSJsb2dpbi1lcnJvciIgY2xhc3M9InRleHQtcmVkIHRleHQtc20gbXQtOCIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+PC9wPgogICAgICAgICAgPC9kaXY+CiAgICAgICAgPC9kaXY+CiAgICAgIDwvZGl2PmA7CiAgICBzZXRUaW1lb3V0KCgpID0+IHsKICAgICAgY29uc3QgaW5wID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Bpbi1pbnB1dCcpOwogICAgICBpZiAoaW5wKSBpbnAuZm9jdXMoKTsKICAgIH0sIDEwMCk7CiAgfSwKCiAgZG9Mb2dpbigpIHsKICAgIGNvbnN0IHBpbiA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwaW4taW5wdXQnKS52YWx1ZS50cmltKCk7CiAgICBpZiAoIXBpbikgewogICAgICB0aGlzLnNob3dMb2dpbkVycm9yKCdJbmdyZXNhciB1biBQSU4nKTsKICAgICAgcmV0dXJuOwogICAgfQogICAgY29uc3QgdXNlciA9IEFyY2Fub0RCLmF1dGhlbnRpY2F0ZVVzZXIocGluKTsKICAgIGlmICh1c2VyKSB7CiAgICAgIHRoaXMuZW50ZXJBcHAoKTsKICAgIH0gZWxzZSB7CiAgICAgIHRoaXMuc2hvd0xvZ2luRXJyb3IoJ1BJTiBpbmNvcnJlY3RvJyk7CiAgICB9CiAgfSwKCiAgc2hvd0xvZ2luRXJyb3IobXNnKSB7CiAgICBjb25zdCBlbCA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdsb2dpbi1lcnJvcicpOwogICAgZWwudGV4dENvbnRlbnQgPSBtc2c7CiAgICBlbC5zdHlsZS5kaXNwbGF5ID0gJ2Jsb2NrJzsKICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwaW4taW5wdXQnKS5jbGFzc0xpc3QuYWRkKCdpbnB1dC1lcnJvcicpOwogICAgc2V0VGltZW91dCgoKSA9PiB7CiAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwaW4taW5wdXQnKS5jbGFzc0xpc3QucmVtb3ZlKCdpbnB1dC1lcnJvcicpOwogICAgfSwgMTUwMCk7CiAgfSwKCiAgLyogLS0tLS0tLS0tLSBBcHAgU2hlbGwgLS0tLS0tLS0tLSAqLwogIGVudGVyQXBwKCkgewogICAgY29uc3QgdXNlciA9IEFyY2Fub0RCLmdldEN1cnJlbnRVc2VyKCk7CiAgICBpZiAoIXVzZXIpIHsgdGhpcy5zaG93TG9naW4oKTsgcmV0dXJuOyB9CgogICAgLy8gTGlzdGVuIGZvciByZW1vdGUgREIgY2hhbmdlcyDihpIgcmUtcmVuZGVyIGN1cnJlbnQgcGFnZQogICAgQXJjYW5vREIub25EQkNoYW5nZSgodHlwZSwgY29sLCBpZCkgPT4gewogICAgICBpZiAodHlwZSA9PT0gJ3JlbW90ZV9jaGFuZ2UnKSB7CiAgICAgICAgY29uc29sZS5sb2coJ1tDb3JlXSBSZW1vdGUgY2hhbmdlIGRldGVjdGVkLCByZS1yZW5kZXJpbmcnKTsKICAgICAgICB0aGlzLnJlbmRlclBhZ2UodGhpcy5jdXJyZW50UGFnZSk7CiAgICAgIH0KICAgIH0pOwoKICAgIHRoaXMucmVuZGVyU2hlbGwodXNlcik7CiAgICB0aGlzLnJlbmRlclBhZ2UoJ2Rhc2hib2FyZCcpOwogIH0sCgogIHJlbmRlclNoZWxsKHVzZXIpIHsKICAgIGNvbnN0IHJvb3QgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXBwLXJvb3QnKTsKICAgIHJvb3QuaW5uZXJIVE1MID0gYAogICAgICA8ZGl2IGNsYXNzPSJhcHAtbGF5b3V0ICR7dGhpcy5zaWRlYmFyT3BlbiA/ICcnIDogJ3NpZGViYXItY2xvc2VkJ30iPgogICAgICAgIDxhc2lkZSBjbGFzcz0ic2lkZWJhciIgaWQ9InNpZGViYXIiPgogICAgICAgICAgPGRpdiBjbGFzcz0ic2lkZWJhci1oZWFkZXIiPgogICAgICAgICAgICA8ZGl2IGNsYXNzPSJzaWRlYmFyLWxvZ28iPkE8L2Rpdj4KICAgICAgICAgICAgPGRpdiBjbGFzcz0ic2lkZWJhci1icmFuZCI+QVJDQU5PPC9kaXY+CiAgICAgICAgICA8L2Rpdj4KICAgICAgICAgIDxuYXYgY2xhc3M9InNpZGViYXItbmF2IiBpZD0ic2lkZWJhci1uYXYiPgogICAgICAgICAgICA8YSBjbGFzcz0ibmF2LWl0ZW0gYWN0aXZlIiBkYXRhLXBhZ2U9ImRhc2hib2FyZCIgb25jbGljaz0iQXBwLm5hdmlnYXRlKCdkYXNoYm9hcmQnKSI+CiAgICAgICAgICAgICAgPHNwYW4gY2xhc3M9Im5hdi1pY29uIj7wn5OKPC9zcGFuPjxzcGFuIGNsYXNzPSJuYXYtbGFiZWwiPkRhc2hib2FyZDwvc3Bhbj4KICAgICAgICAgICAgPC9hPgogICAgICAgICAgICA8YSBjbGFzcz0ibmF2LWl0ZW0iIGRhdGEtcGFnZT0iZXNwZWNpYXMiIG9uY2xpY2s9IkFwcC5uYXZpZ2F0ZSgnZXNwZWNpYXMnKSI+CiAgICAgICAgICAgICAgPHNwYW4gY2xhc3M9Im5hdi1pY29uIj7wn4y277iPPC9zcGFuPjxzcGFuIGNsYXNzPSJuYXYtbGFiZWwiPkVzcGVjaWFzPC9zcGFuPgogICAgICAgICAgICA8L2E+CiAgICAgICAgICAgIDxhIGNsYXNzPSJuYXYtaXRlbSIgZGF0YS1wYWdlPSJibGVuZHMiIG9uY2xpY2s9IkFwcC5uYXZpZ2F0ZSgnYmxlbmRzJykiPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJuYXYtaWNvbiI+8J+nqjwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2LWxhYmVsIj5CbGVuZHM8L3NwYW4+CiAgICAgICAgICAgIDwvYT4KICAgICAgICAgICAgPGEgY2xhc3M9Im5hdi1pdGVtIiBkYXRhLXBhZ2U9ImV0aXF1ZXRhcyIgb25jbGljaz0iQXBwLm5hdmlnYXRlKCdldGlxdWV0YXMnKSI+CiAgICAgICAgICAgICAgPHNwYW4gY2xhc3M9Im5hdi1pY29uIj7wn4+377iPPC9zcGFuPjxzcGFuIGNsYXNzPSJuYXYtbGFiZWwiPkV0aXF1ZXRhczwvc3Bhbj4KICAgICAgICAgICAgPC9hPgogICAgICAgICAgICA8YSBjbGFzcz0ibmF2LWl0ZW0iIGRhdGEtcGFnZT0iY29tcHJhcyIgb25jbGljaz0iQXBwLm5hdmlnYXRlKCdjb21wcmFzJykiPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJuYXYtaWNvbiI+8J+Tpjwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2LWxhYmVsIj5Db21wcmFzPC9zcGFuPgogICAgICAgICAgICA8L2E+CiAgICAgICAgICAgIDxhIGNsYXNzPSJuYXYtaXRlbSIgZGF0YS1wYWdlPSJ2ZW50YXMiIG9uY2xpY2s9IkFwcC5uYXZpZ2F0ZSgndmVudGFzJykiPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJuYXYtaWNvbiI+8J+SsDwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2LWxhYmVsIj5WZW50YXM8L3NwYW4+CiAgICAgICAgICAgIDwvYT4KICAgICAgICAgICAgPGEgY2xhc3M9Im5hdi1pdGVtIiBkYXRhLXBhZ2U9InN0b2NrIiBvbmNsaWNrPSJBcHAubmF2aWdhdGUoJ3N0b2NrJykiPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJuYXYtaWNvbiI+8J+Tizwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2LWxhYmVsIj5TdG9jazwvc3Bhbj4KICAgICAgICAgICAgPC9hPgogICAgICAgICAgICA8YSBjbGFzcz0ibmF2LWl0ZW0iIGRhdGEtcGFnZT0idXN1YXJpb3MiIG9uY2xpY2s9IkFwcC5uYXZpZ2F0ZSgndXN1YXJpb3MnKSI+CiAgICAgICAgICAgICAgPHNwYW4gY2xhc3M9Im5hdi1pY29uIj7wn5GlPC9zcGFuPjxzcGFuIGNsYXNzPSJuYXYtbGFiZWwiPlVzdWFyaW9zPC9zcGFuPgogICAgICAgICAgICA8L2E+CiAgICAgICAgICA8L25hdj4KICAgICAgICAgIDxkaXYgY2xhc3M9InNpZGViYXItZm9vdGVyIj4KICAgICAgICAgICAgPGRpdiBjbGFzcz0idXNlci1pbmZvIj4KICAgICAgICAgICAgICA8c3BhbiBjbGFzcz0idXNlci1uYW1lIj4ke3VzZXIubm9tYnJlIHx8ICdBZG1pbid9PC9zcGFuPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJ1c2VyLXJvbGUiPiR7dXNlci5yb2wgfHwgJ2FkbWluJ308L3NwYW4+CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICA8YnV0dG9uIGNsYXNzPSJidG4gYnRuLXNtIGJ0bi1vdXRsaW5lIiBvbmNsaWNrPSJBcHAubG9nb3V0KCkiPlNhbGlyPC9idXR0b24+CiAgICAgICAgICA8L2Rpdj4KICAgICAgICA8L2FzaWRlPgogICAgICAgIDxtYWluIGNsYXNzPSJtYWluLWNvbnRlbnQiPgogICAgICAgICAgPGhlYWRlciBjbGFzcz0idG9wLWJhciI+CiAgICAgICAgICAgIDxidXR0b24gY2xhc3M9ImJ0biBidG4tZ2hvc3QiIG9uY2xpY2s9IkFwcC50b2dnbGVTaWRlYmFyKCkiPuKYsDwvYnV0dG9uPgogICAgICAgICAgICA8aDIgY2xhc3M9InBhZ2UtdGl0bGUiIGlkPSJwYWdlLXRpdGxlIj5EYXNoYm9hcmQ8L2gyPgogICAgICAgICAgICA8ZGl2IGNsYXNzPSJ0b3AtYmFyLWFjdGlvbnMiPgogICAgICAgICAgICAgIDxzcGFuIGNsYXNzPSJzeW5jLWluZGljYXRvciIgaWQ9InN5bmMtaW5kaWNhdG9yIiB0aXRsZT0iQ29uZWN0YWRvIGEgRmlyZWJhc2UiPuKXjyBGaXJlYmFzZTwvc3Bhbj4KICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICA8L2hlYWRlcj4KICAgICAgICAgIDxkaXYgY2xhc3M9InBhZ2UtY29udGVudCIgaWQ9InBhZ2UtY29udGVudCI+CiAgICAgICAgICAgIDxkaXYgY2xhc3M9ImxvYWRlci1jZW50ZXIiPjxkaXYgY2xhc3M9ImxvYWRlciI+PC9kaXY+PC9kaXY+CiAgICAgICAgICA8L2Rpdj4KICAgICAgICA8L21haW4+CiAgICAgIDwvZGl2PmA7CiAgfSwKCiAgLyogLS0tLS0tLS0tLSBOYXZpZ2F0aW9uIC0tLS0tLS0tLS0gKi8KICBuYXZpZ2F0ZShwYWdlKSB7CiAgICB0aGlzLmN1cnJlbnRQYWdlID0gcGFnZTsKICAgIC8vIFVwZGF0ZSBhY3RpdmUgbmF2CiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCcubmF2LWl0ZW0nKS5mb3JFYWNoKGVsID0+IHsKICAgICAgZWwuY2xhc3NMaXN0LnRvZ2dsZSgnYWN0aXZlJywgZWwuZGF0YXNldC5wYWdlID09PSBwYWdlKTsKICAgIH0pOwogICAgLy8gVXBkYXRlIHRpdGxlCiAgICBjb25zdCB0aXRsZXMgPSB7CiAgICAgIGRhc2hib2FyZDogJ0Rhc2hib2FyZCcsIGVzcGVjaWFzOiAnRXNwZWNpYXMnLCBibGVuZHM6ICdCbGVuZHMnLAogICAgICBldGlxdWV0YXM6ICdFdGlxdWV0YXMnLCBjb21wcmFzOiAnQ29tcHJhcycsIHZlbnRhczogJ1ZlbnRhcycsIHN0b2NrOiAnU3RvY2snLCB1c3VhcmlvczogJ1VzdWFyaW9zJwogICAgfTsKICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwYWdlLXRpdGxlJykudGV4dENvbnRlbnQgPSB0aXRsZXNbcGFnZV0gfHwgcGFnZTsKICAgIHRoaXMucmVuZGVyUGFnZShwYWdlKTsKICB9LAoKICB0b2dnbGVTaWRlYmFyKCkgewogICAgdGhpcy5zaWRlYmFyT3BlbiA9ICF0aGlzLnNpZGViYXJPcGVuOwogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvcignLmFwcC1sYXlvdXQnKS5jbGFzc0xpc3QudG9nZ2xlKCdzaWRlYmFyLWNsb3NlZCcsICF0aGlzLnNpZGViYXJPcGVuKTsKICB9LAoKICBsb2dvdXQoKSB7CiAgICBBcmNhbm9EQi5sb2dvdXRVc2VyKCk7CiAgICB0aGlzLnNob3dMb2dpbigpOwogIH0sCgogIC8qIC0tLS0tLS0tLS0gUGFnZSBSZW5kZXJpbmcgLS0tLS0tLS0tLSAqLwogIHJlbmRlclBhZ2UocGFnZSkgewogICAgY29uc3QgY29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3BhZ2UtY29udGVudCcpOwogICAgaWYgKCFjb250YWluZXIpIHJldHVybjsKICAgIHRyeSB7CiAgICAgIHN3aXRjaCAocGFnZSkgewogICAgICAgIGNhc2UgJ2Rhc2hib2FyZCc6IFBhZ2VzLnJlbmRlckRhc2hib2FyZChjb250YWluZXIpOyBicmVhazsKICAgICAgICBjYXNlICdlc3BlY2lhcyc6IFBhZ2VzLnJlbmRlckVzcGVjaWFzKGNvbnRhaW5lcik7IGJyZWFrOwogICAgICAgIGNhc2UgJ2JsZW5kcyc6IFBhZ2VzLnJlbmRlckJsZW5kcyhjb250YWluZXIpOyBicmVhazsKICAgICAgICBjYXNlICdldGlxdWV0YXMnOiBQYWdlcy5yZW5kZXJFdGlxdWV0YXMoY29udGFpbmVyKTsgYnJlYWs7CiAgICAgICAgY2FzZSAnY29tcHJhcyc6IFBhZ2VzLnJlbmRlckNvbXByYXMoY29udGFpbmVyKTsgYnJlYWs7CiAgICAgICAgY2FzZSAndmVudGFzJzogUGFnZXMucmVuZGVyVmVudGFzKGNvbnRhaW5lcik7IGJyZWFrOwogICAgICAgIGNhc2UgJ3N0b2NrJzogUGFnZXMucmVuZGVyU3RvY2soY29udGFpbmVyKTsgYnJlYWs7CiAgICAgICAgY2FzZSAndXN1YXJpb3MnOiBQYWdlcy5yZW5kZXJVc3Vhcmlvcyhjb250YWluZXIpOyBicmVhazsKICAgICAgICBkZWZhdWx0OiBjb250YWluZXIuaW5uZXJIVE1MID0gJzxwPlDDoWdpbmEgbm8gZW5jb250cmFkYTwvcD4nOwogICAgICB9CiAgICB9IGNhdGNoIChlKSB7CiAgICAgIGNvbnNvbGUuZXJyb3IoJ1tDb3JlXSBQYWdlIHJlbmRlciBlcnJvcjonLCBlKTsKICAgICAgY29udGFpbmVyLmlubmVySFRNTCA9IGA8ZGl2IGNsYXNzPSJlcnJvci1ib3giPjxoMz5FcnJvciBhbCBjYXJnYXIgbGEgcMOhZ2luYTwvaDM+PHA+JHtlLm1lc3NhZ2V9PC9wPjxidXR0b24gY2xhc3M9ImJ0biBidG4tZ29sZCBtdC0xMiIgb25jbGljaz0iQXBwLnJlbmRlclBhZ2UoJyR7cGFnZX0nKSI+UmVpbnRlbnRhcjwvYnV0dG9uPjwvZGl2PmA7CiAgICB9CiAgfQp9OwoKLyogLS0tLS0tLS0tLSBCb290IC0tLS0tLS0tLS0gKi8KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsICgpID0+IEFwcC5pbml0KCkpOw==
+/* ===================== ARCANO V2 — CORE (Auth, Routing, Shell) ===================== */
+
+const App = {
+  currentPage: 'dashboard',
+  sidebarOpen: true,
+
+  /* ---------- Initialization ---------- */
+  async init() {
+    this.showSplash();
+    try {
+      await ArcanoDB.initDB();
+      console.log('[Core] DB initialized');
+    } catch (e) {
+      console.error('[Core] DB init failed:', e);
+    }
+
+    const user = ArcanoDB.getCurrentUser();
+    if (user) {
+      this.enterApp();
+    } else {
+      this.showLogin();
+    }
+  },
+
+  /* ---------- Splash Screen ---------- */
+  showSplash() {
+    document.getElementById('app-root').innerHTML = `
+      <div class="splash">
+        <div class="splash-logo">A</div>
+        <div class="splash-text">ARCANO</div>
+        <div class="splash-sub">Especias & Blends</div>
+        <div class="splash-loader"><div class="loader"></div></div>
+      </div>`;
+  },
+
+  /* ---------- Login ---------- */
+  showLogin() {
+    document.getElementById('app-root').innerHTML = `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="login-logo">A</div>
+          <h1 class="login-title">ARCANO</h1>
+          <p class="login-sub">Especias & Blends</p>
+          <div class="login-form">
+            <label>Ingresar PIN</label>
+            <input type="password" id="pin-input" maxlength="10" placeholder="PIN de acceso" 
+                   onkeydown="if(event.key==='Enter')App.doLogin()">
+            <button class="btn btn-gold btn-block" onclick="App.doLogin()">Ingresar</button>
+            <p id="login-error" class="text-red text-sm mt-8" style="display:none"></p>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => {
+      const inp = document.getElementById('pin-input');
+      if (inp) inp.focus();
+    }, 100);
+  },
+
+  doLogin() {
+    const pin = document.getElementById('pin-input').value.trim();
+    if (!pin) {
+      this.showLoginError('Ingresar un PIN');
+      return;
+    }
+    const user = ArcanoDB.authenticateUser(pin);
+    if (user) {
+      this.enterApp();
+    } else {
+      this.showLoginError('PIN incorrecto');
+    }
+  },
+
+  showLoginError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('pin-input').classList.add('input-error');
+    setTimeout(() => {
+      document.getElementById('pin-input').classList.remove('input-error');
+    }, 1500);
+  },
+
+  /* ---------- App Shell ---------- */
+  enterApp() {
+    const user = ArcanoDB.getCurrentUser();
+    if (!user) { this.showLogin(); return; }
+
+    // Listen for remote DB changes → re-render current page
+    ArcanoDB.onDBChange((type, col, id) => {
+      if (type === 'remote_change') {
+        console.log('[Core] Remote change detected, re-rendering');
+        this.renderPage(this.currentPage);
+      }
+    });
+
+    this.renderShell(user);
+    this.renderPage('dashboard');
+  },
+
+  renderShell(user) {
+    const root = document.getElementById('app-root');
+    root.innerHTML = `
+      <div class="app-layout ${this.sidebarOpen ? '' : 'sidebar-closed'}">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-logo">A</div>
+            <div class="sidebar-brand">ARCANO</div>
+          </div>
+          <nav class="sidebar-nav" id="sidebar-nav">
+            <a class="nav-item active" data-page="dashboard" onclick="App.navigate('dashboard')">
+              <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+            </a>
+            <a class="nav-item" data-page="especias" onclick="App.navigate('especias')">
+              <span class="nav-icon">🌶️</span><span class="nav-label">Especias</span>
+            </a>
+            <a class="nav-item" data-page="blends" onclick="App.navigate('blends')">
+              <span class="nav-icon">🧪</span><span class="nav-label">Blends</span>
+            </a>
+            <a class="nav-item" data-page="etiquetas" onclick="App.navigate('etiquetas')">
+              <span class="nav-icon">🏷️</span><span class="nav-label">Etiquetas</span>
+            </a>
+            <a class="nav-item" data-page="compras" onclick="App.navigate('compras')">
+              <span class="nav-icon">📦</span><span class="nav-label">Compras</span>
+            </a>
+            <a class="nav-item" data-page="ventas" onclick="App.navigate('ventas')">
+              <span class="nav-icon">💰</span><span class="nav-label">Ventas</span>
+            </a>
+            <a class="nav-item" data-page="stock" onclick="App.navigate('stock')">
+              <span class="nav-icon">📋</span><span class="nav-label">Stock</span>
+            </a>
+            <a class="nav-item" data-page="usuarios" onclick="App.navigate('usuarios')">
+              <span class="nav-icon">👥</span><span class="nav-label">Usuarios</span>
+            </a>
+          </nav>
+          <div class="sidebar-footer">
+            <div class="user-info">
+              <span class="user-name">${user.nombre || 'Admin'}</span>
+              <span class="user-role">${user.rol || 'admin'}</span>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="App.logout()">Salir</button>
+          </div>
+        </aside>
+        <main class="main-content">
+          <header class="top-bar">
+            <button class="btn btn-ghost" onclick="App.toggleSidebar()">☰</button>
+            <h2 class="page-title" id="page-title">Dashboard</h2>
+            <div class="top-bar-actions">
+              <span class="sync-indicator" id="sync-indicator" title="Conectado a Firebase">● Firebase</span>
+            </div>
+          </header>
+          <div class="page-content" id="page-content">
+            <div class="loader-center"><div class="loader"></div></div>
+          </div>
+        </main>
+      </div>`;
+  },
+
+  /* ---------- Navigation ---------- */
+  navigate(page) {
+    this.currentPage = page;
+    // Update active nav
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.page === page);
+    });
+    // Update title
+    const titles = {
+      dashboard: 'Dashboard', especias: 'Especias', blends: 'Blends',
+      etiquetas: 'Etiquetas', compras: 'Compras', ventas: 'Ventas', stock: 'Stock', usuarios: 'Usuarios'
+    };
+    document.getElementById('page-title').textContent = titles[page] || page;
+    this.renderPage(page);
+  },
+
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+  },
+
+  logout() {
+    ArcanoDB.logoutUser();
+    this.showLogin();
+  },
+
+  /* ---------- Page Rendering ---------- */
+  renderPage(page) {
+    const container = document.getElementById('page-content');
+    if (!container) return;
+    try {
+      switch (page) {
+        case 'dashboard': Pages.renderDashboard(container); break;
+        case 'especias': Pages.renderEspecias(container); break;
+        case 'blends': Pages.renderBlends(container); break;
+        case 'etiquetas': Pages.renderEtiquetas(container); break;
+        case 'compras': Pages.renderCompras(container); break;
+        case 'ventas': Pages.renderVentas(container); break;
+        case 'stock': Pages.renderStock(container); break;
+        case 'usuarios': Pages.renderUsuarios(container); break;
+        default: container.innerHTML = '<p>Página no encontrada</p>';
+      }
+    } catch (e) {
+      console.error('[Core] Page render error:', e);
+      container.innerHTML = `<div class="error-box"><h3>Error al cargar la página</h3><p>${e.message}</p><button class="btn btn-gold mt-12" onclick="App.renderPage('${page}')">Reintentar</button></div>`;
+    }
+  }
+};
+
+/* ---------- Boot ---------- */
+document.addEventListener('DOMContentLoaded', () => App.init());
