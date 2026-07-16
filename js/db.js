@@ -1,7 +1,7 @@
 // ===================== ARCANO ERP — DB LAYER =====================
 // localStorage + Firebase sync. 6 collections.
 
-var DB_KEY = 'arcano_erp_v1';
+var DB_KEY = 'arcano_db_v3';
 var _idC = 0;
 
 // ---------- Schema constants ----------
@@ -37,7 +37,21 @@ var ROLES = [
 ];
 
 // ---------- Core DB functions ----------
+var _dbCached = null;
+
+// Migrate from old key if needed (runs once)
+(function() {
+  try {
+    var old = localStorage.getItem('arcano_erp_v1');
+    if (old && !localStorage.getItem(DB_KEY)) {
+      localStorage.setItem(DB_KEY, old);
+      console.log('[DB] Migrated from arcano_erp_v1 to ' + DB_KEY);
+    }
+  } catch(e) {}
+})();
+
 function getDB() {
+  if (_dbCached) return _dbCached;
   try {
     var raw = localStorage.getItem(DB_KEY);
     if (raw) {
@@ -48,15 +62,19 @@ function getDB() {
       if (!db.ventas)      db.ventas      = [];
       if (!db.usuarios)    db.usuarios    = [];
       if (!db.movimientos) db.movimientos = [];
+      syncIdCounter(db);
+      _dbCached = db;
       return db;
     }
   } catch(e) { console.warn('[DB] Read error:', e.message); }
-  return emptyDB();
+  _dbCached = emptyDB();
+  return _dbCached;
 }
 
-function saveDB() {
-  var db = getDB();
+function saveDB(dbParam) {
+  var db = dbParam || getDB();
   db._idC = _idC;
+  _dbCached = db;
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   } catch(e) { console.warn('[DB] Write error:', e.message); }
@@ -81,8 +99,8 @@ function syncIdCounter(db) {
   if (mx >= _idC) _idC = mx;
 }
 
-function addMovimiento(tipo, itemId, productoNombre, cantidad, detalle) {
-  var db = getDB();
+function addMovimiento(tipo, itemId, productoNombre, cantidad, detalle, dbOverride) {
+  var db = dbOverride || getDB();
   if (!db.movimientos) db.movimientos = [];
   db.movimientos.push({
     id: nextId(),
@@ -94,7 +112,7 @@ function addMovimiento(tipo, itemId, productoNombre, cantidad, detalle) {
     fecha: new Date().toISOString(),
     usuario: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.nombre : 'Sistema'
   });
-  saveDB();
+  saveDB(db);
 }
 
 // ---------- Formatters ----------

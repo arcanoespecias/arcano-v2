@@ -372,21 +372,21 @@ function submitOrder() {
       db.productos.forEach(function(p) {
         if (p.id === ci.id) {
           p.stock = Math.round((p.stock - ci.qty) * 100) / 100;
-          addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Venta tienda #' + venta.id);
+          addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Venta tienda #' + venta.id, db);
         }
       });
     } else {
       db.blends.forEach(function(b) {
         if (b.id === ci.id) {
           b.stock = (b.stock || 0) - ci.qty;
-          addMovimiento('venta', b.id, b.nombre, -ci.qty, 'Venta tienda blend #' + venta.id);
+          addMovimiento('venta', b.id, b.nombre, -ci.qty, 'Venta tienda blend #' + venta.id, db);
         }
       });
       if (ci.frascoId) {
         db.productos.forEach(function(p) {
           if (p.id === ci.frascoId) {
             p.stock -= ci.qty;
-            addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Frasco para venta #' + venta.id);
+            addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Frasco para venta #' + venta.id, db);
           }
         });
       }
@@ -394,7 +394,7 @@ function submitOrder() {
         db.productos.forEach(function(p) {
           if (p.id === ci.etiquetaId) {
             p.stock -= ci.qty;
-            addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Etiqueta para venta #' + venta.id);
+            addMovimiento('venta', p.id, p.nombre, -ci.qty, 'Etiqueta para venta #' + venta.id, db);
           }
         });
       }
@@ -402,7 +402,7 @@ function submitOrder() {
   });
 
   cart = [];
-  saveDB();
+  saveDB(db);
   var drawer = document.getElementById('cart-drawer');
   var overlay = document.getElementById('cart-overlay');
   if (drawer) drawer.classList.remove('open');
@@ -611,58 +611,71 @@ function modalNuevaCompra() {
     '<input type="text" id="cmp-proveedor" placeholder="Nombre del proveedor"></div>' +
     '<div class="form-group"><label>Notas</label>' +
     '<input type="text" id="cmp-notas" placeholder="Notas opcionales"></div>' +
-    '<div class="form-group"><label>Items de la compra</label>' +
-    '<div id="compra-items"></div>' +
-    '<div style="display:flex;gap:8px;margin-top:8px">' +
-    '<button class="btn btn-sm btn-ghost" onclick="addCompraItemRow()">+ Producto existente</button>' +
-    '<button class="btn btn-sm btn-ghost" onclick="addCompraItemRowNuevo()">+ Nuevo insumo</button>' +
+    '<div class="form-group"><label>Tipo de compra</label>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="btn btn-sm btn-gold" onclick="addCompraEspeciaRow()">+ Especia</button>' +
+    '<button class="btn btn-sm btn-ghost" onclick="addCompraFrascoRow()">+ Frasco</button>' +
+    '<button class="btn btn-sm btn-ghost" onclick="addCompraEtiquetaRow()">+ Etiqueta</button>' +
     '</div></div>' +
+    '<div id="compra-items"></div>' +
     '<div class="form-group"><label class="chk-label"><input type="checkbox" id="cmp-recibida"> Marcar como recibida</label></div>' +
     '<p><strong>Total:</strong> <span id="compra-total">$0</span></p>' +
     '<button class="btn btn-gold btn-full" onclick="guardarCompra()">Guardar Compra</button>' +
     '</div>';
 
   openModal('Nueva Compra', html);
-  addCompraItemRow();
+  addCompraEspeciaRow();
 }
 
-function addCompraItemRow() {
+function addCompraEspeciaRow() {
   var container = document.getElementById('compra-items');
   if (!container) return;
 
   var db = getDB();
-  var opts = '<option value="">-- Seleccionar --</option>';
+  var opts = '<option value="">-- Nueva Especia --</option>';
   db.productos.forEach(function(p) {
-    var tipoLabel = p.tipo === 'especia' ? 'Especia' : p.tipo === 'frasco' ? 'Frasco' : 'Etiqueta';
-    opts += '<option value="' + p.id + '">' + esc(p.nombre) + ' (' + tipoLabel + ')</option>';
+    if (p.tipo === 'especia') {
+      opts += '<option value="' + p.id + '">' + esc(p.nombre) + ' (stock: ' + Math.round(p.stock || 0) + 'gr)</option>';
+    }
   });
 
   var row = document.createElement('div');
   row.className = 'compra-item-row';
-  row.setAttribute('data-nuevo', 'false');
-  row.innerHTML = '<select onchange="cmpItemChanged(this)">' + opts + '</select>' +
-    '<input type="number" min="0" step="any" placeholder="Cantidad" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
-    '<input type="number" min="0" step="any" placeholder="$ Unitario" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+  row.setAttribute('data-tipo', 'especia');
+  row.innerHTML = '<select onchange="cmpExistEspeciaChanged(this)">' + opts + '</select>' +
+    '<input type="text" placeholder="Nombre (si es nueva)" class="cmp-nuevo-nombre" style="display:none">' +
+    '<input type="number" min="0" step="any" placeholder="Cant. grs" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<input type="number" min="0" step="any" placeholder="$ Compra total" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
     '<span class="subtotal-display">$0</span>' +
     '<button class="btn-icon" onclick="this.parentElement.remove();calcCompraTotal()">&times;</button>';
 
   container.appendChild(row);
 }
 
-function addCompraItemRowNuevo() {
+function cmpExistEspeciaChanged(sel) {
+  var row = sel.parentElement;
+  var nombreInput = row.querySelector('.cmp-nuevo-nombre');
+  if (sel.value) {
+    nombreInput.style.display = 'none';
+    nombreInput.value = '';
+  } else {
+    nombreInput.style.display = '';
+    nombreInput.focus();
+  }
+}
+
+function addCompraFrascoRow() {
   var container = document.getElementById('compra-items');
   if (!container) return;
 
   var row = document.createElement('div');
   row.className = 'compra-item-row';
-  row.setAttribute('data-nuevo', 'true');
-  row.innerHTML = '<select onchange="cmpTipoChanged(this)">' +
-    '<option value="especia">Nueva Especia</option>' +
-    '<option value="frasco">Nuevo Frasco</option>' +
-    '<option value="etiqueta">Nueva Etiqueta</option>' +
+  row.setAttribute('data-tipo', 'frasco');
+  row.innerHTML = '<select class="cmp-frasco-tipo">' +
+    '<option value="grande">Frasco Grande</option>' +
+    '<option value="pequeno">Frasco Pequeno</option>' +
     '</select>' +
-    '<input type="text" placeholder="Nombre del insumo" class="cmp-nuevo-nombre">' +
-    '<input type="number" min="0" step="any" placeholder="Cantidad" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<input type="number" min="0" step="1" placeholder="Cantidad uds" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
     '<input type="number" min="0" step="any" placeholder="$ Unitario" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
     '<span class="subtotal-display">$0</span>' +
     '<button class="btn-icon" onclick="this.parentElement.remove();calcCompraTotal()">&times;</button>';
@@ -670,9 +683,41 @@ function addCompraItemRowNuevo() {
   container.appendChild(row);
 }
 
-function cmpTipoChanged(sel) {
-  // Just visual feedback, the type is stored in the select value
-  cmpItemChanged(sel);
+function addCompraEtiquetaRow() {
+  var container = document.getElementById('compra-items');
+  if (!container) return;
+
+  var db = getDB();
+  var opts = '<option value="">-- Nueva Etiqueta --</option>';
+  db.productos.forEach(function(p) {
+    if (p.tipo === 'etiqueta') {
+      opts += '<option value="' + p.id + '">' + esc(p.nombre) + ' (stock: ' + (p.stock || 0) + ')</option>';
+    }
+  });
+
+  var row = document.createElement('div');
+  row.className = 'compra-item-row';
+  row.setAttribute('data-tipo', 'etiqueta');
+  row.innerHTML = '<select onchange="cmpExistEtiquetaChanged(this)">' + opts + '</select>' +
+    '<input type="text" placeholder="Nombre (si es nueva)" class="cmp-nuevo-nombre" style="display:none">' +
+    '<input type="number" min="0" step="1" placeholder="Cantidad uds" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<input type="number" min="0" step="any" placeholder="$ Unitario" onchange="cmpItemChanged(this)" oninput="cmpItemChanged(this)">' +
+    '<span class="subtotal-display">$0</span>' +
+    '<button class="btn-icon" onclick="this.parentElement.remove();calcCompraTotal()">&times;</button>';
+
+  container.appendChild(row);
+}
+
+function cmpExistEtiquetaChanged(sel) {
+  var row = sel.parentElement;
+  var nombreInput = row.querySelector('.cmp-nuevo-nombre');
+  if (sel.value) {
+    nombreInput.style.display = 'none';
+    nombreInput.value = '';
+  } else {
+    nombreInput.style.display = '';
+    nombreInput.focus();
+  }
 }
 
 function cmpItemChanged(el) {
@@ -722,85 +767,172 @@ function guardarCompra() {
   var db = getDB();
 
   rows.forEach(function(row) {
-    var esNuevo = row.getAttribute('data-nuevo') === 'true';
+    var tipo = row.getAttribute('data-tipo') || '';
+    var numInputs = row.querySelectorAll('input[type="number"]');
 
-    if (esNuevo) {
-      // Nuevo insumo
-      var tipoSel = row.querySelector('select');
+    if (tipo === 'especia') {
+      var sel = row.querySelector('select');
+      var existingId = sel ? Number(sel.value) || 0 : 0;
       var nombreInput = row.querySelector('.cmp-nuevo-nombre');
-      var numInputs = row.querySelectorAll('input[type="number"]');
-      var tipo = tipoSel ? tipoSel.value : 'especia';
-      var nombre = nombreInput ? (nombreInput.value || '').trim() : '';
+      var nombre = '';
+      var cantidad = numInputs[0] ? Number(numInputs[0].value) || 0 : 0;
+      var precioTotal = numInputs[1] ? Number(numInputs[1].value) || 0 : 0;
+
+      if (cantidad <= 0 || precioTotal <= 0) return;
+
+      var productId;
+      var productoNombre;
+
+      if (existingId) {
+        productId = existingId;
+        var found = null;
+        db.productos.forEach(function(p) { if (p.id == existingId) found = p; });
+        if (!found) return;
+        productoNombre = found.nombre;
+      } else {
+        nombre = nombreInput ? (nombreInput.value || '').trim() : '';
+        if (!nombre) return;
+
+        var existingProduct = null;
+        db.productos.forEach(function(p) {
+          if (p.nombre.toLowerCase() === nombre.toLowerCase() && p.tipo === 'especia') existingProduct = p;
+        });
+
+        if (existingProduct) {
+          productId = existingProduct.id;
+          productoNombre = existingProduct.nombre;
+        } else {
+          productId = nextId();
+          productoNombre = nombre;
+          var precioPorGr = Math.round(precioTotal / cantidad * 100) / 100;
+          db.productos.push({
+            id: productId,
+            nombre: nombre,
+            tipo: 'especia',
+            unidad: 'gr',
+            stock: 0,
+            stockMin: 0,
+            costoPor1000gr: Math.round(precioTotal / cantidad * 1000) / 100,
+            precioCosto: precioPorGr,
+            precioVenta: 0,
+            categoria: '',
+            proveedor: proveedor,
+            creadoEn: new Date().toISOString()
+          });
+        }
+      }
+
+      var subtotal = cantidad * (precioTotal / cantidad);
+      total += precioTotal;
+      items.push({
+        productoId: productId,
+        productoNombre: productoNombre,
+        tipo: 'especia',
+        cantidad: cantidad,
+        precioUnitario: Math.round(precioTotal / cantidad * 100) / 100,
+        subtotal: precioTotal
+      });
+
+    } else if (tipo === 'frasco') {
+      var frascoTipoSel = row.querySelector('.cmp-frasco-tipo');
+      var frascoTipo = frascoTipoSel ? frascoTipoSel.value : 'grande';
       var cantidad = numInputs[0] ? Number(numInputs[0].value) || 0 : 0;
       var precioUnit = numInputs[1] ? Number(numInputs[1].value) || 0 : 0;
 
-      if (!nombre || cantidad <= 0 || precioUnit <= 0) return;
+      if (cantidad <= 0 || precioUnit <= 0) return;
 
-      var subtotal = cantidad * precioUnit;
-      total += subtotal;
+      var frascoNombre = 'Frasco ' + (frascoTipo === 'grande' ? 'Grande' : 'Pequeno');
 
-      // Create the product if it doesn't exist
-      var existingProduct = null;
+      var existingFrasco = null;
       db.productos.forEach(function(p) {
-        if (p.nombre.toLowerCase() === nombre.toLowerCase() && p.tipo === tipo) existingProduct = p;
+        if (p.tipo === 'frasco' && p.nombre === frascoNombre) existingFrasco = p;
       });
 
-      var productId;
-      if (existingProduct) {
-        productId = existingProduct.id;
+      var fId;
+      if (existingFrasco) {
+        fId = existingFrasco.id;
       } else {
-        productId = nextId();
-        var newProduct = {
-          id: productId,
-          nombre: nombre,
-          tipo: tipo,
+        fId = nextId();
+        db.productos.push({
+          id: fId,
+          nombre: frascoNombre,
+          tipo: 'frasco',
           unidad: 'unidad',
           stock: 0,
           stockMin: 0,
+          precioCosto: precioUnit,
+          precioVenta: 0,
+          proveedor: proveedor,
           creadoEn: new Date().toISOString()
-        };
-        if (tipo === 'especia') {
-          newProduct.unidad = 'gr';
-          newProduct.costoPor1000gr = Math.round(precioUnit * 1000 / cantidad * 100) / 100;
-          newProduct.precioCosto = Math.round(precioUnit / cantidad * 100) / 100;
-          newProduct.precioVenta = 0;
-          newProduct.categoria = '';
-        } else {
-          newProduct.precioCosto = precioUnit;
-          newProduct.precioVenta = 0;
-        }
-        newProduct.proveedor = proveedor;
-        db.productos.push(newProduct);
+        });
       }
 
+      var subtotal = cantidad * precioUnit;
+      total += subtotal;
       items.push({
-        productoId: productId,
-        productoNombre: nombre,
-        tipo: tipo,
+        productoId: fId,
+        productoNombre: frascoNombre,
+        tipo: 'frasco',
         cantidad: cantidad,
         precioUnitario: precioUnit,
         subtotal: subtotal
       });
-    } else {
-      // Existing product
-      var select = row.querySelector('select');
-      var inputs = row.querySelectorAll('input[type="number"]');
-      var productIdVal = select ? Number(select.value) : 0;
-      var cantidad = inputs[0] ? Number(inputs[0].value) || 0 : 0;
-      var precioUnit = inputs[1] ? Number(inputs[1].value) || 0 : 0;
 
-      if (!productIdVal || cantidad <= 0) return;
+    } else if (tipo === 'etiqueta') {
+      var sel = row.querySelector('select');
+      var existingId = sel ? Number(sel.value) || 0 : 0;
+      var nombreInput = row.querySelector('.cmp-nuevo-nombre');
+      var nombre = '';
+      var cantidad = numInputs[0] ? Number(numInputs[0].value) || 0 : 0;
+      var precioUnit = numInputs[1] ? Number(numInputs[1].value) || 0 : 0;
 
-      var producto = null;
-      db.productos.forEach(function(p) { if (p.id == productIdVal) producto = p; });
-      if (!producto) return;
+      if (cantidad <= 0 || precioUnit <= 0) return;
+
+      var productId;
+      var productoNombre;
+
+      if (existingId) {
+        productId = existingId;
+        var found = null;
+        db.productos.forEach(function(p) { if (p.id == existingId) found = p; });
+        if (!found) return;
+        productoNombre = found.nombre;
+      } else {
+        nombre = nombreInput ? (nombreInput.value || '').trim() : '';
+        if (!nombre) return;
+
+        var existingEtq = null;
+        db.productos.forEach(function(p) {
+          if (p.nombre.toLowerCase() === nombre.toLowerCase() && p.tipo === 'etiqueta') existingEtq = p;
+        });
+
+        if (existingEtq) {
+          productId = existingEtq.id;
+          productoNombre = existingEtq.nombre;
+        } else {
+          productId = nextId();
+          productoNombre = nombre;
+          db.productos.push({
+            id: productId,
+            nombre: nombre,
+            tipo: 'etiqueta',
+            unidad: 'unidad',
+            stock: 0,
+            stockMin: 0,
+            precioCosto: precioUnit,
+            precioVenta: 0,
+            proveedor: proveedor,
+            creadoEn: new Date().toISOString()
+          });
+        }
+      }
 
       var subtotal = cantidad * precioUnit;
       total += subtotal;
       items.push({
-        productoId: producto.id,
-        productoNombre: producto.nombre,
-        tipo: producto.tipo,
+        productoId: productId,
+        productoNombre: productoNombre,
+        tipo: 'etiqueta',
         cantidad: cantidad,
         precioUnitario: precioUnit,
         subtotal: subtotal
@@ -835,13 +967,13 @@ function guardarCompra() {
           if (p.tipo === 'especia') {
             p.stock = Math.round(p.stock * 100) / 100;
           }
-          addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida');
+          addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida', db);
         }
       });
     });
   }
 
-  saveDB();
+  saveDB(db);
   closeModal();
   toast('Compra #' + compra.id + ' registrada');
   renderCompras();
@@ -908,7 +1040,7 @@ function cambiarEstadoCompra(id, nuevoEstado) {
         if (p.id == item.productoId) {
           p.stock = (p.stock || 0) + item.cantidad;
           if (p.tipo === 'especia') p.stock = Math.round(p.stock * 100) / 100;
-          addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida');
+          addMovimiento('compra', p.id, p.nombre, item.cantidad, 'Compra #' + compra.id + ' recibida', db);
         }
       });
     });
@@ -920,14 +1052,14 @@ function cambiarEstadoCompra(id, nuevoEstado) {
         if (p.id == item.productoId) {
           p.stock = (p.stock || 0) - item.cantidad;
           if (p.tipo === 'especia') p.stock = Math.round(p.stock * 100) / 100;
-          addMovimiento('ajuste', p.id, p.nombre, -item.cantidad, 'Reversion compra #' + compra.id);
+          addMovimiento('ajuste', p.id, p.nombre, -item.cantidad, 'Reversion compra #' + compra.id, db);
         }
       });
     });
   }
 
   compra.estado = nuevoEstado;
-  saveDB();
+  saveDB(db);
   closeModal();
   toast('Estado actualizado a ' + nuevoEstado);
   renderCompras();
@@ -1068,11 +1200,11 @@ function guardarEspecia(id) {
     var diff = newStock - oldStock;
     p.stock = newStock;
     if (diff !== 0) {
-      addMovimiento('ajuste', p.id, p.nombre, diff, 'Ajuste manual de stock');
+      addMovimiento('ajuste', p.id, p.nombre, diff, 'Ajuste manual de stock', db);
     }
   }
 
-  saveDB();
+  saveDB(db);
   closeModal();
   toast('Especia actualizada');
   renderEspecias();
@@ -1395,7 +1527,7 @@ function guardarBlend(existingId) {
     });
   }
 
-  saveDB();
+  saveDB(db);
   closeModal();
   refreshPage();
   toast(existingId ? 'Blend actualizado' : 'Blend creado');
@@ -1413,7 +1545,7 @@ function eliminarBlend(id) {
   if (!confirm('Eliminar este blend?')) return;
   var db = getDB();
   db.blends = db.blends.filter(function(b) { return b.id !== id; });
-  saveDB();
+  saveDB(db);
   refreshPage();
   toast('Blend eliminado');
 }
@@ -1617,12 +1749,12 @@ function ejecutarProduccion(id) {
     var needed = (ing.gramos || 0) * cantidad;
     spice.stock = Math.round(((spice.stock || 0) - needed) * 100) / 100;
     addMovimiento('produccion', spice.id, spice.nombre, -needed,
-      'Produccion: ' + blend.nombre + ' x' + cantidad + ' (' + needed.toFixed(1) + 'gr)');
+      'Produccion: ' + blend.nombre + ' x' + cantidad + ' (' + needed.toFixed(1) + 'gr)', db);
   });
 
   blend.stock = (blend.stock || 0) + cantidad;
 
-  saveDB();
+  saveDB(db);
   closeModal();
   refreshPage();
   toast('Producidas ' + cantidad + ' unidades de ' + blend.nombre);
@@ -1897,40 +2029,44 @@ function completarVenta() {
 
   ventaActual.items.forEach(function(item) {
     if (item.tipo === 'especia') {
-      var product = dbFindProduct(item.productoId);
-      if (product) {
-        product.stock = Math.round(((product.stock || 0) - item.cantidad) * 100) / 100;
-        addMovimiento('venta', product.id, product.nombre, -item.cantidad,
-          'Venta mostrador #' + venta.id);
-      }
+      db.productos.forEach(function(p) {
+        if (p.id == item.productoId) {
+          p.stock = Math.round(((p.stock || 0) - item.cantidad) * 100) / 100;
+          addMovimiento('venta', p.id, p.nombre, -item.cantidad,
+            'Venta mostrador #' + venta.id, db);
+        }
+      });
     } else if (item.tipo === 'blend') {
-      var blend = dbFindBlend(item.blendId);
-      if (blend) {
-        blend.stock = (blend.stock || 0) - item.cantidad;
-        addMovimiento('venta', blend.id, blend.nombre, -item.cantidad,
-          'Venta mostrador #' + venta.id);
+      var blendRef = null;
+      db.blends.forEach(function(b) { if (b.id == item.blendId) blendRef = b; });
+      if (blendRef) {
+        blendRef.stock = (blendRef.stock || 0) - item.cantidad;
+        addMovimiento('venta', blendRef.id, blendRef.nombre, -item.cantidad,
+          'Venta mostrador #' + venta.id, db);
       }
       if (item.frascoId) {
-        var frasco = dbFindProduct(item.frascoId);
-        if (frasco) {
-          frasco.stock = (frasco.stock || 0) - item.cantidad;
-          addMovimiento('venta', frasco.id, frasco.nombre, -item.cantidad,
-            'Frasco para venta #' + venta.id);
-        }
+        db.productos.forEach(function(p) {
+          if (p.id == item.frascoId) {
+            p.stock = (p.stock || 0) - item.cantidad;
+            addMovimiento('venta', p.id, p.nombre, -item.cantidad,
+              'Frasco para venta #' + venta.id, db);
+          }
+        });
       }
-      if (blend && blend.etiquetaId) {
-        var etiqueta = dbFindProduct(blend.etiquetaId);
-        if (etiqueta) {
-          etiqueta.stock = (etiqueta.stock || 0) - item.cantidad;
-          addMovimiento('venta', etiqueta.id, etiqueta.nombre, -item.cantidad,
-            'Etiqueta para venta #' + venta.id);
-        }
+      if (blendRef && blendRef.etiquetaId) {
+        db.productos.forEach(function(p) {
+          if (p.id == blendRef.etiquetaId) {
+            p.stock = (p.stock || 0) - item.cantidad;
+            addMovimiento('venta', p.id, p.nombre, -item.cantidad,
+              'Etiqueta para venta #' + venta.id, db);
+          }
+        });
       }
     }
   });
 
   db.ventas.push(venta);
-  saveDB();
+  saveDB(db);
   ventaActual = null;
   refreshPage();
   toast('Venta completada: ' + fmt(total));
@@ -1995,39 +2131,43 @@ function cambiarEstadoVenta(id, nuevoEstado) {
     (venta.items || []).forEach(function(item) {
       if (item.tipo === 'especia' || (!item.tipo && !item.isBlend)) {
         var productId = item.productoId || item.id;
-        var product = dbFindProduct(productId);
-        if (product) {
-          var qty = item.cantidad || item.qty || 0;
-          product.stock = Math.round(((product.stock || 0) - qty) * 100) / 100;
-          addMovimiento('venta', product.id, product.nombre, -qty,
-            'Venta tienda #' + venta.id);
-        }
+        var qty = item.cantidad || item.qty || 0;
+        db.productos.forEach(function(p) {
+          if (p.id == productId) {
+            p.stock = Math.round(((p.stock || 0) - qty) * 100) / 100;
+            addMovimiento('venta', p.id, p.nombre, -qty,
+              'Venta tienda #' + venta.id, db);
+          }
+        });
       } else if (item.tipo === 'blend' || item.isBlend) {
         var blendId = item.blendId || item.id;
-        var blend = dbFindBlend(blendId);
-        if (blend) {
+        var blendRef = null;
+        db.blends.forEach(function(b) { if (b.id == blendId) blendRef = b; });
+        if (blendRef) {
           var qty = item.cantidad || item.qty || 0;
-          blend.stock = (blend.stock || 0) - qty;
-          addMovimiento('venta', blend.id, blend.nombre, -qty,
-            'Venta tienda #' + venta.id);
+          blendRef.stock = (blendRef.stock || 0) - qty;
+          addMovimiento('venta', blendRef.id, blendRef.nombre, -qty,
+            'Venta tienda #' + venta.id, db);
         }
         if (item.frascoId) {
-          var frasco = dbFindProduct(item.frascoId);
-          if (frasco) {
-            var qty = item.cantidad || item.qty || 0;
-            frasco.stock = (frasco.stock || 0) - qty;
-            addMovimiento('venta', frasco.id, frasco.nombre, -qty,
-              'Frasco para venta tienda #' + venta.id);
-          }
+          var qty = item.cantidad || item.qty || 0;
+          db.productos.forEach(function(p) {
+            if (p.id == item.frascoId) {
+              p.stock = (p.stock || 0) - qty;
+              addMovimiento('venta', p.id, p.nombre, -qty,
+                'Frasco para venta tienda #' + venta.id, db);
+            }
+          });
         }
-        if (blend && blend.etiquetaId) {
-          var etiqueta = dbFindProduct(blend.etiquetaId);
-          if (etiqueta) {
-            var qty = item.cantidad || item.qty || 0;
-            etiqueta.stock = (etiqueta.stock || 0) - qty;
-            addMovimiento('venta', etiqueta.id, etiqueta.nombre, -qty,
-              'Etiqueta para venta tienda #' + venta.id);
-          }
+        if (blendRef && blendRef.etiquetaId) {
+          var qty = item.cantidad || item.qty || 0;
+          db.productos.forEach(function(p) {
+            if (p.id == blendRef.etiquetaId) {
+              p.stock = (p.stock || 0) - qty;
+              addMovimiento('venta', p.id, p.nombre, -qty,
+                'Etiqueta para venta tienda #' + venta.id, db);
+            }
+          });
         }
       }
     });
@@ -2037,46 +2177,50 @@ function cambiarEstadoVenta(id, nuevoEstado) {
     (venta.items || []).forEach(function(item) {
       if (item.tipo === 'especia' || (!item.tipo && !item.isBlend)) {
         var productId = item.productoId || item.id;
-        var product = dbFindProduct(productId);
-        if (product) {
-          var qty = item.cantidad || item.qty || 0;
-          product.stock = Math.round(((product.stock || 0) + qty) * 100) / 100;
-          addMovimiento('devolucion', product.id, product.nombre, qty,
-            'Cancelacion venta #' + venta.id);
-        }
+        var qty = item.cantidad || item.qty || 0;
+        db.productos.forEach(function(p) {
+          if (p.id == productId) {
+            p.stock = Math.round(((p.stock || 0) + qty) * 100) / 100;
+            addMovimiento('devolucion', p.id, p.nombre, qty,
+              'Cancelacion venta #' + venta.id, db);
+          }
+        });
       } else if (item.tipo === 'blend' || item.isBlend) {
         var blendId = item.blendId || item.id;
-        var blend = dbFindBlend(blendId);
-        if (blend) {
+        var blendRef = null;
+        db.blends.forEach(function(b) { if (b.id == blendId) blendRef = b; });
+        if (blendRef) {
           var qty = item.cantidad || item.qty || 0;
-          blend.stock = (blend.stock || 0) + qty;
-          addMovimiento('devolucion', blend.id, blend.nombre, qty,
-            'Cancelacion venta #' + venta.id);
+          blendRef.stock = (blendRef.stock || 0) + qty;
+          addMovimiento('devolucion', blendRef.id, blendRef.nombre, qty,
+            'Cancelacion venta #' + venta.id, db);
         }
         if (item.frascoId) {
-          var frasco = dbFindProduct(item.frascoId);
-          if (frasco) {
-            var qty = item.cantidad || item.qty || 0;
-            frasco.stock = (frasco.stock || 0) + qty;
-            addMovimiento('devolucion', frasco.id, frasco.nombre, qty,
-              'Cancelacion venta #' + venta.id);
-          }
+          var qty = item.cantidad || item.qty || 0;
+          db.productos.forEach(function(p) {
+            if (p.id == item.frascoId) {
+              p.stock = (p.stock || 0) + qty;
+              addMovimiento('devolucion', p.id, p.nombre, qty,
+                'Cancelacion venta #' + venta.id, db);
+            }
+          });
         }
-        if (blend && blend.etiquetaId) {
-          var etiqueta = dbFindProduct(blend.etiquetaId);
-          if (etiqueta) {
-            var qty = item.cantidad || item.qty || 0;
-            etiqueta.stock = (etiqueta.stock || 0) + qty;
-            addMovimiento('devolucion', etiqueta.id, etiqueta.nombre, qty,
-              'Cancelacion venta #' + venta.id);
-          }
+        if (blendRef && blendRef.etiquetaId) {
+          var qty = item.cantidad || item.qty || 0;
+          db.productos.forEach(function(p) {
+            if (p.id == blendRef.etiquetaId) {
+              p.stock = (p.stock || 0) + qty;
+              addMovimiento('devolucion', p.id, p.nombre, qty,
+                'Cancelacion venta #' + venta.id, db);
+            }
+          });
         }
       }
     });
   }
 
   venta.estado = nuevoEstado;
-  saveDB();
+  saveDB(db);
   closeModal();
   refreshPage();
   toast('Venta ' + nuevoEstado);
@@ -2247,7 +2391,7 @@ function guardarUsuario(existingId) {
     });
   }
 
-  saveDB();
+  saveDB(db);
   closeModal();
   refreshPage();
   toast(existingId ? 'Usuario actualizado' : 'Usuario creado');
@@ -2263,7 +2407,7 @@ function toggleUsuarioActivo(id) {
     return;
   }
   user.activo = !user.activo;
-  saveDB();
+  saveDB(db);
   refreshPage();
   toast('Usuario ' + (user.activo ? 'activado' : 'desactivado'));
 }
@@ -2276,7 +2420,7 @@ function eliminarUsuario(id) {
   if (!confirm('Eliminar este usuario?')) return;
   var db = getDB();
   db.usuarios = db.usuarios.filter(function(u) { return u.id !== id; });
-  saveDB();
+  saveDB(db);
   refreshPage();
   toast('Usuario eliminado');
 }
@@ -2448,7 +2592,7 @@ function importarExcel() {
           });
         }
 
-        saveDB();
+        saveDB(db);
         refreshPage();
         toast('Importados: ' + added + ' nuevos, ' + updated + ' actualizados');
       } catch(err) {

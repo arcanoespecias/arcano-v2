@@ -69,6 +69,7 @@ function startSync(onReady) {
       try {
         localStorage.setItem(DB_KEY, JSON.stringify(data));
         syncIdCounter(data);
+        if (typeof _dbCached !== 'undefined') _dbCached = null;
       } catch(e) { console.warn('[FB] Local write failed:', e.message); }
 
       if (!_bootDone) { clearTimeout(timer); finishBoot(data); }
@@ -127,6 +128,7 @@ function fbForceReload() {
   fbRef.once('value').then(function(s) {
     var d = s.val();
     if (d) {
+      if (typeof _dbCached !== 'undefined') _dbCached = null;
       localStorage.setItem(DB_KEY, JSON.stringify(d));
       syncIdCounter(d);
       refreshPage();

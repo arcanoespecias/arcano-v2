@@ -94,7 +94,7 @@ function migrateData() {
     }
   });
 
-  if (changed) saveDB();
+  if (changed) saveDB(db);
 }
 
 // ---------- 7. Seed Data ----------
@@ -167,7 +167,7 @@ function seedIfEmpty() {
     costoUnitario: 0, etiquetaId: etqCurryId, receta: receta
   });
 
-  saveDB();
+  saveDB(db);
   console.log('[Seed] Datos iniciales creados');
 }
 

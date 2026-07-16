@@ -149,6 +149,10 @@ body {
   margin-top: 16px;
 }
 
+.mb-0 {
+  margin-bottom: 0;
+}
+
 /* ============================================
    Typography Utilities
    ============================================ */
@@ -274,6 +278,12 @@ body {
 
 .btn-danger:hover {
   opacity: .9;
+}
+
+.btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* ============================================
@@ -464,6 +474,13 @@ textarea {
   margin-top: 4px;
 }
 
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
 /* ============================================
    Movement / Action Rows
    ============================================ */
@@ -497,6 +514,29 @@ textarea {
   font-size: .72rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.mov-qty {
+  font-weight: 700;
+  min-width: 60px;
+  text-align: center;
+}
+
+.mov-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mov-det {
+  font-size: .78rem;
+  color: var(--muted);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ============================================
@@ -650,6 +690,20 @@ textarea {
   opacity: .5;
 }
 
+.empty-msg {
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: .88rem;
+}
+
+.alerts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
 /* ============================================
    Modal
    ============================================ */
@@ -727,22 +781,18 @@ textarea {
   color: var(--cream);
 }
 
-/* Modal body content — direct child of .modal */
-.modal > .card,
-.modal > .fr,
-.modal > .fr1,
-.modal > .g2,
-.modal > .mb-12,
-.modal > .mb-16,
-.modal > .mb-20,
-.modal > .actions-row,
-.modal > form {
+/* Modal body content wrapper */
+.modal-content {
   padding: 0 20px;
+  overflow-y: auto;
 }
 
-.modal > .card {
-  border: none;
-  padding: 0 20px 4px;
+/* Full-bleed elements inside modals (reset padding) */
+.modal-content > .card-gold {
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 /* ============================================
@@ -811,6 +861,7 @@ textarea {
    Admin App Shell
    ============================================ */
 #admin-app {
+  display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
@@ -1112,6 +1163,8 @@ textarea {
   justify-content: center;
   padding: 0 16px;
   gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .store-nav-btn {
