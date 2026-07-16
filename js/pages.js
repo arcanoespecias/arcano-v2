@@ -1,4 +1,6 @@
-/* ===================== ARCANO V2 — PAGES ===================== */
+/* ===================== ARCANO V2.1 — PAGES =====================
+   Stock dual: Bolsa (grs materia prima) + Frascos (producto terminado)
+   ===================== */
 const Pages = {
 
   /* ================================================================
@@ -6,11 +8,10 @@ const Pages = {
      ================================================================ */
   renderDashboard(container) {
     const stats = ArcanoDB.getStats();
-    const db = ArcanoDB.getDB();
     const ultimasVentas = ArcanoDB.getVentas().slice(0, 5);
 
     container.innerHTML = `
-      <div class="stats-grid">
+      <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr)">
         <div class="stat-card">
           <div class="stat-value">${stats.totalVentasHoy}</div>
           <div class="stat-label">Ventas Hoy</div>
@@ -19,17 +20,22 @@ const Pages = {
         <div class="stat-card">
           <div class="stat-value">${stats.totalVentasMes.toLocaleString()}</div>
           <div class="stat-label">Ventas del Mes</div>
-          <div class="stat-sub">${stats.ventasMes} operaciones</div>
+          <div class="stat-sub">${stats.ventasMes} ops</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.totalFrascos}</div>
+          <div class="stat-label">Frascos Listos</div>
+          <div class="stat-sub">Para vender</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${stats.totalEspecias}</div>
           <div class="stat-label">Especias</div>
-          <div class="stat-sub">${stats.especiasBajoStock.length} con bajo stock</div>
+          <div class="stat-sub">${stats.especiasBajoStockBolsa.length} con bolsa baja</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${stats.totalBlends}</div>
           <div class="stat-label">Blends</div>
-          <div class="stat-sub">${stats.blendsBajoStock.length} con bajo stock</div>
+          <div class="stat-sub">${stats.blendsBajoStockFrascos.length} con pocos frascos</div>
         </div>
       </div>
 
@@ -38,28 +44,26 @@ const Pages = {
           <div class="card-header"><h3>Compras del Mes</h3></div>
           <div class="card-body">
             <div class="big-number">$${stats.totalComprasMes.toLocaleString()}</div>
-            <div class="text-muted text-sm mt-8">${stats.totalCompras} compras totales registradas</div>
+            <div class="text-muted text-sm mt-8">${stats.totalCompras} compras totales</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><h3>Ultimas Ventas</h3></div>
           <div class="card-body">
-            ${ultimasVentas.length === 0 ? '<p class="text-muted">Sin ventas registradas</p>' :
-              ultimasVentas.map(v => `
-                <div class="list-row">
-                  <span>${v.fecha || '—'}</span>
-                  <span class="fw7">$${(Number(v.total) || 0).toLocaleString()}</span>
-                </div>`).join('')}
+            ${ultimasVentas.length === 0 ? '<p class="text-muted">Sin ventas</p>' :
+              ultimasVentas.map(v => `<div class="list-row"><span>${v.fecha || '—'}</span><span class="fw7">$${(Number(v.total) || 0).toLocaleString()}</span></div>`).join('')}
           </div>
         </div>
       </div>
 
-      ${(stats.especiasBajoStock.length > 0 || stats.blendsBajoStock.length > 0) ? `
+      ${(stats.especiasBajoStockBolsa.length > 0 || stats.especiasBajoStockFrascos.length > 0 || stats.blendsBajoStockFrascos.length > 0 || stats.etiquetasBajoStock.length > 0) ? `
       <div class="card mt-16">
-        <div class="card-header"><h3>Alertas de Stock Bajo</h3></div>
+        <div class="card-header"><h3>Alertas</h3></div>
         <div class="card-body">
-          ${stats.especiasBajoStock.map(e => `<span class="badge badge-red mr-8">${e.nombre}: ${e.stock} uds</span>`).join('')}
-          ${stats.blendsBajoStock.map(b => `<span class="badge badge-yellow mr-8">${b.nombre}: ${b.stock} uds</span>`).join('')}
+          ${stats.especiasBajoStockBolsa.map(e => '<span class="badge badge-yellow mr-8">BOLSA ' + (e.nombre || '?') + ': ' + (e.stockBolsa || 0) + 'grs</span>').join('')}
+          ${stats.especiasBajoStockFrascos.map(e => '<span class="badge badge-red mr-8">FRASCOS ' + (e.nombre || '?') + ': ' + (e.stockFrascos || 0) + '</span>').join('')}
+          ${stats.blendsBajoStockFrascos.map(b => '<span class="badge badge-red mr-8">FRASCOS ' + (b.nombre || '?') + ': ' + (b.stockFrascos || 0) + '</span>').join('')}
+          ${stats.etiquetasBajoStock.map(e => '<span class="badge badge-blue mr-8">ETQ ' + (e.nombre || '?') + ': ' + (e.stock || 0) + '</span>').join('')}
         </div>
       </div>` : ''}`;
   },
@@ -77,27 +81,29 @@ const Pages = {
       <div class="table-wrap mt-12">
         <table class="table">
           <thead>
-            <tr><th>Nombre</th><th>Categoria</th><th>Chico</th><th>Grande</th><th>Stock</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Categoria</th><th>Bolsa (grs)</th><th>Frascos</th><th>$ Chico</th><th>$ Grande</th><th>Acciones</th></tr>
           </thead>
           <tbody id="esp-tbody">
             ${this._especiasRows(especias)}
           </tbody>
         </table>
-        ${especias.length === 0 ? '<p class="text-muted mt-16 text-center">No hay especias cargadas. Agrega la primera con el boton de arriba.</p>' : ''}
+        ${especias.length === 0 ? '<p class="text-muted mt-16 text-center">No hay especias. Agrega la primera.</p>' : ''}
       </div>`;
   },
 
   _especiasRows(list) {
     return list.map(e => `
       <tr>
-        <td class="fw7">${e.nombre}</td>
+        <td class="fw7">${e.nombre || '?'}</td>
         <td><span class="badge badge-gold">${e.categoria || '—'}</span></td>
-        <td>$${(Number(e.precioChico) || 0).toLocaleString()}</td>
-        <td>$${(Number(e.precioGrande) || 0).toLocaleString()}</td>
-        <td><span class="${e.stock <= 3 ? 'text-red fw7' : ''}">${e.stock}</span></td>
+        <td><span class="${(e.stockBolsa || 0) <= 50 ? 'text-red fw7' : ''}">${e.stockBolsa || 0} grs</span></td>
+        <td><span class="${(e.stockFrascos || 0) <= 3 ? 'text-red fw7' : 'text-green'}">${e.stockFrascos || 0}</span></td>
+        <td>$${(e.precioChico || 0).toLocaleString()}</td>
+        <td>$${(e.precioGrande || 0).toLocaleString()}</td>
         <td>
+          <button class="btn btn-sm btn-green" onclick="Pages.formProducirEspecia('${e.id}')" title="Producir frascos">Producir</button>
           <button class="btn btn-sm btn-outline" onclick="Pages.formEspecia('${e.id}')">Editar</button>
-          <button class="btn btn-sm btn-red" onclick="Pages.deleteEspecia('${e.id}')">Eliminar</button>
+          <button class="btn btn-sm btn-red" onclick="Pages.deleteEspecia('${e.id}')">X</button>
         </td>
       </tr>`).join('');
   },
@@ -105,7 +111,7 @@ const Pages = {
   filterEspecias() {
     const q = (document.getElementById('esp-search').value || '').toLowerCase();
     const all = ArcanoDB.getEspecias();
-    const filtered = q ? all.filter(e => e.nombre.toLowerCase().includes(q) || (e.categoria || '').toLowerCase().includes(q)) : all;
+    const filtered = q ? all.filter(e => (e.nombre || '').toLowerCase().includes(q) || (e.categoria || '').toLowerCase().includes(q)) : all;
     document.getElementById('esp-tbody').innerHTML = this._especiasRows(filtered);
   },
 
@@ -116,7 +122,7 @@ const Pages = {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal">
-        <div class="modal-header"><h3>${title}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button></div>
+        <div class="modal-header"><h3>${title}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
           <div class="form-group">
             <label>Nombre</label>
@@ -140,10 +146,7 @@ const Pages = {
               <input type="number" class="input" id="f-esp-pgrande" value="${esp ? esp.precioGrande : ''}" placeholder="0" min="0" step="100">
             </div>
           </div>
-          <div class="form-group">
-            <label>Stock Inicial (unidades)</label>
-            <input type="number" class="input" id="f-esp-stock" value="${esp ? esp.stock : '0'}" placeholder="0" min="0">
-          </div>
+          <p class="text-muted text-xs mt-8">El stock se gestiona via Compras (bolsa en grs) y Produccion (frascos).</p>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
@@ -161,8 +164,7 @@ const Pages = {
       nombre,
       categoria: document.getElementById('f-esp-cat').value,
       precioChico: Number(document.getElementById('f-esp-pchico').value) || 0,
-      precioGrande: Number(document.getElementById('f-esp-pgrande').value) || 0,
-      stock: Number(document.getElementById('f-esp-stock').value) || 0
+      precioGrande: Number(document.getElementById('f-esp-pgrande').value) || 0
     };
     if (id) data.id = id;
     try {
@@ -175,9 +177,73 @@ const Pages = {
   deleteEspecia(id) {
     const esp = ArcanoDB.getEspecia(id);
     if (!esp) return;
-    if (!confirm('Eliminar especia "' + esp.nombre + '"?')) return;
+    if (!confirm('Eliminar "' + (esp.nombre || '') + '"?')) return;
     ArcanoDB.deleteEspecia(id);
     App.renderPage('especias');
+  },
+
+  /* ================================================================
+     PRODUCIR ESPECIA (bolsa → frascos)
+     ================================================================ */
+  formProducirEspecia(especiaId) {
+    const esp = ArcanoDB.getEspecia(especiaId);
+    if (!esp) return;
+    const etqList = ArcanoDB.getEtiquetasStock();
+    const etq = etqList.find(function(e) { return e.nombre === esp.nombre; });
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header"><h3>Producir Frascos: ${esp.nombre}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
+        <div class="modal-body">
+          <p class="text-muted text-sm">Convierte gramos de bolsa en frascos listos para vender.</p>
+          <div class="list-row mt-12"><span>Bolsa disponible</span><span class="fw7 text-gold">${esp.stockBolsa || 0} grs</span></div>
+          <div class="list-row"><span>Etiqueta "${esp.nombre}"</span><span class="${(etq && etq.stock > 0) ? 'text-green' : 'text-red'}">${etq ? etq.stock : 0} uds</span></div>
+          <div class="g2 mt-12">
+            <div class="form-group">
+              <label>Grs por frasco</label>
+              <input type="number" class="input" id="f-pe-grs" value="50" min="1" oninput="Pages._calcEspeciaProduccion('${especiaId}')">
+            </div>
+            <div class="form-group">
+              <label>Cantidad de frascos</label>
+              <input type="number" class="input" id="f-pe-cant" value="1" min="1" oninput="Pages._calcEspeciaProduccion('${especiaId}')">
+            </div>
+          </div>
+          <div id="f-pe-info" class="mt-8"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+          <button class="btn btn-gold" onclick="Pages.doProducirEspecia('${especiaId}')">Producir</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    setTimeout(() => this._calcEspeciaProduccion(especiaId), 50);
+  },
+
+  _calcEspeciaProduccion(especiaId) {
+    const esp = ArcanoDB.getEspecia(especiaId);
+    if (!esp) return;
+    const grs = Number(document.getElementById('f-pe-grs').value) || 0;
+    const cant = Number(document.getElementById('f-pe-cant').value) || 0;
+    const total = grs * cant;
+    const disponible = esp.stockBolsa || 0;
+    const ok = total > 0 && total <= disponible;
+    document.getElementById('f-pe-info').innerHTML =
+      '<p class="text-sm ' + (ok ? 'text-green' : 'text-red') + ' fw7">' +
+      (ok ? 'OK: Se consumen ' + total + 'grs de bolsa' : total > disponible ? 'FALTAN ' + (total - disponible) + 'grs' : 'Ingresa cantidades') +
+      '</p>';
+  },
+
+  doProducirEspecia(especiaId) {
+    const grs = Number(document.getElementById('f-pe-grs').value) || 0;
+    const cant = Number(document.getElementById('f-pe-cant').value) || 0;
+    if (grs <= 0 || cant <= 0) { alert('Ingresa gramos por frasco y cantidad'); return; }
+    try {
+      const result = ArcanoDB.producirEspeciaFrascos(especiaId, grs, cant);
+      alert('Producidos ' + cant + ' frascos de "' + result.especia.nombre + '"\\nConsumidos: ' + (grs * cant) + 'grs de bolsa');
+      document.querySelector('.modal-overlay').remove();
+      App.renderPage('especias');
+    } catch (e) { alert(e.message); }
   },
 
   /* ================================================================
@@ -192,29 +258,29 @@ const Pages = {
       <div class="table-wrap mt-12">
         <table class="table">
           <thead>
-            <tr><th>Nombre</th><th>Categoria</th><th>Ingredientes</th><th>Chico</th><th>Grande</th><th>Stock</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Categoria</th><th>Ingredientes (grs/frasco)</th><th>Frascos</th><th>$ Chico</th><th>$ Grande</th><th>Acciones</th></tr>
           </thead>
           <tbody>
             ${blends.map(b => `
               <tr>
-                <td class="fw7">${b.nombre}</td>
+                <td class="fw7">${b.nombre || '?'}</td>
                 <td><span class="badge badge-blue">${b.categoria || '—'}</span></td>
                 <td class="text-sm">${(b.ingredientes || []).map(i => {
                   const esp = ArcanoDB.getEspecia(i.especiaId);
-                  return (esp ? esp.nombre : '?') + ' x' + (i.cantidad || 0);
+                  return (esp ? esp.nombre : '?') + ' ' + (i.cantidad || 0) + 'grs';
                 }).join(', ')}</td>
-                <td>$${(Number(b.precioChico) || 0).toLocaleString()}</td>
-                <td>$${(Number(b.precioGrande) || 0).toLocaleString()}</td>
-                <td><span class="${b.stock <= 3 ? 'text-red fw7' : ''}">${b.stock}</span></td>
+                <td><span class="${(b.stockFrascos || 0) <= 3 ? 'text-red fw7' : 'text-green'}">${b.stockFrascos || 0}</span></td>
+                <td>$${(b.precioChico || 0).toLocaleString()}</td>
+                <td>$${(b.precioGrande || 0).toLocaleString()}</td>
                 <td>
+                  <button class="btn btn-sm btn-green" onclick="Pages.formProducirBlend('${b.id}')">Producir</button>
                   <button class="btn btn-sm btn-outline" onclick="Pages.formBlend('${b.id}')">Editar</button>
-                  <button class="btn btn-sm btn-green" onclick="Pages.formProducir('${b.id}')">Producir</button>
-                  <button class="btn btn-sm btn-red" onclick="Pages.deleteBlend('${b.id}')">Eliminar</button>
+                  <button class="btn btn-sm btn-red" onclick="Pages.deleteBlend('${b.id}')">X</button>
                 </td>
               </tr>`).join('')}
           </tbody>
         </table>
-        ${blends.length === 0 ? '<p class="text-muted mt-16 text-center">No hay blends. Crea uno con el boton de arriba.</p>' : ''}
+        ${blends.length === 0 ? '<p class="text-muted mt-16 text-center">No hay blends.</p>' : ''}
       </div>`;
   },
 
@@ -223,12 +289,11 @@ const Pages = {
     const especias = ArcanoDB.getEspecias();
     const title = blend ? 'Editar Blend' : 'Nuevo Blend';
     const ings = blend ? blend.ingredientes || [] : [{especiaId: '', cantidad: ''}];
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal modal-lg">
-        <div class="modal-header"><h3>${title}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button></div>
+        <div class="modal-header"><h3>${title}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
           <div class="form-group">
             <label>Nombre del Blend</label>
@@ -253,13 +318,13 @@ const Pages = {
             </div>
           </div>
           <div class="form-group">
-            <label>Ingredientes (especias que componen el blend)</label>
+            <label>Ingredientes (grs por frasco de blend)</label>
             <div id="f-bl-ingredientes">
               ${ings.map((ing, i) => this._ingredienteRow(i, ing, especias)).join('')}
             </div>
-            <button class="btn btn-sm btn-outline mt-8" onclick="Pages.addIngredienteRow()">+ Agregar Ingrediente</button>
+            <button class="btn btn-sm btn-outline mt-8" onclick="Pages.addIngredienteRow()">+ Ingrediente</button>
           </div>
-          <p class="text-muted text-xs mt-8">La cantidad indica cuantas unidades de cada especia se consumen por cada blend producido.</p>
+          <p class="text-muted text-xs mt-8">La cantidad indica los GRAMOS de cada especia por cada frasco de blend producido.</p>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
@@ -273,11 +338,11 @@ const Pages = {
   _ingredienteRow(idx, ing, especias) {
     return `<div class="g3 ing-row" data-idx="${idx}">
       <select class="input" data-field="especiaId">
-        <option value="">Seleccionar especia...</option>
-        ${especias.map(e => `<option value="${e.id}" ${ing.especiaId === e.id ? 'selected' : ''}>${e.nombre} (stock: ${e.stock})</option>`).join('')}
+        <option value="">Especia...</option>
+        ${especias.map(e => '<option value="' + e.id + '" ' + (ing.especiaId === e.id ? 'selected' : '') + '>' + e.nombre + ' (' + (e.stockBolsa || 0) + 'grs)</option>').join('')}
       </select>
-      <input type="number" class="input" data-field="cantidad" value="${ing.cantidad || ''}" placeholder="Cant." min="0">
-      <button class="btn btn-sm btn-red" onclick="this.closest('.ing-row').remove()">✕</button>
+      <input type="number" class="input" data-field="cantidad" value="${ing.cantidad || ''}" placeholder="Grs" min="0">
+      <button class="btn btn-sm btn-red" onclick="this.closest('.ing-row').remove()">X</button>
     </div>`;
   },
 
@@ -299,14 +364,7 @@ const Pages = {
       if (espId && cant > 0) ingredientes.push({ especiaId: espId, cantidad: cant });
     });
     if (ingredientes.length === 0) { alert('Agrega al menos un ingrediente'); return; }
-
-    const data = {
-      nombre,
-      categoria: document.getElementById('f-bl-cat').value,
-      precioChico: Number(document.getElementById('f-bl-pchico').value) || 0,
-      precioGrande: Number(document.getElementById('f-bl-pgrande').value) || 0,
-      ingredientes
-    };
+    const data = { nombre, categoria: document.getElementById('f-bl-cat').value, precioChico: Number(document.getElementById('f-bl-pchico').value) || 0, precioGrande: Number(document.getElementById('f-bl-pgrande').value) || 0, ingredientes };
     if (id) data.id = id;
     try {
       ArcanoDB.saveBlend(data);
@@ -315,42 +373,69 @@ const Pages = {
     } catch (e) { alert('Error: ' + e.message); }
   },
 
-  formProducir(blendId) {
+  formProducirBlend(blendId) {
     const blend = ArcanoDB.getBlend(blendId);
     if (!blend) return;
+    const etqList = ArcanoDB.getEtiquetasStock();
+    const etq = etqList.find(function(e) { return e.nombre === blend.nombre; });
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal">
-        <div class="modal-header"><h3>Producir Blend</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button></div>
+      <div class="modal modal-lg">
+        <div class="modal-header"><h3>Producir: ${blend.nombre}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
-          <p>Producir <b>${blend.nombre}</b></p>
-          <p class="text-muted text-sm">Esto consume stock de las especias componentes.</p>
+          <div class="list-row"><span>Etiqueta "${blend.nombre}"</span><span class="${(etq && etq.stock > 0) ? 'text-green' : 'text-red'}">${etq ? etq.stock : 0} uds</span></div>
           <div class="form-group mt-12">
-            <label>Cantidad a producir</label>
-            <input type="number" class="input" id="f-prod-cant" value="1" min="1">
+            <label>Cantidad de frascos a producir</label>
+            <input type="number" class="input" id="f-prod-cant" value="1" min="1" oninput="Pages._calcBlendProduccion('${blendId}')">
           </div>
-          <div class="mt-8 text-sm">
-            <b>Ingredientes necesarios:</b>
-            ${(blend.ingredientes || []).map(i => {
-              const esp = ArcanoDB.getEspecia(i.especiaId);
-              return `<div class="list-row"><span>${esp ? esp.nombre : '?'}: ${i.cantidad} uds/cada</span><span class="${esp && esp.stock < i.cantidad ? 'text-red' : 'text-green'}">Stock: ${esp ? esp.stock : 0}</span></div>`;
-            }).join('')}
-          </div>
+          <div id="f-prod-calc" class="mt-8"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
-          <button class="btn btn-gold" onclick="Pages.doProducir('${blendId}')">Producir</button>
+          <button class="btn btn-gold" onclick="Pages.doProducirBlend('${blendId}')">Producir</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
+    setTimeout(() => this._calcBlendProduccion(blendId), 50);
   },
 
-  doProducir(blendId) {
+  _calcBlendProduccion(blendId) {
+    const blend = ArcanoDB.getBlend(blendId);
+    if (!blend) return;
+    const cant = Number(document.getElementById('f-prod-cant').value) || 0;
+    const calcDiv = document.getElementById('f-prod-calc');
+    if (cant <= 0) { calcDiv.innerHTML = ''; return; }
+    const ings = blend.ingredientes || [];
+    let html = '<div class="card"><div class="card-body"><table class="table"><thead><tr><th>Especia</th><th>Grs/frasco</th><th>Total grs</th><th>Bolsa</th><th>Estado</th></tr></thead><tbody>';
+    let ok = true;
+    for (const ing of ings) {
+      const esp = ArcanoDB.getEspecia(ing.especiaId);
+      if (!esp) continue;
+      const total = (ing.cantidad || 0) * cant;
+      const disponible = esp.stockBolsa || 0;
+      const itemOk = disponible >= total;
+      if (!itemOk) ok = false;
+      html += '<tr><td class="fw7">' + esp.nombre + '</td><td>' + (ing.cantidad || 0) + 'grs</td><td class="fw7">' + total + 'grs</td><td>' + disponible + 'grs</td><td>' +
+        (itemOk ? '<span class="badge badge-green">OK</span>' : '<span class="badge badge-red">Faltan ' + (total - disponible) + 'grs</span>') + '</td></tr>';
+    }
+    html += '</tbody></table></div></div>';
+    // Etiqueta check
+    const etqList = ArcanoDB.getEtiquetasStock();
+    const etq = etqList.find(function(e) { return e.nombre === blend.nombre; });
+    if (etq && etq.stock < cant) { ok = false; html += '<p class="text-red mt-8 fw7">Faltan ' + (cant - etq.stock) + ' etiquetas de "' + blend.nombre + '"</p>'; }
+    else if (!etq) { ok = false; html += '<p class="text-red mt-8 fw7">No hay etiquetas "' + blend.nombre + '". Compralas en Compras.</p>'; }
+    if (ok) html += '<p class="text-green mt-8 fw7">Todo disponible. Se produciran ' + cant + ' frascos.</p>';
+    calcDiv.innerHTML = html;
+  },
+
+  doProducirBlend(blendId) {
     const cant = Number(document.getElementById('f-prod-cant').value) || 0;
     if (cant <= 0) { alert('Cantidad debe ser mayor a 0'); return; }
     try {
       ArcanoDB.producirBlend(blendId, cant);
+      const blend = ArcanoDB.getBlend(blendId);
+      alert('Producidos ' + cant + ' frascos de "' + (blend ? blend.nombre : 'Blend') + '"');
       document.querySelector('.modal-overlay').remove();
       App.renderPage('blends');
     } catch (e) { alert(e.message); }
@@ -359,13 +444,13 @@ const Pages = {
   deleteBlend(id) {
     const blend = ArcanoDB.getBlend(id);
     if (!blend) return;
-    if (!confirm('Eliminar blend "' + blend.nombre + '"?')) return;
+    if (!confirm('Eliminar "' + (blend.nombre || '') + '"?')) return;
     ArcanoDB.deleteBlend(id);
     App.renderPage('blends');
   },
 
   /* ================================================================
-     COMPRAS (Especias + Etiquetas fisicas)
+     COMPRAS (Especias en grs + Etiquetas)
      ================================================================ */
   renderCompras(container) {
     const compras = ArcanoDB.getCompras();
@@ -375,9 +460,7 @@ const Pages = {
       </div>
       <div class="table-wrap mt-12">
         <table class="table">
-          <thead>
-            <tr><th>Fecha</th><th>Proveedor</th><th>Items</th><th>Total</th><th>Acciones</th></tr>
-          </thead>
+          <thead><tr><th>Fecha</th><th>Proveedor</th><th>Items</th><th>Total</th><th>Acciones</th></tr></thead>
           <tbody>
             ${compras.map(c => `
               <tr>
@@ -386,17 +469,17 @@ const Pages = {
                 <td class="text-sm">${(c.items || []).map(i => {
                   if (i.tipo === 'etiqueta') return '<span class="badge badge-blue">ETQ</span> ' + (i.etiquetaNombre || '?') + ' x' + (i.cantidad || 0);
                   const esp = ArcanoDB.getEspecia(i.especiaId);
-                  return (esp ? esp.nombre : '?') + ' x' + (i.cantidad || 0);
+                  return (esp ? esp.nombre : '?') + ' ' + (i.cantidad || 0) + 'grs';
                 }).join(', ') || '—'}</td>
                 <td class="fw7">$${(Number(c.total) || 0).toLocaleString()}</td>
                 <td>
                   <button class="btn btn-sm btn-outline" onclick="Pages.formCompra('${c.id}')">Ver</button>
-                  <button class="btn btn-sm btn-red" onclick="Pages.deleteCompra('${c.id}')">Eliminar</button>
+                  <button class="btn btn-sm btn-red" onclick="Pages.deleteCompra('${c.id}')">X</button>
                 </td>
               </tr>`).join('')}
           </tbody>
         </table>
-        ${compras.length === 0 ? '<p class="text-muted mt-16 text-center">No hay compras registradas.</p>' : ''}
+        ${compras.length === 0 ? '<p class="text-muted mt-16 text-center">Sin compras.</p>' : ''}
       </div>`;
   },
 
@@ -404,14 +487,11 @@ const Pages = {
     const compra = id ? ArcanoDB.getCompras().find(c => c.id === id) : null;
     const especias = ArcanoDB.getEspecias();
     const readonly = !!id;
-
-    // Separate items by tipo
     const allItems = compra ? compra.items || [] : [];
     const espItems = allItems.filter(i => i.tipo !== 'etiqueta');
     const etqItems = allItems.filter(i => i.tipo === 'etiqueta');
     if (espItems.length === 0 && !readonly) espItems.push({tipo:'especia', especiaId:'', cantidad:'', costoUnitario:''});
     if (etqItems.length === 0 && !readonly) etqItems.push({tipo:'etiqueta', etiquetaNombre:'', cantidad:'', costoUnitario:''});
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
@@ -419,42 +499,25 @@ const Pages = {
         <div class="modal-header"><h3>${id ? 'Detalle Compra' : 'Nueva Compra'}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
           <div class="g2">
-            <div class="form-group">
-              <label>Fecha</label>
-              <input type="date" class="input" id="f-comp-fecha" value="${compra ? compra.fecha : new Date().toISOString().slice(0, 10)}" ${readonly ? 'disabled' : ''}>
-            </div>
-            <div class="form-group">
-              <label>Proveedor</label>
-              <input type="text" class="input" id="f-comp-prov" value="${compra ? compra.proveedor : ''}" placeholder="Nombre del proveedor" ${readonly ? 'disabled' : ''}>
-            </div>
+            <div class="form-group"><label>Fecha</label><input type="date" class="input" id="f-comp-fecha" value="${compra ? compra.fecha : new Date().toISOString().slice(0, 10)}" ${readonly ? 'disabled' : ''}></div>
+            <div class="form-group"><label>Proveedor</label><input type="text" class="input" id="f-comp-prov" value="${compra ? compra.proveedor : ''}" placeholder="Nombre del proveedor" ${readonly ? 'disabled' : ''}></div>
           </div>
-
-          <!-- Especias -->
           <div class="form-group mt-12">
-            <label>Especias</label>
-            <div id="f-comp-esp-items">
-              ${espItems.map((item, i) => this._compraEspRow(i, item, especias, readonly)).join('')}
-            </div>
+            <label>Especias (comprar en gramos para la bolsa)</label>
+            <div id="f-comp-esp-items">${espItems.map((item, i) => this._compraEspRow(i, item, especias, readonly)).join('')}</div>
             ${!readonly ? '<button class="btn btn-sm btn-outline mt-8" onclick="Pages._addCompraEspRow()">+ Especia</button>' : ''}
           </div>
-
-          <!-- Etiquetas -->
           <div class="form-group mt-12">
-            <label>Etiquetas (frascos con nombre)</label>
-            <p class="text-muted text-xs">Las etiquetas llevan el nombre del blend o especia. Ej: "Berbere", "Oregano".</p>
-            <div id="f-comp-etq-items">
-              ${etqItems.map((item, i) => this._compraEtqRow(i, item, readonly)).join('')}
-            </div>
+            <label>Etiquetas fisicas</label>
+            <p class="text-muted text-xs">Nombre igual al producto. Ej: "Berbere", "Oregano".</p>
+            <div id="f-comp-etq-items">${etqItems.map((item, i) => this._compraEtqRow(i, item, readonly)).join('')}</div>
             ${!readonly ? '<button class="btn btn-sm btn-outline mt-8" onclick="Pages._addCompraEtqRow()">+ Etiqueta</button>' : ''}
           </div>
-
-          <div class="mt-12">
-            <b>Total: $<span id="f-comp-total">${(Number(compra ? compra.total : 0) || 0).toLocaleString()}</span></b>
-          </div>
+          <div class="mt-12"><b>Total: $<span id="f-comp-total">${(Number(compra ? compra.total : 0) || 0).toLocaleString()}</span></b></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>
-          ${!readonly ? '<button class="btn btn-gold" onclick="Pages.saveCompra()">Guardar Compra</button>' : ''}
+          ${!readonly ? '<button class="btn btn-gold" onclick="Pages.saveCompra()">Guardar</button>' : ''}
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -471,8 +534,8 @@ const Pages = {
         '<option value="">Especia...</option>' +
         especias.map(function(e) { return '<option value="' + e.id + '" ' + (item.especiaId === e.id ? 'selected' : '') + '>' + e.nombre + '</option>'; }).join('') +
       '</select>' +
-      '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Cant." min="0" ' + (readonly ? 'disabled' : '') + '>' +
-      '<input type="number" class="input" data-field="costoUnitario" value="' + (item.costoUnitario || '') + '" placeholder="$ unit" min="0" step="100" ' + (readonly ? 'disabled' : '') + '>' +
+      '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Grs" min="0" ' + (readonly ? 'disabled' : '') + '>' +
+      '<input type="number" class="input" data-field="costoUnitario" value="' + (item.costoUnitario || '') + '" placeholder="$ / grs" min="0" step="10" ' + (readonly ? 'disabled' : '') + '>' +
       '<span class="item-subtotal">$' + ((Number(item.cantidad) || 0) * (Number(item.costoUnitario) || 0)).toLocaleString() + '</span>' +
       (!readonly ? '<button class="btn btn-sm btn-red" onclick="this.closest(\'.comp-item-row\').remove();Pages._calcCompraTotal()">X</button>' : '') +
     '</div>';
@@ -481,8 +544,8 @@ const Pages = {
   _compraEtqRow(idx, item, readonly) {
     return '<div class="g4 comp-item-row" data-tipo="etiqueta">' +
       '<input type="text" class="input" data-field="etiquetaNombre" value="' + (item.etiquetaNombre || '') + '" placeholder="Nombre etiqueta" ' + (readonly ? 'disabled' : '') + '>' +
-      '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Cant." min="0" ' + (readonly ? 'disabled' : '') + '>' +
-      '<input type="number" class="input" data-field="costoUnitario" value="' + (item.costoUnitario || '') + '" placeholder="$ unit" min="0" step="100" ' + (readonly ? 'disabled' : '') + '>' +
+      '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Uds" min="0" ' + (readonly ? 'disabled' : '') + '>' +
+      '<input type="number" class="input" data-field="costoUnitario" value="' + (item.costoUnitario || '') + '" placeholder="$ / ud" min="0" step="100" ' + (readonly ? 'disabled' : '') + '>' +
       '<span class="item-subtotal">$' + ((Number(item.cantidad) || 0) * (Number(item.costoUnitario) || 0)).toLocaleString() + '</span>' +
       (!readonly ? '<button class="btn btn-sm btn-red" onclick="this.closest(\'.comp-item-row\').remove();Pages._calcCompraTotal()">X</button>' : '') +
     '</div>';
@@ -490,18 +553,15 @@ const Pages = {
 
   _addCompraEspRow() {
     var especias = ArcanoDB.getEspecias();
-    var container = document.getElementById('f-comp-esp-items');
-    container.insertAdjacentHTML('beforeend', this._compraEspRow(0, {}, especias, false));
+    document.getElementById('f-comp-esp-items').insertAdjacentHTML('beforeend', this._compraEspRow(0, {}, especias, false));
   },
-
   _addCompraEtqRow() {
-    var container = document.getElementById('f-comp-etq-items');
-    container.insertAdjacentHTML('beforeend', this._compraEtqRow(0, {}, false));
+    document.getElementById('f-comp-etq-items').insertAdjacentHTML('beforeend', this._compraEtqRow(0, {}, false));
   },
 
   _calcCompraTotal() {
     var total = 0;
-    document.querySelectorAll('#f-comp-esp-items .comp-item-row, #f-comp-etq-items .comp-item-row').forEach(function(row) {
+    document.querySelectorAll('.comp-item-row').forEach(function(row) {
       var cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
       var cost = Number(row.querySelector('[data-field="costoUnitario"]').value) || 0;
       row.querySelector('.item-subtotal').textContent = '$' + (cant * cost).toLocaleString();
@@ -513,34 +573,22 @@ const Pages = {
   saveCompra() {
     var fecha = document.getElementById('f-comp-fecha').value;
     var proveedor = document.getElementById('f-comp-prov').value.trim();
-    var items = [];
-    var total = 0;
-
-    // Especia items
+    var items = [], total = 0;
     document.querySelectorAll('#f-comp-esp-items .comp-item-row').forEach(function(row) {
       var espId = row.querySelector('[data-field="especiaId"]').value;
       var cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
       var cost = Number(row.querySelector('[data-field="costoUnitario"]').value) || 0;
-      if (espId && cant > 0) {
-        items.push({ tipo: 'especia', especiaId: espId, cantidad: cant, costoUnitario: cost });
-        total += cant * cost;
-      }
+      if (espId && cant > 0) { items.push({ tipo: 'especia', especiaId: espId, cantidad: cant, costoUnitario: cost }); total += cant * cost; }
     });
-
-    // Etiqueta items
     document.querySelectorAll('#f-comp-etq-items .comp-item-row').forEach(function(row) {
       var nombre = row.querySelector('[data-field="etiquetaNombre"]').value.trim();
       var cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
       var cost = Number(row.querySelector('[data-field="costoUnitario"]').value) || 0;
-      if (nombre && cant > 0) {
-        items.push({ tipo: 'etiqueta', etiquetaNombre: nombre, cantidad: cant, costoUnitario: cost });
-        total += cant * cost;
-      }
+      if (nombre && cant > 0) { items.push({ tipo: 'etiqueta', etiquetaNombre: nombre, cantidad: cant, costoUnitario: cost }); total += cant * cost; }
     });
-
-    if (items.length === 0) { alert('Agrega al menos un item (especia o etiqueta)'); return; }
+    if (items.length === 0) { alert('Agrega al menos un item'); return; }
     try {
-      ArcanoDB.saveCompra({ fecha: fecha, proveedor: proveedor, items: items, total: total });
+      ArcanoDB.saveCompra({ fecha, proveedor, items, total });
       document.querySelector('.modal-overlay').remove();
       App.renderPage('compras');
     } catch (e) { alert('Error: ' + e.message); }
@@ -553,7 +601,7 @@ const Pages = {
   },
 
   /* ================================================================
-     VENTAS
+     VENTAS (solo frascos)
      ================================================================ */
   renderVentas(container) {
     const ventas = ArcanoDB.getVentas();
@@ -563,70 +611,48 @@ const Pages = {
       </div>
       <div class="table-wrap mt-12">
         <table class="table">
-          <thead>
-            <tr><th>Fecha</th><th>Vendedor</th><th>Items</th><th>Total</th><th>Acciones</th></tr>
-          </thead>
+          <thead><tr><th>Fecha</th><th>Vendedor</th><th>Items</th><th>Total</th><th>Acciones</th></tr></thead>
           <tbody>
             ${ventas.map(v => {
               const vendedor = ArcanoDB.getUsuario(v.vendedorId);
-              return `<tr>
-                <td>${v.fecha || '—'}</td>
-                <td>${vendedor ? vendedor.nombre : '—'}</td>
-                <td class="text-sm">${(v.items || []).map(i => {
-                  const prod = i.tipo === 'especia' ? ArcanoDB.getEspecia(i.productoId) : ArcanoDB.getBlend(i.productoId);
-                  return `${prod ? prod.nombre : '?'} (${i.tamano}) x${i.cantidad}`;
-                }).join(', ') || '—'}</td>
-                <td class="fw7">$${(Number(v.total) || 0).toLocaleString()}</td>
-                <td>
-                  <button class="btn btn-sm btn-outline" onclick="Pages.formVenta('${v.id}')">Ver</button>
-                  <button class="btn btn-sm btn-red" onclick="Pages.deleteVenta('${v.id}')">Eliminar</button>
-                </td>
-              </tr>`;
+              return '<tr><td>' + (v.fecha || '—') + '</td><td>' + (vendedor ? vendedor.nombre : '—') + '</td>' +
+                '<td class="text-sm">' + (v.items || []).map(i => {
+                  return (i.productoNombre || '?') + ' (' + (i.tamano || '') + ') x' + (i.cantidad || 0);
+                }).join(', ') + '</td>' +
+                '<td class="fw7">$' + (Number(v.total) || 0).toLocaleString() + '</td>' +
+                '<td><button class="btn btn-sm btn-outline" onclick="Pages.formVenta(\'' + v.id + '\')">Ver</button>' +
+                '<button class="btn btn-sm btn-red" onclick="Pages.deleteVenta(\'' + v.id + '\')">X</button></td></tr>';
             }).join('')}
           </tbody>
         </table>
-        ${ventas.length === 0 ? '<p class="text-muted mt-16 text-center">No hay ventas registradas.</p>' : ''}
+        ${ventas.length === 0 ? '<p class="text-muted mt-16 text-center">Sin ventas.</p>' : ''}
       </div>`;
   },
 
   formVenta(id) {
     const venta = id ? ArcanoDB.getVentas().find(v => v.id === id) : null;
-    const especias = ArcanoDB.getEspecias();
-    const blends = ArcanoDB.getBlends();
+    const frascos = ArcanoDB.getFrascosParaVender();
     const usuarios = ArcanoDB.getUsuarios().filter(u => u.id !== 'admin');
-    const currentUser = ArcanoDB.getCurrentUser();
     const items = venta ? venta.items || [] : [{tipo: 'especia', productoId: '', cantidad: '', tamano: 'chico'}];
     const readonly = !!id;
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal modal-lg">
-        <div class="modal-header"><h3>${id ? 'Detalle Venta' : 'Nueva Venta'}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button></div>
+        <div class="modal-header"><h3>${id ? 'Detalle Venta' : 'Nueva Venta'}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
           <div class="g2">
-            <div class="form-group">
-              <label>Fecha</label>
-              <input type="date" class="input" id="f-venta-fecha" value="${venta ? venta.fecha : new Date().toISOString().slice(0, 10)}" ${readonly ? 'disabled' : ''}>
-            </div>
-            <div class="form-group">
-              <label>Vendedor</label>
-              <select class="input" id="f-venta-vendedor" ${readonly ? 'disabled' : ''}>
-                ${usuarios.map(u => `<option value="${u.id}" ${venta && venta.vendedorId === u.id ? 'selected' : ''}>${u.nombre}</option>`).join('')}
-                ${usuarios.length === 0 ? '<option value="admin">Admin</option>' : ''}
-              </select>
-            </div>
+            <div class="form-group"><label>Fecha</label><input type="date" class="input" id="f-venta-fecha" value="${venta ? venta.fecha : new Date().toISOString().slice(0, 10)}" ${readonly ? 'disabled' : ''}></div>
+            <div class="form-group"><label>Vendedor</label><select class="input" id="f-venta-vendedor" ${readonly ? 'disabled' : ''}>
+              ${usuarios.map(u => '<option value="' + u.id + '" ' + (venta && venta.vendedorId === u.id ? 'selected' : '') + '>' + u.nombre + '</option>').join('')}
+              ${usuarios.length === 0 ? '<option value="admin">Admin</option>' : ''}
+            </select></div>
           </div>
-          <div class="form-group mt-8">
-            <label>Items</label>
-            <div id="f-venta-items">
-              ${items.map((item, i) => this._ventaItemRow(i, item, especias, blends, readonly)).join('')}
-            </div>
-            ${!readonly ? '<button class="btn btn-sm btn-outline mt-8" onclick="Pages.addVentaItemRow()">+ Agregar Item</button>' : ''}
+          <div class="form-group mt-8"><label>Frascos a vender</label>
+            <div id="f-venta-items">${items.map((item, i) => this._ventaItemRow(i, item, frascos, readonly)).join('')}</div>
+            ${!readonly ? '<button class="btn btn-sm btn-outline mt-8" onclick="Pages.addVentaItemRow()">+ Item</button>' : ''}
           </div>
-          <div class="mt-12">
-            <b>Total: $<span id="f-venta-total">${(Number(venta ? venta.total : 0) || 0).toLocaleString()}</span></b>
-          </div>
+          <div class="mt-12"><b>Total: $<span id="f-venta-total">${(Number(venta ? venta.total : 0) || 0).toLocaleString()}</span></b></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>
@@ -635,61 +661,58 @@ const Pages = {
       </div>`;
     document.body.appendChild(modal);
     if (!readonly) {
-      modal.addEventListener('input', (e) => {
-        if (e.target.closest('#f-venta-items') || e.target.id === 'f-venta-items') this._calcVentaTotal();
-      });
-      modal.addEventListener('change', (e) => {
-        if (e.target.closest('#f-venta-items')) this._calcVentaTotal();
-      });
+      modal.addEventListener('input', (e) => { if (e.target.closest('#f-venta-items')) this._calcVentaTotal(); });
+      modal.addEventListener('change', (e) => { if (e.target.closest('#f-venta-items')) this._calcVentaTotal(); });
     }
   },
 
-  _ventaItemRow(idx, item, especias, blends, readonly) {
-    return `<div class="venta-item-row g4" data-idx="${idx}">
-      <select class="input" data-field="tipo" ${readonly ? 'disabled' : ''} onchange="Pages._updateVentaProductos(this)">
-        <option value="especia" ${item.tipo === 'especia' ? 'selected' : ''}>Especia</option>
-        <option value="blend" ${item.tipo === 'blend' ? 'selected' : ''}>Blend</option>
-      </select>
-      <select class="input" data-field="productoId" ${readonly ? 'disabled' : ''}>
-        <option value="">Seleccionar...</option>
-        ${(item.tipo === 'blend' ? blends : especias).map(p => `<option value="${p.id}" ${item.productoId === p.id ? 'selected' : ''}>${p.nombre} (stock: ${p.stock})</option>`).join('')}
-      </select>
-      <select class="input" data-field="tamano" ${readonly ? 'disabled' : ''}>
-        <option value="chico" ${item.tamano === 'chico' ? 'selected' : ''}>Chico</option>
-        <option value="grande" ${item.tamano === 'grande' ? 'selected' : ''}>Grande</option>
-      </select>
-      <input type="number" class="input" data-field="cantidad" value="${item.cantidad || ''}" placeholder="Cant." min="1" ${readonly ? 'disabled' : ''}>
-      ${!readonly ? '<button class="btn btn-sm btn-red" onclick="this.closest(\'.venta-item-row\').remove();Pages._calcVentaTotal()">✕</button>' : ''}
-    </div>`;
+  _ventaItemRow(idx, item, frascos, readonly) {
+    var tipo = item.tipo || 'especia';
+    var filtered = frascos.filter(f => f.tipo === tipo);
+    return '<div class="venta-item-row g4" data-idx="' + idx + '">' +
+      '<select class="input" data-field="tipo" ' + (readonly ? 'disabled' : '') + ' onchange="Pages._updateVentaProductos(this)">' +
+        '<option value="especia" ' + (tipo === 'especia' ? 'selected' : '') + '>Especia</option>' +
+        '<option value="blend" ' + (tipo === 'blend' ? 'selected' : '') + '>Blend</option>' +
+      '</select>' +
+      '<select class="input" data-field="productoId" ' + (readonly ? 'disabled' : '') + '>' +
+        '<option value="">Seleccionar...</option>' +
+        filtered.map(f => '<option value="' + f.id + '" ' + (item.productoId === f.id ? 'selected' : '') + '>' + f.nombre + ' (' + f.stockFrascos + ' frascos)</option>').join('') +
+      '</select>' +
+      '<select class="input" data-field="tamano" ' + (readonly ? 'disabled' : '') + ' onchange="Pages._calcVentaTotal()">' +
+        '<option value="chico" ' + (item.tamano === 'chico' ? 'selected' : '') + '>Chico</option>' +
+        '<option value="grande" ' + (item.tamano === 'grande' ? 'selected' : '') + '>Grande</option>' +
+      '</select>' +
+      '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Cant." min="1" ' + (readonly ? 'disabled' : '') + ' oninput="Pages._calcVentaTotal()">' +
+      (!readonly ? '<button class="btn btn-sm btn-red" onclick="this.closest(\'.venta-item-row\').remove();Pages._calcVentaTotal()">X</button>' : '') +
+    '</div>';
   },
 
   _updateVentaProductos(tipoSelect) {
-    const row = tipoSelect.closest('.venta-item-row');
-    const tipo = tipoSelect.value;
-    const prodSelect = row.querySelector('[data-field="productoId"]');
-    const productos = tipo === 'blend' ? ArcanoDB.getBlends() : ArcanoDB.getEspecias();
+    var row = tipoSelect.closest('.venta-item-row');
+    var tipo = tipoSelect.value;
+    var prodSelect = row.querySelector('[data-field="productoId"]');
+    var frascos = ArcanoDB.getFrascosParaVender().filter(f => f.tipo === tipo);
     prodSelect.innerHTML = '<option value="">Seleccionar...</option>' +
-      productos.map(p => `<option value="${p.id}">${p.nombre} (stock: ${p.stock})</option>`).join('');
+      frascos.map(f => '<option value="' + f.id + '">' + f.nombre + ' (' + f.stockFrascos + ' frascos)</option>').join('');
     this._calcVentaTotal();
   },
 
   addVentaItemRow() {
-    const especias = ArcanoDB.getEspecias();
-    const blends = ArcanoDB.getBlends();
-    const container = document.getElementById('f-venta-items');
-    const idx = container.children.length;
-    container.insertAdjacentHTML('beforeend', this._ventaItemRow(idx, {}, especias, blends, false));
+    var frascos = ArcanoDB.getFrascosParaVender();
+    var container = document.getElementById('f-venta-items');
+    container.insertAdjacentHTML('beforeend', this._ventaItemRow(container.children.length, {}, frascos, false));
   },
 
   _calcVentaTotal() {
     let total = 0;
     document.querySelectorAll('#f-venta-items .venta-item-row').forEach(row => {
-      const tipo = row.querySelector('[data-field="tipo"]').value;
-      const prodId = row.querySelector('[data-field="productoId"]').value;
-      const tamano = row.querySelector('[data-field="tamano"]').value;
-      const cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
-      const prod = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
-      const precio = tamano === 'grande' ? (prod ? prod.precioGrande : 0) : (prod ? prod.precioChico : 0);
+      var tipo = row.querySelector('[data-field="tipo"]').value;
+      var prodId = row.querySelector('[data-field="productoId"]').value;
+      var tamano = row.querySelector('[data-field="tamano"]').value;
+      var cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
+      var frascos = ArcanoDB.getFrascosParaVender();
+      var prod = frascos.find(f => f.id === prodId);
+      var precio = prod ? (tamano === 'grande' ? prod.precioGrande : prod.precioChico) : 0;
       total += precio * cant;
     });
     document.getElementById('f-venta-total').textContent = total.toLocaleString();
@@ -707,8 +730,9 @@ const Pages = {
       const tamano = row.querySelector('[data-field="tamano"]').value;
       const cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
       if (prodId && cant > 0) {
-        const prod = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
-        const precio = tamano === 'grande' ? (prod ? prod.precioGrande : 0) : (prod ? prod.precioChico : 0);
+        const frascos = ArcanoDB.getFrascosParaVender();
+        const prod = frascos.find(f => f.id === prodId);
+        const precio = prod ? (tamano === 'grande' ? prod.precioGrande : prod.precioChico) : 0;
         items.push({ tipo, productoId: prodId, tamano, cantidad: cant, precioUnitario: precio });
         total += precio * cant;
       }
@@ -728,28 +752,27 @@ const Pages = {
   },
 
   /* ================================================================
-     STOCK
+     STOCK (Bolsa + Frascos)
      ================================================================ */
   renderStock(container) {
     const especias = ArcanoDB.getEspecias();
     const blends = ArcanoDB.getBlends();
-
     container.innerHTML = `
       <div class="g2">
         <div class="card">
-          <div class="card-header"><h3>Especias - Stock</h3></div>
+          <div class="card-header"><h3>Especias en Bolsa (materia prima)</h3></div>
           <div class="card-body">
             ${especias.length === 0 ? '<p class="text-muted">Sin especias</p>' : `
             <table class="table">
-              <thead><tr><th>Nombre</th><th>Categoria</th><th>Stock</th></tr></thead>
+              <thead><tr><th>Especia</th><th>Categoria</th><th>Gramos en bolsa</th></tr></thead>
               <tbody>
-                ${especias.sort((a,b) => (a.stock||0) - (b.stock||0)).map(e => `
+                ${especias.sort((a,b) => (a.stockBolsa||0) - (b.stockBolsa||0)).map(e => `
                   <tr>
                     <td class="fw7">${e.nombre || '?'}</td>
                     <td class="text-sm">${e.categoria || '—'}</td>
                     <td>
-                      <span class="${(e.stock||0) <= 3 ? 'text-red fw7' : (e.stock||0) <= 10 ? 'text-yellow fw7' : 'text-green'}">${e.stock || 0}</span>
-                      <div class="stock-bar"><div class="stock-fill ${(e.stock||0) <= 3 ? 'bar-red' : (e.stock||0) <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (e.stock||0) * 2)}%"></div></div>
+                      <span class="${(e.stockBolsa||0) <= 50 ? 'text-red fw7' : (e.stockBolsa||0) <= 200 ? 'text-yellow fw7' : 'text-green'}">${e.stockBolsa || 0} grs</span>
+                      <div class="stock-bar"><div class="stock-fill ${(e.stockBolsa||0) <= 50 ? 'bar-red' : (e.stockBolsa||0) <= 200 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (e.stockBolsa||0) / 5)}%"></div></div>
                     </td>
                   </tr>`).join('')}
               </tbody>
@@ -757,24 +780,84 @@ const Pages = {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>Blends - Stock</h3></div>
+          <div class="card-header"><h3>Frascos listos para vender</h3></div>
           <div class="card-body">
-            ${blends.length === 0 ? '<p class="text-muted">Sin blends</p>' : `
-            <table class="table">
-              <thead><tr><th>Nombre</th><th>Categoria</th><th>Stock</th></tr></thead>
-              <tbody>
-                ${blends.sort((a,b) => (a.stock||0) - (b.stock||0)).map(b => `
+            ${(() => {
+              var allFrascos = [];
+              especias.forEach(e => { if ((e.stockFrascos||0) > 0) allFrascos.push({nombre: e.nombre, categoria: e.categoria, stock: e.stockFrascos, tipo: 'Especia', chico: e.precioChico, grande: e.precioGrande}); });
+              blends.forEach(b => { if ((b.stockFrascos||0) > 0) allFrascos.push({nombre: b.nombre, categoria: b.categoria, stock: b.stockFrascos, tipo: 'Blend', chico: b.precioChico, grande: b.precioGrande}); });
+              if (allFrascos.length === 0) return '<p class="text-muted">Sin frascos. Produce en Especias o Blends.</p>';
+              return '<table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Frascos</th><th>$ Chico</th><th>$ Grande</th></tr></thead><tbody>' +
+                allFrascos.sort((a,b) => a.stock - b.stock).map(f => `
                   <tr>
-                    <td class="fw7">${b.nombre || '?'}</td>
-                    <td class="text-sm">${b.categoria || '—'}</td>
-                    <td>
-                      <span class="${(b.stock||0) <= 3 ? 'text-red fw7' : (b.stock||0) <= 10 ? 'text-yellow fw7' : 'text-green'}">${b.stock || 0}</span>
-                      <div class="stock-bar"><div class="stock-fill ${(b.stock||0) <= 3 ? 'bar-red' : (b.stock||0) <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (b.stock||0) * 2)}%"></div></div>
-                    </td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>`}
+                    <td class="fw7">${f.nombre}</td>
+                    <td><span class="badge ${f.tipo === 'Blend' ? 'badge-blue' : 'badge-gold'}">${f.tipo}</span></td>
+                    <td><span class="${f.stock <= 3 ? 'text-red fw7' : 'text-green'}">${f.stock}</span></td>
+                    <td>$${(f.chico||0).toLocaleString()}</td>
+                    <td>$${(f.grande||0).toLocaleString()}</td>
+                  </tr>`).join('') + '</tbody></table>';
+            })()}
           </div>
+        </div>
+      </div>`;
+  },
+
+  /* ================================================================
+     ETIQUETAS
+     ================================================================ */
+  renderEtiquetas(container) {
+    const etqStock = ArcanoDB.getEtiquetasStock();
+    const producciones = ArcanoDB.getProducciones();
+    const totalEtq = etqStock.reduce(function(s, e) { return s + (e.stock || 0); }, 0);
+    container.innerHTML = `
+      <div class="stats-grid mt-8" style="grid-template-columns: repeat(3, 1fr)">
+        <div class="stat-card" style="border-left-color: var(--blue)">
+          <div class="stat-value" style="color: var(--blue)">${etqStock.length}</div>
+          <div class="stat-label">Tipos de Etiquetas</div>
+          <div class="stat-sub">${totalEtq} etiquetas en stock</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--green)">
+          <div class="stat-value" style="color: var(--green)">${ArcanoDB.getStats().totalFrascos}</div>
+          <div class="stat-label">Frascos Producidos</div>
+          <div class="stat-sub">Listos para vender</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--gold)">
+          <div class="stat-value">${producciones.length}</div>
+          <div class="stat-label">Producciones</div>
+          <div class="stat-sub">Total registradas</div>
+        </div>
+      </div>
+      <div class="card mt-16">
+        <div class="card-header"><h3>Stock de Etiquetas Fisicas</h3></div>
+        <div class="card-body">
+          ${etqStock.length === 0 ? '<p class="text-muted text-center">Sin etiquetas. Ve a <b>Compras</b> y agrega etiquetas.</p>' :
+          '<div class="etiquetas-grid">' +
+            etqStock.map(function(e) {
+              return '<div class="etiqueta-card"><div class="etiqueta-label">' + (e.nombre || '?') + '</div>' +
+                '<div class="etiqueta-cat"><span class="badge badge-blue">Etiqueta</span></div>' +
+                '<div class="etiqueta-stock ' + ((e.stock||0) <= 5 ? 'text-red' : '') + '">' + (e.stock||0) + ' <span class="text-muted text-xs">uds</span></div>' +
+                '</div>';
+            }).join('') + '</div>'}
+        </div>
+      </div>
+      <div class="card mt-16">
+        <div class="card-header"><h3>Historial de Producciones</h3></div>
+        <div class="card-body">
+          ${producciones.length === 0 ? '<p class="text-muted text-center">Sin producciones.</p>' :
+          '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Frascos</th><th>Detalle</th></tr></thead><tbody>' +
+            producciones.slice(0, 20).map(function(p) {
+              return '<tr><td>' + (p.fecha || '') + '</td>' +
+                '<td><span class="badge ' + (p.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (p.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>' +
+                '<td class="fw7">' + (p.blendNombre || p.especiaNombre || '') + '</td>' +
+                '<td><span class="badge badge-green">' + (p.cantidad || 0) + '</span></td>' +
+                '<td class="text-sm">' +
+                  (p.tipo === 'blend' ?
+                    (p.ingredientesUsados || []).map(function(i) { return i.especiaNombre + ' ' + i.grsTotal + 'grs'; }).join(', ') :
+                    (p.grsConsumidos || 0) + 'grs consumidos'
+                  ) +
+                  (p.etiquetaUsada ? ' | Etq: ' + p.etiquetaUsada.etiquetaNombre : '') +
+                '</td></tr>';
+            }).join('') + '</tbody></table></div>'}
         </div>
       </div>`;
   },
@@ -785,65 +868,43 @@ const Pages = {
   renderUsuarios(container) {
     const usuarios = ArcanoDB.getUsuarios();
     container.innerHTML = `
-      <div class="page-actions">
-        <button class="btn btn-gold" onclick="Pages.formUsuario()">+ Nuevo Usuario</button>
-      </div>
+      <div class="page-actions"><button class="btn btn-gold" onclick="Pages.formUsuario()">+ Nuevo Usuario</button></div>
       <div class="table-wrap mt-12">
-        <table class="table">
-          <thead>
-            <tr><th>ID</th><th>Nombre</th><th>ROL</th><th>PIN</th><th>Estado</th><th>Acciones</th></tr>
-          </thead>
-          <tbody>
-            ${usuarios.map(u => `
-              <tr>
-                <td class="text-muted text-sm">${u.id}</td>
-                <td class="fw7">${u.nombre}</td>
-                <td><span class="badge ${u.rol === 'admin' ? 'badge-gold' : 'badge-blue'}">${u.rol || 'vendedor'}</span></td>
-                <td>${u.id === 'admin' ? '****' : u.pin}</td>
-                <td><span class="badge ${u.activo !== false ? 'badge-green' : 'badge-red'}">${u.activo !== false ? 'Activo' : 'Inactivo'}</span></td>
-                <td>
-                  <button class="btn btn-sm btn-outline" onclick="Pages.formUsuario('${u.id}')">Editar</button>
-                  ${u.id !== 'admin' ? '<button class="btn btn-sm btn-red" onclick="Pages.deleteUsuario(\'' + u.id + '\')">Eliminar</button>' : ''}
-                </td>
-              </tr>`).join('')}
-          </tbody>
+        <table class="table"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>${usuarios.map(u => `
+            <tr>
+              <td class="fw7">${u.nombre || '?'}</td>
+              <td><span class="badge ${u.rol === 'admin' ? 'badge-gold' : 'badge-blue'}">${u.rol || 'vendedor'}</span></td>
+              <td>${u.id === 'admin' ? '****' : u.pin}</td>
+              <td><span class="badge ${u.activo !== false ? 'badge-green' : 'badge-red'}">${u.activo !== false ? 'Activo' : 'Inactivo'}</span></td>
+              <td>
+                <button class="btn btn-sm btn-outline" onclick="Pages.formUsuario('${u.id}')">Editar</button>
+                ${u.id !== 'admin' ? '<button class="btn btn-sm btn-red" onclick="Pages.deleteUsuario(\'' + u.id + '\')">X</button>' : ''}
+              </td>
+            </tr>`).join('')}</tbody>
         </table>
       </div>`;
   },
 
   formUsuario(id) {
     const user = id ? ArcanoDB.getUsuario(id) : null;
-    const title = user ? 'Editar Usuario' : 'Nuevo Usuario';
     const isAdmin = user && user.id === 'admin';
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal">
-        <div class="modal-header"><h3>${title}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button></div>
+        <div class="modal-header"><h3>${user ? 'Editar' : 'Nuevo'} Usuario</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
-          <div class="form-group">
-            <label>Nombre</label>
-            <input type="text" class="input" id="f-user-nombre" value="${user ? user.nombre : ''}" placeholder="Nombre del vendedor">
-          </div>
-          <div class="form-group">
-            <label>Rol</label>
-            <select class="input" id="f-user-rol" ${isAdmin ? 'disabled' : ''}>
-              <option value="vendedor" ${user && user.rol === 'vendedor' ? 'selected' : ''}>Vendedor</option>
-              <option value="admin" ${user && user.rol === 'admin' ? 'selected' : ''}>Admin</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>PIN de acceso</label>
-            <input type="text" class="input" id="f-user-pin" value="${user ? user.pin : ''}" placeholder="PIN numerico" maxlength="10">
-          </div>
-          <div class="form-group">
-            <label>Estado</label>
-            <select class="input" id="f-user-activo" ${isAdmin ? 'disabled' : ''}>
-              <option value="true" ${user && user.activo !== false ? 'selected' : ''}>Activo</option>
-              <option value="false" ${user && user.activo === false ? 'selected' : ''}>Inactivo</option>
-            </select>
-          </div>
+          <div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-user-nombre" value="${user ? user.nombre : ''}" placeholder="Nombre"></div>
+          <div class="form-group"><label>Rol</label><select class="input" id="f-user-rol" ${isAdmin ? 'disabled' : ''}>
+            <option value="vendedor" ${user && user.rol === 'vendedor' ? 'selected' : ''}>Vendedor</option>
+            <option value="admin" ${user && user.rol === 'admin' ? 'selected' : ''}>Admin</option>
+          </select></div>
+          <div class="form-group"><label>PIN</label><input type="text" class="input" id="f-user-pin" value="${user ? user.pin : ''}" placeholder="PIN" maxlength="10"></div>
+          <div class="form-group"><label>Estado</label><select class="input" id="f-user-activo" ${isAdmin ? 'disabled' : ''}>
+            <option value="true" ${user && user.activo !== false ? 'selected' : ''}>Activo</option>
+            <option value="false" ${user && user.activo === false ? 'selected' : ''}>Inactivo</option>
+          </select></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
@@ -858,12 +919,7 @@ const Pages = {
     const pin = document.getElementById('f-user-pin').value.trim();
     if (!nombre) { alert('Nombre requerido'); return; }
     if (!pin) { alert('PIN requerido'); return; }
-    const data = {
-      nombre,
-      pin,
-      rol: document.getElementById('f-user-rol').value,
-      activo: document.getElementById('f-user-activo').value === 'true'
-    };
+    const data = { nombre, pin, rol: document.getElementById('f-user-rol').value, activo: document.getElementById('f-user-activo').value === 'true' };
     if (id) data.id = id;
     try {
       ArcanoDB.saveUsuario(data);
@@ -875,369 +931,8 @@ const Pages = {
   deleteUsuario(id) {
     const user = ArcanoDB.getUsuario(id);
     if (!user) return;
-    if (!confirm('Eliminar usuario "' + user.nombre + '"?')) return;
+    if (!confirm('Eliminar "' + (user.nombre || '') + '"?')) return;
     ArcanoDB.deleteUsuario(id);
     App.renderPage('usuarios');
-  },
-
-  /* ================================================================
-     ETIQUETAS
-     - Stock de etiquetas fisicas compradas (se consumen al producir)
-     - Stock de blends producidos (etiquetas con nombre listas para vender)
-     ================================================================ */
-  renderEtiquetas(container) {
-    const etqStock = ArcanoDB.getEtiquetasStock();
-    const etqProducidas = ArcanoDB.getEtiquetasProducidas();
-    const producciones = ArcanoDB.getProducciones();
-    const allBlends = ArcanoDB.getBlends();
-
-    const totalEtqFisicas = etqStock.reduce(function(s, e) { return s + e.stock; }, 0);
-    const totalProducidas = etqProducidas.reduce(function(s, e) { return s + e.stock; }, 0);
-
-    container.innerHTML = `
-      <div class="page-actions">
-        <button class="btn btn-gold" onclick="Pages.formProducirEtiqueta()">+ Producir</button>
-        <button class="btn btn-outline" onclick="Pages.formVenderEtiqueta()">Vender Etiqueta</button>
-      </div>
-
-      <div class="stats-grid mt-16" style="grid-template-columns: repeat(3, 1fr)">
-        <div class="stat-card" style="border-left-color: var(--blue)">
-          <div class="stat-value" style="color: var(--blue)">${etqStock.length}</div>
-          <div class="stat-label">Tipos de Etiquetas</div>
-          <div class="stat-sub">${totalEtqFisicas} etiquetas fisicas en stock</div>
-        </div>
-        <div class="stat-card" style="border-left-color: var(--green)">
-          <div class="stat-value" style="color: var(--green)">${totalProducidas}</div>
-          <div class="stat-label">Blends Producidos</div>
-          <div class="stat-sub">${etqProducidas.length} blends con stock</div>
-        </div>
-        <div class="stat-card" style="border-left-color: var(--gold)">
-          <div class="stat-value">${allBlends.length}</div>
-          <div class="stat-label">Blends Totales</div>
-          <div class="stat-sub">Ir a Compras para comprar etiquetas</div>
-        </div>
-      </div>
-
-      <!-- Etiquetas fisicas compradas -->
-      <div class="card mt-16">
-        <div class="card-header">
-          <h3>Stock de Etiquetas Fisicas</h3>
-          <span class="text-muted text-sm">Compradas en Compras. Se consumen al producir.</span>
-        </div>
-        <div class="card-body">
-          ${etqStock.length === 0
-            ? '<p class="text-muted text-center">Sin etiquetas. Ve a <b>Compras</b> y agrega etiquetas con el nombre del blend/especia.</p>'
-            : '<div class="etiquetas-grid">' +
-              etqStock.map(function(e) {
-                var baja = (e.stock || 0) <= 5;
-                return '<div class="etiqueta-card">' +
-                  '<div class="etiqueta-label">' + (e.nombre || '?') + '</div>' +
-                  '<div class="etiqueta-cat"><span class="badge badge-blue">Etiqueta Fisica</span></div>' +
-                  '<div class="etiqueta-stock ' + (baja ? 'text-red' : '') + '">' + e.stock + ' <span class="text-muted text-xs">uds</span></div>' +
-                  (baja ? '<p class="text-red text-xs mt-4">Stock bajo - compra mas</p>' : '') +
-                '</div>';
-              }).join('') + '</div>'
-          }
-        </div>
-      </div>
-
-      <!-- Blends producidos (listos para vender) -->
-      <div class="card mt-16">
-        <div class="card-header">
-          <h3>Blends Producidos (listos para vender)</h3>
-        </div>
-        <div class="card-body">
-          ${etqProducidas.length === 0
-            ? '<p class="text-muted text-center">Sin blends producidos. Usa "Producir" para fabricar.</p>'
-            : '<div class="etiquetas-grid">' +
-              etqProducidas.map(function(e) {
-                return '<div class="etiqueta-card">' +
-                  '<div class="etiqueta-label">' + e.nombre + '</div>' +
-                  '<div class="etiqueta-cat"><span class="badge badge-gold">' + (e.categoria || '') + '</span></div>' +
-                  '<div class="etiqueta-stock">' + e.stock + ' <span class="text-muted text-xs">uds</span></div>' +
-                  '<div class="etiqueta-prices"><span>Ch: $' + e.precioChico.toLocaleString() + '</span><span>Gr: $' + e.precioGrande.toLocaleString() + '</span></div>' +
-                  '<div class="etiqueta-actions mt-8">' +
-                    '<button class="btn btn-sm btn-green" onclick="Pages.formProducirEtiqueta(\'' + e.blendId + '\')">+ Producir</button>' +
-                    '<button class="btn btn-sm btn-outline" onclick="Pages.formVenderEtiqueta(\'' + e.blendId + '\')">Vender</button>' +
-                  '</div></div>';
-              }).join('') + '</div>'
-          }
-        </div>
-      </div>
-
-      <!-- Historial -->
-      <div class="card mt-16">
-        <div class="card-header"><h3>Historial de Producciones</h3></div>
-        <div class="card-body">
-          ${producciones.length === 0
-            ? '<p class="text-muted text-center">Sin producciones.</p>'
-            : '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Blend</th><th>Cant.</th><th>Especias consumidas</th><th>Etiqueta</th></tr></thead><tbody>' +
-              producciones.slice(0, 20).map(function(p) {
-                return '<tr><td>' + (p.fecha || '') + '</td><td class="fw7">' + (p.blendNombre || '') + '</td>' +
-                  '<td><span class="badge badge-green">' + (p.cantidad || 0) + ' uds</span></td>' +
-                  '<td class="text-sm">' + (p.ingredientesUsados || []).map(function(i) { return '<span class="badge badge-gold mr-4">' + i.especiaNombre + ' x' + i.cantidadTotal + '</span>'; }).join('') + '</td>' +
-                  '<td class="text-sm">' + (p.etiquetaUsada ? p.etiquetaUsada.etiquetaNombre + ' x' + p.etiquetaUsada.cantidadConsumida + ' (restan ' + p.etiquetaUsada.stockRestante + ')' : '—') + '</td></tr>';
-              }).join('') + '</tbody></table></div>'
-          }
-        </div>
-      </div>`;
-  },
-
-  /** Modal para producir etiquetas — muestra calculo claro de especias + etiqueta */
-  formProducirEtiqueta(preselectedBlendId) {
-    const blends = ArcanoDB.getBlends();
-    if (blends.length === 0) {
-      alert('Primero crea un blend en la seccion Blends.');
-      return;
-    }
-
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-      <div class="modal modal-lg">
-        <div class="modal-header">
-          <h3>Producir Etiquetas</h3>
-          <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted text-sm mb-12">Al producir, se consumen especias del stock y se generan etiquetas con el nombre del blend.</p>
-          <div class="form-group">
-            <label>Seleccionar Blend</label>
-            <select class="input" id="f-etq-blend" onchange="Pages._updateProduccionCalculo()">
-              <option value="">-- Elegir blend --</option>
-              ${blends.map(b => '<option value="' + b.id + '" ' + (preselectedBlendId === b.id ? 'selected' : '') + '>' + b.nombre + ' (' + (b.categoria || '—') + ')</option>').join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Cantidad de etiquetas a producir</label>
-            <input type="number" class="input" id="f-etq-cant" value="1" min="1" oninput="Pages._updateProduccionCalculo()">
-          </div>
-
-          <!-- Calculo en tiempo real -->
-          <div id="f-etq-calculo" class="mt-12" style="display:none">
-            <div class="card">
-              <div class="card-header"><h3>Calculo de Produccion</h3></div>
-              <div class="card-body" id="f-etq-calculo-body"></div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
-          <button class="btn btn-gold" onclick="Pages.doProducirEtiqueta()">Producir Etiquetas</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-
-    // Si ya hay blend preseleccionado, mostrar calculo
-    if (preselectedBlendId) {
-      setTimeout(() => this._updateProduccionCalculo(), 50);
-    }
-  },
-
-  /** Actualiza el calculo de especias necesarias en tiempo real */
-  _updateProduccionCalculo() {
-    const blendId = document.getElementById('f-etq-blend').value;
-    const cant = Number(document.getElementById('f-etq-cant').value) || 0;
-    const calcDiv = document.getElementById('f-etq-calculo');
-    const calcBody = document.getElementById('f-etq-calculo-body');
-
-    if (!blendId || cant <= 0) {
-      calcDiv.style.display = 'none';
-      return;
-    }
-
-    const blend = ArcanoDB.getBlend(blendId);
-    if (!blend) { calcDiv.style.display = 'none'; return; }
-
-    const ingredientes = blend.ingredientes || [];
-    let html = '<p class="mb-8">Para producir <b>' + cant + '</b> etiquetas de <b class="text-gold">"' + blend.nombre + '"</b>:</p>';
-    html += '<table class="table"><thead><tr><th>Especia</th><th>Por unidad</th><th>Total necesario</th><th>Stock actual</th><th>Estado</th></tr></thead><tbody>';
-
-    let todoOk = true;
-    for (const ing of ingredientes) {
-      const esp = ArcanoDB.getEspecia(ing.especiaId);
-      if (!esp) continue;
-      const porUnidad = ing.cantidad || 0;
-      const total = porUnidad * cant;
-      const ok = esp.stock >= total;
-      if (!ok) todoOk = false;
-      html += '<tr>' +
-        '<td class="fw7">' + esp.nombre + '</td>' +
-        '<td>' + porUnidad + '</td>' +
-        '<td class="fw7">' + total + '</td>' +
-        '<td>' + esp.stock + '</td>' +
-        '<td>' + (ok
-          ? '<span class="badge badge-green">OK</span>'
-          : '<span class="badge badge-red">Faltan ' + (total - esp.stock) + '</span>') +
-        '</td></tr>';
-    }
-    html += '</tbody></table>';
-
-    // Show etiqueta info
-    var etqStockList = ArcanoDB.getEtiquetasStock();
-    var etq = null;
-    for (var ei = 0; ei < etqStockList.length; ei++) {
-      if (etqStockList[ei].nombre === blend.nombre) { etq = etqStockList[ei]; break; }
-    }
-    html += '<div class="mt-12 card"><div class="card-header"><h3>Etiqueta fisica requerida</h3></div><div class="card-body">';
-    if (etq) {
-      var etqOk = etq.stock >= cant;
-      html += '<div class="list-row"><span class="fw7">Etiqueta "' + etq.nombre + '"</span><span class="' + (etqOk ? 'text-green' : 'text-red') + '">Stock: ' + etq.stock + ' / Necesario: ' + cant + '</span></div>';
-      if (!etqOk) {
-        html += '<p class="text-red mt-8 fw7">Faltan ' + (cant - etq.stock) + ' etiquetas de "' + blend.nombre + '". Compralas en Compras.</p>';
-        todoOk = false;
-      }
-    } else {
-      html += '<p class="text-red fw7">No hay etiquetas "' + blend.nombre + '" en stock. Compralas en Compras primero.</p>';
-      todoOk = false;
-    }
-    html += '</div></div>';
-
-    if (!todoOk) {
-      html += '<p class="text-red mt-8 fw7">No se puede producir. Revisa los faltantes.</p>';
-    } else {
-      html += '<p class="text-green mt-8 fw7">Todo disponible. Se produciran ' + cant + ' etiquetas de "' + blend.nombre + '".</p>';
-    }
-
-    calcBody.innerHTML = html;
-    calcDiv.style.display = 'block';
-  },
-
-  /** Ejecutar la produccion de etiquetas */
-  doProducirEtiqueta() {
-    const blendId = document.getElementById('f-etq-blend').value;
-    const cant = Number(document.getElementById('f-etq-cant').value) || 0;
-    if (!blendId) { alert('Selecciona un blend'); return; }
-    if (cant <= 0) { alert('Cantidad debe ser mayor a 0'); return; }
-
-    const blend = ArcanoDB.getBlend(blendId);
-    try {
-      const result = ArcanoDB.producirBlend(blendId, cant);
-      const nombre = blend ? blend.nombre : 'Blend';
-      alert('Produccion exitosa: ' + cant + ' etiquetas de "' + nombre + '"\n\n' +
-        'Las etiquetas ahora estan en stock y listas para vender.');
-      document.querySelector('.modal-overlay').remove();
-      App.renderPage('etiquetas');
-    } catch (e) {
-      alert(e.message);
-    }
-  },
-
-  /** Modal para vender directamente desde etiquetas */
-  formVenderEtiqueta(preselectedBlendId) {
-    const etiquetas = ArcanoDB.getEtiquetasProducidas();
-    if (etiquetas.length === 0) {
-      alert('No hay etiquetas en stock. Produce blends primero.');
-      return;
-    }
-    const usuarios = ArcanoDB.getUsuarios().filter(u => u.id !== 'admin');
-
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-      <div class="modal">
-        <div class="modal-header">
-          <h3>Vender Etiqueta</h3>
-          <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted text-sm mb-12">Se descuenta del stock la etiqueta con el nombre del blend seleccionado.</p>
-          <div class="form-group">
-            <label>Etiqueta (Blend)</label>
-            <select class="input" id="f-vetq-blend" onchange="Pages._updateVentaEtiquetaPrecio()">
-              <option value="">-- Elegir etiqueta --</option>
-              ${etiquetas.map(e =>
-                '<option value="' + e.blendId + '" ' + (preselectedBlendId === e.blendId ? 'selected' : '') + '>' +
-                e.nombre + ' (stock: ' + e.stock + ')</option>'
-              ).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Tamano del frasco</label>
-            <select class="input" id="f-vetq-tamano" onchange="Pages._updateVentaEtiquetaPrecio()">
-              <option value="chico">Frasco Chico</option>
-              <option value="grande">Frasco Grande</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Cantidad</label>
-            <input type="number" class="input" id="f-vetq-cant" value="1" min="1" oninput="Pages._updateVentaEtiquetaPrecio()">
-          </div>
-          <div class="g2">
-            <div class="form-group">
-              <label>Vendedor</label>
-              <select class="input" id="f-vetq-vendedor">
-                ${usuarios.map(u => '<option value="' + u.id + '">' + u.nombre + '</option>').join('')}
-                ${usuarios.length === 0 ? '<option value="admin">Admin</option>' : ''}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Total</label>
-              <div class="venta-total-box" id="f-vetq-total">$0</div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
-          <button class="btn btn-gold" onclick="Pages.doVenderEtiqueta()">Registrar Venta</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-
-    if (preselectedBlendId) {
-      setTimeout(() => this._updateVentaEtiquetaPrecio(), 50);
-    }
-  },
-
-  /** Actualiza precio total en tiempo real al vender etiqueta */
-  _updateVentaEtiquetaPrecio() {
-    const blendId = document.getElementById('f-vetq-blend').value;
-    const tamano = document.getElementById('f-vetq-tamano').value;
-    const cant = Number(document.getElementById('f-vetq-cant').value) || 0;
-    const totalEl = document.getElementById('f-vetq-total');
-    if (!blendId || cant <= 0) { totalEl.textContent = '$0'; return; }
-
-    const blend = ArcanoDB.getBlend(blendId);
-    if (!blend) { totalEl.textContent = '$0'; return; }
-    const precio = tamano === 'grande' ? (blend.precioGrande || 0) : (blend.precioChico || 0);
-    totalEl.textContent = '$' + (precio * cant).toLocaleString();
-  },
-
-  /** Ejecutar venta de etiqueta */
-  doVenderEtiqueta() {
-    const blendId = document.getElementById('f-vetq-blend').value;
-    const tamano = document.getElementById('f-vetq-tamano').value;
-    const cant = Number(document.getElementById('f-vetq-cant').value) || 0;
-    const vendedorId = document.getElementById('f-vetq-vendedor').value;
-
-    if (!blendId) { alert('Selecciona una etiqueta'); return; }
-    if (cant <= 0) { alert('Cantidad debe ser mayor a 0'); return; }
-
-    const blend = ArcanoDB.getBlend(blendId);
-    if (!blend) { alert('Blend no encontrado'); return; }
-    const precio = tamano === 'grande' ? (blend.precioGrande || 0) : (blend.precioChico || 0);
-
-    const ventaData = {
-      fecha: new Date().toISOString().slice(0, 10),
-      vendedorId: vendedorId || 'admin',
-      items: [{
-        tipo: 'blend',
-        productoId: blendId,
-        tamano: tamano,
-        cantidad: cant,
-        precioUnitario: precio
-      }],
-      total: precio * cant
-    };
-
-    try {
-      ArcanoDB.saveVenta(ventaData);
-      alert('Venta registrada: ' + cant + ' etiqueta' + (cant > 1 ? 's' : '') + ' de "' + blend.nombre + '" (' + tamano + ')\n' +
-        'Stock descontado de la etiqueta "' + blend.nombre + '".');
-      document.querySelector('.modal-overlay').remove();
-      App.renderPage('etiquetas');
-    } catch (e) {
-      alert(e.message);
-    }
   }
 };

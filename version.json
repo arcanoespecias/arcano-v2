@@ -1,1 +1,1 @@
-{"version": "2.1.0", "build": "2026-07-17", "notes": "Fixed null safety, nextId crash, added etiquetas in compras"}
+{"version": "2.1.0", "build": "2026-07-17", "notes": "Stock dual: bolsa grs + frascos. Migracion automatica v2.0→v2.1"}

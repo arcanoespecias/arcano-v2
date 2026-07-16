@@ -1,6 +1,8 @@
-/* ===================== ARCANO V2 — DATA LAYER =====================
-   Single source of truth. DB_KEY = 'arcano_v2' everywhere.
-   Firebase-first: every write goes to Firebase RTDB, then mirrors to localStorage.
+/* ===================== ARCANO V2.1 — DATA LAYER =====================
+   Stock dual:
+     - stockBolsa: gramos de especia cruda en bolsa (materia prima)
+     - stockFrascos: unidades de producto listo para vender (frascos)
+   Flujo: Compras(grs) → Produccion(consume grs+etiquetas) → Frascos → Ventas
    ===================== */
 
 const DB_KEY = 'arcano_v2';
@@ -46,16 +48,37 @@ function _cleanNulls() {
   }
 }
 
+/* ---------- Migrate v2.0 (single stock) → v2.1 (bolsa+frascos) ---------- */
+function _migrateV2toV21() {
+  // Especias: old 'stock' (units) → stockBolsa: 0, stockFrascos: old stock
+  var espKeys = Object.keys(_db.especias || {});
+  for (var i = 0; i < espKeys.length; i++) {
+    var esp = _db.especias[espKeys[i]];
+    if (!esp || typeof esp !== 'object') continue;
+    if (esp.stockBolsa === undefined) esp.stockBolsa = 0;
+    if (esp.stockFrascos === undefined) {
+      esp.stockFrascos = (typeof esp.stock === 'number') ? esp.stock : 0;
+    }
+  }
+  // Blends: old 'stock' was already frascos concept
+  var blKeys = Object.keys(_db.blends || {});
+  for (var i = 0; i < blKeys.length; i++) {
+    var bl = _db.blends[blKeys[i]];
+    if (!bl || typeof bl !== 'object') continue;
+    if (bl.stockFrascos === undefined) {
+      bl.stockFrascos = (typeof bl.stock === 'number') ? bl.stock : 0;
+    }
+  }
+}
+
 /* ---------- Ensure DB structure is valid ---------- */
 function _ensureStructure() {
   if (!_db) _db = {};
   if (typeof _db !== 'object' || Array.isArray(_db)) _db = {};
-  // Clean any null entries first (from corrupted Firebase data)
   _cleanNulls();
   if (!_db.meta || !_db.meta.nextId) {
     _db.meta = { nextId: Object.assign({}, DEFAULT_IDS) };
   } else {
-    // Fill any missing ID counters
     for (var k in DEFAULT_IDS) {
       if (typeof _db.meta.nextId[k] !== 'number') {
         _db.meta.nextId[k] = DEFAULT_IDS[k];
@@ -69,15 +92,16 @@ function _ensureStructure() {
   if (!_db.ventas) _db.ventas = {};
   if (!_db.usuarios) _db.usuarios = { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } };
   if (!_db.etiquetas) _db.etiquetas = {};
+  // Run migration after structure is ensured
+  _migrateV2toV21();
 }
 
 function _emptyDB() {
-  var db = {
+  return {
     especias: {}, blends: {}, producciones: {}, compras: {}, ventas: {}, etiquetas: {},
     usuarios: { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } },
     meta: { nextId: Object.assign({}, DEFAULT_IDS) }
   };
-  return db;
 }
 
 /* ---------- Firebase ---------- */
@@ -90,7 +114,6 @@ function _initFirebase() {
     if (typeof firebase === 'undefined') { console.warn('[DB] Firebase SDK not loaded'); return; }
     _firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDb = firebase.database();
-    console.log('[DB] Firebase initialized');
   } catch (e) { console.error('[DB] Firebase init error:', e); }
 }
 
@@ -101,9 +124,7 @@ function _fbRef() {
 
 function _saveToFirebase() {
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(function() {
-    _doFirebaseSave();
-  }, 300);
+  _saveTimer = setTimeout(function() { _doFirebaseSave(); }, 300);
 }
 
 function _saveToFirebaseImmediate() {
@@ -117,7 +138,6 @@ function _doFirebaseSave() {
   var ref = _fbRef();
   if (!ref) { _saveToLocal(); return; }
   ref.set(_db).then(function() {
-    console.log('[DB] Saved to Firebase');
     _saveToLocal();
   }).catch(function(err) {
     console.error('[DB] Firebase save error:', err);
@@ -137,11 +157,9 @@ function _loadFromFirebase() {
       if (snap.exists() && snap.val()) {
         var data = snap.val();
         if (typeof data !== 'object' || Array.isArray(data)) {
-          console.warn('[DB] Invalid Firebase data, starting fresh');
           _db = _emptyDB();
         } else {
           _db = data;
-          console.log('[DB] Loaded from Firebase');
         }
       } else {
         _db = _emptyDB();
@@ -181,12 +199,9 @@ async function initDB() {
     ref.on('value', function(snap) {
       if (snap.exists() && snap.val()) {
         var data = snap.val();
-        if (typeof data !== 'object' || Array.isArray(data)) {
-          console.warn('[DB] Realtime listener: invalid data, ignoring');
-          return;
-        }
+        if (typeof data !== 'object' || Array.isArray(data)) return;
         _db = data;
-        _ensureStructure(); // cleans nulls + ensures structure
+        _ensureStructure();
         _saveToLocal();
         _notify('remote_change', '*', '*');
       }
@@ -206,18 +221,18 @@ function onDBChange(fn) {
 }
 
 function nextId(collection) {
-  _ensureStructure(); // CRITICAL: prevents undefined meta
+  _ensureStructure();
   var id = String(_db.meta.nextId[collection] || 1);
   _db.meta.nextId[collection] = (_db.meta.nextId[collection] || 0) + 1;
   _saveToFirebase();
   return id;
 }
 
-/* ==================== ESPECIAS ==================== */
-
 function _filterValid(arr) {
   return arr.filter(function(item) { return item != null && typeof item === 'object'; });
 }
+
+/* ==================== ESPECIAS ==================== */
 
 function getEspecias() {
   return _filterValid(Object.values(getDB().especias)).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
@@ -234,8 +249,11 @@ function saveEspecia(data) {
   if (isNew) {
     data.id = nextId('especias');
     data.creado = new Date().toISOString();
+    data.stockBolsa = 0;
+    data.stockFrascos = 0;
   }
-  data.stock = Number(data.stock) || 0;
+  data.stockBolsa = Number(data.stockBolsa) || 0;
+  data.stockFrascos = Number(data.stockFrascos) || 0;
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   _db.especias[data.id] = data;
@@ -270,8 +288,9 @@ function saveBlend(data) {
     data.id = nextId('blends');
     data.creado = new Date().toISOString();
     data.ingredientes = data.ingredientes || [];
+    data.stockFrascos = 0;
   }
-  data.stock = Number(data.stock) || 0;
+  data.stockFrascos = Number(data.stockFrascos) || 0;
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   _db.blends[data.id] = data;
@@ -280,7 +299,56 @@ function saveBlend(data) {
   return data;
 }
 
-/** Produce blend: consume especias + etiquetas fisicas, add blend stock. */
+/* ==================== PRODUCCION ==================== */
+
+/** Producir frascos de ESPECIA pura: consume grs de bolsa + etiquetas, agrega frascos */
+function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad) {
+  _ensureStructure();
+  var esp = _db.especias[especiaId];
+  if (!esp) throw new Error('Especia no encontrada');
+  grsPorFrasco = Number(grsPorFrasco) || 0;
+  cantidad = Number(cantidad) || 0;
+  if (grsPorFrasco <= 0) throw new Error('Los gramos por frasco deben ser mayor a 0');
+  if (cantidad <= 0) throw new Error('La cantidad de frascos debe ser mayor a 0');
+
+  var grsTotal = grsPorFrasco * cantidad;
+  if ((esp.stockBolsa || 0) < grsTotal) {
+    throw new Error('Stock insuficiente en BOLSA de "' + esp.nombre + '". Necesario: ' + grsTotal + 'grs, Disponible: ' + (esp.stockBolsa || 0) + 'grs');
+  }
+
+  // Check etiqueta
+  var etiqueta = _findEtiquetaByNombre(esp.nombre);
+  var detalleEtiqueta = null;
+  if (etiqueta) {
+    if (etiqueta.stock < cantidad) {
+      throw new Error('Stock insuficiente de ETIQUETAS "' + esp.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etiqueta.stock);
+    }
+    etiqueta.stock -= cantidad;
+    detalleEtiqueta = { etiquetaNombre: esp.nombre, cantidadConsumida: cantidad, stockRestante: etiqueta.stock };
+  } else {
+    throw new Error('No hay etiquetas fisicas registradas para "' + esp.nombre + '". Compralas en Compras primero.');
+  }
+
+  // Consume bolsa, add frascos
+  esp.stockBolsa = (esp.stockBolsa || 0) - grsTotal;
+  esp.stockFrascos = (esp.stockFrascos || 0) + cantidad;
+
+  // Record
+  var prodId = nextId('producciones');
+  var produccion = {
+    id: prodId, tipo: 'especia', especiaId: especiaId, especiaNombre: esp.nombre,
+    categoria: esp.categoria || '', grsPorFrasco: grsPorFrasco, cantidad: cantidad,
+    grsConsumidos: grsTotal, etiquetaUsada: detalleEtiqueta,
+    fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
+  };
+  _db.producciones[prodId] = produccion;
+  _saveToFirebase();
+  _notify('create', 'producciones', prodId);
+  _notify('update', 'especias', especiaId);
+  return { especia: esp, produccion: produccion };
+}
+
+/** Producir frascos de BLEND: consume grs de especias (bolsa) + etiquetas, agrega frascos al blend */
 function producirBlend(blendId, cantidad) {
   _ensureStructure();
   var blend = _db.blends[blendId];
@@ -292,30 +360,29 @@ function producirBlend(blendId, cantidad) {
   var detalleIngredientes = [];
   var detalleEtiqueta = null;
 
-  // 1. Check & consume especias stock
+  // 1. Check especias stockBolsa (grams)
   for (var i = 0; i < ingredientes.length; i++) {
     var ing = ingredientes[i];
     var esp = _db.especias[ing.especiaId];
     if (!esp) throw new Error('Especia no encontrada: ' + ing.especiaId);
-    var needed = (ing.cantidad || 0) * cantidad;
-    if (esp.stock < needed) {
-      throw new Error('Stock insuficiente de "' + esp.nombre + '". Necesario: ' + needed + ', Disponible: ' + esp.stock);
+    var grsNeeded = (ing.cantidad || 0) * cantidad;
+    if ((esp.stockBolsa || 0) < grsNeeded) {
+      throw new Error('Stock insuficiente en BOLSA de "' + esp.nombre + '". Necesario: ' + grsNeeded + 'grs, Disponible: ' + (esp.stockBolsa || 0) + 'grs');
     }
   }
+  // 2. Consume especias from bolsa
   for (var i = 0; i < ingredientes.length; i++) {
     var ing = ingredientes[i];
     var esp = _db.especias[ing.especiaId];
-    var needed = (ing.cantidad || 0) * cantidad;
-    esp.stock -= needed;
+    var grsNeeded = (ing.cantidad || 0) * cantidad;
+    esp.stockBolsa = (esp.stockBolsa || 0) - grsNeeded;
     detalleIngredientes.push({
-      especiaId: ing.especiaId,
-      especiaNombre: esp.nombre,
-      cantidadPorUnidad: ing.cantidad || 0,
-      cantidadTotal: needed
+      especiaId: ing.especiaId, especiaNombre: esp.nombre,
+      grsPorFrasco: ing.cantidad || 0, grsTotal: grsNeeded
     });
   }
 
-  // 2. Check & consume etiqueta fisica (por nombre del blend)
+  // 3. Check & consume etiqueta
   var etiqueta = _findEtiquetaByNombre(blend.nombre);
   if (etiqueta) {
     if (etiqueta.stock < cantidad) {
@@ -324,28 +391,24 @@ function producirBlend(blendId, cantidad) {
     etiqueta.stock -= cantidad;
     detalleEtiqueta = { etiquetaNombre: etiqueta.nombre, cantidadConsumida: cantidad, stockRestante: etiqueta.stock };
   } else {
-    throw new Error('No hay etiquetas fisicas registradas para "' + blend.nombre + '". Compra las etiquetas primero en Compras.');
+    throw new Error('No hay etiquetas fisicas registradas para "' + blend.nombre + '". Compralas en Compras primero.');
   }
 
-  // 3. Add blend stock
-  blend.stock += cantidad;
+  // 4. Add blend frascos
+  blend.stockFrascos = (blend.stockFrascos || 0) + cantidad;
 
-  // 4. Create produccion record
+  // 5. Record
   var prodId = nextId('producciones');
   var produccion = {
-    id: prodId, blendId: blendId, blendNombre: blend.nombre,
+    id: prodId, tipo: 'blend', blendId: blendId, blendNombre: blend.nombre,
     categoria: blend.categoria || '', cantidad: cantidad,
-    ingredientesUsados: detalleIngredientes,
-    etiquetaUsada: detalleEtiqueta,
-    fecha: new Date().toISOString().slice(0, 10),
-    creado: new Date().toISOString()
+    ingredientesUsados: detalleIngredientes, etiquetaUsada: detalleEtiqueta,
+    fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = produccion;
-
   _saveToFirebase();
   _notify('create', 'producciones', prodId);
   _notify('update', 'blends', blendId);
-  console.log('[DB] Produccion: ' + blend.nombre + ' x' + cantidad + ' (etiqueta consumida)');
   return { blend: blend, produccion: produccion };
 }
 
@@ -357,7 +420,7 @@ function deleteBlend(id) {
   return true;
 }
 
-/* ==================== ETIQUETAS FISICAS (compradas) ==================== */
+/* ==================== ETIQUETAS FISICAS ==================== */
 
 function _findEtiquetaByNombre(nombre) {
   if (!_db.etiquetas) return null;
@@ -369,11 +432,9 @@ function _findEtiquetaByNombre(nombre) {
 }
 
 function getEtiquetasStock() {
-  var db = getDB();
-  return _filterValid(Object.values(db.etiquetas || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+  return _filterValid(Object.values(getDB().etiquetas || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 }
 
-/** Find or create an etiqueta entry by nombre, return it. */
 function _getOrCreateEtiqueta(nombre) {
   if (!_db.etiquetas) _db.etiquetas = {};
   var existing = _findEtiquetaByNombre(nombre);
@@ -396,14 +457,25 @@ function deleteProduccion(id) {
   return true;
 }
 
-/** Get blends with stock > 0 (etiquetas producidas listas para vender). */
-function getEtiquetasProducidas() {
-  return _filterValid(Object.values(getDB().blends || {}))
-    .filter(function(b) { return (b.stock || 0) > 0; })
-    .map(function(b) {
-      return { blendId: b.id, nombre: b.nombre, categoria: b.categoria || '', stock: b.stock, precioChico: b.precioChico || 0, precioGrande: b.precioGrande || 0 };
-    })
-    .sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+/** Todos los productos con frascos listos para vender (especias + blends) */
+function getFrascosParaVender() {
+  var db = getDB();
+  var items = [];
+  var espKeys = Object.keys(db.especias || {});
+  for (var i = 0; i < espKeys.length; i++) {
+    var e = db.especias[espKeys[i]];
+    if (e && typeof e === 'object' && (e.stockFrascos || 0) > 0) {
+      items.push({ tipo: 'especia', id: e.id, nombre: e.nombre || '', categoria: e.categoria || '', stockFrascos: e.stockFrascos || 0, precioChico: e.precioChico || 0, precioGrande: e.precioGrande || 0 });
+    }
+  }
+  var blKeys = Object.keys(db.blends || {});
+  for (var i = 0; i < blKeys.length; i++) {
+    var b = db.blends[blKeys[i]];
+    if (b && typeof b === 'object' && (b.stockFrascos || 0) > 0) {
+      items.push({ tipo: 'blend', id: b.id, nombre: b.nombre || '', categoria: b.categoria || '', stockFrascos: b.stockFrascos || 0, precioChico: b.precioChico || 0, precioGrande: b.precioGrande || 0 });
+    }
+  }
+  return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
 /* ==================== COMPRAS ==================== */
@@ -426,12 +498,11 @@ function saveCompra(data) {
     for (var i = 0; i < data.items.length; i++) {
       var item = data.items[i];
       if (item.tipo === 'etiqueta') {
-        // Add stock to etiquetas fisicas
         var etq = _getOrCreateEtiqueta(item.etiquetaNombre);
         etq.stock += Number(item.cantidad) || 0;
-      } else if (item.especiaId && _db.especias[item.especiaId]) {
-        // Add stock to especias
-        _db.especias[item.especiaId].stock += Number(item.cantidad) || 0;
+      } else if (item.tipo === 'especia' && item.especiaId && _db.especias[item.especiaId]) {
+        // Add to stockBolsa (grams of raw spice)
+        _db.especias[item.especiaId].stockBolsa = (_db.especias[item.especiaId].stockBolsa || 0) + (Number(item.cantidad) || 0);
       }
     }
   }
@@ -468,14 +539,21 @@ function saveVenta(data) {
   if (isNew) {
     for (var i = 0; i < data.items.length; i++) {
       var item = data.items[i];
-      var producto = item.tipo === 'especia' ? _db.especias[item.productoId] : _db.blends[item.productoId];
-      if (!producto) throw new Error('Producto no encontrado: ' + item.tipo + '/' + item.productoId);
+      var producto;
+      if (item.tipo === 'especia') {
+        producto = _db.especias[item.productoId];
+        if (!producto) throw new Error('Especia no encontrada: ' + item.productoId);
+      } else {
+        producto = _db.blends[item.productoId];
+        if (!producto) throw new Error('Blend no encontrado: ' + item.productoId);
+      }
       var cant = Number(item.cantidad) || 0;
-      if (producto.stock < cant) {
-        throw new Error('Stock insuficiente de "' + producto.nombre + '". Solicitado: ' + cant + ', Disponible: ' + producto.stock);
+      var stockDisponible = (producto.stockFrascos || 0);
+      if (stockDisponible < cant) {
+        throw new Error('Stock insuficiente de FRASCOS de "' + producto.nombre + '". Solicitado: ' + cant + ', Disponible: ' + stockDisponible);
       }
       item.productoNombre = producto.nombre;
-      producto.stock -= cant;
+      producto.stockFrascos = (producto.stockFrascos || 0) - cant;
     }
   }
   _db.ventas[data.id] = data;
@@ -551,13 +629,15 @@ function getStats() {
   var ventasHoy = ventas.filter(function(v) { return v.fecha === today; });
   var ventasMes = ventas.filter(function(v) { return v.fecha && v.fecha.startsWith(mes); });
   var comprasMes = compras.filter(function(c) { return c.fecha && c.fecha.startsWith(mes); });
-
-  var etqBajoStock = etiquetas.filter(function(e) { return e.stock <= 5; });
+  var etqBajoStock = etiquetas.filter(function(e) { return (e.stock || 0) <= 5; });
+  var totalFrascos = especias.reduce(function(s, e) { return s + (e.stockFrascos || 0); }, 0) +
+                      blends.reduce(function(s, b) { return s + (b.stockFrascos || 0); }, 0);
 
   return {
     totalEspecias: especias.length,
     totalBlends: blends.length,
     totalEtiquetas: etiquetas.length,
+    totalFrascos: totalFrascos,
     totalVentas: ventas.length,
     totalCompras: compras.length,
     ventasHoy: ventasHoy.length,
@@ -565,8 +645,9 @@ function getStats() {
     ventasMes: ventasMes.length,
     totalVentasMes: ventasMes.reduce(function(s, v) { return s + (Number(v.total) || 0); }, 0),
     totalComprasMes: comprasMes.reduce(function(s, c) { return s + (Number(c.total) || 0); }, 0),
-    especiasBajoStock: especias.filter(function(e) { return e.stock <= 3; }),
-    blendsBajoStock: blends.filter(function(b) { return b.stock <= 3; }),
+    especiasBajoStockBolsa: especias.filter(function(e) { return (e.stockBolsa || 0) <= 50; }),
+    especiasBajoStockFrascos: especias.filter(function(e) { return (e.stockFrascos || 0) <= 3; }),
+    blendsBajoStockFrascos: blends.filter(function(b) { return (b.stockFrascos || 0) <= 3; }),
     etiquetasBajoStock: etqBajoStock
   };
 }
@@ -575,9 +656,10 @@ function getStats() {
 window.ArcanoDB = {
   initDB: initDB, getDB: getDB, onDBChange: onDBChange, nextId: nextId,
   getEspecias: getEspecias, getEspecia: getEspecia, saveEspecia: saveEspecia, deleteEspecia: deleteEspecia,
-  getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend, producirBlend: producirBlend,
+  getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
+  producirEspeciaFrascos: producirEspeciaFrascos, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
-  getEtiquetasStock: getEtiquetasStock, getEtiquetasProducidas: getEtiquetasProducidas, _cleanNulls: _cleanNulls,
+  getEtiquetasStock: getEtiquetasStock, getFrascosParaVender: getFrascosParaVender, _cleanNulls: _cleanNulls,
   getCompras: getCompras, saveCompra: saveCompra, deleteCompra: deleteCompra,
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
   getUsuarios: getUsuarios, getUsuario: getUsuario, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
