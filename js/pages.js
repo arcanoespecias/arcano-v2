@@ -60,7 +60,8 @@ const Pages = {
     var blends = ArcanoDB.getBlends();
     var h = '<div class="page-actions">' +
       '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button>' +
-      '<button class="btn btn-outline" onclick="Pages.formBlend()">+ Blend</button></div>';
+      '<button class="btn btn-outline" onclick="Pages.formBlend()">+ Blend</button>' +
+      '<button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button></div>';
 
     // --- ESPECIAS ---
     h += '<div class="card mt-16"><div class="card-header"><h3>Especias</h3></div><div class="card-body">';
@@ -95,13 +96,14 @@ const Pages = {
     if (blends.length === 0) {
       h += '<p class="text-muted text-center">Sin blends</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Ingredientes</th><th>$Chico</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Chico</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
       for (var i = 0; i < blends.length; i++) {
         var b = blends[i];
         var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
         h += '<tr>' +
           '<td class="fw7">' + b.nombre + '</td>' +
           '<td><span class="badge badge-blue">' + (b.categoria||'—') + '</span></td>' +
+          '<td class="text-sm text-muted">' + (b.region||'—') + '</td>' +
           '<td class="text-sm text-muted">' + (ingN||'—') + '</td>' +
           '<td>$' + (b.precioChico||0).toLocaleString() + '</td>' +
           '<td>$' + (b.precioGrande||0).toLocaleString() + '</td>' +
@@ -204,11 +206,15 @@ const Pages = {
       '<button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
         '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-bl-nombre" value="' + (isEdit ? bl.nombre : '') + '" placeholder="Ej: Curry Casero" ' + (isEdit ? 'readonly style="opacity:0.6"' : '') + '></div>' +
-        '<div class="form-group"><label>Categoria</label><select class="input" id="f-bl-cat">' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label><select class="input" id="f-bl-cat">' +
           '<option value="Comidas"' + (isEdit && bl.categoria==='Comidas' ? ' selected' : '') + '>Comidas</option>' +
           '<option value="Infusiones"' + (isEdit && bl.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
           '<option value="Cocteleria"' + (isEdit && bl.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
         '</select></div>' +
+          '<div class="form-group"><label>Region (opcional)</label><input type="text" class="input" id="f-bl-region" value="' + (isEdit ? (bl.region||'') : '') + '" placeholder="Ej: India"></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Uso (opcional)</label><input type="text" class="input" id="f-bl-uso" value="' + (isEdit ? (bl.uso||'') : '') + '" placeholder="Ej: Carnes, Currys"></div>' +
         '<div class="g2"><div class="form-group"><label>Precio Chico ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="form-group"><label>Ingredientes</label><div id="blend-ings"></div>' +
@@ -263,6 +269,8 @@ const Pages = {
       var data = {
         nombre: nombre,
         categoria: document.getElementById('f-bl-cat').value,
+        region: (document.getElementById('f-bl-region') || {}).value ? document.getElementById('f-bl-region').value.trim() : '',
+        uso: (document.getElementById('f-bl-uso') || {}).value ? document.getElementById('f-bl-uso').value.trim() : '',
         precioChico: Number(document.getElementById('f-bl-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-bl-pg').value) || 0,
         ingredientes: ingredientes
@@ -816,6 +824,252 @@ const Pages = {
     }
     h += '</div></div>';
     container.innerHTML = h;
+  },
+
+  /* ================================================================
+     IMPORTAR EXCEL
+     ================================================================ */
+  formImportarExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' +
+      '<div class="modal-header"><h3>Importar Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi tu archivo Excel con las hojas <b>ESPECIAS</b> y <b>BLENDS</b>. El sistema creara los productos automaticamente.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-import-file" accept=".xlsx,.xls"></div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Grs por Frasco Chico</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
+          '<div class="form-group"><label>Grs por Frasco Grande</label><input type="number" class="input" id="f-import-gg" value="80" min="1"></div>' +
+        '</div>' +
+        '<div id="f-import-status" class="mt-12"></div>' +
+        '<div id="f-import-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-import-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-import-file');
+    var parseBtn = document.getElementById('btn-parse-excel');
+    var statusDiv = document.getElementById('f-import-status');
+    var previewDiv = document.getElementById('f-import-preview');
+    var footerDiv = document.getElementById('f-import-footer');
+
+    // Enable parse button when file selected
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    // Parse Excel
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS sheet
+          var especiasList = [];
+          var espSheet = workbook.Sheets['ESPECIAS'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              var nombre = (row[0] || '').toString().trim();
+              if (!nombre || nombre.toLowerCase() === 'especia / ingrediente') continue;
+              especiasList.push({ nombre: nombre, categoria: 'Comidas' });
+            }
+          }
+
+          // Parse BLENDS sheet
+          var blendsList = [];
+          var blSheet = workbook.Sheets['BLENDS'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlend = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              var firstCol = row[0] ? (row[0] || '').toString().trim() : '';
+              var ingCol = row[3] ? (row[3] || '').toString().trim() : '';
+
+              if (firstCol) {
+                // New blend row — save previous if any
+                if (currentBlend && currentBlend.ingredientes.length > 0) {
+                  blendsList.push(currentBlend);
+                }
+                currentBlend = {
+                  nombre: firstCol,
+                  region: (row[1] || '').toString().trim(),
+                  uso: (row[2] || '').toString().trim(),
+                  ingredientes: []
+                };
+              }
+
+              // This row has an ingredient (either on the blend header row or on subsequent rows)
+              if (currentBlend && ingCol) {
+                currentBlend.ingredientes.push({
+                  especia: ingCol,
+                  g: Number(row[4]) || 0,
+                  pct: Number(row[5]) || 0
+                });
+              }
+            }
+            if (currentBlend && currentBlend.ingredientes.length > 0) {
+              blendsList.push(currentBlend);
+            }
+          }
+
+          if (especiasList.length === 0 && blendsList.length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos. Asegurate que el Excel tenga las hojas ESPECIAS y BLENDS.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Check for existing
+          var existEsp = 0;
+          var existBl = 0;
+          var allEspecias = ArcanoDB.getEspecias();
+          var allBlends = ArcanoDB.getBlends();
+          for (var i = 0; i < especiasList.length; i++) {
+            if (ArcanoDB.findEspeciaByName(especiasList[i].nombre)) existEsp++;
+          }
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var k = 0; k < allBlends.length; k++) {
+              if (allBlends[k].nombre.toLowerCase() === blendsList[j].nombre.toLowerCase()) { existBl++; break; }
+            }
+          }
+
+          // Check unresolved ingredients (mirroring db.js findEspeciaByName logic)
+          var unresolved = [];
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var ii = 0; ii < blendsList[j].ingredientes.length; ii++) {
+              var ingName = blendsList[j].ingredientes[ii].especia;
+              var found = false;
+              // Check existing especias in DB
+              if (ArcanoDB.findEspeciaByName(ingName)) { found = true; }
+              // Check in especiasList (to be created)
+              if (!found) {
+                var target = ingName.trim().toLowerCase();
+                for (var ei = 0; ei < especiasList.length; ei++) {
+                  var ename = especiasList[ei].nombre.trim().toLowerCase();
+                  if (ename === target) { found = true; break; }
+                  if (ename.indexOf(target) === 0 || target.indexOf(ename) === 0) { found = true; break; }
+                  // Word overlap
+                  var words = target.split(/[\s()\/,]+/).filter(function(w){return w.length>=4});
+                  for (var wi = 0; wi < words.length; wi++) {
+                    if (ename.indexOf(words[wi]) >= 0) { found = true; break; }
+                  }
+                  if (found) break;
+                }
+              }
+              if (!found) unresolved.push(blendsList[j].nombre + ' -> ' + ingName);
+            }
+          }
+
+          // Show preview
+          var gramosChico = Number(document.getElementById('f-import-gc').value) || 30;
+          var gramosGrande = Number(document.getElementById('f-import-gg').value) || 80;
+
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + especiasList.length + '</div><div class="stat-label">Especias en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + blendsList.length + '</div><div class="stat-label">Blends en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="font-size:1rem">' + gramosChico + 'g / ' + gramosGrande + 'g</div><div class="stat-label">Frasco Ch/Gr</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:' + (unresolved.length > 0 ? 'var(--red)' : 'var(--green)') + '">' + unresolved.length + '</div><div class="stat-label">Ingredientes sin resolver</div></div>' +
+          '</div>';
+
+          if (existEsp > 0 || existBl > 0) {
+            phtml += '<p class="text-sm text-muted mb-8">' +
+              (existEsp > 0 ? '<span class="badge badge-yellow mr-8">' + existEsp + ' especias ya existen (se omiten)</span>' : '') +
+              (existBl > 0 ? '<span class="badge badge-yellow mr-8">' + existBl + ' blends ya existen (se omiten)</span>' : '') +
+            '</p>';
+          }
+
+          if (unresolved.length > 0) {
+            phtml += '<div class="mb-8"><p class="text-red fw7 mb-4">Ingredientes que no se pudieron resolver:</p>' +
+              '<div style="max-height:120px;overflow-y:auto;font-size:0.78rem;color:var(--red)">' +
+              unresolved.map(function(u) { return '<div>' + u + '</div>'; }).join('') +
+              '</div><p class="text-xs text-muted mt-4">Estos ingredientes no se vincularan a los blends.</p></div>';
+          }
+
+          // Sample blends
+          phtml += '<p class="fw7 mt-8 mb-4">Ejemplos de blends a crear:</p>';
+          var sampleBlends = blendsList.slice(0, 5);
+          for (var s = 0; s < sampleBlends.length; s++) {
+            var sb = sampleBlends[s];
+            phtml += '<div class="list-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+              '<span class="fw7 text-gold">' + sb.nombre + '</span>' +
+              '<span class="text-xs text-muted">' + (sb.region ? sb.region + ' | ' : '') + (sb.uso || '') + ' | ' + sb.ingredientes.length + ' ingredientes</span>' +
+              '<span class="text-xs text-muted">' + sb.ingredientes.map(function(ing) {
+                var gc = Math.round((ing.g / 500) * gramosChico * 100) / 100;
+                return ing.especia + ' ' + ing.g + 'g → ' + gc + 'g/frasco';
+              }).join(' + ') + '</span></div>';
+          }
+          if (blendsList.length > 5) phtml += '<p class="text-xs text-muted mt-4">... y ' + (blendsList.length - 5) + ' blends mas</p>';
+
+          phtml += '</div></div>';
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          // Replace footer with Confirm button
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-import">Confirmar Importacion (' + (especiasList.length - existEsp) + ' esp + ' + (blendsList.length - existBl) + ' blends)</button>';
+
+          document.getElementById('btn-do-import').addEventListener('click', function() {
+            var gc = Number(document.getElementById('f-import-gc').value) || 30;
+            var gg = Number(document.getElementById('f-import-gg').value) || 80;
+            var btn = document.getElementById('btn-do-import');
+            btn.disabled = true;
+            btn.textContent = 'Importando...';
+
+            try {
+              var resultado = ArcanoDB.importFromExcelData(especiasList, blendsList, gc, gg);
+              var rhtml = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.especiasCreadas + '</div><div class="stat-label">Especias Creadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.blendsCreados + '</div><div class="stat-label">Blends Creados</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.especiasExistentes + '</div><div class="stat-label">Especias Ya Existentes</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.blendsExistentes + '</div><div class="stat-label">Blends Ya Existentes</div></div>' +
+                '</div>';
+              if (resultado.ingredientesNoResueltos.length > 0) {
+                rhtml += '<p class="text-xs text-muted mt-8">Ingredientes no resueltos: ' + resultado.ingredientesNoResueltos.length + '</p>';
+              }
+              rhtml += '</div></div>';
+              previewDiv.innerHTML = rhtml;
+
+              // Close after 2s
+              setTimeout(function() {
+                modal.remove();
+                App.renderPage('productos');
+              }, 2000);
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
   },
 
   /* ================================================================

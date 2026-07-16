@@ -696,6 +696,147 @@ function getFrascosParaVender() {
   return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
+/* ==================== EXCEL IMPORT ==================== */
+
+/** Find especia by name with flexible matching (exact, prefix, contains, word overlap) */
+function findEspeciaByName(nombre) {
+  if (!nombre) return null;
+  var target = nombre.trim().toLowerCase();
+  var keys = Object.keys(_db.especias || {});
+  // 1. Exact match
+  for (var i = 0; i < keys.length; i++) {
+    var e = _db.especias[keys[i]];
+    if (e && (e.nombre || '').trim().toLowerCase() === target) return e;
+  }
+  // 2. Especia name starts with target (e.g. "Color" matches "Color (achiote/...)")
+  for (var i = 0; i < keys.length; i++) {
+    var e = _db.especias[keys[i]];
+    if (e && (e.nombre || '').trim().toLowerCase().indexOf(target) === 0) return e;
+  }
+  // 3. Target is contained in especia name
+  for (var i = 0; i < keys.length; i++) {
+    var e = _db.especias[keys[i]];
+    if (e && (e.nombre || '').trim().toLowerCase().indexOf(target) >= 0) return e;
+  }
+  // 4. Word overlap: any word (len>=4) from target appears in especia name
+  var targetWords = target.split(/[\s()\/,]+/).filter(function(w) { return w.length >= 4; });
+  for (var w = 0; w < targetWords.length; w++) {
+    for (var i = 0; i < keys.length; i++) {
+      var e = _db.especias[keys[i]];
+      if (e && (e.nombre || '').trim().toLowerCase().indexOf(targetWords[w]) >= 0) return e;
+    }
+  }
+  return null;
+}
+
+/** Auto-detect categoria from blend USO field */
+function _categoriaFromUso(uso) {
+  if (!uso) return 'Comidas';
+  var u = uso.toLowerCase();
+  // Cocteleria keywords
+  if (/\b(gin|ron|vodka|whisky|mojito|mule|vermouth|aperitif|coctel)\b/.test(u)) return 'Cocteleria';
+  // Infusiones keywords
+  if (/\b(relajant|sueño|digestiv|energiz|té|calidez|respiratorio|meditaci|antioxidant|bienestar|infusi)\b/.test(u)) return 'Infusiones';
+  return 'Comidas';
+}
+
+/**
+ * Import especias and blends from parsed Excel data.
+ * Returns { especiasCreadas: N, blendsCreados: N, blendsParciales: N, errores: [] }
+ *
+ * especiasList: [{ nombre, categoria? }]
+ * blendsList:   [{ nombre, region, uso, categoria, ingredientes: [{ especia, g, pct }] }]
+ * gramosChico:  default grams for frasco chico (e.g. 30)
+ * gramosGrande: default grams for frasco grande (e.g. 80)
+ */
+function importFromExcelData(especiasList, blendsList, gramosChico, gramosGrande) {
+  _ensureStructure();
+  var resultado = { especiasCreadas: 0, especiasExistentes: 0, blendsCreados: 0, blendsExistentes: 0, ingredientesNoResueltos: [], errores: [] };
+
+  // 1. Create especias (skip if name already exists)
+  for (var i = 0; i < especiasList.length; i++) {
+    var esp = especiasList[i];
+    var nombre = (esp.nombre || '').trim();
+    if (!nombre) continue;
+    var existing = findEspeciaByName(nombre);
+    if (existing) {
+      resultado.especiasExistentes++;
+      continue;
+    }
+    saveEspecia({
+      nombre: nombre,
+      categoria: esp.categoria || 'Comidas',
+      precioChico: 0,
+      precioGrande: 0,
+      gramosChico: Number(gramosChico) || 30,
+      gramosGrande: Number(gramosGrande) || 80,
+      stockBolsa: 0,
+      stockChico: 0,
+      stockGrande: 0
+    });
+    resultado.especiasCreadas++;
+  }
+
+  // 2. Create blends (skip if name already exists)
+  for (var j = 0; j < blendsList.length; j++) {
+    var bl = blendsList[j];
+    var nombre = (bl.nombre || '').trim();
+    if (!nombre) continue;
+    var existingBlend = null;
+    var blKeys = Object.keys(_db.blends || {});
+    for (var k = 0; k < blKeys.length; k++) {
+      if ((_db.blends[blKeys[k]].nombre || '').trim().toLowerCase() === nombre.toLowerCase()) {
+        existingBlend = _db.blends[blKeys[k]];
+        break;
+      }
+    }
+    if (existingBlend) {
+      resultado.blendsExistentes++;
+      continue;
+    }
+
+    // Resolve ingredients: map specia names to IDs and calculate grams per frasco
+    var ings = bl.ingredientes || [];
+    var recipeTotal = 0;
+    for (var ii = 0; ii < ings.length; ii++) recipeTotal += (Number(ings[ii].g) || 0);
+    if (recipeTotal <= 0) recipeTotal = 500;
+
+    var resolvedIngs = [];
+    for (var ii = 0; ii < ings.length; ii++) {
+      var ing = ings[ii];
+      var espObj = findEspeciaByName(ing.especia);
+      if (!espObj) {
+        resultado.ingredientesNoResueltos.push(nombre + ' → ' + (ing.especia || '?'));
+        continue;
+      }
+      var ingG = Number(ing.g) || 0;
+      resolvedIngs.push({
+        especiaId: espObj.id,
+        especiaNombre: espObj.nombre,
+        gramosChico: Math.round((ingG / recipeTotal) * (Number(gramosChico) || 30) * 100) / 100,
+        gramosGrande: Math.round((ingG / recipeTotal) * (Number(gramosGrande) || 80) * 100) / 100,
+        gramosReceta: ingG
+      });
+    }
+
+    var cat = bl.categoria || _categoriaFromUso(bl.uso);
+    saveBlend({
+      nombre: nombre,
+      categoria: cat,
+      region: bl.region || '',
+      uso: bl.uso || '',
+      precioChico: 0,
+      precioGrande: 0,
+      ingredientes: resolvedIngs,
+      stockChico: 0,
+      stockGrande: 0
+    });
+    resultado.blendsCreados++;
+  }
+
+  return resultado;
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -711,5 +852,7 @@ window.ArcanoDB = {
   getUsuarios: getUsuarios, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
   authenticateUser: authenticateUser, getCurrentUser: getCurrentUser, logoutUser: logoutUser,
   getStats: getStats,
+  findEspeciaByName: findEspeciaByName,
+  importFromExcelData: importFromExcelData,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };
