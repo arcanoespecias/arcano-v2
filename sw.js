@@ -1,31 +1,4 @@
-const CACHE = 'arcano-erp-v2';
-
-self.addEventListener('install', e => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  var url = e.request.url;
-  if (url.indexOf('firebaseio.com') !== -1 ||
-      url.indexOf('googleapis.com') !== -1 ||
-      url.indexOf('gstatic.com') !== -1) {
-    return;
-  }
-  e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).then(r => {
-      if (r.status === 200) {
-        var c = r.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, c));
-      }
-      return r;
-    }).catch(() => caches.match(e.request))
-  );
-});
+var CACHE='arcano-v8';
+self.addEventListener('install',function(e){e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll(['./','index.html','css/style.css','js/db.js','js/app.js','manifest.json','icons/favicon.png','icons/icon-192.png']);}));self.skipWaiting();});
+self.addEventListener('activate',function(e){e.waitUntil(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!==CACHE;}).map(function(k){return caches.delete(k);}));}));self.clients.claim();});
+self.addEventListener('fetch',function(e){e.respondWith(caches.match(e.request).then(function(r){return r||fetch(e.request).then(function(res){if(res.status===200){var clone=res.clone();caches.open(CACHE).then(function(c){c.put(e.request,clone);});}return res;});}).catch(function(){return caches.match('./index.html');}));});

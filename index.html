@@ -4,58 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta name="theme-color" content="#1b0b07">
+<meta name="theme-color" content="#120905">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arcano">
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Arcano — ERP Especias</title>
+<title>Arcano — Especias y Blends</title>
 <link rel="manifest" href="manifest.json?v=1">
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
 
-<!-- ========== STOREFRONT (public) ========== -->
+<!-- ========== STOREFRONT ========== -->
 <div id="storefront" style="display:none">
-  <header id="store-header">
+  <header class="store-header">
     <div class="store-header-inner">
       <div class="store-brand">
-        <span class="store-logo-text">ARCANO</span>
-        <span class="store-sub">Cómplice del Sabor</span>
+        <span class="store-logo">ARCANO</span>
+        <span class="store-sub">Complice del Sabor</span>
       </div>
       <div class="store-actions">
-        <button class="btn btn-ghost btn-sm" onclick="showLogin()" id="store-login-btn">Ingresar</button>
-        <button class="btn btn-gold btn-sm cart-toggle" onclick="toggleCart()" id="cart-btn">
+        <button class="btn btn-ghost btn-sm" onclick="showLogin()">Ingresar</button>
+        <button class="btn btn-gold btn-sm cart-btn" onclick="toggleCart()">
           Carrito <span id="cart-count" class="cart-count" style="display:none">0</span>
         </button>
       </div>
     </div>
   </header>
-  <nav id="store-nav">
-    <button class="store-nav-btn active" data-cat="todos">Todos</button>
-    <button class="store-nav-btn" data-cat="Gastronomía">Gastronomía</button>
-    <button class="store-nav-btn" data-cat="Infusión">Infusión</button>
-    <button class="store-nav-btn" data-cat="Coctelería">Coctelería</button>
-    <button class="store-nav-btn" data-cat="blends">Blends</button>
-  </nav>
-  <div id="store-hero">
+  <nav class="store-nav"><div id="store-nav" class="store-nav-inner"></div></nav>
+  <div class="store-hero">
     <h1 class="hero-title">ARCANO</h1>
     <p class="hero-sub">Especias y blends artesanales</p>
   </div>
-  <main id="store-main">
+  <main class="store-main">
     <div id="store-products" class="products-grid"></div>
-    <div id="store-empty" class="empty" style="display:none">
-      <div class="empty-icon">🧂</div>
-      <p>No hay productos disponibles aún</p>
-    </div>
+    <div id="store-empty" class="empty-msg" style="display:none">No hay productos disponibles</div>
   </main>
   <div id="cart-overlay" class="cart-overlay" onclick="toggleCart()"></div>
   <div id="cart-drawer" class="cart-drawer">
-    <div class="cart-header">
-      <h3>Tu Carrito</h3>
-      <button class="modal-close" onclick="toggleCart()">&times;</button>
-    </div>
+    <div class="cart-header"><h3>Tu Carrito</h3><button class="btn-icon" onclick="toggleCart()">&times;</button></div>
     <div id="cart-items" class="cart-items"></div>
     <div id="cart-footer" class="cart-footer" style="display:none">
       <div class="cart-total">Total: <strong id="cart-total-val">$0</strong></div>
@@ -65,73 +53,58 @@
 </div>
 
 <!-- ========== PIN SCREEN ========== -->
-<div id="pin-screen" style="display:flex">
-  <div id="pin-content">
-    <div id="boot-loader" style="text-align:center;padding:60px 20px">
-      <div style="width:40px;height:40px;border:3px solid #7a5a20;border-top-color:#e8b84b;border-radius:50%;margin:0 auto 20px;animation:spin .8s linear infinite"></div>
-      <div style="color:#e8b84b;font-family:'Cormorant Garamond',Georgia,serif;font-size:1.6rem;font-weight:700;letter-spacing:.1em">ARCANO</div>
-      <div style="color:#7a6a50;font-size:.78rem;margin-top:8px" id="boot-status">Cargando...</div>
+<div id="pin-screen">
+  <div class="pin-container" id="pin-content">
+    <div id="boot-loader">
+      <div class="loader-spin"></div>
+      <div class="boot-brand">ARCANO</div>
+      <div class="boot-sub" id="boot-status">Cargando...</div>
     </div>
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   </div>
 </div>
 
 <!-- ========== ADMIN APP ========== -->
 <div id="admin-app" style="display:none">
-  <header id="app-header">
+  <header class="app-header">
     <div class="header-logo">
-      <img src="icons/logo-header.png" alt="Arcano" onerror="this.style.display='none'">
-      <div>
-        <div class="header-brand">ARCANO</div>
-        <div class="header-sub">Cómplice del Sabor</div>
-      </div>
+      <img src="icons/logo-header.png" alt="" onerror="this.style.display='none'">
+      <div><div class="header-brand">ARCANO</div><div class="header-sub">Complice del Sabor</div></div>
     </div>
-    <div class="header-pin">
-      <span id="sync-badge" class="badge bg">Online</span>
-      <div class="user-chip" onclick="handleLogout()" id="user-chip" title="Cerrar sesión"></div>
+    <div class="header-right">
+      <span id="sync-badge" class="badge badge-green">Online</span>
+      <div class="user-chip" id="user-chip" onclick="handleLogout()"></div>
     </div>
   </header>
-  <nav id="app-nav"></nav>
-  <main id="app-main">
+  <nav id="admin-nav" class="admin-nav"></nav>
+  <main class="admin-main">
     <div id="page-dashboard" class="page"></div>
     <div id="page-compras" class="page"></div>
     <div id="page-especias" class="page"></div>
     <div id="page-blends" class="page"></div>
-    <div id="page-produccion" class="page"></div>
     <div id="page-ventas" class="page"></div>
+    <div id="page-produccion" class="page"></div>
     <div id="page-usuarios" class="page"></div>
-    <div id="page-ajustes" class="page"></div>
   </main>
 </div>
 
 <!-- ========== MODAL ========== -->
 <div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
-  <div class="modal" id="modal-body" onclick="event.stopPropagation()"></div>
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-title"></h3>
+      <button class="btn-icon" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
 </div>
 
 <!-- ========== TOAST ========== -->
 <div id="toast"></div>
 
-<!-- ========== PWA BANNER ========== -->
-<div id="pwa-banner" style="display:none">
-  <div class="pwa-banner-inner">
-    <img src="icons/icon-192.png" alt="" style="width:40px;height:40px;border-radius:8px">
-    <div class="pwa-banner-text">
-      <div class="fw7 text-sm">Instalar Arcano</div>
-      <div class="text-xs text-muted">Acceso rápido desde tu pantalla de inicio</div>
-    </div>
-    <button class="btn btn-gold btn-sm" onclick="installPWA()">Instalar</button>
-    <button class="btn btn-ghost btn-sm" onclick="dismissPWA()" style="padding:5px 8px;font-size:.9rem">x</button>
-  </div>
-</div>
-
 <!-- ========== SCRIPTS ========== -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="js/db.js?v=7"></script>
-<script src="js/firebase-sync.js?v=7"></script>
-<script src="js/core.js?v=7"></script>
-<script src="js/pages.js?v=7"></script>
+<script src="js/db.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 </body>
 </html>

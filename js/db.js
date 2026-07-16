@@ -1,134 +1,150 @@
-// ===================== ARCANO ERP — DB LAYER =====================
-// localStorage + Firebase sync. 6 collections.
+// ===================== ARCANO — DATA LAYER (Firebase-first) =====================
+// No localStorage. Firebase is the single source of truth.
+// Every mutation calls DB.save() which writes to Firebase directly.
 
-var DB_KEY = 'arcano_db_v3';
-var _idC = 0;
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBvuJusx4_FvAdXhBl89VVlCicNb-yrdzo",
+  authDomain: "arcano-6788d.firebaseapp.com",
+  databaseURL: "https://arcano-6788d-default-rtdb.firebaseio.com",
+  projectId: "arcano-6788d",
+  storageBucket: "arcano-6788d.firebasestorage.app",
+  messagingSenderId: "545294699567",
+  appId: "1:545294699567:web:f354ae604a0034c6578ada"
+};
 
-// ---------- Schema constants ----------
-var PRODUCT_TYPES = [
-  { val: 'especia', label: 'Especia' },
-  { val: 'frasco',  label: 'Frasco'  },
-  { val: 'etiqueta',label: 'Etiqueta' }
-];
+var FB_PATH = 'arcano/db';
 
-var BLEND_FORMATOS = [
-  { val: 'polvo',   label: 'Polvo'   },
-  { val: 'escamas', label: 'Escamas' }
-];
+var DB = {
+  data: null,
+  _cbs: [],
 
-var UNITS = ['gr','kg','ml','L','unidad','cm','mt','rollo'];
+  init: function(onReady) {
+    var self = this;
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      var ref = firebase.database().ref(FB_PATH);
 
-var COMPRA_ESTADOS = [
-  { val: 'pendiente', label: 'Pendiente' },
-  { val: 'recibida',  label: 'Recibida'  },
-  { val: 'cancelada', label: 'Cancelada' }
-];
+      firebase.database().ref('.info/connected').on('value', function(s) {
+        var el = document.getElementById('sync-badge');
+        if (el) {
+          el.textContent = s.val() ? 'Online' : 'Offline';
+          el.className = 'badge ' + (s.val() ? 'badge-green' : 'badge-red');
+        }
+      });
 
-var VENTA_ESTADOS = [
-  { val: 'pendiente',  label: 'Pendiente'  },
-  { val: 'completada', label: 'Completada' },
-  { val: 'cancelada',  label: 'Cancelada'  }
-];
+      ref.on('value', function(snap) {
+        var d = snap.val();
+        if (d && typeof d === 'object') {
+          var cols = ['especias','frascos','etiquetas','blends','compras','ventas','usuarios','produccion'];
+          cols.forEach(function(c) { if (!Array.isArray(d[c])) d[c] = []; });
+          self.data = d;
+        } else {
+          self.data = self.empty();
+        }
+        self._notify();
+        if (onReady) { onReady(); onReady = null; }
+      }, function(err) {
+        console.error('[DB] Firebase listener error:', err);
+        if (!self.data) { self.data = self.empty(); }
+        if (onReady) { onReady(); onReady = null; }
+      });
 
-var ROLES = [
-  { val: 'admin',    label: 'Admin'    },
-  { val: 'operador', label: 'Operador' },
-  { val: 'vendedor', label: 'Vendedor' }
-];
+      setTimeout(function() {
+        if (!self.data) {
+          console.warn('[DB] Timeout');
+          self.data = self.empty();
+          if (onReady) { onReady(); onReady = null; }
+        }
+      }, 8000);
 
-// ---------- Core DB functions ----------
-var _dbCached = null;
-
-// Migrate from old key if needed (runs once)
-(function() {
-  try {
-    var old = localStorage.getItem('arcano_erp_v1');
-    if (old && !localStorage.getItem(DB_KEY)) {
-      localStorage.setItem(DB_KEY, old);
-      console.log('[DB] Migrated from arcano_erp_v1 to ' + DB_KEY);
+    } catch(e) {
+      console.error('[DB] Init error:', e);
+      self.data = self.empty();
+      if (onReady) { onReady(); onReady = null; }
     }
-  } catch(e) {}
-})();
+  },
 
-function getDB() {
-  if (_dbCached) return _dbCached;
-  try {
-    var raw = localStorage.getItem(DB_KEY);
-    if (raw) {
-      var db = JSON.parse(raw);
-      if (!db.productos)   db.productos   = [];
-      if (!db.compras)     db.compras     = [];
-      if (!db.blends)      db.blends      = [];
-      if (!db.ventas)      db.ventas      = [];
-      if (!db.usuarios)    db.usuarios    = [];
-      if (!db.movimientos) db.movimientos = [];
-      syncIdCounter(db);
-      _dbCached = db;
-      return db;
+  empty: function() {
+    return { especias:[], frascos:[], etiquetas:[], blends:[], compras:[], ventas:[], usuarios:[], produccion:[] };
+  },
+
+  onChange: function(fn) { this._cbs.push(fn); },
+
+  _notify: function() {
+    var d = this.data;
+    this._cbs.forEach(function(fn) { try { fn(d); } catch(e) { console.error('[DB] callback error:', e); } });
+  },
+
+  save: function() {
+    if (!this.data) return;
+    try {
+      firebase.database().ref(FB_PATH).set(this.data)
+        .then(function() { console.log('[DB] Saved'); })
+        .catch(function(e) { console.error('[DB] Save error:', e.message); });
+    } catch(e) {
+      console.error('[DB] Save error:', e.message);
     }
-  } catch(e) { console.warn('[DB] Read error:', e.message); }
-  _dbCached = emptyDB();
-  return _dbCached;
+  },
+
+  nextId: function(col) {
+    var items = (this.data && this.data[col]) || [];
+    var mx = 0;
+    items.forEach(function(x) { if (x.id > mx) mx = x.id; });
+    return mx + 1;
+  },
+
+  find: function(col, id) {
+    var items = (this.data && this.data[col]) || [];
+    var r = null;
+    items.forEach(function(x) { if (x.id === id) r = x; });
+    return r;
+  },
+
+  findWhere: function(col, fn) {
+    var items = (this.data && this.data[col]) || [];
+    var r = [];
+    items.forEach(function(x) { if (fn(x)) r.push(x); });
+    return r;
+  },
+
+  seed: function() {
+    if ((this.data.usuarios || []).length > 0) return;
+    this.data.usuarios.push({
+      id: 1, nombre: 'Admin', pin: '1234', rol: 'admin', activo: true, creadoEn: new Date().toISOString()
+    });
+    this.data.frascos.push(
+      { id: 1, nombre: 'Frasco Grande', tipo: 'grande', capacidadGr: 100, stock: 50, costoUnit: 350, creadoEn: new Date().toISOString() },
+      { id: 2, nombre: 'Frasco Pequeno', tipo: 'pequeno', capacidadGr: 50, stock: 100, costoUnit: 250, creadoEn: new Date().toISOString() }
+    );
+    this.save();
+    console.log('[DB] Seed OK');
+  }
+};
+
+// ===================== HELPERS =====================
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-function saveDB(dbParam) {
-  var db = dbParam || getDB();
-  db._idC = _idC;
-  _dbCached = db;
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  } catch(e) { console.warn('[DB] Write error:', e.message); }
-  clearTimeout(saveDB._t);
-  saveDB._t = setTimeout(function() {
-    if (typeof fbPush === 'function') fbPush();
-  }, 800);
+function escJs(s) {
+  return esc(s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 }
-
-function emptyDB() {
-  return { productos:[], compras:[], blends:[], ventas:[], usuarios:[], movimientos:[], _idC:0 };
-}
-
-function nextId() { _idC++; return _idC; }
-
-function syncIdCounter(db) {
-  var ids = [
-    (db.productos||[]),(db.compras||[]),(db.blends||[]),
-    (db.ventas||[]),(db.usuarios||[]),(db.movimientos||[])
-  ].reduce(function(a,c){ return a.concat(c.map(function(x){return x.id||0})); }, []);
-  var mx = Math.max.apply(null,[0].concat(ids));
-  if (mx >= _idC) _idC = mx;
-}
-
-function addMovimiento(tipo, itemId, productoNombre, cantidad, detalle, dbOverride) {
-  var db = dbOverride || getDB();
-  if (!db.movimientos) db.movimientos = [];
-  db.movimientos.push({
-    id: nextId(),
-    tipo: tipo,
-    itemId: itemId,
-    producto: productoNombre,
-    cantidad: cantidad,
-    detalle: detalle || '',
-    fecha: new Date().toISOString(),
-    usuario: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.nombre : 'Sistema'
-  });
-  saveDB(db);
-}
-
-// ---------- Formatters ----------
 function fmt(n) { return '$' + Number(n||0).toLocaleString('es-CO'); }
-
 function fmtDate(iso) {
   if (!iso) return '-';
   try { return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
   catch(e) { return iso; }
 }
-
 function fmtDateTime(iso) {
   if (!iso) return '-';
-  try {
-    var d = new Date(iso);
-    return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) + ' ' +
-           d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-  } catch(e) { return iso; }
+  try { var d = new Date(iso); return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e) { return iso; }
+}
+function optHtml(arr, sel) {
+  if (!arr) return '';
+  return arr.map(function(o) {
+    var v = typeof o === 'string' ? o : o.val;
+    var l = typeof o === 'string' ? o : o.label;
+    return '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(l)+'</option>';
+  }).join('');
 }
