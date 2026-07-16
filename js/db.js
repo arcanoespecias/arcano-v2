@@ -473,9 +473,38 @@ function _getOrCreateEtiqueta(nombre) {
   var existing = _findEtiquetaByNombre(nombre);
   if (existing) return existing;
   var id = nextId('etiquetas');
-  var nueva = { id: id, nombre: nombre, stock: 0, creado: new Date().toISOString() };
+  var nueva = { id: id, nombre: nombre, stockChico: 0, stockGrande: 0, creado: new Date().toISOString() };
   _db.etiquetas[id] = nueva;
   return nueva;
+}
+
+/** Full list: all especias + blends merged with their etiqueta stock (chico/grande) */
+function getEtiquetasFullList() {
+  var db = getDB();
+  var items = [];
+  var espKeys = Object.keys(db.especias || {});
+  for (var i = 0; i < espKeys.length; i++) {
+    var e = db.especias[espKeys[i]];
+    if (!e || typeof e !== 'object') continue;
+    var etq = _findEtiquetaByNombre(e.nombre);
+    items.push({
+      id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '',
+      stockChico: etq ? (Number(etq.stockChico) || 0) : 0,
+      stockGrande: etq ? (Number(etq.stockGrande) || 0) : 0
+    });
+  }
+  var blKeys = Object.keys(db.blends || {});
+  for (var i = 0; i < blKeys.length; i++) {
+    var b = db.blends[blKeys[i]];
+    if (!b || typeof b !== 'object') continue;
+    var etq = _findEtiquetaByNombre(b.nombre);
+    items.push({
+      id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '',
+      stockChico: etq ? (Number(etq.stockChico) || 0) : 0,
+      stockGrande: etq ? (Number(etq.stockGrande) || 0) : 0
+    });
+  }
+  return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
 function getProducciones() {
