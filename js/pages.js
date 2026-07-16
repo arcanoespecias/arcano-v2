@@ -117,7 +117,10 @@ const Pages = {
 
   formEspecia(id) {
     const esp = id ? ArcanoDB.getEspecia(id) : null;
-    const title = esp ? 'Editar Especia' : 'Nueva Especia';
+    const isEdit = !!esp;
+    const title = isEdit ? 'Editar: ' + (esp.nombre || '') : 'Nueva Especia';
+    const nombreReadonly = isEdit ? 'readonly' : '';
+    const nombreStyle = isEdit ? 'opacity:0.7;cursor:not-allowed;background:var(--bg-card)' : '';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
@@ -126,7 +129,8 @@ const Pages = {
         <div class="modal-body">
           <div class="form-group">
             <label>Nombre</label>
-            <input type="text" class="input" id="f-esp-nombre" value="${esp ? esp.nombre : ''}" placeholder="Ej: Canela">
+            <input type="text" class="input" id="f-esp-nombre" value="${esp ? esp.nombre : ''}" placeholder="Ej: Canela" ${nombreReadonly} style="${nombreStyle}">
+            ${isEdit ? '<p class="text-muted text-xs mt-4">El nombre no se puede cambiar al editar. Si necesitas otro nombre, elimina y crea una nueva.</p>' : ''}
           </div>
           <div class="form-group">
             <label>Categoria</label>
@@ -154,7 +158,10 @@ const Pages = {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    setTimeout(() => document.getElementById('f-esp-nombre').focus(), 100);
+    setTimeout(function() {
+      var el = document.getElementById(isEdit ? 'f-esp-cat' : 'f-esp-nombre');
+      if (el) el.focus();
+    }, 100);
   },
 
   saveEspecia(id) {
@@ -287,7 +294,10 @@ const Pages = {
   formBlend(id) {
     const blend = id ? ArcanoDB.getBlend(id) : null;
     const especias = ArcanoDB.getEspecias();
-    const title = blend ? 'Editar Blend' : 'Nuevo Blend';
+    const isEdit = !!blend;
+    const title = isEdit ? 'Editar: ' + (blend.nombre || '') : 'Nuevo Blend';
+    const nombreReadonly = isEdit ? 'readonly' : '';
+    const nombreStyle = isEdit ? 'opacity:0.7;cursor:not-allowed;background:var(--bg-card)' : '';
     const ings = blend ? blend.ingredientes || [] : [{especiaId: '', cantidad: ''}];
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -297,7 +307,8 @@ const Pages = {
         <div class="modal-body">
           <div class="form-group">
             <label>Nombre del Blend</label>
-            <input type="text" class="input" id="f-bl-nombre" value="${blend ? blend.nombre : ''}" placeholder="Ej: Curry Especial">
+            <input type="text" class="input" id="f-bl-nombre" value="${blend ? blend.nombre : ''}" placeholder="Ej: Curry Especial" ${nombreReadonly} style="${nombreStyle}">
+            ${isEdit ? '<p class="text-muted text-xs mt-4">El nombre no se puede cambiar al editar. Si necesitas otro nombre, elimina y crea uno nuevo.</p>' : ''}
           </div>
           <div class="form-group">
             <label>Categoria</label>
@@ -332,7 +343,10 @@ const Pages = {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    setTimeout(() => document.getElementById('f-bl-nombre').focus(), 100);
+    setTimeout(function() {
+      var el = document.getElementById(isEdit ? 'f-bl-cat' : 'f-bl-nombre');
+      if (el) el.focus();
+    }, 100);
   },
 
   _ingredienteRow(idx, ing, especias) {
