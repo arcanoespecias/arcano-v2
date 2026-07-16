@@ -67,9 +67,10 @@ body {
 .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.g5 { display: grid; grid-template-columns: 1.5fr 0.8fr 0.6fr 0.8fr 0.8fr; gap: 12px; align-items: end; }
 
 @media (max-width: 768px) {
-  .g2, .g3, .g4 { grid-template-columns: 1fr; }
+  .g2, .g3, .g4, .g5 { grid-template-columns: 1fr; }
 }
 
 /* ---------- BADGES ---------- */

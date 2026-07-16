@@ -63,7 +63,7 @@ const Pages = {
           ${stats.especiasBajoStockBolsa.map(e => '<span class="badge badge-yellow mr-8">BOLSA ' + (e.nombre || '?') + ': ' + (e.stockBolsa || 0) + 'grs</span>').join('')}
           ${stats.especiasBajoStockFrascos.map(e => '<span class="badge badge-red mr-8">FRASCOS ' + (e.nombre || '?') + ': ' + (e.stockFrascos || 0) + '</span>').join('')}
           ${stats.blendsBajoStockFrascos.map(b => '<span class="badge badge-red mr-8">FRASCOS ' + (b.nombre || '?') + ': ' + (b.stockFrascos || 0) + '</span>').join('')}
-          ${stats.etiquetasBajoStock.map(e => '<span class="badge badge-blue mr-8">ETQ ' + (e.nombre || '?') + ': ' + (e.stock || 0) + '</span>').join('')}
+          ${stats.etiquetasBajoStock.map(e => '<span class="badge badge-blue mr-8">ETQ ' + (e.nombre || '?') + ': ' + ((e.stockChico||0)+(e.stockGrande||0)) + '</span>').join('')}
         </div>
       </div>` : ''}`;
   },
@@ -205,8 +205,18 @@ const Pages = {
         <div class="modal-body">
           <p class="text-muted text-sm">Convierte gramos de bolsa en frascos listos para vender.</p>
           <div class="list-row mt-12"><span>Bolsa disponible</span><span class="fw7 text-gold">${esp.stockBolsa || 0} grs</span></div>
-          <div class="list-row"><span>Etiqueta "${esp.nombre}"</span><span class="${(etq && etq.stock > 0) ? 'text-green' : 'text-red'}">${etq ? etq.stock : 0} uds</span></div>
-          <div class="g2 mt-12">
+          <div class="g2 mt-8">
+            <div class="list-row"><span>Etq. Chico</span><span class="${(etq && (etq.stockChico || 0) > 0) ? 'text-green' : 'text-red'}">${etq ? (etq.stockChico || 0) : 0} uds</span></div>
+            <div class="list-row"><span>Etq. Grande</span><span class="${(etq && (etq.stockGrande || 0) > 0) ? 'text-green' : 'text-red'}">${etq ? (etq.stockGrande || 0) : 0} uds</span></div>
+          </div>
+          <div class="form-group mt-12">
+            <label>Talla del frasco</label>
+            <select class="input" id="f-pe-talla" onchange="Pages._calcEspeciaProduccion('${especiaId}')">
+              <option value="chico">Chico</option>
+              <option value="grande">Grande</option>
+            </select>
+          </div>
+          <div class="g2 mt-8">
             <div class="form-group">
               <label>Grs por frasco</label>
               <input type="number" class="input" id="f-pe-grs" value="50" min="1" oninput="Pages._calcEspeciaProduccion('${especiaId}')">
@@ -230,24 +240,33 @@ const Pages = {
   _calcEspeciaProduccion(especiaId) {
     const esp = ArcanoDB.getEspecia(especiaId);
     if (!esp) return;
+    const talla = (document.getElementById('f-pe-talla') || {}).value || 'chico';
     const grs = Number(document.getElementById('f-pe-grs').value) || 0;
     const cant = Number(document.getElementById('f-pe-cant').value) || 0;
     const total = grs * cant;
     const disponible = esp.stockBolsa || 0;
-    const ok = total > 0 && total <= disponible;
-    document.getElementById('f-pe-info').innerHTML =
-      '<p class="text-sm ' + (ok ? 'text-green' : 'text-red') + ' fw7">' +
-      (ok ? 'OK: Se consumen ' + total + 'grs de bolsa' : total > disponible ? 'FALTAN ' + (total - disponible) + 'grs' : 'Ingresa cantidades') +
-      '</p>';
+    const okBolsa = total > 0 && total <= disponible;
+    const etqList = ArcanoDB.getEtiquetasStock();
+    const etq = etqList.find(function(e) { return e.nombre === esp.nombre; });
+    var etqDisp = 0, okEtq = false;
+    if (etq) { etqDisp = Number(talla === 'grande' ? etq.stockGrande : etq.stockChico) || 0; okEtq = etqDisp >= cant; }
+    const ok = okBolsa && okEtq && cant > 0;
+    var html = '<p class="text-sm fw7 ' + (okBolsa ? 'text-green' : 'text-red') + '">' +
+      (total > disponible ? 'FALTAN ' + (total - disponible) + 'grs en bolsa' : total > 0 ? 'OK: ' + total + 'grs de bolsa' : 'Ingresa cantidades') + '</p>';
+    html += '<p class="text-sm fw7 ' + (okEtq ? 'text-green' : 'text-red') + '">' +
+      (etq ? (okEtq ? 'OK: ' + cant + ' etq. ' + talla + ' disponible' : 'FALTAN ' + (cant - etqDisp) + ' etq. ' + talla) : 'SIN ETIQUETAS "' + esp.nombre + '"') + '</p>';
+    if (ok) html += '<p class="text-green mt-8 fw7">Todo disponible. Se produciran ' + cant + ' frascos ' + talla + '.</p>';
+    document.getElementById('f-pe-info').innerHTML = html;
   },
 
   doProducirEspecia(especiaId) {
+    const talla = document.getElementById('f-pe-talla').value || 'chico';
     const grs = Number(document.getElementById('f-pe-grs').value) || 0;
     const cant = Number(document.getElementById('f-pe-cant').value) || 0;
     if (grs <= 0 || cant <= 0) { alert('Ingresa gramos por frasco y cantidad'); return; }
     try {
-      const result = ArcanoDB.producirEspeciaFrascos(especiaId, grs, cant);
-      alert('Producidos ' + cant + ' frascos de "' + result.especia.nombre + '"\\nConsumidos: ' + (grs * cant) + 'grs de bolsa');
+      const result = ArcanoDB.producirEspeciaFrascos(especiaId, grs, cant, talla);
+      alert('Producidos ' + cant + ' frascos ' + talla + ' de "' + result.especia.nombre + '"\nConsumidos: ' + (grs * cant) + 'grs de bolsa');
       document.querySelector('.modal-overlay').remove();
       App.renderPage('especias');
     } catch (e) { alert(e.message); }
@@ -398,10 +417,22 @@ const Pages = {
       <div class="modal modal-lg">
         <div class="modal-header"><h3>Producir: ${blend.nombre}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
         <div class="modal-body">
-          <div class="list-row"><span>Etiqueta "${blend.nombre}"</span><span class="${(etq && etq.stock > 0) ? 'text-green' : 'text-red'}">${etq ? etq.stock : 0} uds</span></div>
-          <div class="form-group mt-12">
-            <label>Cantidad de frascos a producir</label>
-            <input type="number" class="input" id="f-prod-cant" value="1" min="1" oninput="Pages._calcBlendProduccion('${blendId}')">
+          <div class="g2 mt-8">
+            <div class="list-row"><span>Etq. Chico</span><span class="${(etq && (etq.stockChico || 0) > 0) ? 'text-green' : 'text-red'}">${etq ? (etq.stockChico || 0) : 0} uds</span></div>
+            <div class="list-row"><span>Etq. Grande</span><span class="${(etq && (etq.stockGrande || 0) > 0) ? 'text-green' : 'text-red'}">${etq ? (etq.stockGrande || 0) : 0} uds</span></div>
+          </div>
+          <div class="g2 mt-12">
+            <div class="form-group">
+              <label>Talla del frasco</label>
+              <select class="input" id="f-prod-talla" onchange="Pages._calcBlendProduccion('${blendId}')">
+                <option value="chico">Chico</option>
+                <option value="grande">Grande</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Cantidad de frascos</label>
+              <input type="number" class="input" id="f-prod-cant" value="1" min="1" oninput="Pages._calcBlendProduccion('${blendId}')">
+            </div>
           </div>
           <div id="f-prod-calc" class="mt-8"></div>
         </div>
@@ -417,6 +448,7 @@ const Pages = {
   _calcBlendProduccion(blendId) {
     const blend = ArcanoDB.getBlend(blendId);
     if (!blend) return;
+    const talla = (document.getElementById('f-prod-talla') || {}).value || 'chico';
     const cant = Number(document.getElementById('f-prod-cant').value) || 0;
     const calcDiv = document.getElementById('f-prod-calc');
     if (cant <= 0) { calcDiv.innerHTML = ''; return; }
@@ -434,22 +466,26 @@ const Pages = {
         (itemOk ? '<span class="badge badge-green">OK</span>' : '<span class="badge badge-red">Faltan ' + (total - disponible) + 'grs</span>') + '</td></tr>';
     }
     html += '</tbody></table></div></div>';
-    // Etiqueta check
+    // Etiqueta check por talla
     const etqList = ArcanoDB.getEtiquetasStock();
     const etq = etqList.find(function(e) { return e.nombre === blend.nombre; });
-    if (etq && etq.stock < cant) { ok = false; html += '<p class="text-red mt-8 fw7">Faltan ' + (cant - etq.stock) + ' etiquetas de "' + blend.nombre + '"</p>'; }
-    else if (!etq) { ok = false; html += '<p class="text-red mt-8 fw7">No hay etiquetas "' + blend.nombre + '". Compralas en Compras.</p>'; }
-    if (ok) html += '<p class="text-green mt-8 fw7">Todo disponible. Se produciran ' + cant + ' frascos.</p>';
+    if (etq) {
+      var etqDisp = Number(talla === 'grande' ? etq.stockGrande : etq.stockChico) || 0;
+      if (etqDisp < cant) { ok = false; html += '<p class="text-red mt-8 fw7">Faltan ' + (cant - etqDisp) + ' etq. ' + talla + ' de "' + blend.nombre + '"</p>'; }
+      else { html += '<p class="text-green mt-4">OK: ' + cant + ' etq. ' + talla + ' disponible</p>'; }
+    } else { ok = false; html += '<p class="text-red mt-8 fw7">No hay etiquetas "' + blend.nombre + '". Compralas en Compras.</p>'; }
+    if (ok) html += '<p class="text-green mt-8 fw7">Todo disponible. Se produciran ' + cant + ' frascos ' + talla + '.</p>';
     calcDiv.innerHTML = html;
   },
 
   doProducirBlend(blendId) {
+    const talla = document.getElementById('f-prod-talla').value || 'chico';
     const cant = Number(document.getElementById('f-prod-cant').value) || 0;
     if (cant <= 0) { alert('Cantidad debe ser mayor a 0'); return; }
     try {
-      ArcanoDB.producirBlend(blendId, cant);
+      ArcanoDB.producirBlend(blendId, cant, talla);
       const blend = ArcanoDB.getBlend(blendId);
-      alert('Producidos ' + cant + ' frascos de "' + (blend ? blend.nombre : 'Blend') + '"');
+      alert('Producidos ' + cant + ' frascos ' + talla + ' de "' + (blend ? blend.nombre : 'Blend') + '"');
       document.querySelector('.modal-overlay').remove();
       App.renderPage('blends');
     } catch (e) { alert(e.message); }
@@ -481,7 +517,7 @@ const Pages = {
                 <td>${c.fecha || '—'}</td>
                 <td>${c.proveedor || '—'}</td>
                 <td class="text-sm">${(c.items || []).map(i => {
-                  if (i.tipo === 'etiqueta') return '<span class="badge badge-blue">ETQ</span> ' + (i.etiquetaNombre || '?') + ' x' + (i.cantidad || 0);
+                  if (i.tipo === 'etiqueta') return '<span class="badge badge-blue">ETQ</span> ' + (i.etiquetaNombre || '?') + ' ' + ((i.talla || 'chico') === 'grande' ? 'GRD' : 'CHC') + ' x' + (i.cantidad || 0);
                   const esp = ArcanoDB.getEspecia(i.especiaId);
                   return (esp ? esp.nombre : '?') + ' ' + (i.cantidad || 0) + 'grs';
                 }).join(', ') || '—'}</td>
@@ -556,8 +592,13 @@ const Pages = {
   },
 
   _compraEtqRow(idx, item, readonly) {
-    return '<div class="g4 comp-item-row" data-tipo="etiqueta">' +
+    var talla = item.talla || 'chico';
+    return '<div class="g5 comp-item-row" data-tipo="etiqueta">' +
       '<input type="text" class="input" data-field="etiquetaNombre" value="' + (item.etiquetaNombre || '') + '" placeholder="Nombre etiqueta" ' + (readonly ? 'disabled' : '') + '>' +
+      '<select class="input" data-field="talla" ' + (readonly ? 'disabled' : '') + '>' +
+        '<option value="chico" ' + (talla === 'chico' ? 'selected' : '') + '>Chico</option>' +
+        '<option value="grande" ' + (talla === 'grande' ? 'selected' : '') + '>Grande</option>' +
+      '</select>' +
       '<input type="number" class="input" data-field="cantidad" value="' + (item.cantidad || '') + '" placeholder="Uds" min="0" ' + (readonly ? 'disabled' : '') + '>' +
       '<input type="number" class="input" data-field="costoUnitario" value="' + (item.costoUnitario || '') + '" placeholder="$ / ud" min="0" step="100" ' + (readonly ? 'disabled' : '') + '>' +
       '<span class="item-subtotal">$' + ((Number(item.cantidad) || 0) * (Number(item.costoUnitario) || 0)).toLocaleString() + '</span>' +
@@ -596,9 +637,10 @@ const Pages = {
     });
     document.querySelectorAll('#f-comp-etq-items .comp-item-row').forEach(function(row) {
       var nombre = row.querySelector('[data-field="etiquetaNombre"]').value.trim();
+      var talla = row.querySelector('[data-field="talla"]').value || 'chico';
       var cant = Number(row.querySelector('[data-field="cantidad"]').value) || 0;
       var cost = Number(row.querySelector('[data-field="costoUnitario"]').value) || 0;
-      if (nombre && cant > 0) { items.push({ tipo: 'etiqueta', etiquetaNombre: nombre, cantidad: cant, costoUnitario: cost }); total += cant * cost; }
+      if (nombre && cant > 0) { items.push({ tipo: 'etiqueta', etiquetaNombre: nombre, talla: talla, cantidad: cant, costoUnitario: cost }); total += cant * cost; }
     });
     if (items.length === 0) { alert('Agrega al menos un item'); return; }
     try {
@@ -897,56 +939,70 @@ const Pages = {
      ETIQUETAS
      ================================================================ */
   renderEtiquetas(container) {
-    const etqStock = ArcanoDB.getEtiquetasStock();
+    const fullList = ArcanoDB.getEtiquetasFullList();
     const producciones = ArcanoDB.getProducciones();
-    const totalEtq = etqStock.reduce(function(s, e) { return s + (e.stock || 0); }, 0);
+    const totalChico = fullList.reduce(function(s, e) { return s + e.stockChico; }, 0);
+    const totalGrande = fullList.reduce(function(s, e) { return s + e.stockGrande; }, 0);
+    const bajoStock = fullList.filter(function(e) { return (e.stockChico + e.stockGrande) <= 5; });
     container.innerHTML = `
-      <div class="stats-grid mt-8" style="grid-template-columns: repeat(3, 1fr)">
+      <div class="stats-grid mt-8" style="grid-template-columns: repeat(4, 1fr)">
         <div class="stat-card" style="border-left-color: var(--blue)">
-          <div class="stat-value" style="color: var(--blue)">${etqStock.length}</div>
-          <div class="stat-label">Tipos de Etiquetas</div>
-          <div class="stat-sub">${totalEtq} etiquetas en stock</div>
-        </div>
-        <div class="stat-card" style="border-left-color: var(--green)">
-          <div class="stat-value" style="color: var(--green)">${ArcanoDB.getStats().totalFrascos}</div>
-          <div class="stat-label">Frascos Producidos</div>
-          <div class="stat-sub">Listos para vender</div>
+          <div class="stat-value" style="color: var(--blue)">${fullList.length}</div>
+          <div class="stat-label">Productos</div>
+          <div class="stat-sub">${fullList.filter(e => e.tipo === 'especia').length} especias, ${fullList.filter(e => e.tipo === 'blend').length} blends</div>
         </div>
         <div class="stat-card" style="border-left-color: var(--gold)">
-          <div class="stat-value">${producciones.length}</div>
-          <div class="stat-label">Producciones</div>
-          <div class="stat-sub">Total registradas</div>
+          <div class="stat-value" style="color: var(--gold)">${totalChico}</div>
+          <div class="stat-label">Etiquetas Chico</div>
+          <div class="stat-sub">Envase pequeno</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--green)">
+          <div class="stat-value" style="color: var(--green)">${totalGrande}</div>
+          <div class="stat-label">Etiquetas Grande</div>
+          <div class="stat-sub">Envase grande</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--red)">
+          <div class="stat-value" style="color: var(--red)">${bajoStock.length}</div>
+          <div class="stat-label">Sin Etiquetas</div>
+          <div class="stat-sub">${bajoStock.length} productos con 0 etiquetas</div>
         </div>
       </div>
       <div class="card mt-16">
-        <div class="card-header"><h3>Stock de Etiquetas Fisicas</h3></div>
+        <div class="card-header"><h3>Stock de Etiquetas por Producto</h3></div>
         <div class="card-body">
-          ${etqStock.length === 0 ? '<p class="text-muted text-center">Sin etiquetas. Ve a <b>Compras</b> y agrega etiquetas.</p>' :
-          '<div class="etiquetas-grid">' +
-            etqStock.map(function(e) {
-              return '<div class="etiqueta-card"><div class="etiqueta-label">' + (e.nombre || '?') + '</div>' +
-                '<div class="etiqueta-cat"><span class="badge badge-blue">Etiqueta</span></div>' +
-                '<div class="etiqueta-stock ' + ((e.stock||0) <= 5 ? 'text-red' : '') + '">' + (e.stock||0) + ' <span class="text-muted text-xs">uds</span></div>' +
-                '</div>';
-            }).join('') + '</div>'}
+          ${fullList.length === 0 ? '<p class="text-muted text-center">Sin productos. Agrega especias o blends primero.</p>' :
+          '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Categoria</th><th>Etq. Chico</th><th>Etq. Grande</th><th>Total</th></tr></thead><tbody>' +
+            fullList.map(function(e) {
+              var total = e.stockChico + e.stockGrande;
+              var claseTotal = total <= 5 ? 'text-red fw7' : total <= 15 ? 'text-yellow fw7' : 'text-green';
+              return '<tr>' +
+                '<td class="fw7">' + e.nombre + '</td>' +
+                '<td><span class="badge ' + (e.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (e.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>' +
+                '<td class="text-sm">' + (e.categoria || '—') + '</td>' +
+                '<td><span class="' + (e.stockChico <= 5 ? 'text-red fw7' : '') + '">' + e.stockChico + '</span></td>' +
+                '<td><span class="' + (e.stockGrande <= 5 ? 'text-red fw7' : '') + '">' + e.stockGrande + '</span></td>' +
+                '<td><span class="' + claseTotal + '">' + total + '</span></td>' +
+                '</tr>';
+            }).join('') + '</tbody></table></div>'}
         </div>
       </div>
       <div class="card mt-16">
         <div class="card-header"><h3>Historial de Producciones</h3></div>
         <div class="card-body">
           ${producciones.length === 0 ? '<p class="text-muted text-center">Sin producciones.</p>' :
-          '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Frascos</th><th>Detalle</th></tr></thead><tbody>' +
+          '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Talla</th><th>Frascos</th><th>Detalle</th></tr></thead><tbody>' +
             producciones.slice(0, 20).map(function(p) {
               return '<tr><td>' + (p.fecha || '') + '</td>' +
                 '<td><span class="badge ' + (p.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (p.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>' +
                 '<td class="fw7">' + (p.blendNombre || p.especiaNombre || '') + '</td>' +
+                '<td><span class="badge ' + ((p.talla || 'chico') === 'grande' ? 'badge-gold' : 'badge-blue') + '">' + (p.talla || 'chico') + '</span></td>' +
                 '<td><span class="badge badge-green">' + (p.cantidad || 0) + '</span></td>' +
                 '<td class="text-sm">' +
                   (p.tipo === 'blend' ?
                     (p.ingredientesUsados || []).map(function(i) { return i.especiaNombre + ' ' + i.grsTotal + 'grs'; }).join(', ') :
                     (p.grsConsumidos || 0) + 'grs consumidos'
                   ) +
-                  (p.etiquetaUsada ? ' | Etq: ' + p.etiquetaUsada.etiquetaNombre : '') +
+                  (p.etiquetaUsada ? ' | Etq ' + (p.etiquetaUsada.talla || '') + ': ' + p.etiquetaUsada.etiquetaNombre : '') +
                 '</td></tr>';
             }).join('') + '</tbody></table></div>'}
         </div>

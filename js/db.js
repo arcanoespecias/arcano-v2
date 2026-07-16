@@ -48,7 +48,7 @@ function _cleanNulls() {
   }
 }
 
-/* ---------- Migrate v2.0 (single stock) → v2.1 (bolsa+frascos) ---------- */
+/* ---------- Migrate v2.0 → v2.1 → v2.2 ---------- */
 function _migrateV2toV21() {
   // Especias: old 'stock' (units) → stockBolsa: 0, stockFrascos: old stock
   var espKeys = Object.keys(_db.especias || {});
@@ -67,6 +67,16 @@ function _migrateV2toV21() {
     if (!bl || typeof bl !== 'object') continue;
     if (bl.stockFrascos === undefined) {
       bl.stockFrascos = (typeof bl.stock === 'number') ? bl.stock : 0;
+    }
+  }
+  // Etiquetas: old 'stock' → stockChico, add stockGrande
+  var etqKeys = Object.keys(_db.etiquetas || {});
+  for (var i = 0; i < etqKeys.length; i++) {
+    var etq = _db.etiquetas[etqKeys[i]];
+    if (!etq || typeof etq !== 'object') continue;
+    if (etq.stockChico === undefined && etq.stockGrande === undefined) {
+      etq.stockChico = (typeof etq.stock === 'number') ? etq.stock : 0;
+      etq.stockGrande = 0;
     }
   }
 }
@@ -318,13 +328,14 @@ function saveBlend(data) {
 
 /* ==================== PRODUCCION ==================== */
 
-/** Producir frascos de ESPECIA pura: consume grs de bolsa + etiquetas, agrega frascos */
-function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad) {
+/** Producir frascos de ESPECIA pura: consume grs de bolsa + etiquetas (por talla), agrega frascos */
+function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad, talla) {
   _ensureStructure();
   var esp = _db.especias[especiaId];
   if (!esp) throw new Error('Especia no encontrada');
   grsPorFrasco = Number(grsPorFrasco) || 0;
   cantidad = Number(cantidad) || 0;
+  talla = (talla === 'grande') ? 'grande' : 'chico';
   if (grsPorFrasco <= 0) throw new Error('Los gramos por frasco deben ser mayor a 0');
   if (cantidad <= 0) throw new Error('La cantidad de frascos debe ser mayor a 0');
 
@@ -333,15 +344,17 @@ function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad) {
     throw new Error('Stock insuficiente en BOLSA de "' + esp.nombre + '". Necesario: ' + grsTotal + 'grs, Disponible: ' + (esp.stockBolsa || 0) + 'grs');
   }
 
-  // Check etiqueta
+  // Check etiqueta por talla
   var etiqueta = _findEtiquetaByNombre(esp.nombre);
   var detalleEtiqueta = null;
+  var stockKey = (talla === 'grande') ? 'stockGrande' : 'stockChico';
   if (etiqueta) {
-    if (etiqueta.stock < cantidad) {
-      throw new Error('Stock insuficiente de ETIQUETAS "' + esp.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etiqueta.stock);
+    var etqDisp = Number(etiqueta[stockKey]) || 0;
+    if (etqDisp < cantidad) {
+      throw new Error('Stock insuficiente de ETIQUETAS ' + talla.toUpperCase() + ' de "' + esp.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etqDisp);
     }
-    etiqueta.stock -= cantidad;
-    detalleEtiqueta = { etiquetaNombre: esp.nombre, cantidadConsumida: cantidad, stockRestante: etiqueta.stock };
+    etiqueta[stockKey] = etqDisp - cantidad;
+    detalleEtiqueta = { etiquetaNombre: esp.nombre, talla: talla, cantidadConsumida: cantidad, stockRestante: etiqueta[stockKey] };
   } else {
     throw new Error('No hay etiquetas fisicas registradas para "' + esp.nombre + '". Compralas en Compras primero.');
   }
@@ -354,7 +367,7 @@ function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad) {
   var prodId = nextId('producciones');
   var produccion = {
     id: prodId, tipo: 'especia', especiaId: especiaId, especiaNombre: esp.nombre,
-    categoria: esp.categoria || '', grsPorFrasco: grsPorFrasco, cantidad: cantidad,
+    categoria: esp.categoria || '', talla: talla, grsPorFrasco: grsPorFrasco, cantidad: cantidad,
     grsConsumidos: grsTotal, etiquetaUsada: detalleEtiqueta,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
@@ -365,12 +378,13 @@ function producirEspeciaFrascos(especiaId, grsPorFrasco, cantidad) {
   return { especia: esp, produccion: produccion };
 }
 
-/** Producir frascos de BLEND: consume grs de especias (bolsa) + etiquetas, agrega frascos al blend */
-function producirBlend(blendId, cantidad) {
+/** Producir frascos de BLEND: consume grs de especias (bolsa) + etiquetas (por talla), agrega frascos al blend */
+function producirBlend(blendId, cantidad, talla) {
   _ensureStructure();
   var blend = _db.blends[blendId];
   if (!blend) throw new Error('Blend no encontrado');
   cantidad = Number(cantidad) || 0;
+  talla = (talla === 'grande') ? 'grande' : 'chico';
   if (cantidad <= 0) throw new Error('Cantidad debe ser mayor a 0');
 
   var ingredientes = blend.ingredientes || [];
@@ -399,14 +413,16 @@ function producirBlend(blendId, cantidad) {
     });
   }
 
-  // 3. Check & consume etiqueta
+  // 3. Check & consume etiqueta por talla
+  var stockKey = (talla === 'grande') ? 'stockGrande' : 'stockChico';
   var etiqueta = _findEtiquetaByNombre(blend.nombre);
   if (etiqueta) {
-    if (etiqueta.stock < cantidad) {
-      throw new Error('Stock insuficiente de ETIQUETAS "' + blend.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etiqueta.stock);
+    var etqDisp = Number(etiqueta[stockKey]) || 0;
+    if (etqDisp < cantidad) {
+      throw new Error('Stock insuficiente de ETIQUETAS ' + talla.toUpperCase() + ' de "' + blend.nombre + '". Necesario: ' + cantidad + ', Disponible: ' + etqDisp);
     }
-    etiqueta.stock -= cantidad;
-    detalleEtiqueta = { etiquetaNombre: etiqueta.nombre, cantidadConsumida: cantidad, stockRestante: etiqueta.stock };
+    etiqueta[stockKey] = etqDisp - cantidad;
+    detalleEtiqueta = { etiquetaNombre: etiqueta.nombre, talla: talla, cantidadConsumida: cantidad, stockRestante: etiqueta[stockKey] };
   } else {
     throw new Error('No hay etiquetas fisicas registradas para "' + blend.nombre + '". Compralas en Compras primero.');
   }
@@ -418,7 +434,7 @@ function producirBlend(blendId, cantidad) {
   var prodId = nextId('producciones');
   var produccion = {
     id: prodId, tipo: 'blend', blendId: blendId, blendNombre: blend.nombre,
-    categoria: blend.categoria || '', cantidad: cantidad,
+    categoria: blend.categoria || '', talla: talla, cantidad: cantidad,
     ingredientesUsados: detalleIngredientes, etiquetaUsada: detalleEtiqueta,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
@@ -516,7 +532,12 @@ function saveCompra(data) {
       var item = data.items[i];
       if (item.tipo === 'etiqueta') {
         var etq = _getOrCreateEtiqueta(item.etiquetaNombre);
-        etq.stock += Number(item.cantidad) || 0;
+        var talla = item.talla || 'chico';
+        if (talla === 'grande') {
+          etq.stockGrande = (etq.stockGrande || 0) + (Number(item.cantidad) || 0);
+        } else {
+          etq.stockChico = (etq.stockChico || 0) + (Number(item.cantidad) || 0);
+        }
       } else if (item.tipo === 'especia' && item.especiaId && _db.especias[item.especiaId]) {
         // Add to stockBolsa (grams of raw spice)
         _db.especias[item.especiaId].stockBolsa = (_db.especias[item.especiaId].stockBolsa || 0) + (Number(item.cantidad) || 0);
@@ -646,7 +667,11 @@ function getStats() {
   var ventasHoy = ventas.filter(function(v) { return v.fecha === today; });
   var ventasMes = ventas.filter(function(v) { return v.fecha && v.fecha.startsWith(mes); });
   var comprasMes = compras.filter(function(c) { return c.fecha && c.fecha.startsWith(mes); });
-  var etqBajoStock = etiquetas.filter(function(e) { return (e.stock || 0) <= 5; });
+  var etqBajoStock = etiquetas.filter(function(e) {
+    var chico = Number(e.stockChico) || 0;
+    var grande = Number(e.stockGrande) || 0;
+    return chico + grande <= 5;
+  });
   var totalFrascos = especias.reduce(function(s, e) { return s + (e.stockFrascos || 0); }, 0) +
                       blends.reduce(function(s, b) { return s + (b.stockFrascos || 0); }, 0);
 
@@ -701,7 +726,7 @@ window.ArcanoDB = {
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
   producirEspeciaFrascos: producirEspeciaFrascos, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
-  getEtiquetasStock: getEtiquetasStock, getFrascosParaVender: getFrascosParaVender, _cleanNulls: _cleanNulls,
+  getEtiquetasStock: getEtiquetasStock, getEtiquetasFullList: getEtiquetasFullList, getFrascosParaVender: getFrascosParaVender, _cleanNulls: _cleanNulls,
   getCompras: getCompras, saveCompra: saveCompra, deleteCompra: deleteCompra,
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
   getUsuarios: getUsuarios, getUsuario: getUsuario, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
