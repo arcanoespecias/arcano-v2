@@ -1,1 +1,1 @@
-{"version": "2.0.0", "build": "2026-07-16"}
+{"version": "2.1.0", "build": "2026-07-17", "notes": "Fixed null safety, nextId crash, added etiquetas in compras"}

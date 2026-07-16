@@ -24,9 +24,34 @@ var _listeners = [];
 
 var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, compras: 1, ventas: 1, usuarios: 1, etiquetas: 1 };
 
+/* ---------- Remove null/invalid entries from all collections ---------- */
+function _cleanNulls() {
+  var cols = ['especias', 'blends', 'producciones', 'compras', 'ventas', 'etiquetas'];
+  for (var c = 0; c < cols.length; c++) {
+    var col = cols[c];
+    if (!_db[col]) { _db[col] = {}; continue; }
+    var keys = Object.keys(_db[col]);
+    for (var j = 0; j < keys.length; j++) {
+      if (_db[col][keys[j]] == null || typeof _db[col][keys[j]] !== 'object') {
+        delete _db[col][keys[j]];
+      }
+    }
+  }
+  if (!_db.usuarios) _db.usuarios = {};
+  var ukeys = Object.keys(_db.usuarios);
+  for (var j = 0; j < ukeys.length; j++) {
+    if (_db.usuarios[ukeys[j]] == null || typeof _db.usuarios[ukeys[j]] !== 'object') {
+      delete _db.usuarios[ukeys[j]];
+    }
+  }
+}
+
 /* ---------- Ensure DB structure is valid ---------- */
 function _ensureStructure() {
   if (!_db) _db = {};
+  if (typeof _db !== 'object' || Array.isArray(_db)) _db = {};
+  // Clean any null entries first (from corrupted Firebase data)
+  _cleanNulls();
   if (!_db.meta || !_db.meta.nextId) {
     _db.meta = { nextId: Object.assign({}, DEFAULT_IDS) };
   } else {
@@ -77,17 +102,27 @@ function _fbRef() {
 function _saveToFirebase() {
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
-    _ensureStructure();
-    var ref = _fbRef();
-    if (!ref) { _saveToLocal(); return; }
-    ref.set(_db).then(function() {
-      console.log('[DB] Saved to Firebase');
-      _saveToLocal();
-    }).catch(function(err) {
-      console.error('[DB] Firebase save error:', err);
-      _saveToLocal();
-    });
+    _doFirebaseSave();
   }, 300);
+}
+
+function _saveToFirebaseImmediate() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = null;
+  _doFirebaseSave();
+}
+
+function _doFirebaseSave() {
+  _ensureStructure();
+  var ref = _fbRef();
+  if (!ref) { _saveToLocal(); return; }
+  ref.set(_db).then(function() {
+    console.log('[DB] Saved to Firebase');
+    _saveToLocal();
+  }).catch(function(err) {
+    console.error('[DB] Firebase save error:', err);
+    _saveToLocal();
+  });
 }
 
 function _saveToLocal() {
@@ -100,8 +135,14 @@ function _loadFromFirebase() {
     if (!ref) { resolve(_loadFromLocal()); return; }
     ref.once('value').then(function(snap) {
       if (snap.exists() && snap.val()) {
-        _db = snap.val();
-        console.log('[DB] Loaded from Firebase');
+        var data = snap.val();
+        if (typeof data !== 'object' || Array.isArray(data)) {
+          console.warn('[DB] Invalid Firebase data, starting fresh');
+          _db = _emptyDB();
+        } else {
+          _db = data;
+          console.log('[DB] Loaded from Firebase');
+        }
       } else {
         _db = _emptyDB();
       }
@@ -139,8 +180,13 @@ async function initDB() {
   if (ref) {
     ref.on('value', function(snap) {
       if (snap.exists() && snap.val()) {
-        _db = snap.val();
-        _ensureStructure();
+        var data = snap.val();
+        if (typeof data !== 'object' || Array.isArray(data)) {
+          console.warn('[DB] Realtime listener: invalid data, ignoring');
+          return;
+        }
+        _db = data;
+        _ensureStructure(); // cleans nulls + ensures structure
         _saveToLocal();
         _notify('remote_change', '*', '*');
       }
@@ -169,10 +215,18 @@ function nextId(collection) {
 
 /* ==================== ESPECIAS ==================== */
 
-function getEspecias() {
-  return Object.values(getDB().especias).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+function _filterValid(arr) {
+  return arr.filter(function(item) { return item != null && typeof item === 'object'; });
 }
-function getEspecia(id) { return getDB().especias[id] || null; }
+
+function getEspecias() {
+  return _filterValid(Object.values(getDB().especias)).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+}
+function getEspecia(id) {
+  var db = getDB();
+  var esp = db.especias[id];
+  return (esp != null && typeof esp === 'object') ? esp : null;
+}
 
 function saveEspecia(data) {
   _ensureStructure();
@@ -201,9 +255,13 @@ function deleteEspecia(id) {
 /* ==================== BLENDS ==================== */
 
 function getBlends() {
-  return Object.values(getDB().blends).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+  return _filterValid(Object.values(getDB().blends)).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 }
-function getBlend(id) { return getDB().blends[id] || null; }
+function getBlend(id) {
+  var db = getDB();
+  var bl = db.blends[id];
+  return (bl != null && typeof bl === 'object') ? bl : null;
+}
 
 function saveBlend(data) {
   _ensureStructure();
@@ -312,7 +370,7 @@ function _findEtiquetaByNombre(nombre) {
 
 function getEtiquetasStock() {
   var db = getDB();
-  return Object.values(db.etiquetas).sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+  return _filterValid(Object.values(db.etiquetas || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 }
 
 /** Find or create an etiqueta entry by nombre, return it. */
@@ -327,7 +385,7 @@ function _getOrCreateEtiqueta(nombre) {
 }
 
 function getProducciones() {
-  return Object.values(getDB().producciones).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  return _filterValid(Object.values(getDB().producciones)).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function deleteProduccion(id) {
@@ -340,8 +398,8 @@ function deleteProduccion(id) {
 
 /** Get blends with stock > 0 (etiquetas producidas listas para vender). */
 function getEtiquetasProducidas() {
-  return Object.values(getDB().blends)
-    .filter(function(b) { return b.stock > 0; })
+  return _filterValid(Object.values(getDB().blends || {}))
+    .filter(function(b) { return (b.stock || 0) > 0; })
     .map(function(b) {
       return { blendId: b.id, nombre: b.nombre, categoria: b.categoria || '', stock: b.stock, precioChico: b.precioChico || 0, precioGrande: b.precioGrande || 0 };
     })
@@ -351,7 +409,7 @@ function getEtiquetasProducidas() {
 /* ==================== COMPRAS ==================== */
 
 function getCompras() {
-  return Object.values(getDB().compras).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  return _filterValid(Object.values(getDB().compras)).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function saveCompra(data) {
@@ -394,7 +452,7 @@ function deleteCompra(id) {
 /* ==================== VENTAS ==================== */
 
 function getVentas() {
-  return Object.values(getDB().ventas).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  return _filterValid(Object.values(getDB().ventas)).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 }
 
 function saveVenta(data) {
@@ -436,8 +494,12 @@ function deleteVenta(id) {
 
 /* ==================== USUARIOS ==================== */
 
-function getUsuarios() { return Object.values(getDB().usuarios); }
-function getUsuario(id) { return getDB().usuarios[id] || null; }
+function getUsuarios() { return _filterValid(Object.values(getDB().usuarios)); }
+function getUsuario(id) {
+  var db = getDB();
+  var u = db.usuarios[id];
+  return (u != null && typeof u === 'object') ? u : null;
+}
 
 function saveUsuario(data) {
   _ensureStructure();
@@ -463,7 +525,7 @@ function deleteUsuario(id) {
 }
 
 function authenticateUser(pin) {
-  var users = Object.values(getDB().usuarios);
+  var users = _filterValid(Object.values(getDB().usuarios));
   var found = users.find(function(u) { return u.pin === String(pin) && u.activo !== false; });
   if (found) { sessionStorage.setItem(DB_KEY + '_session', JSON.stringify(found)); return found; }
   return null;
@@ -478,11 +540,11 @@ function logoutUser() { sessionStorage.removeItem(DB_KEY + '_session'); }
 
 function getStats() {
   var db = getDB();
-  var especias = Object.values(db.especias);
-  var blends = Object.values(db.blends);
-  var ventas = Object.values(db.ventas);
-  var compras = Object.values(db.compras);
-  var etiquetas = Object.values(db.etiquetas || {});
+  var especias = _filterValid(Object.values(db.especias || {}));
+  var blends = _filterValid(Object.values(db.blends || {}));
+  var ventas = _filterValid(Object.values(db.ventas || {}));
+  var compras = _filterValid(Object.values(db.compras || {}));
+  var etiquetas = _filterValid(Object.values(db.etiquetas || {}));
 
   var today = new Date().toISOString().slice(0, 10);
   var mes = new Date().toISOString().slice(0, 7);
@@ -515,7 +577,7 @@ window.ArcanoDB = {
   getEspecias: getEspecias, getEspecia: getEspecia, saveEspecia: saveEspecia, deleteEspecia: deleteEspecia,
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
-  getEtiquetasStock: getEtiquetasStock, getEtiquetasProducidas: getEtiquetasProducidas,
+  getEtiquetasStock: getEtiquetasStock, getEtiquetasProducidas: getEtiquetasProducidas, _cleanNulls: _cleanNulls,
   getCompras: getCompras, saveCompra: saveCompra, deleteCompra: deleteCompra,
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
   getUsuarios: getUsuarios, getUsuario: getUsuario, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,

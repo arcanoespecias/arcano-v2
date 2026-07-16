@@ -731,9 +731,8 @@ const Pages = {
      STOCK
      ================================================================ */
   renderStock(container) {
-    const db = ArcanoDB.getDB();
-    const especias = Object.values(db.especias);
-    const blends = Object.values(db.blends);
+    const especias = ArcanoDB.getEspecias();
+    const blends = ArcanoDB.getBlends();
 
     container.innerHTML = `
       <div class="g2">
@@ -744,13 +743,13 @@ const Pages = {
             <table class="table">
               <thead><tr><th>Nombre</th><th>Categoria</th><th>Stock</th></tr></thead>
               <tbody>
-                ${especias.sort((a,b) => a.stock - b.stock).map(e => `
+                ${especias.sort((a,b) => (a.stock||0) - (b.stock||0)).map(e => `
                   <tr>
-                    <td class="fw7">${e.nombre}</td>
+                    <td class="fw7">${e.nombre || '?'}</td>
                     <td class="text-sm">${e.categoria || '—'}</td>
                     <td>
-                      <span class="${e.stock <= 3 ? 'text-red fw7' : e.stock <= 10 ? 'text-yellow fw7' : 'text-green'}">${e.stock}</span>
-                      <div class="stock-bar"><div class="stock-fill ${e.stock <= 3 ? 'bar-red' : e.stock <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, e.stock * 2)}%"></div></div>
+                      <span class="${(e.stock||0) <= 3 ? 'text-red fw7' : (e.stock||0) <= 10 ? 'text-yellow fw7' : 'text-green'}">${e.stock || 0}</span>
+                      <div class="stock-bar"><div class="stock-fill ${(e.stock||0) <= 3 ? 'bar-red' : (e.stock||0) <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (e.stock||0) * 2)}%"></div></div>
                     </td>
                   </tr>`).join('')}
               </tbody>
@@ -764,13 +763,13 @@ const Pages = {
             <table class="table">
               <thead><tr><th>Nombre</th><th>Categoria</th><th>Stock</th></tr></thead>
               <tbody>
-                ${blends.sort((a,b) => a.stock - b.stock).map(b => `
+                ${blends.sort((a,b) => (a.stock||0) - (b.stock||0)).map(b => `
                   <tr>
-                    <td class="fw7">${b.nombre}</td>
+                    <td class="fw7">${b.nombre || '?'}</td>
                     <td class="text-sm">${b.categoria || '—'}</td>
                     <td>
-                      <span class="${b.stock <= 3 ? 'text-red fw7' : b.stock <= 10 ? 'text-yellow fw7' : 'text-green'}">${b.stock}</span>
-                      <div class="stock-bar"><div class="stock-fill ${b.stock <= 3 ? 'bar-red' : b.stock <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, b.stock * 2)}%"></div></div>
+                      <span class="${(b.stock||0) <= 3 ? 'text-red fw7' : (b.stock||0) <= 10 ? 'text-yellow fw7' : 'text-green'}">${b.stock || 0}</span>
+                      <div class="stock-bar"><div class="stock-fill ${(b.stock||0) <= 3 ? 'bar-red' : (b.stock||0) <= 10 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (b.stock||0) * 2)}%"></div></div>
                     </td>
                   </tr>`).join('')}
               </tbody>
@@ -890,8 +889,7 @@ const Pages = {
     const etqStock = ArcanoDB.getEtiquetasStock();
     const etqProducidas = ArcanoDB.getEtiquetasProducidas();
     const producciones = ArcanoDB.getProducciones();
-    const db = ArcanoDB.getDB();
-    const allBlends = Object.values(db.blends);
+    const allBlends = ArcanoDB.getBlends();
 
     const totalEtqFisicas = etqStock.reduce(function(s, e) { return s + e.stock; }, 0);
     const totalProducidas = etqProducidas.reduce(function(s, e) { return s + e.stock; }, 0);
@@ -931,9 +929,9 @@ const Pages = {
             ? '<p class="text-muted text-center">Sin etiquetas. Ve a <b>Compras</b> y agrega etiquetas con el nombre del blend/especia.</p>'
             : '<div class="etiquetas-grid">' +
               etqStock.map(function(e) {
-                var baja = e.stock <= 5;
+                var baja = (e.stock || 0) <= 5;
                 return '<div class="etiqueta-card">' +
-                  '<div class="etiqueta-label">' + e.nombre + '</div>' +
+                  '<div class="etiqueta-label">' + (e.nombre || '?') + '</div>' +
                   '<div class="etiqueta-cat"><span class="badge badge-blue">Etiqueta Fisica</span></div>' +
                   '<div class="etiqueta-stock ' + (baja ? 'text-red' : '') + '">' + e.stock + ' <span class="text-muted text-xs">uds</span></div>' +
                   (baja ? '<p class="text-red text-xs mt-4">Stock bajo - compra mas</p>' : '') +
