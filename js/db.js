@@ -251,9 +251,18 @@ function saveEspecia(data) {
     data.creado = new Date().toISOString();
     data.stockBolsa = 0;
     data.stockFrascos = 0;
+  } else {
+    // Editing: merge with existing record to preserve stock, creado, etc.
+    var existing = _db.especias[data.id];
+    if (existing && typeof existing === 'object') {
+      data.stockBolsa = Number(existing.stockBolsa) || 0;
+      data.stockFrascos = Number(existing.stockFrascos) || 0;
+      data.creado = existing.creado;
+    } else {
+      data.stockBolsa = 0;
+      data.stockFrascos = 0;
+    }
   }
-  data.stockBolsa = Number(data.stockBolsa) || 0;
-  data.stockFrascos = Number(data.stockFrascos) || 0;
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   _db.especias[data.id] = data;
@@ -289,8 +298,16 @@ function saveBlend(data) {
     data.creado = new Date().toISOString();
     data.ingredientes = data.ingredientes || [];
     data.stockFrascos = 0;
+  } else {
+    // Editing: merge with existing record to preserve stock, creado, etc.
+    var existing = _db.blends[data.id];
+    if (existing && typeof existing === 'object') {
+      data.stockFrascos = Number(existing.stockFrascos) || 0;
+      data.creado = existing.creado;
+    } else {
+      data.stockFrascos = 0;
+    }
   }
-  data.stockFrascos = Number(data.stockFrascos) || 0;
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   _db.blends[data.id] = data;
@@ -652,6 +669,31 @@ function getStats() {
   };
 }
 
+/* ==================== MANUAL STOCK UPDATE ==================== */
+
+/** Editar manualmente stock de especia (bolsa grs + frascos) */
+function updateStockEspecia(id, stockBolsa, stockFrascos) {
+  _ensureStructure();
+  var esp = _db.especias[id];
+  if (!esp) throw new Error('Especia no encontrada');
+  esp.stockBolsa = Math.max(0, Number(stockBolsa) || 0);
+  esp.stockFrascos = Math.max(0, Number(stockFrascos) || 0);
+  _saveToFirebase();
+  _notify('update', 'especias', id);
+  return esp;
+}
+
+/** Editar manualmente stock de blend (frascos) */
+function updateStockBlend(id, stockFrascos) {
+  _ensureStructure();
+  var bl = _db.blends[id];
+  if (!bl) throw new Error('Blend no encontrado');
+  bl.stockFrascos = Math.max(0, Number(stockFrascos) || 0);
+  _saveToFirebase();
+  _notify('update', 'blends', id);
+  return bl;
+}
+
 /* ---------- Export ---------- */
 window.ArcanoDB = {
   initDB: initDB, getDB: getDB, onDBChange: onDBChange, nextId: nextId,
@@ -664,5 +706,6 @@ window.ArcanoDB = {
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
   getUsuarios: getUsuarios, getUsuario: getUsuario, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
   authenticateUser: authenticateUser, getCurrentUser: getCurrentUser, logoutUser: logoutUser,
-  getStats: getStats, DB_KEY: DB_KEY, FB_PATH: FB_PATH
+  getStats: getStats, updateStockEspecia: updateStockEspecia, updateStockBlend: updateStockBlend,
+  DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };

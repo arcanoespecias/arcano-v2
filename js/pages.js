@@ -764,7 +764,7 @@ const Pages = {
           <div class="card-body">
             ${especias.length === 0 ? '<p class="text-muted">Sin especias</p>' : `
             <table class="table">
-              <thead><tr><th>Especia</th><th>Categoria</th><th>Gramos en bolsa</th></tr></thead>
+              <thead><tr><th>Especia</th><th>Categoria</th><th>Gramos en bolsa</th><th>Frascos</th><th></th></tr></thead>
               <tbody>
                 ${especias.sort((a,b) => (a.stockBolsa||0) - (b.stockBolsa||0)).map(e => `
                   <tr>
@@ -774,6 +774,8 @@ const Pages = {
                       <span class="${(e.stockBolsa||0) <= 50 ? 'text-red fw7' : (e.stockBolsa||0) <= 200 ? 'text-yellow fw7' : 'text-green'}">${e.stockBolsa || 0} grs</span>
                       <div class="stock-bar"><div class="stock-fill ${(e.stockBolsa||0) <= 50 ? 'bar-red' : (e.stockBolsa||0) <= 200 ? 'bar-yellow' : 'bar-green'}" style="width:${Math.min(100, (e.stockBolsa||0) / 5)}%"></div></div>
                     </td>
+                    <td><span class="${(e.stockFrascos||0) <= 3 ? 'text-red fw7' : 'text-green'}">${e.stockFrascos || 0}</span></td>
+                    <td><button class="btn btn-sm btn-outline" onclick="Pages.formEditStockEspecia('${e.id}')">Editar</button></td>
                   </tr>`).join('')}
               </tbody>
             </table>`}
@@ -784,22 +786,97 @@ const Pages = {
           <div class="card-body">
             ${(() => {
               var allFrascos = [];
-              especias.forEach(e => { if ((e.stockFrascos||0) > 0) allFrascos.push({nombre: e.nombre, categoria: e.categoria, stock: e.stockFrascos, tipo: 'Especia', chico: e.precioChico, grande: e.precioGrande}); });
-              blends.forEach(b => { if ((b.stockFrascos||0) > 0) allFrascos.push({nombre: b.nombre, categoria: b.categoria, stock: b.stockFrascos, tipo: 'Blend', chico: b.precioChico, grande: b.precioGrande}); });
-              if (allFrascos.length === 0) return '<p class="text-muted">Sin frascos. Produce en Especias o Blends.</p>';
-              return '<table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Frascos</th><th>$ Chico</th><th>$ Grande</th></tr></thead><tbody>' +
-                allFrascos.sort((a,b) => a.stock - b.stock).map(f => `
+              especias.forEach(e => { if ((e.stockFrascos||0) > 0 || (e.stockBolsa||0) > 0) allFrascos.push({id: e.id, nombre: e.nombre, categoria: e.categoria, stock: e.stockFrascos, tipo: 'especia', chico: e.precioChico, grande: e.precioGrande}); });
+              blends.forEach(b => { allFrascos.push({id: b.id, nombre: b.nombre, categoria: b.categoria, stock: b.stockFrascos, tipo: 'blend', chico: b.precioChico, grande: b.precioGrande}); });
+              if (allFrascos.length === 0) return '<p class="text-muted">Sin productos. Agrega especias o blends primero.</p>';
+              return '<table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Frascos</th><th>$ Chico</th><th>$ Grande</th><th></th></tr></thead><tbody>' +
+                allFrascos.sort((a,b) => a.nombre.localeCompare(b.nombre)).map(f => `
                   <tr>
                     <td class="fw7">${f.nombre}</td>
-                    <td><span class="badge ${f.tipo === 'Blend' ? 'badge-blue' : 'badge-gold'}">${f.tipo}</span></td>
+                    <td><span class="badge ${f.tipo === 'blend' ? 'badge-blue' : 'badge-gold'}">${f.tipo}</span></td>
                     <td><span class="${f.stock <= 3 ? 'text-red fw7' : 'text-green'}">${f.stock}</span></td>
                     <td>$${(f.chico||0).toLocaleString()}</td>
                     <td>$${(f.grande||0).toLocaleString()}</td>
+                    <td><button class="btn btn-sm btn-outline" onclick="Pages.formEditStock${f.tipo === 'blend' ? 'Blend' : 'Especia'}('${f.id}')">Editar</button></td>
                   </tr>`).join('') + '</tbody></table>';
             })()}
           </div>
         </div>
       </div>`;
+  },
+
+  /* ================================================================
+     EDITAR STOCK MANUALMENTE
+     ================================================================ */
+  formEditStockEspecia(id) {
+    const esp = ArcanoDB.getEspecia(id);
+    if (!esp) return;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header"><h3>Editar Stock: ${esp.nombre}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
+        <div class="modal-body">
+          <p class="text-muted text-sm mb-12">Ajusta manualmente las cantidades de stock. Usa esto para correcciones o inventario inicial.</p>
+          <div class="form-group">
+            <label>Stock en Bolsa (gramos de materia prima)</label>
+            <input type="number" class="input" id="f-st-bolsa" value="${esp.stockBolsa || 0}" min="0" step="1">
+          </div>
+          <div class="form-group">
+            <label>Frascos listos para vender (unidades)</label>
+            <input type="number" class="input" id="f-st-frascos" value="${esp.stockFrascos || 0}" min="0" step="1">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+          <button class="btn btn-gold" onclick="Pages.doEditStockEspecia('${id}')">Guardar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    setTimeout(() => document.getElementById('f-st-bolsa').focus(), 100);
+  },
+
+  doEditStockEspecia(id) {
+    const stockBolsa = Number(document.getElementById('f-st-bolsa').value) || 0;
+    const stockFrascos = Number(document.getElementById('f-st-frascos').value) || 0;
+    try {
+      ArcanoDB.updateStockEspecia(id, stockBolsa, stockFrascos);
+      document.querySelector('.modal-overlay').remove();
+      App.renderPage('stock');
+    } catch (e) { alert('Error: ' + e.message); }
+  },
+
+  formEditStockBlend(id) {
+    const bl = ArcanoDB.getBlend(id);
+    if (!bl) return;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header"><h3>Editar Stock: ${bl.nombre}</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>
+        <div class="modal-body">
+          <p class="text-muted text-sm mb-12">Ajusta manualmente la cantidad de frascos de este blend.</p>
+          <div class="form-group">
+            <label>Frascos listos para vender (unidades)</label>
+            <input type="number" class="input" id="f-st-frascos" value="${bl.stockFrascos || 0}" min="0" step="1">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+          <button class="btn btn-gold" onclick="Pages.doEditStockBlend('${id}')">Guardar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    setTimeout(() => document.getElementById('f-st-frascos').focus(), 100);
+  },
+
+  doEditStockBlend(id) {
+    const stockFrascos = Number(document.getElementById('f-st-frascos').value) || 0;
+    try {
+      ArcanoDB.updateStockBlend(id, stockFrascos);
+      document.querySelector('.modal-overlay').remove();
+      App.renderPage('stock');
+    } catch (e) { alert('Error: ' + e.message); }
   },
 
   /* ================================================================

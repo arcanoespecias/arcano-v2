@@ -1,1 +1,1 @@
-{"version": "2.1.0", "build": "2026-07-17", "notes": "Stock dual: bolsa grs + frascos. Migracion automatica v2.0→v2.1"}
+{"version": "2.1.1", "build": "2026-07-17", "notes": "Fix editar especia/blend (merge con existente). Edicion manual de stock en pagina Stock."}
