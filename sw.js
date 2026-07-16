@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arcano-v2-6';
+const CACHE_NAME = 'arcano-v3-1';
 const ASSETS = [
   '/',
   '/index.html',
@@ -28,7 +28,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Firebase: always network-first
   if (e.request.url.includes('firebaseio.com')) {
     e.respondWith(
       fetch(e.request)
@@ -41,7 +40,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // App assets: cache-first
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if (resp.status === 200) {

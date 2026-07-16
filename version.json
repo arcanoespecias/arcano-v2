@@ -1,1 +1,1 @@
-{"version": "2.2.0", "build": "2026-07-17", "notes": "Etiquetas por talla (chico/grande). Lista completa especias+blends en Etiquetas."}
+{"version": "3.0.0", "build": "2026-07-17", "notes": "Reescritura completa. Modelo simplificado: Productos, Insumos, Produccion, Ventas, Stock."}
