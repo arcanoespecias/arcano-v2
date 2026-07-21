@@ -82,7 +82,8 @@ const Pages = {
           '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
           '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
           '<td style="white-space:nowrap">' +
-            '<button class="btn btn-sm btn-green mr-8" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
+            '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
+            '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
             '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
             '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
           '</td></tr>';
@@ -110,7 +111,8 @@ const Pages = {
           '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
           '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
           '<td style="white-space:nowrap">' +
-            '<button class="btn btn-sm btn-green mr-8" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
+            '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
+            '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
             '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formBlend(' + b.id + ')">Editar</button>' +
             '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
           '</td></tr>';
@@ -144,6 +146,11 @@ const Pages = {
         '<div class="form-group"><label>Precio Frasco Grande ($)</label><input type="number" class="input" id="f-esp-pg" value="' + (isEdit ? esp.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="g2"><div class="form-group"><label>Gramos por Frasco Chico</label><input type="number" class="input" id="f-esp-gc" value="' + (isEdit ? esp.gramosChico : '') + '" placeholder="Ej: 30" min="0"></div>' +
         '<div class="form-group"><label>Gramos por Frasco Grande</label><input type="number" class="input" id="f-esp-gg" value="' + (isEdit ? esp.gramosGrande : '') + '" placeholder="Ej: 80" min="0"></div></div>' +
+        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
+        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-esp-tienda"><option value="0"' + (isEdit && esp.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && esp.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-esp-tg" value="' + (isEdit ? (esp.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '</div></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g bolsa, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -162,7 +169,10 @@ const Pages = {
         precioChico: Number(document.getElementById('f-esp-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-esp-pg').value) || 0,
         gramosChico: Number(document.getElementById('f-esp-gc').value) || 0,
-        gramosGrande: Number(document.getElementById('f-esp-gg').value) || 0
+        gramosGrande: Number(document.getElementById('f-esp-gg').value) || 0,
+        enTienda: document.getElementById('f-esp-tienda').value === '1',
+        precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
+        precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -219,6 +229,11 @@ const Pages = {
         '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="form-group"><label>Ingredientes</label><div id="blend-ings"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ing">+ Ingrediente</button></div>' +
+        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
+        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && bl.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-bl-tg" value="' + (isEdit ? (bl.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '</div></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -273,7 +288,10 @@ const Pages = {
         uso: (document.getElementById('f-bl-uso') || {}).value ? document.getElementById('f-bl-uso').value.trim() : '',
         precioChico: Number(document.getElementById('f-bl-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-bl-pg').value) || 0,
-        ingredientes: ingredientes
+        ingredientes: ingredientes,
+        enTienda: document.getElementById('f-bl-tienda').value === '1',
+        precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
+        precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -391,6 +409,23 @@ const Pages = {
       return o;
     }
 
+    function buildProductoOpts() {
+      var o = '';
+      var esps = ArcanoDB.getEspecias();
+      var bls = ArcanoDB.getBlends();
+      if (esps.length > 0) {
+        o += '<optgroup label="Especias">';
+        for (var i = 0; i < esps.length; i++) o += '<option value="' + esps[i].nombre + '">' + esps[i].nombre + '</option>';
+        o += '</optgroup>';
+      }
+      if (bls.length > 0) {
+        o += '<optgroup label="Blends">';
+        for (var i = 0; i < bls.length; i++) o += '<option value="' + bls[i].nombre + '">' + bls[i].nombre + '</option>';
+        o += '</optgroup>';
+      }
+      return o;
+    }
+
     function addEntRow() {
       var div = document.createElement('div');
       div.className = 'card mb-8';
@@ -417,7 +452,7 @@ const Pages = {
         } else if (t === 'envase') {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select>';
         } else {
-          detailDiv.innerHTML = '<label>Producto</label><input type="text" class="input ent-etq-nombre" placeholder="Nombre del producto"><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select>';
+          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-etq-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select>';
         }
       }
       tipoSel.addEventListener('change', renderDetail);
@@ -819,6 +854,45 @@ const Pages = {
           '<td class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</td>' +
           '<td class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</td>' +
           '<td>' + (et?et.stockChico:0) + '</td><td>' + (et?et.stockGrande:0) + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
+     TIENDA ADMIN
+     ================================================================ */
+  renderTiendaAdmin(container) {
+    var productos = ArcanoDB.getTiendaProductos();
+    var allEsp = ArcanoDB.getEspecias();
+    var allBl = ArcanoDB.getBlends();
+    var enTiendaCount = 0;
+    for (var i = 0; i < allEsp.length; i++) { if (allEsp[i].enTienda) enTiendaCount++; }
+    for (var i = 0; i < allBl.length; i++) { if (allBl[i].enTienda) enTiendaCount++; }
+
+    var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">' +
+      '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">' + enTiendaCount + '</div><div class="stat-label">Productos en Tienda</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + productos.length + '</div><div class="stat-label">Disponibles (con stock)</div></div>' +
+      '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
+      '</div>';
+
+    h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
+    if (productos.length === 0) {
+      h += '<p class="text-muted text-center">No hay productos visibles. Activa "Tienda" en Productos > Editar.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cat.</th><th>Precio Chico</th><th>Precio Grande</th><th>Stock Ch</th><th>Stock Gr</th></tr></thead><tbody>';
+      for (var i = 0; i < productos.length; i++) {
+        var p = productos[i];
+        h += '<tr>' +
+          '<td class="fw7">' + p.nombre + '</td>' +
+          '<td><span class="badge ' + (p.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (p.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
+          '<td>' + (p.categoria||'') + '</td>' +
+          '<td class="text-gold">$' + (p.precioChico||0).toLocaleString() + '</td>' +
+          '<td class="text-gold">$' + (p.precioGrande||0).toLocaleString() + '</td>' +
+          '<td class="text-green">' + p.stockChico + '</td>' +
+          '<td class="text-green">' + p.stockGrande + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }

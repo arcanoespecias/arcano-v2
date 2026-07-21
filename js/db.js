@@ -696,6 +696,51 @@ function getFrascosParaVender() {
   return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
+/* ==================== TIENDA (STORE) ==================== */
+
+/** Products visible in the public store (enTienda=true, stock>0) */
+function getTiendaProductos() {
+  var products = [];
+  var espKeys = Object.keys(_db.especias || {});
+  for (var i = 0; i < espKeys.length; i++) {
+    var e = _db.especias[espKeys[i]];
+    if (!e || !e.enTienda) continue;
+    if ((e.stockChico || 0) <= 0 && (e.stockGrande || 0) <= 0) continue;
+    products.push({
+      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas',
+      precioChico: Number(e.precioTiendaChico) || Number(e.precioChico) || 0,
+      precioGrande: Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0,
+      stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0,
+      region: '', uso: ''
+    });
+  }
+  var blKeys = Object.keys(_db.blends || {});
+  for (var i = 0; i < blKeys.length; i++) {
+    var b = _db.blends[blKeys[i]];
+    if (!b || !b.enTienda) continue;
+    if ((b.stockChico || 0) <= 0 && (b.stockGrande || 0) <= 0) continue;
+    products.push({
+      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas',
+      precioChico: Number(b.precioTiendaChico) || Number(b.precioChico) || 0,
+      precioGrande: Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0,
+      stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0,
+      region: b.region || '', uso: b.uso || ''
+    });
+  }
+  return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+}
+
+/** Toggle enTienda for a product */
+function toggleTienda(tipo, id) {
+  if (tipo === 'especia' && _db.especias[id]) {
+    _db.especias[id].enTienda = !_db.especias[id].enTienda;
+  } else if (tipo === 'blend' && _db.blends[id]) {
+    _db.blends[id].enTienda = !_db.blends[id].enTienda;
+  } else return;
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', tipo === 'especia' ? 'especias' : 'blends', id);
+}
+
 /* ==================== EXCEL IMPORT ==================== */
 
 /** Find especia by name with flexible matching (exact, prefix, contains, word overlap) */
@@ -854,5 +899,7 @@ window.ArcanoDB = {
   getStats: getStats,
   findEspeciaByName: findEspeciaByName,
   importFromExcelData: importFromExcelData,
+  getTiendaProductos: getTiendaProductos,
+  toggleTienda: toggleTienda,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };

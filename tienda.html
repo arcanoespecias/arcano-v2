@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Arcano Especias - Especias y Blends artesanales del mundo">
+  <meta name="theme-color" content="#1b0b07">
+  <title>Arcano Especias - Tienda</title>
+  <link rel="stylesheet" href="css/tienda.css">
+</head>
+<body>
+  <header class="store-header">
+    <div class="store-logo">A</div>
+    <h1>ARCANO</h1>
+    <div class="sub">Especias & Blends</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h2>Especias del Mundo</h2>
+      <p>Mezclas artesanales con ingredientes seleccionados de cada rincon</p>
+    </section>
+
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-cat="Todos">Todos</button>
+      <button class="filter-btn" data-cat="Comidas">Comidas</button>
+      <button class="filter-btn" data-cat="Infusiones">Infusiones</button>
+      <button class="filter-btn" data-cat="Cocteleria">Cocteleria</button>
+    </div>
+
+    <div class="products-grid" id="products-grid">
+      <div class="empty-state"><p>Cargando productos...</p></div>
+    </div>
+  </main>
+
+  <button class="cart-fab" id="cart-fab" style="display:none" onclick="openCart()">
+    <span class="cart-count" id="cart-count">0</span> Ver Pedido
+  </button>
+
+  <footer class="store-footer">
+    Arcano Especias & Blends &middot; Especias artesanales
+  </footer>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="js/tienda-data.js"></script>
+  <script src="js/tienda-ui.js"></script>
+</body>
+</html>
