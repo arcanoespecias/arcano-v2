@@ -67,6 +67,7 @@ function renderProducts(filter) {
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
         '<div class="card-meta">' + meta + '</div>' +
+        (p.tags && p.tags.length ? '<div class="card-tags">' + p.tags.map(function(t){return '<span class="card-tag">' + t + '</span>';}).join('') + '</div>' : '') +
         (anyStock ? '<span class="stock-badge ' + stockClass + '">' + stockText + '</span>' : '') +
         '<div class="card-prices">' +
           (hasChico ? '<div class="price-box"><div class="price-label">Chico</div><div class="price-value">$' + p.precioChico.toLocaleString() + '</div></div>' : '') +
@@ -106,6 +107,11 @@ function openDetail(pid) {
   if (p.categoria) tagsHtml += '<span class="detail-info-tag">' + p.categoria + '</span>';
   if (p.uso) tagsHtml += '<span class="detail-info-tag">' + p.uso + '</span>';
   if (p.region) tagsHtml += '<span class="detail-info-tag">' + p.region + '</span>';
+  if (p.tags && p.tags.length) {
+    for (var ti = 0; ti < p.tags.length; ti++) {
+      tagsHtml += '<span class="detail-info-tag detail-tag-item">' + p.tags[ti] + '</span>';
+    }
+  }
 
   var pricesHtml = '';
   if (hasChico) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Chico</div><div class="detail-price-val">$' + p.precioChico.toLocaleString() + '</div></div>';

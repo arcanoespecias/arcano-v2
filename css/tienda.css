@@ -112,6 +112,10 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 .success-icon { font-size: 3rem; margin-bottom: 12px; }
 .success-msg h3 { color: var(--green); margin-bottom: 8px; }
 
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.card-tag { background: var(--gold-light); color: var(--gold-dark); padding: 2px 8px; border-radius: 10px; font-size: .65rem; font-weight: 600; }
+.detail-tag-item { background: var(--gold-light); }
+
 /* === PRODUCT DETAIL MODAL === */
 .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; animation: fadeIn .2s; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

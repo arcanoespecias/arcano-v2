@@ -74,6 +74,11 @@ function _ensureStructure() {
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
+  if (!_db.productTags) _db.productTags = {
+    'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
+    'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
+    'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
+  };
   _cleanNulls();
   return true;
 }
@@ -83,6 +88,11 @@ function _emptyDB() {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
     especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, etiquetas: {},
     stockEnvases: { chico: 0, grande: 0 },
+    productTags: {
+      'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
+      'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
+      'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
+    },
     usuarios: { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
   };
 }
@@ -882,6 +892,61 @@ function importFromExcelData(especiasList, blendsList, gramosChico, gramosGrande
   return resultado;
 }
 
+/* ==================== PRODUCT TAGS ==================== */
+
+function getProductTags() {
+  _ensureStructure();
+  return _db.productTags || {};
+}
+
+function getTagsForCategoria(cat) {
+  var tags = getProductTags();
+  return tags[cat] || [];
+}
+
+function addProductTag(cat, tagName) {
+  _ensureStructure();
+  tagName = (tagName || '').trim();
+  if (!tagName) return false;
+  if (!_db.productTags) _db.productTags = {};
+  if (!_db.productTags[cat]) _db.productTags[cat] = [];
+  // Check duplicate (case-insensitive)
+  for (var i = 0; i < _db.productTags[cat].length; i++) {
+    if (_db.productTags[cat][i].toLowerCase() === tagName.toLowerCase()) return false;
+  }
+  _db.productTags[cat].push(tagName);
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
+function removeProductTag(cat, tagName) {
+  _ensureStructure();
+  if (!_db.productTags || !_db.productTags[cat]) return false;
+  var idx = -1;
+  for (var i = 0; i < _db.productTags[cat].length; i++) {
+    if (_db.productTags[cat][i] === tagName) { idx = i; break; }
+  }
+  if (idx < 0) return false;
+  _db.productTags[cat].splice(idx, 1);
+  // Also remove from all products that have this tag
+  var allEsp = getEspecias();
+  for (var e = 0; e < allEsp.length; e++) {
+    if (allEsp[e].tags) {
+      var ti = allEsp[e].tags.indexOf(tagName);
+      if (ti >= 0) { allEsp[e].tags.splice(ti, 1); }
+    }
+  }
+  var allBl = getBlends();
+  for (var b = 0; b < allBl.length; b++) {
+    if (allBl[b].tags) {
+      var bi = allBl[b].tags.indexOf(tagName);
+      if (bi >= 0) { allBl[b].tags.splice(bi, 1); }
+    }
+  }
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
 /* ==================== IMAGE HELPER ==================== */
 
 function compressImage(file, maxW, quality, cb) {
@@ -924,6 +989,8 @@ window.ArcanoDB = {
   importFromExcelData: importFromExcelData,
   getTiendaProductos: getTiendaProductos,
   toggleTienda: toggleTienda,
+  getProductTags: getProductTags, getTagsForCategoria: getTagsForCategoria,
+  addProductTag: addProductTag, removeProductTag: removeProductTag,
   compressImage: compressImage,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };

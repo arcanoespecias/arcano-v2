@@ -120,6 +120,25 @@ const Pages = {
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
+
+    // --- ETIQUETAS ---
+    var allTags = ArcanoDB.getProductTags();
+    var catKeys = ['Comidas', 'Infusiones', 'Cocteleria'];
+    h += '<div class="card mt-16"><div class="card-header"><h3>Etiquetas por Categoria</h3></div><div class="card-body">';
+    for (var ci = 0; ci < catKeys.length; ci++) {
+      var cat = catKeys[ci];
+      var tags = allTags[cat] || [];
+      h += '<div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="badge badge-gold" style="min-width:90px;text-align:center">' + cat + '</span>' +
+        '<input type="text" class="input" id="new-tag-' + ci + '" placeholder="Nueva etiqueta..." style="flex:1;padding:6px 10px;font-size:.85rem">' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag(\'' + cat + '\',' + ci + ')">+ Agregar</button></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (var ti = 0; ti < tags.length; ti++) {
+        h += '<span class="tag-chip-admin"><span>' + tags[ti] + '</span><button onclick="Pages.doRemoveTag(\'' + cat + '\',\'' + tags[ti].replace(/'/g, "\\\'") + '\')" style=\"background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px\">\u00d7</button></span>';
+      }
+      if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas</span>';
+      h += '</div></div>';
+    }
+    h += '</div></div>';
     container.innerHTML = h;
   },
 
@@ -137,7 +156,7 @@ const Pages = {
       '<button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
         '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-esp-nombre" value="' + (isEdit ? esp.nombre : '') + '" placeholder="Ej: Curcuma" ' + (isEdit ? 'readonly style="opacity:0.6"' : '') + '></div>' +
-        '<div class="form-group"><label>Categoria</label><select class="input" id="f-esp-cat">' +
+        '<div class="form-group"><label>Categoria</label><select class="input" id="f-esp-cat" onchange="Pages.refreshTagSelector(\'esp\')">' +
           '<option value="Comidas"' + (isEdit && esp.categoria==='Comidas' ? ' selected' : '') + '>Comidas</option>' +
           '<option value="Infusiones"' + (isEdit && esp.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
           '<option value="Cocteleria"' + (isEdit && esp.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
@@ -154,6 +173,7 @@ const Pages = {
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
+        '<div class="form-group"><label>Etiquetas</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', esp.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g bolsa, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
@@ -181,7 +201,8 @@ const Pages = {
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
         imagen: previewEl ? previewEl.src : '',
         descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
-        uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : ''
+        uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : '',
+        tags: Pages.getSelectedTags()
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -226,7 +247,7 @@ const Pages = {
       '<div class="modal-body">' +
         '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-bl-nombre" value="' + (isEdit ? bl.nombre : '') + '" placeholder="Ej: Curry Casero" ' + (isEdit ? 'readonly style="opacity:0.6"' : '') + '></div>' +
         '<div class="g2">' +
-          '<div class="form-group"><label>Categoria</label><select class="input" id="f-bl-cat">' +
+          '<div class="form-group"><label>Categoria</label><select class="input" id="f-bl-cat" onchange="Pages.refreshTagSelector(\'bl\')">' +
           '<option value="Comidas"' + (isEdit && bl.categoria==='Comidas' ? ' selected' : '') + '>Comidas</option>' +
           '<option value="Infusiones"' + (isEdit && bl.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
           '<option value="Cocteleria"' + (isEdit && bl.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
@@ -246,6 +267,7 @@ const Pages = {
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
+        '<div class="form-group"><label>Etiquetas</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', bl.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -306,7 +328,8 @@ const Pages = {
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
         imagen: (document.getElementById('img-preview-bl') || {}).src || '',
-        descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : ''
+        descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : '',
+        tags: Pages.getSelectedTags()
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -1221,6 +1244,60 @@ const Pages = {
     if (!confirm('Eliminar usuario?')) return;
     ArcanoDB.deleteUsuario(id);
     App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     TAG SELECTOR HELPER
+     ================================================================ */
+  buildTagSelectorHtml(cat, selectedTags) {
+    var tags = ArcanoDB.getTagsForCategoria(cat);
+    var sel = selectedTags || [];
+    var h = '<div class="tag-selector" id="tag-selector">';
+    if (tags.length === 0) {
+      h += '<p class="text-sm text-muted">No hay etiquetas para esta categoria.</p>';
+    } else {
+      for (var i = 0; i < tags.length; i++) {
+        var checked = sel.indexOf(tags[i]) >= 0 ? ' checked' : '';
+        h += '<label class="tag-chip"><input type="checkbox" value="' + tags[i] + '"' + checked + '><span>' + tags[i] + '</span></label>';
+      }
+    }
+    h += '</div>';
+    return h;
+  },
+
+  getSelectedTags() {
+    var cbs = document.querySelectorAll('#tag-selector input[type=checkbox]');
+    var tags = [];
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) tags.push(cbs[i].value);
+    }
+    return tags;
+  },
+
+  refreshTagSelector(prefix) {
+    var catEl = document.getElementById('f-' + prefix + '-cat');
+    var areaEl = document.getElementById('tag-area-' + prefix);
+    if (!catEl || !areaEl) return;
+    areaEl.innerHTML = Pages.buildTagSelectorHtml(catEl.value, []);
+  },
+
+  doAddTag(cat, idx) {
+    var inp = document.getElementById('new-tag-' + idx);
+    if (!inp) return;
+    var name = inp.value.trim();
+    if (!name) return;
+    if (ArcanoDB.addProductTag(cat, name)) {
+      App.renderPage('productos');
+    } else {
+      alert('La etiqueta ya existe en esta categoria.');
+    }
+  },
+
+  doRemoveTag(cat, tagName) {
+    if (confirm('Eliminar etiqueta "' + tagName + '"? Se quitara de los productos que la tengan.')) {
+      ArcanoDB.removeProductTag(cat, tagName);
+      App.renderPage('productos');
+    }
   },
 
   /* ================================================================
