@@ -1,12 +1,12 @@
 /* ===================== ARCANO V3 — DATA LAYER =====================
    Flujo:
-     Insumos → Stock (bolsa grs, envases, stickers)
+     Insumos → Stock (pala grs, envases, stickers, bolsas)
      Produccion → consume insumos → Frascos listos (chico / grande)
      Ventas → consume frascos
 
    Stock por especia: stockBolsa (grs), stockChico, stockGrande (frascos)
    Stock por blend:   stockChico, stockGrande (frascos)
-   Stock global:      envasesChico, envasesGrande
+   Stock global:      stockEnvases (chico/grande), stockBolsas (chico/grande)
    Stickers:           por producto, stockChico, stockGrande
    ===================== */
 
@@ -28,6 +28,7 @@ var _db = null;
 var _ready = false;
 var _saveTimer = null;
 var _listeners = [];
+var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
 var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1 };
 
@@ -76,6 +77,7 @@ function _ensureStructure() {
   }
   delete _db.etiquetas;
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
+  if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
@@ -93,6 +95,7 @@ function _emptyDB() {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
     especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {},
     stockEnvases: { chico: 0, grande: 0 },
+    stockBolsas: { chico: 0, grande: 0 },
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
@@ -127,12 +130,19 @@ function _initFirebase() {
 
 function _saveToFirebase() {
   if (!_firebaseRef) return;
+  _localDirty = true;
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
     try {
-      _firebaseRef.set(_db);
+      var safetyTimer = setTimeout(function() { _localDirty = false; }, 5000);
+      _firebaseRef.set(_db, function(error) {
+        clearTimeout(safetyTimer);
+        _localDirty = false;
+        if (error) console.error('[DB] Firebase save error:', error);
+      });
     } catch (e) {
       console.error('[DB] Firebase save error:', e);
+      _localDirty = false;
     }
   }, 500);
 }
@@ -149,12 +159,13 @@ function initDB() {
   return new Promise(function(resolve) {
     _initFirebase();
 
-    // Try localStorage cache
+    // Always try localStorage cache for instant UI
     var cached = null;
     try { cached = JSON.parse(localStorage.getItem(DB_KEY)); } catch (e) {}
 
     if (cached && cached.meta && cached.meta.version === DB_VERSION && _ensureStructureOn(cached)) {
       _db = cached;
+      _ensureStructure();  // ensure new fields exist on cached data
       _ready = true;
       _startFirebaseListener();
       resolve();
@@ -167,8 +178,8 @@ function initDB() {
         var fbData = snap.val();
         if (fbData && fbData.meta && fbData.meta.version === DB_VERSION && _ensureStructureOn(fbData)) {
           _db = fbData;
+          _ensureStructure();  // ensure new fields exist on Firebase data
         } else {
-          // Fresh DB (old version or empty)
           _db = _emptyDB();
           _ensureStructure();
           _saveToFirebase();
@@ -210,6 +221,8 @@ function _startFirebaseListener() {
   _firebaseRef.on('value', function(snap) {
     var data = snap.val();
     if (!data || !data.meta || data.meta.version !== DB_VERSION) return;
+    // CRITICAL: skip if local save is pending to prevent overwriting unsaved changes
+    if (_localDirty) return;
     var prevJson = JSON.stringify(_db);
     _db = data;
     _ensureStructure();
@@ -409,6 +422,10 @@ function saveEntrada(data) {
         } else {
           stk.stockChico = (stk.stockChico || 0) + (Number(item.cantidad) || 0);
         }
+      } else if (tipo === 'bolsa') {
+        var tallaB = item.talla || 'chico';
+        if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+        _db.stockBolsas[tallaB] = (_db.stockBolsas[tallaB] || 0) + (Number(item.cantidad) || 0);
       }
     }
   }
@@ -441,9 +458,9 @@ function producirEspecia(especiaId, talla, cantidad) {
 
   var grsTotal = gramosPorFrasco * cantidad;
 
-  // Check & consume bolsa
+  // Check & consume pala (raw material)
   if ((esp.stockBolsa || 0) < grsTotal) {
-    throw new Error('Bolsa insuficiente de "' + esp.nombre + '". Necesitas ' + grsTotal + 'grs, tienes ' + (esp.stockBolsa || 0) + 'grs');
+    throw new Error('Pala insuficiente de "' + esp.nombre + '". Necesitas ' + grsTotal + 'grs, tienes ' + (esp.stockBolsa || 0) + 'grs');
   }
 
   // Check & consume envases
@@ -459,9 +476,16 @@ function producirEspecia(especiaId, talla, cantidad) {
     throw new Error('Stickers ' + talla + ' insuficientes para "' + esp.nombre + '". Necesitas ' + cantidad + ', tienes ' + stkStock);
   }
 
+  // Check & consume bolsas (packaging)
+  if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+  if ((_db.stockBolsas[talla] || 0) < cantidad) {
+    throw new Error('Bolsas ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockBolsas[talla] || 0));
+  }
+
   // All checks passed — consume
   esp.stockBolsa = (esp.stockBolsa || 0) - grsTotal;
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
+  _db.stockBolsas[talla] = (_db.stockBolsas[talla] || 0) - cantidad;
   if (stk) {
     var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
     stk[stkKey] = (stk[stkKey] || 0) - cantidad;
@@ -475,7 +499,7 @@ function producirEspecia(especiaId, talla, cantidad) {
     id: prodId, tipo: 'especia', productoId: especiaId, productoNombre: esp.nombre,
     categoria: esp.categoria || '', talla: talla, cantidad: cantidad,
     gramosPorFrasco: gramosPorFrasco, gramosTotal: grsTotal,
-    envasesConsumidos: cantidad, stickersConsumidos: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -506,7 +530,7 @@ function producirBlend(blendId, talla, cantidad) {
     if (grsPorFrasco <= 0) throw new Error('El ingrediente "' + esp.nombre + '" no tiene gramos para frasco ' + talla);
     var grsNeeded = grsPorFrasco * cantidad;
     if ((esp.stockBolsa || 0) < grsNeeded) {
-      throw new Error('Bolsa insuficiente de "' + esp.nombre + '". Necesitas ' + grsNeeded + 'grs, tienes ' + (esp.stockBolsa || 0) + 'grs');
+      throw new Error('Pala insuficiente de "' + esp.nombre + '". Necesitas ' + grsNeeded + 'grs, tienes ' + (esp.stockBolsa || 0) + 'grs');
     }
     detalleIngredientes.push({ especiaId: ing.especiaId, especiaNombre: esp.nombre, gramosPorFrasco: grsPorFrasco, gramosTotal: grsNeeded });
   }
@@ -524,6 +548,12 @@ function producirBlend(blendId, talla, cantidad) {
     throw new Error('Stickers ' + talla + ' insuficientes para "' + blend.nombre + '". Necesitas ' + cantidad + ', tienes ' + stkStock);
   }
 
+  // Check & consume bolsas (packaging)
+  if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+  if ((_db.stockBolsas[talla] || 0) < cantidad) {
+    throw new Error('Bolsas ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockBolsas[talla] || 0));
+  }
+
   // All checks passed — consume
   var grsTotalGeneral = 0;
   for (var i = 0; i < detalleIngredientes.length; i++) {
@@ -533,6 +563,7 @@ function producirBlend(blendId, talla, cantidad) {
     grsTotalGeneral += d.gramosTotal;
   }
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
+  _db.stockBolsas[talla] = (_db.stockBolsas[talla] || 0) - cantidad;
   if (stk) {
     var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
     stk[stkKey] = (stk[stkKey] || 0) - cantidad;
@@ -545,7 +576,7 @@ function producirBlend(blendId, talla, cantidad) {
     id: prodId, tipo: 'blend', productoId: blendId, productoNombre: blend.nombre,
     categoria: blend.categoria || '', talla: talla, cantidad: cantidad,
     ingredientes: detalleIngredientes, gramosTotal: grsTotalGeneral,
-    envasesConsumidos: cantidad, stickersConsumidos: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -659,6 +690,7 @@ function getStats() {
   var ventas = _filterValid(Object.values(_db.ventas || {}));
   var stickers = _filterValid(Object.values(_db.stickers || {}));
   var envases = _db.stockEnvases || { chico: 0, grande: 0 };
+  var bolsas = _db.stockBolsas || { chico: 0, grande: 0 };
 
   var today = new Date().toISOString().slice(0, 10);
   var mes = new Date().toISOString().slice(0, 7);
@@ -682,6 +714,8 @@ function getStats() {
     totalFrascos: frascosChico + frascosGrande,
     envasesChico: envases.chico || 0,
     envasesGrande: envases.grande || 0,
+    bolsasChico: bolsas.chico || 0,
+    bolsasGrande: bolsas.grande || 0,
     ventasHoy: ventasHoy.length,
     totalVentasHoy: ventasHoy.reduce(function(s, v) { return s + (Number(v.total) || 0); }, 0),
     ventasMes: ventasMes.length,
