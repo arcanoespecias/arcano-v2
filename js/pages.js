@@ -150,6 +150,9 @@ const Pages = {
         '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-esp-tienda"><option value="0"' + (isEdit && esp.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && esp.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
         '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-esp-tg" value="' + (isEdit ? (esp.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-esp"><input type="file" accept="image/*" id="f-esp-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-esp\')">' +
+        (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
+        '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g bolsa, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -163,6 +166,7 @@ const Pages = {
     document.getElementById('btn-save-esp').addEventListener('click', function() {
       var nombre = document.getElementById('f-esp-nombre').value.trim();
       if (!nombre) { alert('Ingresa un nombre'); return; }
+      var previewEl = document.getElementById('img-preview-esp');
       var data = {
         nombre: nombre,
         categoria: document.getElementById('f-esp-cat').value,
@@ -172,7 +176,8 @@ const Pages = {
         gramosGrande: Number(document.getElementById('f-esp-gg').value) || 0,
         enTienda: document.getElementById('f-esp-tienda').value === '1',
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
-        precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0
+        precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
+        imagen: previewEl ? previewEl.src : ''
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -233,6 +238,9 @@ const Pages = {
         '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && bl.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
         '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-bl-tg" value="' + (isEdit ? (bl.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-bl"><input type="file" accept="image/*" id="f-bl-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-bl\')">' +
+        (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
+        '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -291,7 +299,8 @@ const Pages = {
         ingredientes: ingredientes,
         enTienda: document.getElementById('f-bl-tienda').value === '1',
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
-        precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0
+        precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
+        imagen: (document.getElementById('img-preview-bl') || {}).src || ''
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -1206,5 +1215,46 @@ const Pages = {
     if (!confirm('Eliminar usuario?')) return;
     ArcanoDB.deleteUsuario(id);
     App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     IMAGE UPLOAD HELPERS
+     ================================================================ */
+  handleImageUpload(input, areaId) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
+      if (err) { alert(err); return; }
+      var area = document.getElementById(areaId);
+      var placeholder = area.querySelector('.img-upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
+      if (existing) existing.remove();
+      var removeBtn = area.querySelector('.btn-red');
+      if (removeBtn) removeBtn.remove();
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = 'img-preview';
+      img.id = 'img-preview-' + areaId.split('-').pop();
+      area.insertBefore(img, placeholder);
+      var rmBtn = document.createElement('button');
+      rmBtn.className = 'btn btn-sm btn-red';
+      rmBtn.style.marginTop = '6px';
+      rmBtn.textContent = 'Quitar imagen';
+      rmBtn.onclick = function() { Pages.removeImage(areaId, input.id); };
+      area.insertBefore(rmBtn, placeholder);
+    });
+  },
+
+  removeImage(areaId, inputId) {
+    var area = document.getElementById(areaId);
+    var preview = area.querySelector('.img-preview');
+    if (preview) preview.remove();
+    var btn = area.querySelector('.btn-red');
+    if (btn) btn.remove();
+    var placeholder = area.querySelector('.img-upload-placeholder');
+    if (placeholder) placeholder.style.display = '';
+    var inp = document.getElementById(inputId);
+    if (inp) inp.value = '';
   }
 };

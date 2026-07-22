@@ -882,6 +882,29 @@ function importFromExcelData(especiasList, blendsList, gramosChico, gramosGrande
   return resultado;
 }
 
+/* ==================== IMAGE HELPER ==================== */
+
+function compressImage(file, maxW, quality, cb) {
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL('image/jpeg', quality);
+      cb(null, dataUrl);
+    };
+    img.onerror = function() { cb('Error al cargar imagen'); };
+    img.src = ev.target.result;
+  };
+  reader.onerror = function() { cb('Error al leer archivo'); };
+  reader.readAsDataURL(file);
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -901,5 +924,6 @@ window.ArcanoDB = {
   importFromExcelData: importFromExcelData,
   getTiendaProductos: getTiendaProductos,
   toggleTienda: toggleTienda,
+  compressImage: compressImage,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };

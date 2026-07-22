@@ -387,6 +387,12 @@ select.input { cursor: pointer; }
   align-items: center; justify-content: center;
 }
 
+/* ---------- Image Upload ---------- */
+.img-upload-area { position: relative; }
+.img-upload-placeholder { border: 2px dashed var(--border); border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; color: var(--text3); font-size: 0.85rem; transition: border-color 0.2s; }
+.img-upload-placeholder:hover { border-color: var(--gold); color: var(--gold); }
+.img-preview { width: 100%; max-width: 200px; max-height: 200px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; margin-bottom: 4px; }
+
 /* ---------- Scrollbar ---------- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }

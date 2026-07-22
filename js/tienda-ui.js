@@ -62,7 +62,9 @@ function renderProducts(filter) {
     if (p.uso) meta += ' · ' + p.uso;
 
     h += '<div class="product-card">' +
-      '<div class="card-img" style="position:relative"><span style="font-size:1.6rem">' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span></div>' +
+      '<div class="card-img" style="position:relative">' +
+        (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px">' : '<span style="font-size:1.6rem">' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
+      '</div>' +
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
         '<div class="card-meta">' + meta + '</div>' +
