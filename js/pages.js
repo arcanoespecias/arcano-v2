@@ -62,9 +62,9 @@ const Pages = {
 
     var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
-        '<button class="tab' + (tab==='especias' ? ' active' : '') + '" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">' + especias.length + '</span></button>' +
-        '<button class="tab' + (tab==='blends' ? ' active' : '') + '" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">' + blends.length + '</span></button>' +
-        '<button class="tab' + (tab==='etiquetas' ? ' active' : '') + '" onclick="window._prodTab='etiquetas';App.renderPage('productos')">Etiquetas</button>' +
+        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
+        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
+        `<button class="tab${tab==='etiquetas' ? ' active' : ''}" onclick="window._prodTab='etiquetas';App.renderPage('productos')">Etiquetas</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
@@ -92,8 +92,8 @@ const Pages = {
             '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda('especia',' + e.id + ');App.renderPage('productos')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida('especia',' + e.id + ')">Producir</button>' +
+              '<button class="btn btn-sm "' + (e.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
             '</td></tr>';
@@ -121,9 +121,8 @@ const Pages = {
             '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda('blend',' + b.id + ');App.renderPage('productos')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida('blend',' + b.id + ')">Producir</button>' +
-              '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formBlend(' + b.id + ')">Editar</button>' +
+              '<button class="btn btn-sm "' + (b.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
             '</td></tr>';
         }
@@ -140,11 +139,11 @@ const Pages = {
         var cat = catKeys[ci];
         var tags = allTags[cat] || [];
         h += '<div style="margin-bottom:20px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge badge-gold" style="min-width:100px;text-align:center">' + cat + '</span>' +
-          '<input type="text" class="input" id="new-tag-' + ci + '" placeholder="Nueva etiqueta..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key==='Enter')Pages.doAddTag('' + cat + '',' + ci + ')">' +
-          '<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag('' + cat + '',' + ci + ')">+ Agregar</button></div>' +
+          `<input type="text" class="input" id="new-tag-${ci}" placeholder="Nueva etiqueta..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key==='Enter')Pages.doAddTag('${cat}',${ci})">` +
+          `<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag('${cat}',${ci})">+ Agregar</button></div>` +
           '<div style="display:flex;flex-wrap:wrap;gap:6px">';
         for (var ti = 0; ti < tags.length; ti++) {
-          h += '<span class="tag-chip-admin"><span>' + tags[ti] + '</span><button onclick="Pages.doRemoveTag('' + cat + '','' + tags[ti].replace(/'/g, "\'") + '')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">×</button></span>';
+          `<span class="tag-chip-admin"><span>${tags[ti]}</span><button onclick="Pages.doRemoveTag('${cat}','${tags[ti].replace(/'/g, '&apos;')}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">Ã</button></span>`;
         }
         if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas</span>';
         h += '</div></div>';
