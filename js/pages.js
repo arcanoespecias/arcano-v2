@@ -34,9 +34,9 @@ const Pages = {
         <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">${s.envasesGrande}</div><div class="stat-label">Env. Grandes</div></div>
         <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:${s.especiasBolsaBaja.length > 0 ? 'var(--red)' : 'var(--green)'}">${s.especiasBolsaBaja.length}</div><div class="stat-label">Bolsa Baja</div><div class="stat-sub">${s.especiasBolsaBaja.map(function(e){return e.nombre}).join(', ') || 'OK'}</div></div>
       </div>
-      ${(s.etiquetasBajas.length > 0 || s.especiasBolsaBaja.length > 0) ? '<div class="card mt-16"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">' +
+      ${(s.stickersBajos.length > 0 || s.especiasBolsaBaja.length > 0) ? '<div class="card mt-16"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">' +
         s.especiasBolsaBaja.map(function(e){return '<span class="badge badge-red mr-8">BOLSA: '+e.nombre+' '+(e.stockBolsa||0)+'g</span>'}).join('') +
-        s.etiquetasBajas.map(function(e){return '<span class="badge badge-yellow mr-8">ETQ: '+(e.nombre||'?')+' ('+((e.stockChico||0)+(e.stockGrande||0))+')</span>'}).join('') +
+        s.stickersBajos.map(function(e){return '<span class="badge badge-yellow mr-8">ETQ: '+(e.nombre||'?')+' ('+((e.stockChico||0)+(e.stockGrande||0))+')</span>'}).join('') +
         '</div></div>' : ''}
       <div class="g2 mt-16" style="gap:16px">
         <div class="card"><div class="card-header"><h3>Ultimas Ventas</h3></div><div class="card-body">
@@ -64,7 +64,7 @@ const Pages = {
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
         `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
         `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
-        `<button class="tab${tab==='etiquetas' ? ' active' : ''}" onclick="window._prodTab='etiquetas';App.renderPage('productos')">Etiquetas</button>` +
+        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage('productos')">Etiquetas de uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
@@ -130,8 +130,8 @@ const Pages = {
       }
     }
 
-    // --- TAB: ETIQUETAS ---
-    if (tab === 'etiquetas') {
+    // --- TAB: ETIQUETAS DE USO ---
+    if (tab === 'uso') {
       var allTags = ArcanoDB.getProductTags();
       var catKeys = ['Comidas', 'Infusiones', 'Cocteleria'];
       h += '<div class="card"><div class="card-body">';
@@ -139,13 +139,13 @@ const Pages = {
         var cat = catKeys[ci];
         var tags = allTags[cat] || [];
         h += '<div style="margin-bottom:20px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge badge-gold" style="min-width:100px;text-align:center">' + cat + '</span>' +
-          `<input type="text" class="input" id="new-tag-${ci}" placeholder="Nueva etiqueta..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key==='Enter')Pages.doAddTag('${cat}',${ci})">` +
+          `<input type="text" class="input" id="new-tag-${ci}" placeholder="Nueva etiqueta de uso..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key==='Enter')Pages.doAddTag('${cat}',${ci})">` +
           `<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag('${cat}',${ci})">+ Agregar</button></div>` +
           '<div style="display:flex;flex-wrap:wrap;gap:6px">';
         for (var ti = 0; ti < tags.length; ti++) {
           `<span class="tag-chip-admin"><span>${tags[ti]}</span><button onclick="Pages.doRemoveTag('${cat}','${tags[ti].replace(/'/g, '&apos;')}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">Ã</button></span>`;
         }
-        if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas</span>';
+        if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas de uso</span>';
         h += '</div></div>';
       }
       h += '</div></div>';
@@ -185,7 +185,7 @@ const Pages = {
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', esp.tags || []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', esp.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g bolsa, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
@@ -279,7 +279,7 @@ const Pages = {
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', bl.tags || []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', bl.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -371,7 +371,7 @@ const Pages = {
     var db = ArcanoDB.getDB();
     var envases = db.stockEnvases || { chico: 0, grande: 0 };
     var especias = ArcanoDB.getEspecias();
-    var etiqList = ArcanoDB.getProductosConEtiquetas();
+    var etiqList = ArcanoDB.getProductosConStickers();
     var entradas = ArcanoDB.getEntradas();
 
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button></div>';
@@ -394,8 +394,8 @@ const Pages = {
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
-    // Etiquetas
-    h += '<div class="card"><div class="card-header"><h3>Etiquetas</h3></div><div class="card-body">';
+    // Stickers
+    h += '<div class="card"><div class="card-header"><h3>Stickers</h3></div><div class="card-body">';
     if (etiqList.length === 0) { h += '<p class="text-muted text-center text-sm">Sin productos</p>'; }
     else {
       h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Chico</th><th>Grande</th></tr></thead><tbody>';
@@ -419,7 +419,7 @@ const Pages = {
         var desc = (en.items||[]).map(function(it) {
           if (it.tipo==='especia_grs') return (it.especiaNombre||'?') + ' ' + it.cantidad + 'grs';
           if (it.tipo==='envase') return 'Env ' + (it.talla||'chico') + ' x' + it.cantidad;
-          if (it.tipo==='etiqueta') return 'Etq ' + (it.etiquetaNombre||'?') + ' ' + (it.talla||'chico') + ' x' + it.cantidad;
+          if (it.tipo==='sticker') return 'Stk ' + (it.stickerNombre||'?') + ' ' + (it.talla||'chico') + ' x' + it.cantidad;
           return '?';
         }).join(' | ');
         h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + '</td>' +
@@ -482,7 +482,7 @@ const Pages = {
       div.style.background = 'var(--bg)';
       div.innerHTML = '<div class="card-body" style="padding:12px">' +
         '<div class="g4 mb-8">' +
-          '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Envases</option><option value="etiqueta">Etiquetas</option></select></div>' +
+          '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Envases</option><option value="sticker">Stickers</option></select></div>' +
           '<div class="form-group" style="margin:0" id="ent-detail-placeholder"></div>' +
           '<div class="form-group" style="margin:0"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
           '<div class="form-group" style="margin:0"><label>Costo Unit.</label><input type="number" class="input ent-cost" placeholder="0" min="0"></div>' +
@@ -548,9 +548,9 @@ const Pages = {
           item.especiaNombre = espObj ? espObj.nombre : '?';
         } else if (tipo === 'envase') {
           item.talla = rows[i].querySelector('.ent-talla').value;
-        } else if (tipo === 'etiqueta') {
-          item.etiquetaNombre = (rows[i].querySelector('.ent-etq-nombre').value || '').trim();
-          if (!item.etiquetaNombre) { alert('Falta nombre de etiqueta en item ' + (i+1)); return; }
+        } else if (tipo === 'sticker') {
+          item.stickerNombre = (rows[i].querySelector('.ent-stk-nombre').value || '').trim();
+          if (!item.stickerNombre) { alert('Falta nombre de sticker en item ' + (i+1)); return; }
           item.talla = rows[i].querySelector('.ent-talla').value;
         }
         items.push(item);
@@ -591,7 +591,7 @@ const Pages = {
           '<td class="fw7">' + (p.productoNombre||'') + '</td>' +
           '<td><span class="badge ' + ((p.talla||'chico')==='grande'?'badge-gold':'badge-blue') + '">' + (p.talla||'chico') + '</span></td>' +
           '<td class="fw7 text-green">' + (p.cantidad||0) + ' fr</td>' +
-          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Etq:' + (p.etiquetasConsumidas||0) + '</td></tr>';
+          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -688,18 +688,18 @@ const Pages = {
       if (!envOk) allOk = false;
       h += '<div class="list-row"><span>Envases ' + talla + '</span><span class="' + (envOk?'text-green':'text-red fw7') + '">' + envAvail + ' → necesita ' + cant + ' ' + (envOk?'OK':'FALTA') + '</span></div>';
 
-      // Etiquetas
-      var etqAvail = 0;
-      var etqKeys = Object.keys(db.etiquetas || {});
-      for (var j = 0; j < etqKeys.length; j++) {
-        if (db.etiquetas[etqKeys[j]].nombre === producto.nombre) {
-          etqAvail = Number(db.etiquetas[etqKeys[j]][talla==='grande'?'stockGrande':'stockChico']) || 0;
+      // Stickers
+      var stkAvail = 0;
+      var stkKeys = Object.keys(db.stickers || {});
+      for (var j = 0; j < stkKeys.length; j++) {
+        if (db.stickers[stkKeys[j]].nombre === producto.nombre) {
+          stkAvail = Number(db.stickers[stkKeys[j]][talla==='grande'?'stockGrande':'stockChico']) || 0;
           break;
         }
       }
-      var etqOk = etqAvail >= cant;
-      if (!etqOk) allOk = false;
-      h += '<div class="list-row"><span>Etiquetas ' + talla + '</span><span class="' + (etqOk?'text-green':'text-red fw7') + '">' + etqAvail + ' → necesita ' + cant + ' ' + (etqOk?'OK':'FALTA') + '</span></div>';
+      var stkOk = stkAvail >= cant;
+      if (!stkOk) allOk = false;
+      h += '<div class="list-row"><span>Stickers ' + talla + '</span><span class="' + (stkOk?'text-green':'text-red fw7') + '">' + stkAvail + ' → necesita ' + cant + ' ' + (stkOk?'OK':'FALTA') + '</span></div>';
 
       h += '</div></div>';
       previewDiv.innerHTML = h;
@@ -865,7 +865,7 @@ const Pages = {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
     var envases = db.stockEnvases || { chico: 0, grande: 0 };
-    var etiqList = ArcanoDB.getProductosConEtiquetas();
+    var etiqList = ArcanoDB.getProductosConStickers();
 
     var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Envases Chicos</div></div>' +
@@ -877,7 +877,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Especias</h3></div><div class="card-body">';
     if (especias.length === 0) { h += '<p class="text-muted text-center">Sin especias</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Bolsa (grs)</th><th>Fr.Chico</th><th>Fr.Grande</th><th>Etq.Chico</th><th>Etq.Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Bolsa (grs)</th><th>Fr.Chico</th><th>Fr.Grande</th><th>Stk.Chico</th><th>Stk.Grande</th></tr></thead><tbody>';
       for (var i = 0; i < especias.length; i++) {
         var e = especias[i];
         var et = null;
@@ -895,7 +895,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Blends</h3></div><div class="card-body">';
     if (blends.length === 0) { h += '<p class="text-muted text-center">Sin blends</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Fr.Chico</th><th>Fr.Grande</th><th>Etq.Chico</th><th>Etq.Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Fr.Chico</th><th>Fr.Grande</th><th>Stk.Chico</th><th>Stk.Grande</th></tr></thead><tbody>';
       for (var i = 0; i < blends.length; i++) {
         var b = blends[i];
         var et = null;
@@ -1266,7 +1266,7 @@ const Pages = {
     var sel = selectedTags || [];
     var h = '<div class="tag-selector" id="tag-selector">';
     if (tags.length === 0) {
-      h += '<p class="text-sm text-muted">No hay etiquetas para esta categoria.</p>';
+      h += '<p class="text-sm text-muted">No hay etiquetas de uso para esta categoria.</p>';
     } else {
       for (var i = 0; i < tags.length; i++) {
         var checked = sel.indexOf(tags[i]) >= 0 ? ' checked' : '';
@@ -1301,12 +1301,12 @@ const Pages = {
     if (ArcanoDB.addProductTag(cat, name)) {
       App.renderPage('productos');
     } else {
-      alert('La etiqueta ya existe en esta categoria.');
+      alert('La etiqueta de uso ya existe en esta categoria.');
     }
   },
 
   doRemoveTag(cat, tagName) {
-    if (confirm('Eliminar etiqueta "' + tagName + '"? Se quitara de los productos que la tengan.')) {
+    if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
       ArcanoDB.removeProductTag(cat, tagName);
       App.renderPage('productos');
     }

@@ -1,13 +1,13 @@
 /* ===================== ARCANO V3 — DATA LAYER =====================
    Flujo:
-     Insumos → Stock (bolsa grs, envases, etiquetas)
+     Insumos → Stock (bolsa grs, envases, stickers)
      Produccion → consume insumos → Frascos listos (chico / grande)
      Ventas → consume frascos
 
    Stock por especia: stockBolsa (grs), stockChico, stockGrande (frascos)
    Stock por blend:   stockChico, stockGrande (frascos)
    Stock global:      envasesChico, envasesGrande
-   Etiquetas:         por producto, stockChico, stockGrande
+   Stickers:           por producto, stockChico, stockGrande
    ===================== */
 
 const DB_KEY = 'arcano_v3';
@@ -29,7 +29,7 @@ var _ready = false;
 var _saveTimer = null;
 var _listeners = [];
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, etiquetas: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -38,7 +38,7 @@ function _filterValid(arr) {
 }
 
 function _cleanNulls() {
-  var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'etiquetas'];
+  var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'stickers'];
   for (var c = 0; c < cols.length; c++) {
     var col = cols[c];
     if (!_db[col]) { _db[col] = {}; continue; }
@@ -69,7 +69,12 @@ function _ensureStructure() {
   if (!_db.producciones) _db.producciones = {};
   if (!_db.ventas) _db.ventas = {};
   if (!_db.entradas) _db.entradas = {};
-  if (!_db.etiquetas) _db.etiquetas = {};
+  if (!_db.stickers) _db.stickers = {};
+  // Migration: copy old etiquetas data to stickers
+  if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
+    _db.stickers = _db.etiquetas;
+  }
+  delete _db.etiquetas;
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
@@ -86,7 +91,7 @@ function _ensureStructure() {
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, etiquetas: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {},
     stockEnvases: { chico: 0, grande: 0 },
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
@@ -232,8 +237,8 @@ function getBlends() {
 }
 function getBlend(id) { return _db.blends[id] || null; }
 
-function getEtiquetas() {
-  return _filterValid(Object.values(_db.etiquetas || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+function getStickers() {
+  return _filterValid(Object.values(_db.stickers || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 }
 
 function getEntradas() {
@@ -323,49 +328,49 @@ function deleteBlend(id) {
   return true;
 }
 
-/* ==================== ETIQUETAS ==================== */
+/* ==================== STICKERS ==================== */
 
-function _findEtiquetaByNombre(nombre) {
-  var keys = Object.keys(_db.etiquetas || {});
+function _findStickerByNombre(nombre) {
+  var keys = Object.keys(_db.stickers || {});
   for (var i = 0; i < keys.length; i++) {
-    if (_db.etiquetas[keys[i]].nombre === nombre) return _db.etiquetas[keys[i]];
+    if (_db.stickers[keys[i]].nombre === nombre) return _db.stickers[keys[i]];
   }
   return null;
 }
 
-function _getOrCreateEtiqueta(nombre) {
-  if (!_db.etiquetas) _db.etiquetas = {};
-  var existing = _findEtiquetaByNombre(nombre);
+function _getOrCreateSticker(nombre) {
+  if (!_db.stickers) _db.stickers = {};
+  var existing = _findStickerByNombre(nombre);
   if (existing) return existing;
-  var id = nextId('etiquetas');
+  var id = nextId('stickers');
   var nueva = { id: id, nombre: nombre, stockChico: 0, stockGrande: 0, creado: new Date().toISOString() };
-  _db.etiquetas[id] = nueva;
+  _db.stickers[id] = nueva;
   return nueva;
 }
 
-/** Get all products (especias+blends) with their etiqueta stock merged */
-function getProductosConEtiquetas() {
+/** Get all products (especias+blends) with their sticker stock merged */
+function getProductosConStickers() {
   var items = [];
   var espKeys = Object.keys(_db.especias || {});
   for (var i = 0; i < espKeys.length; i++) {
     var e = _db.especias[espKeys[i]];
     if (!e || typeof e !== 'object') continue;
-    var etq = _findEtiquetaByNombre(e.nombre);
+    var stk = _findStickerByNombre(e.nombre);
     items.push({
       id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '',
-      stockChico: etq ? (Number(etq.stockChico) || 0) : 0,
-      stockGrande: etq ? (Number(etq.stockGrande) || 0) : 0
+      stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
+      stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
   }
   var blKeys = Object.keys(_db.blends || {});
   for (var i = 0; i < blKeys.length; i++) {
     var b = _db.blends[blKeys[i]];
     if (!b || typeof b !== 'object') continue;
-    var etq = _findEtiquetaByNombre(b.nombre);
+    var stk = _findStickerByNombre(b.nombre);
     items.push({
       id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '',
-      stockChico: etq ? (Number(etq.stockChico) || 0) : 0,
-      stockGrande: etq ? (Number(etq.stockGrande) || 0) : 0
+      stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
+      stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
   }
   return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
@@ -396,13 +401,13 @@ function saveEntrada(data) {
         var talla = item.talla || 'chico';
         if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
         _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) + (Number(item.cantidad) || 0);
-      } else if (tipo === 'etiqueta') {
-        var etq = _getOrCreateEtiqueta(item.etiquetaNombre);
+      } else if (tipo === 'sticker') {
+        var stk = _getOrCreateSticker(item.stickerNombre);
         var t = item.talla || 'chico';
         if (t === 'grande') {
-          etq.stockGrande = (etq.stockGrande || 0) + (Number(item.cantidad) || 0);
+          stk.stockGrande = (stk.stockGrande || 0) + (Number(item.cantidad) || 0);
         } else {
-          etq.stockChico = (etq.stockChico || 0) + (Number(item.cantidad) || 0);
+          stk.stockChico = (stk.stockChico || 0) + (Number(item.cantidad) || 0);
         }
       }
     }
@@ -447,19 +452,19 @@ function producirEspecia(especiaId, talla, cantidad) {
     throw new Error('Envases ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockEnvases[talla] || 0));
   }
 
-  // Check & consume etiquetas
-  var etq = _findEtiquetaByNombre(esp.nombre);
-  var etqStock = etq ? (Number(etq[talla === 'grande' ? 'stockGrande' : 'stockChico']) || 0) : 0;
-  if (etqStock < cantidad) {
-    throw new Error('Etiquetas ' + talla + ' insuficientes para "' + esp.nombre + '". Necesitas ' + cantidad + ', tienes ' + etqStock);
+  // Check & consume stickers
+  var stk = _findStickerByNombre(esp.nombre);
+  var stkStock = stk ? (Number(stk[talla === 'grande' ? 'stockGrande' : 'stockChico']) || 0) : 0;
+  if (stkStock < cantidad) {
+    throw new Error('Stickers ' + talla + ' insuficientes para "' + esp.nombre + '". Necesitas ' + cantidad + ', tienes ' + stkStock);
   }
 
   // All checks passed — consume
   esp.stockBolsa = (esp.stockBolsa || 0) - grsTotal;
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
-  if (etq) {
-    var etqKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-    etq[etqKey] = (etq[etqKey] || 0) - cantidad;
+  if (stk) {
+    var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+    stk[stkKey] = (stk[stkKey] || 0) - cantidad;
   }
   var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
   esp[frascoKey] = (esp[frascoKey] || 0) + cantidad;
@@ -470,7 +475,7 @@ function producirEspecia(especiaId, talla, cantidad) {
     id: prodId, tipo: 'especia', productoId: especiaId, productoNombre: esp.nombre,
     categoria: esp.categoria || '', talla: talla, cantidad: cantidad,
     gramosPorFrasco: gramosPorFrasco, gramosTotal: grsTotal,
-    envasesConsumidos: cantidad, etiquetasConsumidas: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -512,11 +517,11 @@ function producirBlend(blendId, talla, cantidad) {
     throw new Error('Envases ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockEnvases[talla] || 0));
   }
 
-  // Check etiquetas
-  var etq = _findEtiquetaByNombre(blend.nombre);
-  var etqStock = etq ? (Number(etq[talla === 'grande' ? 'stockGrande' : 'stockChico']) || 0) : 0;
-  if (etqStock < cantidad) {
-    throw new Error('Etiquetas ' + talla + ' insuficientes para "' + blend.nombre + '". Necesitas ' + cantidad + ', tienes ' + etqStock);
+  // Check stickers
+  var stk = _findStickerByNombre(blend.nombre);
+  var stkStock = stk ? (Number(stk[talla === 'grande' ? 'stockGrande' : 'stockChico']) || 0) : 0;
+  if (stkStock < cantidad) {
+    throw new Error('Stickers ' + talla + ' insuficientes para "' + blend.nombre + '". Necesitas ' + cantidad + ', tienes ' + stkStock);
   }
 
   // All checks passed — consume
@@ -528,9 +533,9 @@ function producirBlend(blendId, talla, cantidad) {
     grsTotalGeneral += d.gramosTotal;
   }
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
-  if (etq) {
-    var etqKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-    etq[etqKey] = (etq[etqKey] || 0) - cantidad;
+  if (stk) {
+    var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+    stk[stkKey] = (stk[stkKey] || 0) - cantidad;
   }
   var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
   blend[frascoKey] = (blend[frascoKey] || 0) + cantidad;
@@ -540,7 +545,7 @@ function producirBlend(blendId, talla, cantidad) {
     id: prodId, tipo: 'blend', productoId: blendId, productoNombre: blend.nombre,
     categoria: blend.categoria || '', talla: talla, cantidad: cantidad,
     ingredientes: detalleIngredientes, gramosTotal: grsTotalGeneral,
-    envasesConsumidos: cantidad, etiquetasConsumidas: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -652,7 +657,7 @@ function getStats() {
   var especias = _filterValid(Object.values(_db.especias || {}));
   var blends = _filterValid(Object.values(_db.blends || {}));
   var ventas = _filterValid(Object.values(_db.ventas || {}));
-  var etiquetas = _filterValid(Object.values(_db.etiquetas || {}));
+  var stickers = _filterValid(Object.values(_db.stickers || {}));
   var envases = _db.stockEnvases || { chico: 0, grande: 0 };
 
   var today = new Date().toISOString().slice(0, 10);
@@ -665,7 +670,7 @@ function getStats() {
   var frascosGrande = especias.reduce(function(s, e) { return s + (e.stockGrande || 0); }, 0) +
                       blends.reduce(function(s, b) { return s + (b.stockGrande || 0); }, 0);
 
-  var etqBajo = etiquetas.filter(function(e) { return (e.stockChico + e.stockGrande) <= 5; });
+  var stkBajo = stickers.filter(function(e) { return (e.stockChico + e.stockGrande) <= 5; });
   var espBolsaBaja = especias.filter(function(e) { return (e.stockBolsa || 0) <= 50; });
 
   return {
@@ -682,7 +687,7 @@ function getStats() {
     ventasMes: ventasMes.length,
     totalVentasMes: ventasMes.reduce(function(s, v) { return s + (Number(v.total) || 0); }, 0),
     especiasBolsaBaja: espBolsaBaja,
-    etiquetasBajas: etqBajo
+    stickersBajos: stkBajo
   };
 }
 
@@ -976,7 +981,7 @@ window.ArcanoDB = {
   initDB: initDB, getDB: getDB, onDBChange: onDBChange, nextId: nextId,
   getEspecias: getEspecias, getEspecia: getEspecia, saveEspecia: saveEspecia, deleteEspecia: deleteEspecia,
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
-  getEtiquetas: getEtiquetas, getProductosConEtiquetas: getProductosConEtiquetas,
+  getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
