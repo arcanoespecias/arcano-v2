@@ -154,6 +154,8 @@ const Pages = {
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
+        '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
+        '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g bolsa, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -177,7 +179,9 @@ const Pages = {
         enTienda: document.getElementById('f-esp-tienda').value === '1',
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
-        imagen: previewEl ? previewEl.src : ''
+        imagen: previewEl ? previewEl.src : '',
+        descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
+        uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : ''
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
@@ -242,6 +246,7 @@ const Pages = {
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
+        '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -300,7 +305,8 @@ const Pages = {
         enTienda: document.getElementById('f-bl-tienda').value === '1',
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
-        imagen: (document.getElementById('img-preview-bl') || {}).src || ''
+        imagen: (document.getElementById('img-preview-bl') || {}).src || '',
+        descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : ''
       };
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID

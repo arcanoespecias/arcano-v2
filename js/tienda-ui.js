@@ -58,51 +58,89 @@ function renderProducts(filter) {
     else if (hasGrande) stockText = 'Grande: ' + p.stockGrande + ' disp.';
 
     var meta = (p.tipo === 'blend' ? 'Blend' : 'Especia');
-    if (p.region) meta += ' · ' + p.region;
-    if (p.uso) meta += ' · ' + p.uso;
+    if (p.categoria) meta += ' · ' + p.categoria;
 
     h += '<div class="product-card">' +
-      '<div class="card-img" style="position:relative">' +
-        (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px">' : '<span style="font-size:1.6rem">' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
+      '<div class="card-img" style="position:relative" onclick="openDetail(' + p.id + ')">' +
+        (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span>' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
       '</div>' +
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
         '<div class="card-meta">' + meta + '</div>' +
-        '<span class="stock-badge ' + stockClass + '">' + stockText + '</span>' +
+        (anyStock ? '<span class="stock-badge ' + stockClass + '">' + stockText + '</span>' : '') +
         '<div class="card-prices">' +
           (hasChico ? '<div class="price-box"><div class="price-label">Chico</div><div class="price-value">$' + p.precioChico.toLocaleString() + '</div></div>' : '') +
           (hasGrande ? '<div class="price-box"><div class="price-label">Grande</div><div class="price-value">$' + p.precioGrande.toLocaleString() + '</div></div>' : '') +
           (!hasChico && !hasGrande ? '<div class="price-na">Sin precio</div>' : '') +
         '</div>' +
-        (anyStock ? '<div class="size-select" id="sizes-' + p.id + '">' +
-          (hasChico ? '<div class="size-opt active" onclick="selectSize(' + p.id + ',\'chico\')">Chico</div>' : '') +
-          (hasGrande ? '<div class="size-opt' + (!hasChico ? ' active' : '') + '" onclick="selectSize(' + p.id + ',\'grande\')">Grande</div>' : '') +
-        '</div>' +
-        '<button class="add-btn" id="add-' + p.id + '" onclick="doAddToCart(' + p.id + ')">Agregar al pedido</button>'
+        (anyStock ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ')">Agregar al pedido</button>'
         : '<button class="add-btn" disabled>Sin stock</button>') +
       '</div></div>';
   }
   grid.innerHTML = h;
 }
 
-/* Size selector state */
-var _selectedSizes = {};
-function selectSize(pid, talla) {
-  _selectedSizes[pid] = talla;
-  var el = document.getElementById('sizes-' + pid);
-  if (!el) return;
-  var opts = el.querySelectorAll('.size-opt');
-  for (var i = 0; i < opts.length; i++) {
-    opts[i].classList.toggle('active', opts[i].textContent.toLowerCase().indexOf(talla) >= 0);
-  }
-}
 function doAddToCart(pid) {
   var products = getStoreProducts();
   var product = null;
   for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { product = products[i]; break; } }
   if (!product) return;
-  var talla = _selectedSizes[pid] || (product.stockChico > 0 ? 'chico' : 'grande');
+  var talla = (product.stockChico > 0 && product.precioChico > 0) ? 'chico' : 'grande';
   addToCart(product, talla);
+}
+
+/* === PRODUCT DETAIL MODAL === */
+function openDetail(pid) {
+  var products = getStoreProducts();
+  var p = null;
+  for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { p = products[i]; break; } }
+  if (!p) return;
+
+  var hasChico = p.stockChico > 0 && p.precioChico > 0;
+  var hasGrande = p.stockGrande > 0 && p.precioGrande > 0;
+  var anyStock = hasChico || hasGrande;
+  var typeClass = p.tipo === 'blend' ? 'detail-type-blend' : 'detail-type-especia';
+  var typeLabel = p.tipo === 'blend' ? 'Blend' : 'Especia';
+
+  var tagsHtml = '';
+  if (p.categoria) tagsHtml += '<span class="detail-info-tag">' + p.categoria + '</span>';
+  if (p.uso) tagsHtml += '<span class="detail-info-tag">' + p.uso + '</span>';
+  if (p.region) tagsHtml += '<span class="detail-info-tag">' + p.region + '</span>';
+
+  var pricesHtml = '';
+  if (hasChico) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Chico</div><div class="detail-price-val">$' + p.precioChico.toLocaleString() + '</div></div>';
+  if (hasGrande) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Grande</div><div class="detail-price-val">$' + p.precioGrande.toLocaleString() + '</div></div>';
+
+  var stockHtml = '';
+  if (hasChico && hasGrande) stockHtml = 'Chico: ' + p.stockChico + ' disponibles · Grande: ' + p.stockGrande + ' disponibles';
+  else if (hasChico) stockHtml = p.stockChico + ' frascos disponibles';
+  else if (hasGrande) stockHtml = p.stockGrande + ' frascos disponibles';
+
+  var descHtml = p.descripcion ? '<p class="detail-desc">' + p.descripcion + '</p>' : '';
+
+  var overlay = document.createElement('div');
+  overlay.className = 'detail-overlay';
+  overlay.id = 'detail-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var html = '<div class="detail-modal">' +
+    '<div class="detail-img" style="position:relative">' +
+      '<button class="detail-close" onclick="document.getElementById(\'detail-overlay\').remove()">&times;</button>' +
+      (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span class="detail-emoji">' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
+    '</div>' +
+    '<div class="detail-content">' +
+      '<span class="detail-type ' + typeClass + '">' + typeLabel + '</span>' +
+      '<h2>' + p.nombre + '</h2>' +
+      (tagsHtml ? '<div class="detail-info-row">' + tagsHtml + '</div>' : '') +
+      descHtml +
+      (pricesHtml ? '<div class="detail-prices-row">' + pricesHtml + '</div>' : '') +
+      (stockHtml ? '<p class="detail-stock">' + stockHtml + '</p>' : '') +
+      (anyStock ? '<button class="detail-add-btn" onclick="doAddToCart(' + p.id + ');document.getElementById(\'detail-overlay\').remove()">Agregar al pedido</button>' :
+        '<button class="detail-add-btn" disabled>Sin stock</button>') +
+    '</div></div>';
+
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
 }
 
 /* === CART MODAL === */
@@ -179,8 +217,8 @@ function sendOrder() {
   var total = getCartTotal();
   var body = 'PEDIDO NUEVO\\n\\n' +
     'Cliente: ' + nombre + '\\n' +
-    'Telefono: ' + tel + '\\n' +
     (email ? 'Email: ' + email + '\\n' : '') +
+    (tel ? 'Telefono: ' + tel + '\\n' : '') +
     (ciudad ? 'Ciudad: ' + ciudad + '\\n' : '') +
     (dir ? 'Direccion: ' + dir + '\\n' : '') +
     '\\n--- PRODUCTOS ---\\n' + items +
@@ -191,7 +229,6 @@ function sendOrder() {
     '&body=' + encodeURIComponent(body);
   window.open(mailto, '_blank');
 
-  // Show success
   var overlay = document.getElementById('order-modal');
   if (overlay) {
     overlay.querySelector('.modal').innerHTML =
@@ -218,7 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCartFab();
   });
 
-  // Filter buttons
   document.getElementById('filters').addEventListener('click', function(e) {
     var btn = e.target.closest('.filter-btn');
     if (!btn) return;

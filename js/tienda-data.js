@@ -46,7 +46,7 @@ function getStoreProducts() {
       precioChico: Number(e.precioTiendaChico) || Number(e.precioChico) || 0,
       precioGrande: Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0,
       stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0,
-      region: '', uso: '', imagen: e.imagen || ''
+      region: '', uso: e.uso || '', descripcion: e.descripcion || '', imagen: e.imagen || ''
     });
   }
   var bk = Object.keys(_sDb.blends || {});
@@ -58,7 +58,7 @@ function getStoreProducts() {
       precioChico: Number(b.precioTiendaChico) || Number(b.precioChico) || 0,
       precioGrande: Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0,
       stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0,
-      region: b.region || '', uso: b.uso || '', imagen: b.imagen || ''
+      region: b.region || '', uso: b.uso || '', descripcion: b.descripcion || '', imagen: b.imagen || ''
     });
   }
   return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
