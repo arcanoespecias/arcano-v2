@@ -880,8 +880,9 @@ const Pages = {
     var envases = db.stockEnvases || { chico: 0, grande: 0 };
     var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
     var etiqList = ArcanoDB.getProductosConStickers();
+    var ajustes = ArcanoDB.getAjustes();
 
-    var h = '';
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formAjusteStock()">Ajustar Stock</button></div>';
 
     // === SECTION 1: PRODUCTOS ===
     h += '<h3 style="color:var(--gold);margin-bottom:12px;font-size:1.1rem">Stock de Productos</h3>';
@@ -941,7 +942,206 @@ const Pages = {
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
+
+    // === SECTION 3: HISTORIAL DE AJUSTES ===
+    h += '<div class="card mt-24"><div class="card-header"><h3>Historial de Ajustes Manuales</h3></div><div class="card-body">';
+    if (ajustes.length === 0) {
+      h += '<p class="text-muted text-center">Sin ajustes manuales.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Sub</th><th>Cant.</th><th>Motivo</th><th></th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(ajustes.length, 50); i++) {
+        var aj = ajustes[i];
+        var catLabel = aj.categoria === 'especia' ? 'Especia' : aj.categoria === 'blend' ? 'Blend' : aj.categoria === 'envase' ? 'Frascos' : aj.categoria === 'bolsa' ? 'Bolsas' : 'Sticker';
+        var subLabel = aj.subtipo === 'pala' ? 'Pala' : aj.subtipo === 'chico' ? 'Chico' : 'Grande';
+        var cantColor = (aj.cantidad > 0) ? 'text-green' : 'text-red';
+        var cantSign = (aj.cantidad > 0) ? '+' : '';
+        var unidad = aj.subtipo === 'pala' ? 'g' : 'u';
+        h += '<tr><td>' + (aj.fecha||'') + '</td>' +
+          '<td><span class="badge badge-gold">' + catLabel + '</span></td>' +
+          '<td class="fw7">' + (aj.productoNombre||'—') + '</td>' +
+          '<td>' + subLabel + '</td>' +
+          '<td class="' + cantColor + ' fw7">' + cantSign + (aj.cantidad||0) + ' ' + unidad + '</td>' +
+          '<td class="text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (aj.motivo||'').replace(/"/g, '&quot;') + '">' + (aj.motivo||'—') + '</td>' +
+          '<td><button class="btn btn-sm btn-red" onclick="Pages.delAjuste(' + aj.id + ')">X</button></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
     container.innerHTML = h;
+  },
+
+  /* ---------- Ajuste Manual de Stock ---------- */
+  delAjuste(id) {
+    if (!confirm('Eliminar este ajuste? (El stock NO se revertira)')) return;
+    ArcanoDB.deleteAjuste(id);
+    App.renderPage('stock');
+  },
+
+  formAjusteStock() {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var stickerList = ArcanoDB.getStickers();
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:560px">' +
+      '<div class="modal-header"><h3>Ajustar Stock Manualmente</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Categoria</label><select class="input" id="f-aj-cat">' +
+          '<option value="especia">Especia</option>' +
+          '<option value="blend">Blend</option>' +
+          '<option value="envase">Frascos</option>' +
+          '<option value="bolsa">Bolsas</option>' +
+          '<option value="sticker">Stickers</option>' +
+        '</select></div>' +
+        '<div class="form-group" id="f-aj-prod-wrap"><label>Producto</label><select class="input" id="f-aj-prod"></select></div>' +
+        '<div class="form-group"><label>Sub-tipo</label><select class="input" id="f-aj-sub"></select></div>' +
+        '<div class="form-group"><label>Cantidad (<span style="color:var(--red)">negativo = restar</span>, positivo = sumar)</label><input type="number" class="input" id="f-aj-cant" placeholder="Ej: -100 o 50"></div>' +
+        '<div class="form-group"><label>Motivo <span class="text-red">*</span></label><textarea class="input" id="f-aj-motivo" rows="2" placeholder="Ej: Se rompieron, merma, conteo fisico, etc."></textarea></div>' +
+        '<div id="f-aj-preview" class="card mt-12" style="background:var(--bg);border-color:var(--gold);display:none"><div class="card-body" id="f-aj-preview-body"></div></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-aj">Aplicar Ajuste</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+
+    var catSel = document.getElementById('f-aj-cat');
+    var prodSel = document.getElementById('f-aj-prod');
+    var prodWrap = document.getElementById('f-aj-prod-wrap');
+    var subSel = document.getElementById('f-aj-sub');
+    var cantInput = document.getElementById('f-aj-cant');
+    var previewDiv = document.getElementById('f-aj-preview');
+    var previewBody = document.getElementById('f-aj-preview-body');
+
+    function buildEspOpts() {
+      var o = '';
+      for (var i = 0; i < especias.length; i++) o += '<option value="' + especias[i].id + '">' + especias[i].nombre + '</option>';
+      return o;
+    }
+    function buildBlendOpts() {
+      var o = '';
+      for (var i = 0; i < blends.length; i++) o += '<option value="' + blends[i].id + '">' + blends[i].nombre + '</option>';
+      return o;
+    }
+    function buildStickerOpts() {
+      var o = '';
+      for (var i = 0; i < stickerList.length; i++) o += '<option value="' + stickerList[i].nombre + '">' + stickerList[i].nombre + '</option>';
+      return o;
+    }
+
+    function updateForm() {
+      var cat = catSel.value;
+      var prodId = prodSel.value;
+
+      // Show/hide product selector
+      if (cat === 'envase' || cat === 'bolsa') {
+        prodWrap.style.display = 'none';
+      } else {
+        prodWrap.style.display = '';
+        if (cat === 'especia') prodSel.innerHTML = buildEspOpts();
+        else if (cat === 'blend') prodSel.innerHTML = buildBlendOpts();
+        else if (cat === 'sticker') prodSel.innerHTML = buildStickerOpts();
+      }
+
+      // Subtipo options
+      if (cat === 'especia') {
+        subSel.innerHTML = '<option value="pala">Pala (gramos)</option><option value="chico">Frasco Chico (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
+      } else if (cat === 'blend') {
+        subSel.innerHTML = '<option value="chico">Frasco Chico (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
+      } else if (cat === 'envase') {
+        subSel.innerHTML = '<option value="chico">Chico (unidades)</option><option value="grande">Grande (unidades)</option>';
+      } else if (cat === 'bolsa') {
+        subSel.innerHTML = '<option value="chico">Chica (unidades)</option><option value="grande">Grande (unidades)</option>';
+      } else if (cat === 'sticker') {
+        subSel.innerHTML = '<option value="chico">Chico (unidades)</option><option value="grande">Grande (unidades)</option>';
+      }
+
+      updatePreview();
+    }
+
+    function updatePreview() {
+      var cat = catSel.value;
+      var sub = subSel.value;
+      var cant = Number(cantInput.value) || 0;
+      var db = ArcanoDB.getDB();
+      var actual = 0;
+      var nombre = '';
+      var unidad = sub === 'pala' ? 'g' : 'u';
+
+      if (cat === 'especia' && prodSel.value) {
+        var esp = ArcanoDB.getEspecia(Number(prodSel.value));
+        if (esp) {
+          nombre = esp.nombre;
+          if (sub === 'pala') actual = esp.stockBolsa || 0;
+          else if (sub === 'chico') actual = esp.stockChico || 0;
+          else actual = esp.stockGrande || 0;
+        }
+      } else if (cat === 'blend' && prodSel.value) {
+        var bl = ArcanoDB.getBlend(Number(prodSel.value));
+        if (bl) {
+          nombre = bl.nombre;
+          actual = (sub === 'grande') ? (bl.stockGrande || 0) : (bl.stockChico || 0);
+        }
+      } else if (cat === 'envase') {
+        nombre = 'Frascos ' + sub;
+        actual = (db.stockEnvases || {})[sub] || 0;
+      } else if (cat === 'bolsa') {
+        nombre = 'Bolsas ' + sub;
+        actual = (db.stockBolsas || {})[sub] || 0;
+      } else if (cat === 'sticker' && prodSel.value) {
+        nombre = prodSel.value;
+        var stks = ArcanoDB.getStickers();
+        for (var i = 0; i < stks.length; i++) {
+          if (stks[i].nombre === nombre) {
+            actual = (sub === 'grande') ? (stks[i].stockGrande || 0) : (stks[i].stockChico || 0);
+            break;
+          }
+        }
+      }
+
+      if (!nombre) { previewDiv.style.display = 'none'; return; }
+      var resultante = actual + cant;
+      var resColor = resultante < 0 ? 'text-red' : (resultante === 0 ? 'text-yellow' : 'text-green');
+      previewDiv.style.display = '';
+      previewBody.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center"><div><span class="text-sm text-muted">Stock actual de <b>' + nombre + '</b> (' + sub + '):</span></div>' +
+        '<div style="text-align:right"><span class="fw7" style="font-size:1.2rem">' + actual + ' ' + unidad + '</span>' +
+        ' <span class="text-muted" style="margin:0 8px">&#8594;</span>' +
+        '<span class="fw7 ' + resColor + '" style="font-size:1.2rem">' + resultante + ' ' + unidad + '</span></div></div>';
+    }
+
+    catSel.addEventListener('change', updateForm);
+    prodSel.addEventListener('change', updatePreview);
+    subSel.addEventListener('change', updatePreview);
+    cantInput.addEventListener('input', updatePreview);
+    updateForm();
+
+    // Save
+    document.getElementById('btn-save-aj').addEventListener('click', function() {
+      var motivo = (document.getElementById('f-aj-motivo').value || '').trim();
+      if (!motivo) { alert('Debes indicar el motivo del ajuste'); return; }
+      var cant = Number(cantInput.value) || 0;
+      if (cant === 0) { alert('La cantidad no puede ser 0'); return; }
+      var cat = catSel.value;
+      var sub = subSel.value;
+      var data = {
+        categoria: cat,
+        subtipo: sub,
+        cantidad: cant,
+        motivo: motivo,
+        fecha: new Date().toISOString().slice(0, 10)
+      };
+      if (cat === 'especia' || cat === 'blend') {
+        data.productoId = Number(prodSel.value);
+      }
+      if (cat === 'sticker') {
+        data.productoNombre = prodSel.value;
+      }
+      try {
+        ArcanoDB.saveAjuste(data);
+        modal.remove();
+        App.renderPage('stock');
+      } catch (err) { alert('Error: ' + err.message); }
+    });
   },
 
   /* ================================================================

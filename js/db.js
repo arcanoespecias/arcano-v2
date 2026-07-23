@@ -30,7 +30,7 @@ var _saveTimer = null;
 var _listeners = [];
 var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -39,7 +39,7 @@ function _filterValid(arr) {
 }
 
 function _cleanNulls() {
-  var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'stickers'];
+  var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'stickers', 'ajustes'];
   for (var c = 0; c < cols.length; c++) {
     var col = cols[c];
     if (!_db[col]) { _db[col] = {}; continue; }
@@ -71,6 +71,7 @@ function _ensureStructure() {
   if (!_db.ventas) _db.ventas = {};
   if (!_db.entradas) _db.entradas = {};
   if (!_db.stickers) _db.stickers = {};
+  if (!_db.ajustes) _db.ajustes = {};
   // Migration: copy old etiquetas data to stickers
   if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
     _db.stickers = _db.etiquetas;
@@ -93,7 +94,7 @@ function _ensureStructure() {
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {},
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     productTags: {
@@ -440,6 +441,86 @@ function deleteEntrada(id) {
   delete _db.entradas[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'entradas', id);
+  return true;
+}
+
+/* ==================== AJUSTES MANUALES DE STOCK ==================== */
+
+function getAjustes() {
+  return _filterValid(Object.values(_db.ajustes || {})).sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+}
+
+function saveAjuste(data) {
+  _ensureStructure();
+  if (!_db.ajustes) _db.ajustes = {};
+  var isNew = !data.id;
+  if (isNew) {
+    data.id = nextId('ajustes');
+    data.creado = new Date().toISOString();
+    data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  }
+  var cantidad = Number(data.cantidad) || 0;
+  if (cantidad === 0) throw new Error('La cantidad no puede ser 0');
+  var cat = data.categoria; // 'especia', 'blend', 'envase', 'bolsa', 'sticker'
+  var sub = data.subtipo;   // 'pala', 'chico', 'grande'
+
+  if (cat === 'especia') {
+    var esp = _db.especias[data.productoId];
+    if (!esp) throw new Error('Especia no encontrada');
+    if (sub === 'pala') {
+      var nv = (Number(esp.stockBolsa) || 0) + cantidad;
+      if (nv < 0) throw new Error('Stock de pala resultante negativo (' + nv + 'g) para ' + esp.nombre);
+      esp.stockBolsa = nv;
+    } else {
+      var field = (sub === 'grande') ? 'stockGrande' : 'stockChico';
+      var nv = (Number(esp[field]) || 0) + cantidad;
+      if (nv < 0) throw new Error('Stock de frascos resultante negativo (' + nv + ') para ' + esp.nombre);
+      esp[field] = nv;
+    }
+    data.productoNombre = esp.nombre;
+  } else if (cat === 'blend') {
+    var bl = _db.blends[data.productoId];
+    if (!bl) throw new Error('Blend no encontrado');
+    var field = (sub === 'grande') ? 'stockGrande' : 'stockChico';
+    var nv = (Number(bl[field]) || 0) + cantidad;
+    if (nv < 0) throw new Error('Stock resultante negativo (' + nv + ') para ' + bl.nombre);
+    bl[field] = nv;
+    data.productoNombre = bl.nombre;
+  } else if (cat === 'envase') {
+    if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
+    var t = (sub === 'grande') ? 'grande' : 'chico';
+    var nv = (_db.stockEnvases[t] || 0) + cantidad;
+    if (nv < 0) throw new Error('Stock de frascos ' + t + ' resultante negativo (' + nv + ')');
+    _db.stockEnvases[t] = nv;
+    data.productoNombre = 'Frascos ' + t;
+  } else if (cat === 'bolsa') {
+    if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+    var t = (sub === 'grande') ? 'grande' : 'chico';
+    var nv = (_db.stockBolsas[t] || 0) + cantidad;
+    if (nv < 0) throw new Error('Stock de bolsas ' + t + ' resultante negativo (' + nv + ')');
+    _db.stockBolsas[t] = nv;
+    data.productoNombre = 'Bolsas ' + t;
+  } else if (cat === 'sticker') {
+    var stk = _findStickerByNombre(data.productoNombre);
+    if (!stk) throw new Error('Sticker "' + (data.productoNombre||'') + '" no encontrado');
+    var field = (sub === 'grande') ? 'stockGrande' : 'stockChico';
+    var nv = (Number(stk[field]) || 0) + cantidad;
+    if (nv < 0) throw new Error('Stock resultante negativo (' + nv + ') para sticker ' + stk.nombre);
+    stk[field] = nv;
+  }
+
+  data.cantidad = cantidad;
+  _db.ajustes[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'ajustes', data.id);
+  return data;
+}
+
+function deleteAjuste(id) {
+  if (!_db.ajustes || !_db.ajustes[id]) return false;
+  delete _db.ajustes[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'ajustes', id);
   return true;
 }
 
@@ -1017,6 +1098,7 @@ window.ArcanoDB = {
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
+  getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,
