@@ -1222,7 +1222,8 @@ const Pages = {
           '<td>' + nItems + '</td>' +
           '<td class="text-gold fw7">$' + (p.total || 0).toLocaleString() + '</td>' +
           '<td><span class="badge ' + estClass + '" style="border:1px solid">' + estLabel + '</span></td>' +
-          '<td><button class="btn btn-sm btn-gold" onclick="Pages.verPedido(\'' + p._key + '\')">Ver</button></td>' +
+          '<td><button class="btn btn-sm btn-gold" onclick="Pages.verPedido(\'' + p._key + '\')">Ver</button>' +
+          '<button class="btn btn-sm" style="color:var(--red);border:1px solid var(--red);margin-left:4px" onclick="Pages.eliminarPedido(\'' + p._key + '\')">Eliminar</button></td>' +
           '</tr>';
       }
       h += '</tbody></table></div>';
@@ -1273,6 +1274,7 @@ const Pages = {
 
     h += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'pedido-modal\').remove()">Cerrar</button>';
     h += '<a class="btn btn-gold" href="tel:' + (cl.telefono || '') + '" target="_blank">Llamar Cliente</a>';
+    h += '<button class="btn btn-sm" style="color:var(--red);border:1px solid var(--red);margin-left:auto" onclick="Pages.eliminarPedido(\'' + pedidoKey + '\')">Eliminar Pedido</button>';
     h += '</div></div>';
 
     var modal = document.createElement('div');
@@ -1287,6 +1289,14 @@ const Pages = {
     ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
     var modal = document.getElementById('pedido-modal');
     if (modal) modal.remove();
+    App.renderPage(App.currentPage);
+  },
+
+  eliminarPedido(pedidoKey) {
+    if (!confirm('Seguro que deseas eliminar este pedido? Esta accion no se puede deshacer.')) return;
+    var modal = document.getElementById('pedido-modal');
+    if (modal) modal.remove();
+    ArcanoDB.deletePedido(pedidoKey);
     App.renderPage(App.currentPage);
   },
 

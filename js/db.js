@@ -301,6 +301,11 @@ function updatePedidoEstado(pedidoKey, nuevoEstado) {
   _pedidosRef.child(pedidoKey + '/estado').set(nuevoEstado);
 }
 
+function deletePedido(pedidoKey) {
+  if (!_pedidosRef) return;
+  _pedidosRef.child(pedidoKey).remove();
+}
+
 function onDBChange(fn) { _listeners.push(fn); }
 
 /* ==================== GETTERS ==================== */
@@ -1165,7 +1170,7 @@ window.ArcanoDB = {
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
   getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
-  getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, onPedidosChange: onPedidosChange,
+  getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, deletePedido: deletePedido, onPedidosChange: onPedidosChange,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,

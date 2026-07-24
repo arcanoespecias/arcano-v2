@@ -7,14 +7,31 @@ function getCartCount() { var c = 0; for (var i = 0; i < cart.length; i++) c += 
 
 function getCartTotal() { var t = 0; for (var i = 0; i < cart.length; i++) t += cart[i].precio * cart[i].qty; return t; }
 
+function _showCartToast(nombre) {
+  var existing = document.getElementById('cart-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.id = 'cart-toast';
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1b0b07;color:#e8b84b;padding:12px 24px;border-radius:8px;border:1px solid #e8b84b;font-size:0.95rem;font-weight:600;z-index:10000;animation:toastIn 0.3s ease,toastOut 0.3s ease 1.7s forwards;box-shadow:0 4px 20px rgba(232,184,75,0.3)';
+  toast.textContent = 'Producto agregado al carrito';
+  if (!document.getElementById('toast-keyframes')) {
+    var style = document.createElement('style');
+    style.id = 'toast-keyframes';
+    style.textContent = '@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes toastOut{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}';
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(toast);
+  setTimeout(function() { if (toast.parentNode) toast.remove(); }, 2000);
+}
+
 function addToCart(product, talla) {
   var precio = talla === 'grande' ? product.precioGrande : product.precioChico;
   if (precio <= 0) return;
   for (var i = 0; i < cart.length; i++) {
-    if (cart[i].productId === product.id && cart[i].talla === talla) { cart[i].qty++; saveCart(); updateCartFab(); return; }
+    if (cart[i].productId === product.id && cart[i].talla === talla) { cart[i].qty++; saveCart(); updateCartFab(); _showCartToast(product.nombre); return; }
   }
   cart.push({ productId: product.id, nombre: product.nombre, tipo: product.tipo, talla: talla, precio: precio, qty: 1 });
-  saveCart(); updateCartFab();
+  saveCart(); updateCartFab(); _showCartToast(product.nombre);
 }
 
 function removeFromCart(idx) { cart.splice(idx, 1); saveCart(); updateCartFab(); if (document.getElementById('cart-list')) renderCartModal(); }
