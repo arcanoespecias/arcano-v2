@@ -118,9 +118,9 @@ var _firebaseApp = null;
 var _firebaseDb = null;
 var _firebaseRef = null;
 
-/* === Pedidos (separate path arcano/pedidos) === */
+/* === Pedidos (path arcano/db/pedidos) === */
 var _pedidos = [];           // in-memory list of orders from tienda
-var _pedidosRef = null;      // Firebase ref for arcano/pedidos
+var _pedidosRef = null;      // Firebase ref for arcano/db/pedidos
 var _pedidosListeners = [];  // callbacks when new pedido arrives
 
 function _initFirebase() {
@@ -129,7 +129,7 @@ function _initFirebase() {
     _firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
-    _pedidosRef = _firebaseDb.ref('arcano/pedidos');
+    _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
   }
@@ -142,7 +142,7 @@ function _saveToFirebase() {
   _saveTimer = setTimeout(function() {
     try {
       var safetyTimer = setTimeout(function() { _localDirty = false; }, 5000);
-      _firebaseRef.set(_db, function(error) {
+      _firebaseRef.update(_db, function(error) {
         clearTimeout(safetyTimer);
         _localDirty = false;
         if (error) console.error('[DB] Firebase save error:', error);
@@ -185,6 +185,7 @@ function initDB() {
       _firebaseRef.once('value').then(function(snap) {
         var fbData = snap.val();
         if (fbData && fbData.meta && fbData.meta.version === DB_VERSION && _ensureStructureOn(fbData)) {
+          delete fbData.pedidos;  // pedidos managed separately, not part of admin _db
           _db = fbData;
           _ensureStructure();  // ensure new fields exist on Firebase data
         } else {
@@ -232,6 +233,7 @@ function _startFirebaseListener() {
     if (!data || !data.meta || data.meta.version !== DB_VERSION) return;
     // CRITICAL: skip if local save is pending to prevent overwriting unsaved changes
     if (_localDirty) return;
+    delete data.pedidos;  // pedidos managed separately, not part of admin _db
     var prevJson = JSON.stringify(_db);
     _db = data;
     _ensureStructure();

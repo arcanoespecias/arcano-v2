@@ -39,7 +39,7 @@ var _pedidosRef = null;
 
 function submitOrder(orderData) {
   return new Promise(function(resolve, reject) {
-    if (!_pedidosRef) _pedidosRef = firebase.database().ref('arcano/pedidos');
+    if (!_pedidosRef) _pedidosRef = firebase.database().ref('arcano/db/pedidos');
     orderData.creado = new Date().toISOString();
     orderData.estado = 'nuevo';
     _pedidosRef.push(orderData, function(error) {
