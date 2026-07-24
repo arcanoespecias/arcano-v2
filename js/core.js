@@ -73,13 +73,51 @@ const App = {
       if (type === 'remote_change') App.renderPage(App.currentPage);
     });
 
-    // Pedidos badge listener
-    function _updatePedidosBadge() {
+    // Pedidos badge listener + audio notification
+    function _playNotifSound() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Two-tone notification: high note then higher note
+        var times = [0, 0.15, 0.35];
+        var freqs = [880, 1100, 880];
+        for (var i = 0; i < times.length; i++) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freqs[i];
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + times[i]);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + 0.14);
+          osc.start(ctx.currentTime + times[i]);
+          osc.stop(ctx.currentTime + times[i] + 0.15);
+        }
+      } catch (e) {}
+    }
+
+    var _lastPedidoNuevoCount = -1;
+    function _updatePedidosBadge(pedidos, isNew, countChanged) {
       var count = ArcanoDB.getPedidosCount('nuevo');
       var badge = document.getElementById('pedidos-badge');
-      if (!badge) return;
-      if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
-      else { badge.style.display = 'none'; }
+      if (badge) {
+        if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+      }
+      // Audio + visual alert when a NEW pedido arrives (not on initial load)
+      if (isNew && _lastPedidoNuevoCount >= 0) {
+        _playNotifSound();
+        // Flash browser tab title
+        var origTitle = document.title;
+        var flashCount = 0;
+        var flashInterval = setInterval(function() {
+          document.title = flashCount % 2 === 0 ? '\u{1F514} Nuevo Pedido!' : origTitle;
+          flashCount++;
+          if (flashCount >= 10) { clearInterval(flashInterval); document.title = origTitle; }
+        }, 800);
+        // Re-render current page to show new pedido in dashboard
+        App.renderPage(App.currentPage);
+      }
+      _lastPedidoNuevoCount = count;
     }
     ArcanoDB.onPedidosChange(_updatePedidosBadge);
     // Initial badge update after a short delay to let pedidos load

@@ -247,27 +247,39 @@ function _startFirebaseListener() {
 
 function _startPedidosListener() {
   if (!_pedidosRef) return;
+  var _prevNuevoKeys = {};
   _pedidosRef.on('value', function(snap) {
     var data = snap.val();
     var prevLen = _pedidos.length;
+    var prevNuevoKeys = Object.assign({}, _prevNuevoKeys);
     _pedidos = [];
+    var nuevoKeys = {};
     if (data) {
       var keys = Object.keys(data);
       for (var i = 0; i < keys.length; i++) {
         var p = data[keys[i]];
-        if (p && typeof p === 'object') { p._key = keys[i]; _pedidos.push(p); }
+        if (p && typeof p === 'object') {
+          p._key = keys[i];
+          _pedidos.push(p);
+          if (p.estado === 'nuevo') nuevoKeys[keys[i]] = true;
+        }
       }
     }
     _pedidos.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
-    if (_pedidos.length !== prevLen) {
-      _notifyPedidos();
+    _prevNuevoKeys = nuevoKeys;
+    // Detect new pedido: a key in nuevoKeys that was NOT in prevNuevoKeys
+    var hasNew = false;
+    var nk = Object.keys(nuevoKeys);
+    for (var n = 0; n < nk.length; n++) {
+      if (!prevNuevoKeys[nk[n]]) { hasNew = true; break; }
     }
+    _notifyPedidos(hasNew, _pedidos.length !== prevLen);
   });
 }
 
-function _notifyPedidos() {
+function _notifyPedidos(isNew, countChanged) {
   for (var i = 0; i < _pedidosListeners.length; i++) {
-    try { _pedidosListeners[i](_pedidos); } catch (e) {}
+    try { _pedidosListeners[i](_pedidos, isNew, countChanged); } catch (e) {}
   }
 }
 

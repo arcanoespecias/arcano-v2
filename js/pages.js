@@ -1271,19 +1271,21 @@ const Pages = {
     }
     h += '</div></div>';
 
-    h += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="App.renderPage(\'pedidos\')">Cerrar</button>';
+    h += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'pedido-modal\').remove()">Cerrar</button>';
     h += '<a class="btn btn-gold" href="tel:' + (cl.telefono || '') + '" target="_blank">Llamar Cliente</a>';
     h += '</div></div>';
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.id = 'pedido-modal';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
     modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' + h + '</div>';
     document.body.appendChild(modal);
   },
 
   cambiarEstadoPedido(pedidoKey, nuevoEstado) {
     ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
-    var modal = document.querySelector('.modal-overlay');
+    var modal = document.getElementById('pedido-modal');
     if (modal) modal.remove();
     App.renderPage(App.currentPage);
   },
