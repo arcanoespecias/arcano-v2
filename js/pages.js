@@ -5,51 +5,85 @@ const Pages = {
      DASHBOARD
      ================================================================ */
   renderDashboard(container) {
-    const s = ArcanoDB.getStats();
-    const ultimasVentas = ArcanoDB.getVentas().slice(0, 5);
-    const ultimasProd = ArcanoDB.getProducciones().slice(0, 5);
+    var s = ArcanoDB.getStats();
+    var ultimasVentas = ArcanoDB.getVentas().slice(0, 5);
+    var ultimasProd = ArcanoDB.getProducciones().slice(0, 5);
+    var pedidosNuevos = ArcanoDB.getPedidos().filter(function(p) { return p.estado === 'nuevo'; });
 
-    container.innerHTML = `
-      <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">
-        <div class="stat-card" style="border-left-color: var(--gold)">
-          <div class="stat-value">$${s.totalVentasHoy.toLocaleString()}</div>
-          <div class="stat-label">Ventas Hoy</div>
-          <div class="stat-sub">${s.ventasHoy} ops</div>
-        </div>
-        <div class="stat-card" style="border-left-color: var(--green)">
-          <div class="stat-value">${s.totalFrascos}</div>
-          <div class="stat-label">Frascos Listos</div>
-          <div class="stat-sub">${s.frascosChico} ch / ${s.frascosGrande} gr</div>
-        </div>
-        <div class="stat-card" style="border-left-color: var(--blue)">
-          <div class="stat-value">$${s.totalVentasMes.toLocaleString()}</div>
-          <div class="stat-label">Ventas del Mes</div>
-          <div class="stat-sub">${s.ventasMes} ops</div>
-        </div>
-      </div>
-      <div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">
-        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem">${s.totalEspecias}</div><div class="stat-label">Especias</div></div>
-        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem">${s.totalBlends}</div><div class="stat-label">Blends</div></div>
-        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">${s.envasesChico}</div><div class="stat-label">Env. Chicos</div></div>
-        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">${s.envasesGrande}</div><div class="stat-label">Env. Grandes</div></div>
-        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:${s.especiasBolsaBaja.length > 0 ? 'var(--red)' : 'var(--green)'}">${s.especiasBolsaBaja.length}</div><div class="stat-label">Bolsa Baja</div><div class="stat-sub">${s.especiasBolsaBaja.map(function(e){return e.nombre}).join(', ') || 'OK'}</div></div>
-      </div>
-      ${(s.stickersBajos.length > 0 || s.especiasBolsaBaja.length > 0) ? '<div class="card mt-16"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">' +
-        s.especiasBolsaBaja.map(function(e){return '<span class="badge badge-red mr-8">BOLSA: '+e.nombre+' '+(e.stockBolsa||0)+'g</span>'}).join('') +
-        s.stickersBajos.map(function(e){return '<span class="badge badge-yellow mr-8">ETQ: '+(e.nombre||'?')+' ('+((e.stockChico||0)+(e.stockGrande||0))+')</span>'}).join('') +
-        '</div></div>' : ''}
-      <div class="g2 mt-16" style="gap:16px">
-        <div class="card"><div class="card-header"><h3>Ultimas Ventas</h3></div><div class="card-body">
-          ${ultimasVentas.length === 0 ? '<p class="text-muted text-center text-sm">Sin ventas</p>' :
-          '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Total</th><th>Items</th></tr></thead><tbody>' +
-          ultimasVentas.map(function(v){return '<tr><td>'+(v.fecha||'')+'</td><td class="fw7 text-gold">$'+(v.total||0).toLocaleString()+'</td><td class="text-sm">'+(v.items||[]).map(function(i){return (i.productoNombre||'?')+' x'+(i.cantidad||0)}).join(', ')+'</td></tr>'}).join('') +
-          '</tbody></table></div>'}</div></div>
-        <div class="card"><div class="card-header"><h3>Ultimas Producciones</h3></div><div class="card-body">
-          ${ultimasProd.length === 0 ? '<p class="text-muted text-center text-sm">Sin producciones</p>' :
-          '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Producto</th><th>Talla</th><th>Cant.</th></tr></thead><tbody>' +
-          ultimasProd.map(function(p){return '<tr><td>'+(p.fecha||'')+'</td><td class="fw7">'+(p.productoNombre||'')+'</td><td><span class="badge '+((p.talla||'chico')==='grande'?'badge-gold':'badge-blue')+'">'+(p.talla||'chico')+'</span></td><td class="fw7 text-green">'+(p.cantidad||0)+'</td></tr>'}).join('') +
-          '</tbody></table></div>'}</div></div>
-      </div>`;
+    var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">';
+    h += '<div class="stat-card" style="border-left-color: var(--gold)"><div class="stat-value">$' + s.totalVentasHoy.toLocaleString() + '</div><div class="stat-label">Ventas Hoy</div><div class="stat-sub">' + s.ventasHoy + ' ops</div></div>';
+    h += '<div class="stat-card" style="border-left-color: var(--green)"><div class="stat-value">' + s.totalFrascos + '</div><div class="stat-label">Frascos Listos</div><div class="stat-sub">' + s.frascosChico + ' ch / ' + s.frascosGrande + ' gr</div></div>';
+    h += '<div class="stat-card" style="border-left-color: var(--blue)"><div class="stat-value">$' + s.totalVentasMes.toLocaleString() + '</div><div class="stat-label">Ventas del Mes</div><div class="stat-sub">' + s.ventasMes + ' ops</div></div>';
+    h += '</div>';
+
+    h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem">' + s.totalEspecias + '</div><div class="stat-label">Especias</div></div>';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem">' + s.totalBlends + '</div><div class="stat-label">Blends</div></div>';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">' + s.envasesChico + '</div><div class="stat-label">Env. Chicos</div></div>';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">' + s.envasesGrande + '</div><div class="stat-label">Env. Grandes</div></div>';
+    var bolsaBajaColor = s.especiasBolsaBaja.length > 0 ? 'var(--red)' : 'var(--green)';
+    var bolsaBajaNombres = s.especiasBolsaBaja.map(function(e){return e.nombre}).join(', ') || 'OK';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:' + bolsaBajaColor + '">' + s.especiasBolsaBaja.length + '</div><div class="stat-label">Pala Baja</div><div class="stat-sub">' + bolsaBajaNombres + '</div></div>';
+    h += '</div>';
+
+    // Alertas
+    if (s.stickersBajos.length > 0 || s.especiasBolsaBaja.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">';
+      for (var ai = 0; ai < s.especiasBolsaBaja.length; ai++) {
+        h += '<span class="badge badge-red mr-8">PALA: ' + s.especiasBolsaBaja[ai].nombre + ' ' + (s.especiasBolsaBaja[ai].stockBolsa||0) + 'g</span>';
+      }
+      for (var ai2 = 0; ai2 < s.stickersBajos.length; ai2++) {
+        h += '<span class="badge badge-yellow mr-8">STK: ' + (s.stickersBajos[ai2].nombre||'?') + ' (' + ((s.stickersBajos[ai2].stockChico||0)+(s.stickersBajos[ai2].stockGrande||0)) + ')</span>';
+      }
+      h += '</div></div>';
+    }
+
+    // Pedidos nuevos (NOTIFICACION)
+    if (pedidosNuevos.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--red)"><div class="card-header"><h3 style="color:var(--red)">Pedidos Nuevos (' + pedidosNuevos.length + ')</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Hora</th><th>Cliente</th><th>Items</th><th>Total</th><th>Ciudad</th><th></th></tr></thead><tbody>';
+      for (var pi = 0; pi < pedidosNuevos.length; pi++) {
+        var ped = pedidosNuevos[pi];
+        var cl = ped.cliente || {};
+        var hora = ped.creado ? ped.creado.slice(11, 16) : '';
+        var itemsCount = (ped.items || []).length;
+        h += '<tr><td class="fw7">' + hora + '</td><td class="fw7">' + (cl.nombre || '?') + '</td><td>' + itemsCount + ' items</td><td class="text-gold fw7">$' + (ped.total || 0).toLocaleString() + '</td><td>' + (cl.ciudad || '') + '</td>' +
+          '<td><button class="btn btn-sm btn-gold" onclick="Pages.verPedido(\'' + ped._key + '\')">Ver</button></td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // Ultimas ventas y producciones
+    h += '<div class="g2 mt-16" style="gap:16px">';
+    h += '<div class="card"><div class="card-header"><h3>Ultimas Ventas</h3></div><div class="card-body">';
+    if (ultimasVentas.length === 0) {
+      h += '<p class="text-muted text-center text-sm">Sin ventas</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Total</th><th>Items</th></tr></thead><tbody>';
+      for (var vi = 0; vi < ultimasVentas.length; vi++) {
+        var v = ultimasVentas[vi];
+        var vItems = (v.items||[]).map(function(i){return (i.productoNombre||'?')+' x'+(i.cantidad||0)}).join(', ');
+        h += '<tr><td>' + (v.fecha||'') + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td><td class="text-sm">' + vItems + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    h += '<div class="card"><div class="card-header"><h3>Ultimas Producciones</h3></div><div class="card-body">';
+    if (ultimasProd.length === 0) {
+      h += '<p class="text-muted text-center text-sm">Sin producciones</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Producto</th><th>Talla</th><th>Cant.</th></tr></thead><tbody>';
+      for (var ui = 0; ui < ultimasProd.length; ui++) {
+        var p = ultimasProd[ui];
+        var tBadge = (p.talla||'chico') === 'grande' ? 'badge-gold' : 'badge-blue';
+        h += '<tr><td>' + (p.fecha||'') + '</td><td class="fw7">' + (p.productoNombre||'') + '</td><td><span class="badge ' + tBadge + '">' + (p.talla||'chico') + '</span></td><td class="fw7 text-green">' + (p.cantidad||0) + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
   },
 
   /* ================================================================
@@ -1142,6 +1176,116 @@ const Pages = {
         App.renderPage('stock');
       } catch (err) { alert('Error: ' + err.message); }
     });
+  },
+
+  /* ================================================================
+     PEDIDOS (Tienda)
+     ================================================================ */
+  renderPedidos(container) {
+    var pedidos = ArcanoDB.getPedidos();
+    var estados = ['nuevo', 'confirmado', 'enviado', 'entregado', 'cancelado'];
+    var estadoColors = { nuevo: 'text-red', confirmado: 'text-yellow', enviado: 'text-blue', entregado: 'text-green', cancelado: 'text-muted' };
+    var estadoLabels = { nuevo: 'Nuevo', confirmado: 'Confirmado', enviado: 'Enviado', entregado: 'Entregado', cancelado: 'Cancelado' };
+
+    var h = '<div class="page-actions"><button class="btn btn-outline" onclick="App.renderPage(\'dashboard\')">Volver al Dashboard</button></div>';
+
+    // Summary cards
+    h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">';
+    for (var si = 0; si < estados.length; si++) {
+      var est = estados[si];
+      var count = 0;
+      for (var sc = 0; sc < pedidos.length; sc++) { if (pedidos[sc].estado === est) count++; }
+      h += '<div class="stat-card"><div class="stat-value ' + estadoColors[est] + '">' + count + '</div><div class="stat-label">' + estadoLabels[est] + '</div></div>';
+    }
+    h += '</div>';
+
+    // Table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Todos los Pedidos</h3></div><div class="card-body">';
+    if (pedidos.length === 0) {
+      h += '<p class="text-muted text-center">Sin pedidos.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Telefono</th><th>Ciudad</th><th>Items</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>';
+      for (var i = 0; i < pedidos.length; i++) {
+        var p = pedidos[i];
+        var cl = p.cliente || {};
+        var fecha = p.creado ? p.creado.slice(0, 10) : '';
+        var hora = p.creado ? p.creado.slice(11, 16) : '';
+        var nItems = (p.items || []).length;
+        var estClass = estadoColors[p.estado] || 'text-muted';
+        var estLabel = estadoLabels[p.estado] || p.estado;
+        h += '<tr>' +
+          '<td>' + fecha + '</td>' +
+          '<td class="fw7">' + hora + '</td>' +
+          '<td class="fw7">' + (cl.nombre || '?') + '</td>' +
+          '<td>' + (cl.telefono || '') + '</td>' +
+          '<td>' + (cl.ciudad || '') + '</td>' +
+          '<td>' + nItems + '</td>' +
+          '<td class="text-gold fw7">$' + (p.total || 0).toLocaleString() + '</td>' +
+          '<td><span class="badge ' + estClass + '" style="border:1px solid">' + estLabel + '</span></td>' +
+          '<td><button class="btn btn-sm btn-gold" onclick="Pages.verPedido(\'' + p._key + '\')">Ver</button></td>' +
+          '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+  },
+
+  verPedido(pedidoKey) {
+    var pedidos = ArcanoDB.getPedidos();
+    var p = null;
+    for (var i = 0; i < pedidos.length; i++) { if (pedidos[i]._key === pedidoKey) { p = pedidos[i]; break; } }
+    if (!p) { alert('Pedido no encontrado'); return; }
+    var cl = p.cliente || {};
+    var estadoLabels = { nuevo: 'Nuevo', confirmado: 'Confirmado', enviado: 'Enviado', entregado: 'Entregado', cancelado: 'Cancelado' };
+    var estados = ['nuevo', 'confirmado', 'enviado', 'entregado', 'cancelado'];
+    var estadoColors = { nuevo: 'text-red', confirmado: 'text-yellow', enviado: 'text-blue', entregado: 'text-green', cancelado: 'text-muted' };
+
+    var h = '<div class="card"><div class="card-header"><h3>Pedido de ' + (cl.nombre || '?') + '</h3><span class="badge ' + (estadoColors[p.estado]||'') + '" style="font-size:0.85rem">' + (estadoLabels[p.estado]||p.estado) + '</span></div><div class="card-body">';
+    h += '<div class="g2">';
+    h += '<div><p class="text-sm text-muted">Fecha</p><p class="fw7">' + (p.creado || '').replace('T', ' ') + '</p></div>';
+    h += '<div><p class="text-sm text-muted">Telefono</p><p class="fw7">' + (cl.telefono || '') + '</p></div>';
+    h += '<div><p class="text-sm text-muted">Email</p><p class="fw7">' + (cl.email || '') + '</p></div>';
+    h += '<div><p class="text-sm text-muted">Ciudad</p><p class="fw7">' + (cl.ciudad || '') + '</p></div>';
+    h += '</div>';
+    if (cl.direccion) h += '<p class="mt-8 text-sm text-muted">Direccion: <b>' + cl.direccion + '</b></p>';
+    if (p.notas) h += '<p class="mt-4 text-sm text-muted">Notas: <b>' + p.notas + '</b></p>';
+
+    h += '<h4 class="mt-16">Productos</h4>';
+    h += '<div class="table-wrap mt-8"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
+    for (var i = 0; i < (p.items || []).length; i++) {
+      var it = p.items[i];
+      var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Chico';
+      h += '<tr><td class="fw7">' + (it.nombre || '?') + '</td><td>' + tallaLabel + '</td><td>' + (it.qty || 0) + '</td><td>$' + (it.precio || 0).toLocaleString() + '</td><td class="fw7">$' + (it.subtotal || 0).toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '<div style="text-align:right;margin-top:12px;font-size:1.2rem" class="fw7">Total: $' + (p.total || 0).toLocaleString() + '</div>';
+
+    // Estado buttons
+    h += '<div class="mt-16"><h4>Cambiar Estado</h4><div class="mt-8" style="display:flex;gap:8px;flex-wrap:wrap">';
+    for (var ei = 0; ei < estados.length; ei++) {
+      var est = estados[ei];
+      var isActive = p.estado === est;
+      var btnClass = isActive ? 'btn btn-gold' : 'btn btn-outline';
+      h += '<button class="' + btnClass + ' btn-sm" onclick="Pages.cambiarEstadoPedido(\'' + pedidoKey + '\',\'' + est + '\')">' + estadoLabels[est] + '</button>';
+    }
+    h += '</div></div>';
+
+    h += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="App.renderPage(\'pedidos\')">Cerrar</button>';
+    h += '<a class="btn btn-gold" href="tel:' + (cl.telefono || '') + '" target="_blank">Llamar Cliente</a>';
+    h += '</div></div>';
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' + h + '</div>';
+    document.body.appendChild(modal);
+  },
+
+  cambiarEstadoPedido(pedidoKey, nuevoEstado) {
+    ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
+    var modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
+    App.renderPage(App.currentPage);
   },
 
   /* ================================================================

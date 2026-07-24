@@ -118,12 +118,18 @@ var _firebaseApp = null;
 var _firebaseDb = null;
 var _firebaseRef = null;
 
+/* === Pedidos (separate path arcano/pedidos) === */
+var _pedidos = [];           // in-memory list of orders from tienda
+var _pedidosRef = null;      // Firebase ref for arcano/pedidos
+var _pedidosListeners = [];  // callbacks when new pedido arrives
+
 function _initFirebase() {
   if (_firebaseDb) return;
   try {
     _firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
+    _pedidosRef = _firebaseDb.ref('arcano/pedidos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
   }
@@ -169,6 +175,7 @@ function initDB() {
       _ensureStructure();  // ensure new fields exist on cached data
       _ready = true;
       _startFirebaseListener();
+      _startPedidosListener();
       resolve();
       return;
     }
@@ -188,6 +195,7 @@ function initDB() {
         _ready = true;
         _cacheLocal();
         _startFirebaseListener();
+        _startPedidosListener();
         resolve();
       }).catch(function() {
         _db = _emptyDB();
@@ -233,6 +241,50 @@ function _startFirebaseListener() {
       _notify('remote_change', '', '');
     }
   });
+}
+
+function _startPedidosListener() {
+  if (!_pedidosRef) return;
+  _pedidosRef.on('value', function(snap) {
+    var data = snap.val();
+    var prevLen = _pedidos.length;
+    _pedidos = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var p = data[keys[i]];
+        if (p && typeof p === 'object') { p._key = keys[i]; _pedidos.push(p); }
+      }
+    }
+    _pedidos.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+    if (_pedidos.length !== prevLen) {
+      _notifyPedidos();
+    }
+  });
+}
+
+function _notifyPedidos() {
+  for (var i = 0; i < _pedidosListeners.length; i++) {
+    try { _pedidosListeners[i](_pedidos); } catch (e) {}
+  }
+}
+
+function onPedidosChange(fn) { _pedidosListeners.push(fn); }
+
+function getPedidos() {
+  return _pedidos.slice();
+}
+
+function getPedidosCount(estado) {
+  if (!estado) return _pedidos.length;
+  var c = 0;
+  for (var i = 0; i < _pedidos.length; i++) { if (_pedidos[i].estado === estado) c++; }
+  return c;
+}
+
+function updatePedidoEstado(pedidoKey, nuevoEstado) {
+  if (!_pedidosRef) return;
+  _pedidosRef.child(pedidoKey + '/estado').set(nuevoEstado);
 }
 
 function onDBChange(fn) { _listeners.push(fn); }
@@ -1099,6 +1151,7 @@ window.ArcanoDB = {
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
   getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
+  getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, onPedidosChange: onPedidosChange,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,

@@ -58,11 +58,11 @@ function renderProducts(filter) {
     else if (hasGrande) stockText = 'Grande: ' + p.stockGrande + ' disp.';
 
     var meta = (p.tipo === 'blend' ? 'Blend' : 'Especia');
-    if (p.categoria) meta += ' · ' + p.categoria;
+    if (p.categoria) meta += ' \u00b7 ' + p.categoria;
 
     h += '<div class="product-card">' +
       '<div class="card-img" style="position:relative" onclick="openDetail(' + p.id + ')">' +
-        (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span>' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
+        (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span>' + (p.tipo === 'blend' ? '\ud83c\udf3f' : '\ud83c\udf31') + '</span>') +
       '</div>' +
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
@@ -118,7 +118,7 @@ function openDetail(pid) {
   if (hasGrande) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Grande</div><div class="detail-price-val">$' + p.precioGrande.toLocaleString() + '</div></div>';
 
   var stockHtml = '';
-  if (hasChico && hasGrande) stockHtml = 'Chico: ' + p.stockChico + ' disponibles · Grande: ' + p.stockGrande + ' disponibles';
+  if (hasChico && hasGrande) stockHtml = 'Chico: ' + p.stockChico + ' disponibles \u00b7 Grande: ' + p.stockGrande + ' disponibles';
   else if (hasChico) stockHtml = p.stockChico + ' frascos disponibles';
   else if (hasGrande) stockHtml = p.stockGrande + ' frascos disponibles';
 
@@ -132,7 +132,7 @@ function openDetail(pid) {
   var html = '<div class="detail-modal">' +
     '<div class="detail-img" style="position:relative">' +
       '<button class="detail-close" onclick="document.getElementById(\'detail-overlay\').remove()">&times;</button>' +
-      (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span class="detail-emoji">' + (p.tipo === 'blend' ? '🌿' : '🌱') + '</span>') +
+      (p.imagen ? '<img src="' + p.imagen + '" alt="' + p.nombre + '">' : '<span class="detail-emoji">' + (p.tipo === 'blend' ? '\ud83c\udf3f' : '\ud83c\udf31') + '</span>') +
     '</div>' +
     '<div class="detail-content">' +
       '<span class="detail-type ' + typeClass + '">' + typeLabel + '</span>' +
@@ -176,7 +176,7 @@ function renderCartModal() {
       var c = cart[i];
       h += '<div class="cart-item">' +
         '<div class="cart-item-info"><div class="cart-item-name">' + c.nombre + '</div>' +
-        '<div class="cart-item-detail">' + (c.talla === 'grande' ? 'Grande' : 'Chico') + ' · $' + c.precio.toLocaleString() + ' c/u</div></div>' +
+        '<div class="cart-item-detail">' + (c.talla === 'grande' ? 'Grande' : 'Chico') + ' \u00b7 $' + c.precio.toLocaleString() + ' c/u</div></div>' +
         '<div class="cart-item-qty"><button onclick="changeQty(' + i + ',-1)">-</button><span>' + c.qty + '</span><button onclick="changeQty(' + i + ',1)">+</button></div>' +
         '<div class="cart-item-price">$' + (c.precio * c.qty).toLocaleString() + '</div>' +
         '<button class="cart-item-rm" onclick="removeFromCart(' + i + ')">&times;</button></div>';
@@ -205,7 +205,7 @@ function closeCart() {
   if (el) el.remove();
 }
 
-/* === SEND ORDER === */
+/* === SEND ORDER (Firebase) === */
 function sendOrder() {
   var nombre = document.getElementById('o-nombre').value.trim();
   var tel = document.getElementById('o-tel').value.trim();
@@ -214,37 +214,36 @@ function sendOrder() {
   var dir = document.getElementById('o-dir').value.trim();
   var notas = document.getElementById('o-notas').value.trim();
   if (!nombre || !tel) { alert('Nombre y telefono son obligatorios'); return; }
+  if (cart.length === 0) { alert('El carrito esta vacio'); return; }
 
-  var items = '';
+  var items = [];
   for (var i = 0; i < cart.length; i++) {
     var c = cart[i];
-    items += c.nombre + ' (' + (c.talla === 'grande' ? 'Grande' : 'Chico') + ') x' + c.qty + ' = $' + (c.precio * c.qty).toLocaleString() + '\\n';
+    items.push({ productId: c.productId, nombre: c.nombre, tipo: c.tipo, talla: c.talla, precio: c.precio, qty: c.qty, subtotal: c.precio * c.qty });
   }
   var total = getCartTotal();
-  var body = 'PEDIDO NUEVO\\n\\n' +
-    'Cliente: ' + nombre + '\\n' +
-    (email ? 'Email: ' + email + '\\n' : '') +
-    (tel ? 'Telefono: ' + tel + '\\n' : '') +
-    (ciudad ? 'Ciudad: ' + ciudad + '\\n' : '') +
-    (dir ? 'Direccion: ' + dir + '\\n' : '') +
-    '\\n--- PRODUCTOS ---\\n' + items +
-    '\\nTOTAL: $' + total.toLocaleString() +
-    (notas ? '\\n\\nNOTAS: ' + notas : '');
-
-  var mailto = 'mailto:arcano.especias@gmail.com?subject=Pedido%20-%20' + encodeURIComponent(nombre) +
-    '&body=' + encodeURIComponent(body);
-  window.open(mailto, '_blank');
+  var orderData = {
+    cliente: { nombre: nombre, telefono: tel, email: email, ciudad: ciudad, direccion: dir },
+    items: items, total: total, notas: notas
+  };
 
   var overlay = document.getElementById('order-modal');
-  if (overlay) {
-    overlay.querySelector('.modal').innerHTML =
-      '<div class="modal-body"><div class="success-msg">' +
-      '<div class="success-icon">✉️</div>' +
-      '<h3>Pedido casi listo</h3>' +
-      '<p>Se abrio tu cliente de email con el detalle del pedido. Envialo para completar.</p>' +
-      '<button class="btn-primary" style="margin-top:20px" onclick="finishOrder()">Entendido</button>' +
-      '</div></div>';
-  }
+  if (overlay) overlay.querySelector('.modal-body').innerHTML = '<div style="text-align:center;padding:30px"><div class="loader"></div><p class="text-muted mt-12">Enviando pedido...</p></div>';
+
+  submitOrder(orderData).then(function() {
+    if (overlay) {
+      overlay.querySelector('.modal').innerHTML =
+        '<div class="modal-body"><div class="success-msg">' +
+        '<div class="success-icon">\u2705</div>' +
+        '<h3>Pedido enviado</h3>' +
+        '<p>Tu pedido fue recibido correctamente. Nos contactaremos pronto para confirmar.</p>' +
+        '<button class="btn-primary" style="margin-top:20px" onclick="finishOrder()">Entendido</button>' +
+        '</div></div>';
+    }
+  }).catch(function(err) {
+    alert('Error al enviar el pedido: ' + (err.message || err));
+    if (overlay) renderCartModal();
+  });
 }
 
 function finishOrder() {

@@ -73,6 +73,18 @@ const App = {
       if (type === 'remote_change') App.renderPage(App.currentPage);
     });
 
+    // Pedidos badge listener
+    function _updatePedidosBadge() {
+      var count = ArcanoDB.getPedidosCount('nuevo');
+      var badge = document.getElementById('pedidos-badge');
+      if (!badge) return;
+      if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
+      else { badge.style.display = 'none'; }
+    }
+    ArcanoDB.onPedidosChange(_updatePedidosBadge);
+    // Initial badge update after a short delay to let pedidos load
+    setTimeout(_updatePedidosBadge, 2000);
+
     this.renderShell(user);
     this.renderPage('dashboard');
   },
@@ -97,6 +109,8 @@ const App = {
               '<span class="nav-icon">🏭</span><span class="nav-label">Produccion</span></a>' +
             '<a class="nav-item" data-page="ventas" onclick="App.navigate(\'ventas\')">' +
               '<span class="nav-icon">💰</span><span class="nav-label">Ventas</span></a>' +
+            '<a class="nav-item" data-page="pedidos" onclick="App.navigate(\'pedidos\')" id="nav-pedidos">' +
+              '<span class="nav-icon">📦</span><span class="nav-label">Pedidos</span><span class="nav-badge" id="pedidos-badge" style="display:none"></span></a>' +
             '<a class="nav-item" data-page="stock" onclick="App.navigate(\'stock\')">' +
               '<span class="nav-icon">📋</span><span class="nav-label">Stock</span></a>' +
             '<a class="nav-item" data-page="tienda" onclick="App.navigate(\'tienda\')">' +
@@ -134,7 +148,7 @@ const App = {
     });
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos',
-      produccion: 'Produccion', ventas: 'Ventas', stock: 'Stock', tienda: 'Tienda', usuarios: 'Usuarios'
+      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', usuarios: 'Usuarios'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -160,6 +174,7 @@ const App = {
         case 'insumos': Pages.renderInsumos(container); break;
         case 'produccion': Pages.renderProduccion(container); break;
         case 'ventas': Pages.renderVentas(container); break;
+        case 'pedidos': Pages.renderPedidos(container); break;
         case 'stock': Pages.renderStock(container); break;
         case 'tienda': Pages.renderTiendaAdmin(container); break;
         case 'usuarios': Pages.renderUsuarios(container); break;

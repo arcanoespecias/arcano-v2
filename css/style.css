@@ -243,6 +243,7 @@ select.input { cursor: pointer; }
 .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
 .nav-item.active { background: var(--gold-dim); color: var(--gold); font-weight: 600; }
 .nav-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+.nav-badge { background: var(--red); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-left: 6px; min-width: 18px; text-align: center; }
 
 .sidebar-footer {
   padding: 12px; border-top: 1px solid var(--bg4);

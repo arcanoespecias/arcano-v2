@@ -34,6 +34,21 @@ function initTienda() {
 
 function onTiendaChange(fn) { _sListeners.push(fn); }
 
+/* === PEDIDOS (write) === */
+var _pedidosRef = null;
+
+function submitOrder(orderData) {
+  return new Promise(function(resolve, reject) {
+    if (!_pedidosRef) _pedidosRef = firebase.database().ref('arcano/pedidos');
+    orderData.creado = new Date().toISOString();
+    orderData.estado = 'nuevo';
+    _pedidosRef.push(orderData, function(error) {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
 function getStoreProducts() {
   if (!_sDb) return [];
   var products = [];
