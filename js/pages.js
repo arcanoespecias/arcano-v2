@@ -1740,5 +1740,210 @@ const Pages = {
     if (placeholder) placeholder.style.display = '';
     var inp = document.getElementById(inputId);
     if (inp) inp.value = '';
+  },
+
+  /* ================================================================
+     RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
+     ================================================================ */
+  renderRecetasAdmin(container) {
+    var savedKey = localStorage.getItem('arcano_groq_key') || '';
+    var categorias = ['Comida', 'Bebidas', 'Postres', 'Snacks', 'Salsas', 'Otros'];
+
+    // Build list of available products for context
+    var productos = ArcanoDB.getTiendaProductos();
+    var productNames = [];
+    for (var i = 0; i < productos.length; i++) productNames.push(productos[i].nombre);
+    var productsContext = productNames.length > 0 ? productNames.join(', ') : 'No hay productos disponibles';
+
+    var h = '<div class="card mb-16">' +
+      '<div class="card-header"><h3>Configuracion</h3></div>' +
+      '<div class="card-body">' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
+        '<div class="form-group"><label>Groq API Key</label>' +
+        '<input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx...">' +
+        '</div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label>' +
+          '<select class="input" id="ra-categoria">';
+    for (var c = 0; c < categorias.length; c++) {
+      h += '<option value="' + categorias[c] + '">' + categorias[c] + '</option>';
+    }
+    h += '</select></div>' +
+          '<div class="form-group"><label>Tema de la receta (opcional)</label>' +
+          '<input type="text" class="input" id="ra-tema" placeholder="Ej: arroz con leche, adobo de pollo...">' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Idioma de salida</label>' +
+        '<select class="input" id="ra-idioma">' +
+          '<option value="es">Espanol</option>' +
+          '<option value="en">English</option>' +
+        '</select></div>' +
+        '<button class="btn btn-gold" id="ra-gen-btn" onclick="Pages.generarReceta()">Generar Receta con IA</button>' +
+        '<span id="ra-gen-status" class="text-sm text-muted ml-12"></span>' +
+      '</div>' +
+    '</div>';
+
+    // Existing recipes section
+    h += '<div class="card">' +
+      '<div class="card-header"><h3>Recetas Existentes (' + '<span id="ra-count">0</span>' + ')</h3></div>' +
+      '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
+    '</div>';
+
+    container.innerHTML = h;
+
+    // Load existing recipes from Firebase
+    Pages._loadRecetasAdmin();
+  },
+
+  _loadRecetasAdmin: function() {
+    var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+    ref.once('value', function(snap) {
+      var data = snap.val();
+      var recetas = [];
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          r._key = keys[i];
+          recetas.push(r);
+        }
+      }
+      recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+      Pages._renderRecetasList(recetas);
+    });
+  },
+
+  _renderRecetasList: function(recetas) {
+    var countEl = document.getElementById('ra-count');
+    var listEl = document.getElementById('ra-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = recetas.length;
+    if (recetas.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Categoria</th><th>Tiempo</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < recetas.length; i++) {
+      var r = recetas[i];
+      h += '<tr>' +
+        '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">Eliminar</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarReceta: function(key) {
+    if (!confirm('Eliminar esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
+  generarReceta: function() {
+    var keyInput = document.getElementById('ra-groq-key');
+    var catSelect = document.getElementById('ra-categoria');
+    var temaInput = document.getElementById('ra-tema');
+    var idiomaSelect = document.getElementById('ra-idioma');
+    var btn = document.getElementById('ra-gen-btn');
+    var status = document.getElementById('ra-gen-status');
+
+    var apiKey = keyInput.value.trim();
+    var categoria = catSelect.value;
+    var tema = temaInput.value.trim();
+    var idioma = idiomaSelect.value;
+
+    if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_groq_key', apiKey);
+
+    // Build product context
+    var productos = ArcanoDB.getTiendaProductos();
+    var nombres = [];
+    for (var i = 0; i < productos.length; i++) nombres.push(productos[i].nombre);
+    var productContext = nombres.length > 0 ? nombres.join(', ') : 'especias y blends variados';
+
+    var langInstr = idioma === 'en'
+      ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
+      : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
+
+    var temaInstr = tema
+      ? 'El tema especifico es: ' + tema + '.'
+      : 'Inventa un tema creativo y apetitoso.';
+
+    var systemPrompt =
+      'Eres un chef experto en especias y blends artesanales de la marca Arcano Especias. ' +
+      'Tu especialidad es crear recetas deliciosas que resalten los sabores de las especias. ' +
+      'Los productos disponibles son: ' + productContext + '. ' +
+      'Si es posible, usa al menos uno de estos productos en la receta. ' +
+      langInstr;
+
+    var userPrompt =
+      'Genera una receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+      'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
+      '{"titulo": "...", "descripcion": "... (2-3 oraciones)", "categoria": "' + categoria + '", ' +
+      '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+      '"ingredientes": ["1 cucharadita de comino", "200g de pollo", ...], ' +
+      '"pasos": ["Paso 1: ...", "Paso 2: ...", ...]}\n\n' +
+      'La receta debe ser practica, deliciosa y usar especias de forma creativa. ' +
+      'Entre 4 y 8 ingredientes, entre 4 y 6 pasos.';
+
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+
+    fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.8,
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+      return res.json();
+    })
+    .then(function(data) {
+      var content = data.choices[0].message.content.trim();
+      // Strip markdown code blocks if present
+      content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+      var receta = JSON.parse(content);
+
+      // Validate structure
+      if (!receta.titulo) throw new Error('La receta no tiene titulo');
+      if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+      if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+
+      // Save to Firebase
+      receta.fecha = new Date().toISOString().slice(0, 10);
+      if (!receta.categoria) receta.categoria = categoria;
+      firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+        if (err) {
+          status.textContent = 'Error al guardar: ' + (err.message || err);
+        } else {
+          status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+          Pages._loadRecetasAdmin();
+        }
+        btn.disabled = false;
+        btn.textContent = 'Generar Receta con IA';
+      });
+    })
+    .catch(function(err) {
+      status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
+      btn.disabled = false;
+      btn.textContent = 'Generar Receta con IA';
+    });
   }
 };
