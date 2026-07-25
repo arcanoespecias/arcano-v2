@@ -270,7 +270,7 @@ function finishOrder() {
 }
 
 /* === SIDEBAR === */
-var _sidebarOpen = false;
+var _sidebarOpen = true;
 var _currentRecetaCat = 'Comida';
 var _SOCIAL_LINKS = [
   { name: 'Facebook', url: 'https://facebook.com/arcanoespecias', svg: '<svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>' },
@@ -325,6 +325,7 @@ function renderRecetas() {
       '<div class="recipe-card-sb-body"><div class="recipe-card-sb-inner">' +
       (r.descripcion ? '<p class="recipe-sb-desc">' + r.descripcion + '</p>' : '') +
       ingredientes + pasos +
+      '<button class="recipe-share-btn" onclick="event.stopPropagation();compartirReceta(\'' + r._key + '\')">Compartir receta</button>' +
       '</div></div></div>';
   }
   container.innerHTML = h;
@@ -341,6 +342,50 @@ function renderSocialLinks() {
   }
   el.innerHTML = h;
 }
+function renderSidebarLogo() {
+  var el = document.getElementById('sidebar-brand');
+  if (!el) return;
+  // Use the same logo from the header
+  var headerImg = document.querySelector('.store-logo img');
+  if (headerImg) {
+    el.innerHTML = '<img src="' + headerImg.src + '" alt="Arcano">';
+  }
+}
+function compartirReceta(key) {
+  var recetas = getRecetas();
+  var receta = null;
+  for (var i = 0; i < recetas.length; i++) { if (recetas[i]._key === key) { receta = recetas[i]; break; } }
+  if (!receta) return;
+  var text = '🍳 ' + (receta.titulo || 'Receta Arcano') + '\n';
+  text += (receta.tiempo || '') + (receta.porciones ? ' \u00b7 ' + receta.porciones : '') + '\n\n';
+  if (receta.ingredientes && receta.ingredientes.length) {
+    text += 'Ingredientes:\n';
+    for (var i = 0; i < receta.ingredientes.length; i++) text += '\u2022 ' + receta.ingredientes[i] + '\n';
+    text += '\n';
+  }
+  if (receta.pasos && receta.pasos.length) {
+    text += 'Preparaci\u00f3n:\n';
+    for (var j = 0; j < receta.pasos.length; j++) text += (j + 1) + '. ' + receta.pasos[j] + '\n';
+  }
+  text += '\n\u2728 Arcano Especias';
+  if (navigator.share) {
+    navigator.share({ title: receta.titulo, text: text }).catch(function() {});
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1b0b07;color:#e8b84b;padding:10px 20px;border-radius:8px;border:1px solid #e8b84b;font-size:0.85rem;font-weight:600;z-index:10000;box-shadow:0 4px 20px rgba(232,184,75,0.3)';
+    toast.textContent = 'Receta copiada al portapapeles';
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 2000);
+  }
+}
 /* === INIT === */
 var currentFilter = 'Todos';
 document.addEventListener('DOMContentLoaded', function() {
@@ -349,6 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCartFab();
     onRecetasReady(function() { renderRecetas(); });
     initRecetas();
+    renderSidebarLogo();
     renderSocialLinks();
   });
 
