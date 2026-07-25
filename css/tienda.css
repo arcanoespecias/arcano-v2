@@ -179,11 +179,15 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 .recipe-sb-steps { list-style: none; padding: 0; margin: 0; counter-reset: sbstep; }
 .recipe-sb-steps li { font-size: .8rem; color: #c4b8aa; padding: 4px 0 4px 26px; position: relative; line-height: 1.5; counter-increment: sbstep; }
 .recipe-sb-steps li::before { content: counter(sbstep); position: absolute; left: 0; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: rgba(200,150,58,.15); color: var(--gold); font-size: .65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.sidebar-brand { padding: 12px 20px; display: flex; justify-content: center; border-top: 1px solid #3a2218; }
+.sidebar-brand img { height: 48px; width: auto; object-fit: contain; opacity: 0.85; }
 .sidebar-social { padding: 16px 20px; border-top: 1px solid #3a2218; display: flex; justify-content: center; gap: 12px; }
 .social-link { width: 36px; height: 36px; border-radius: 50%; background: #241209; border: 1px solid #3a2218; display: flex; align-items: center; justify-content: center; color: #9a8a78; transition: all .2s; text-decoration: none; }
 .social-link:hover { background: rgba(200,150,58,.15); color: var(--gold); border-color: var(--gold); }
 .social-link svg { width: 18px; height: 18px; fill: currentColor; }
 .sidebar-empty { text-align: center; padding: 40px 16px; color: #9a8a78; font-size: .85rem; }
+.recipe-share-btn { width: 100%; margin-top: 12px; padding: 8px; border-radius: 6px; border: 1px solid #3a2218; background: rgba(200,150,58,.1); color: var(--gold); font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .2s; }
+.recipe-share-btn:hover { background: rgba(200,150,58,.25); border-color: var(--gold); }
 
 /* === RESPONSIVE === */
 @media (max-width: 600px) {
