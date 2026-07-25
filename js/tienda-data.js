@@ -78,3 +78,34 @@ function getStoreProducts() {
   }
   return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
+
+/* === RECETAS (read) === */
+var _recetas = [];
+var _recetasReady = false;
+var _recetasListeners = [];
+
+function initRecetas() {
+  var recetasRef = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+  recetasRef.on('value', function(snap) {
+    var data = snap.val();
+    _recetas = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var r = data[keys[i]];
+        r._key = keys[i];
+        _recetas.push(r);
+      }
+    }
+    _recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    _recetasReady = true;
+    for (var j = 0; j < _recetasListeners.length; j++) { try { _recetasListeners[j](_recetas); } catch(e) {} }
+  });
+}
+
+function getRecetas() { return _recetas; }
+
+function onRecetasReady(cb) {
+  if (_recetasReady) { cb(_recetas); return; }
+  _recetasListeners.push(cb);
+}
