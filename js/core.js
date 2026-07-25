@@ -155,6 +155,8 @@ const App = {
               '<span class="nav-icon">📋</span><span class="nav-label">Stock</span></a>' +
             '<a class="nav-item" data-page="tienda" onclick="App.navigate(\'tienda\')">' +
               '<span class="nav-icon">🛒</span><span class="nav-label">Tienda</span></a>' +
+            '<a class="nav-item" data-page="recetas" onclick="App.navigate(\'recetas\')">' +
+              '<span class="nav-icon">🍳</span><span class="nav-label">Recetas IA</span></a>' +
             '<a class="nav-item" data-page="usuarios" onclick="App.navigate(\'usuarios\')">' +
               '<span class="nav-icon">👥</span><span class="nav-label">Usuarios</span></a>' +
           '</nav>' +
@@ -188,7 +190,7 @@ const App = {
     });
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos',
-      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', usuarios: 'Usuarios'
+      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', usuarios: 'Usuarios'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -217,6 +219,7 @@ const App = {
         case 'pedidos': Pages.renderPedidos(container); break;
         case 'stock': Pages.renderStock(container); break;
         case 'tienda': Pages.renderTiendaAdmin(container); break;
+        case 'recetas': Pages.renderRecetasAdmin(container); break;
         case 'usuarios': Pages.renderUsuarios(container); break;
         default: container.innerHTML = '<p>Pagina no encontrada</p>';
       }
