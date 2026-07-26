@@ -1747,7 +1747,7 @@ const Pages = {
      ================================================================ */
   renderRecetasAdmin(container) {
     var savedKey = localStorage.getItem('arcano_groq_key') || '';
-    var categorias = ['Comida', 'Bebidas', 'Postres', 'Snacks', 'Salsas', 'Otros'];
+    var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
 
     // Build list of available products for context
     var productos = ArcanoDB.getTiendaProductos();
