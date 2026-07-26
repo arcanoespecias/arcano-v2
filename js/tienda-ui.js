@@ -282,13 +282,23 @@ var _SOCIAL_LINKS = [
 
 function toggleSidebar() {
   _sidebarOpen = !_sidebarOpen;
-  document.getElementById('sidebar-overlay').classList.toggle('open', _sidebarOpen);
-  document.getElementById('sidebar-panel').classList.toggle('open', _sidebarOpen);
+  var panel = document.getElementById('sidebar-panel');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (window.innerWidth <= 768) {
+    panel.classList.toggle('open', _sidebarOpen);
+    panel.classList.toggle('closed', !_sidebarOpen);
+    overlay.classList.toggle('open', _sidebarOpen);
+  } else {
+    panel.classList.toggle('closed', !_sidebarOpen);
+  }
 }
 function closeSidebar() {
   _sidebarOpen = false;
-  document.getElementById('sidebar-overlay').classList.remove('open');
-  document.getElementById('sidebar-panel').classList.remove('open');
+  var panel = document.getElementById('sidebar-panel');
+  var overlay = document.getElementById('sidebar-overlay');
+  panel.classList.add('closed');
+  panel.classList.remove('open');
+  overlay.classList.remove('open');
 }
 function selectRecetaCat(cat) {
   _currentRecetaCat = cat;
