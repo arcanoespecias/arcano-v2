@@ -23,7 +23,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tienda-body { display: flex; flex: 1; }
 
 /* === HEADER === */
-.store-header { background: var(--dark); color: #ece0d0; padding: 14px 20px; position: sticky; top: 0; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,.3); display: flex; align-items: center; gap: 14px; }
+.store-header { background: var(--dark); color: #ece0d0; padding: 14px 20px; position: sticky; top: 0; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,.3); display: flex; align-items: center; gap: 14px; justify-content: center; }
 .store-logo { width: 56px; height: 56px; flex-shrink: 0; }
 .store-logo img { width: 100%; height: 100%; object-fit: contain; }
 .store-header-text { display: flex; flex-direction: column; }
@@ -184,7 +184,7 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 .recipe-sb-steps li { font-size: .8rem; color: #c4b8aa; padding: 4px 0 4px 26px; position: relative; line-height: 1.5; counter-increment: sbstep; }
 .recipe-sb-steps li::before { content: counter(sbstep); position: absolute; left: 0; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: rgba(200,150,58,.15); color: var(--gold); font-size: .65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .sidebar-brand { padding: 12px 20px; display: flex; justify-content: center; border-top: 1px solid #3a2218; }
-.sidebar-brand img { height: 48px; width: auto; object-fit: contain; opacity: 0.85; }
+.sidebar-brand img { height: 80px; width: auto; object-fit: contain; opacity: 0.85; }
 .sidebar-social { padding: 16px 20px; border-top: 1px solid #3a2218; display: flex; justify-content: center; gap: 12px; }
 .social-link { width: 36px; height: 36px; border-radius: 50%; background: #241209; border: 1px solid #3a2218; display: flex; align-items: center; justify-content: center; color: #9a8a78; transition: all .2s; text-decoration: none; }
 .social-link:hover { background: rgba(200,150,58,.15); color: var(--gold); border-color: var(--gold); }
@@ -198,7 +198,7 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
-  .sidebar-btn { display: flex; background: none; border: none; color: var(--gold); font-size: 1.5rem; cursor: pointer; padding: 4px 8px 4px 0; line-height: 1; align-items: center; justify-content: center; border-radius: 6px; transition: background .2s; }
+  .sidebar-btn { display: flex; background: none; border: none; color: var(--gold); font-size: 1.5rem; cursor: pointer; padding: 4px 8px 4px 0; line-height: 1; align-items: center; justify-content: center; border-radius: 6px; transition: background .2s; position: absolute; left: 16px; top: 50%; transform: translateY(-50%); }
   .sidebar-btn:hover { background: rgba(200,150,58,.15); }
   .sidebar-close { display: block; background: none; border: none; color: #9a8a78; font-size: 1.5rem; cursor: pointer; padding: 0 4px; line-height: 1; }
   .sidebar-close:hover { color: var(--gold); }
