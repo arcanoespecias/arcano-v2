@@ -74,8 +74,12 @@ function renderProducts(filter) {
     else if (hasChico) stockText = 'Chico: ' + p.stockChico + ' disp.';
     else if (hasGrande) stockText = 'Grande: ' + p.stockGrande + ' disp.';
 
-    var meta = (p.tipo === 'blend' ? 'Blend' : 'Especia');
-    if (p.categoria) meta += ' \u00b7 ' + p.categoria;
+    var usoTags = [];
+    if (p.tags && p.tags.length) {
+      usoTags = p.tags;
+    } else if (p.uso) {
+      usoTags = p.uso.split(/[,;]/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
+    }
 
     h += '<div class="product-card">' +
       '<div class="card-img" style="position:relative" onclick="openDetail(' + p.id + ')">' +
@@ -83,8 +87,7 @@ function renderProducts(filter) {
       '</div>' +
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
-        '<div class="card-meta">' + meta + '</div>' +
-        (p.tags && p.tags.length ? '<div class="card-tags">' + p.tags.map(function(t){return '<span class="card-tag">' + t + '</span>';}).join('') + '</div>' : '') +
+        (usoTags.length ? '<div class="card-tags">' + usoTags.map(function(t){return '<span class="card-tag">' + t + '</span>';}).join('') + '</div>' : '') +
         (anyStock ? '<span class="stock-badge ' + stockClass + '">' + stockText + '</span>' : '') +
         '<div class="card-prices">' +
           (hasChico ? '<div class="price-box"><div class="price-label">Chico</div><div class="price-value">$' + p.precioChico.toLocaleString() + '</div></div>' : '') +
