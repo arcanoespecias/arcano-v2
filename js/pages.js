@@ -126,6 +126,7 @@ const Pages = {
             '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
+              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.showQRLabels(\'especia\',' + e.id + ')" title="QR Label">QR</button>' +
               '<button class="btn btn-sm "' + (e.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
@@ -155,6 +156,7 @@ const Pages = {
             '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
+              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.showQRLabels(\'blend\',' + b.id + ')" title="QR Label">QR</button>' +
               '<button class="btn btn-sm "' + (b.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
@@ -790,7 +792,9 @@ const Pages = {
      ================================================================ */
   renderVentas(container) {
     var ventas = ArcanoDB.getVentas();
-    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formVenta()">+ Nueva Venta</button></div>';
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formVenta()">+ Nueva Venta</button>' +
+      '<button class="btn btn-outline" onclick="Pages.formVentaQR()" style="margin-left:8px">\u{1F4F7} Vender por QR</button></div>';
+
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
@@ -902,6 +906,371 @@ const Pages = {
     if (!confirm('Eliminar esta venta?')) return;
     ArcanoDB.deleteVenta(id);
     App.renderPage('ventas');
+  },
+
+  /* ================================================================
+     VENTA POR QR
+     ================================================================ */
+  _qrScanner: null,
+  _qrCart: [],
+  _qrScanning: false,
+
+  /** Build QR data string for a product: ARCANO|tipo|id|talla */
+  buildQRData(tipo, id, talla) {
+    return 'ARCANO|' + tipo + '|' + id + '|' + talla;
+  },
+
+  /** Parse QR data string, returns {tipo, id, talla} or null */
+  parseQRData(raw) {
+    if (!raw) return null;
+    var parts = raw.split('|');
+    if (parts.length < 4 || parts[0] !== 'ARCANO') return null;
+    return { tipo: parts[1], id: Number(parts[2]), talla: parts[3] };
+  },
+
+  /** Open QR scanner modal for selling */
+  formVentaQR() {
+    Pages._qrCart = [];
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'qr-venta-modal';
+    modal.innerHTML =
+      '<div class="modal modal-lg" style="max-width:480px">' +
+        '<div class="modal-header"><h3>\u{1F4F7} Venta por QR</h3>' +
+          '<button class="btn btn-ghost" onclick="Pages.closeVentaQR()">X</button></div>' +
+        '<div class="modal-body" style="padding:0">' +
+          '<!-- Scanner area -->' +
+          '<div id="qr-reader-venta" style="width:100%;border-bottom:1px solid var(--border)"></div>' +
+          '<div id="qr-scan-status" style="padding:12px 16px;background:var(--bg-card);color:var(--muted);font-size:0.85rem;text-align:center">' +
+            'Apunta la camara al codigo QR del producto' +
+          '</div>' +
+          '<!-- Flash toggle -->' +
+          '<div style="display:flex;justify-content:center;padding:4px 0;background:var(--bg-card)">' +
+            '<button class="btn btn-sm btn-outline" id="qr-flash-btn" onclick="Pages.toggleQRFlash()">\u{1F526} Flash</button>' +
+          '</div>' +
+          '<!-- Cart -->' +
+          '<div id="qr-cart-area" style="padding:12px 16px;max-height:200px;overflow-y:auto;display:none">' +
+            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Productos escaneados</div>' +
+            '<div id="qr-cart-items"></div>' +
+          '</div>' +
+          '<!-- Total and confirm -->' +
+          '<div id="qr-total-area" style="padding:12px 16px;border-top:1px solid var(--border);display:none">' +
+            '<div class="venta-total-box">Total: $<span id="qr-venta-total">0</span></div>' +
+            '<button class="btn btn-gold btn-block mt-8" id="qr-confirm-btn" onclick="Pages.confirmarVentaQR()">\u{2705} Confirmar Venta</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    // Start scanner after a small delay to let modal render
+    setTimeout(function() { Pages.startQRScanner('qr-reader-venta', 'qr-scan-status'); }, 300);
+  },
+
+  startQRScanner(readerId, statusId) {
+    if (Pages._qrScanning) return;
+    if (typeof Html5Qrcode === 'undefined') {
+      var el = document.getElementById(statusId);
+      if (el) el.innerHTML = '<span style="color:var(--red)">Error: Libreria QR no disponible. Verifica conexion a internet.</span>';
+      return;
+    }
+    try {
+      Pages._qrScanner = new Html5Qrcode(readerId);
+      Pages._qrScanning = true;
+
+      var config = {
+        fps: 15,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.5,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+      };
+
+      Pages._qrScanner.start(
+        { facingMode: 'environment' },
+        config,
+        function(decodedText) {
+          Pages.handleQRScan(decodedText, statusId);
+        },
+        function() {}
+      ).catch(function(err) {
+        var el = document.getElementById(statusId);
+        if (el) el.innerHTML = '<span style="color:var(--red)">No se pudo acceder a la camara: ' + err.message + '</span>';
+        Pages._qrScanning = false;
+      });
+    } catch (err) {
+      var el2 = document.getElementById(statusId);
+      if (el2) el2.innerHTML = '<span style="color:var(--red)">Error al iniciar escaner: ' + err.message + '</span>';
+      Pages._qrScanning = false;
+    }
+  },
+
+  stopQRScanner() {
+    if (Pages._qrScanner && Pages._qrScanning) {
+      try {
+        Pages._qrScanner.stop().then(function() {
+          Pages._qrScanner.clear();
+          Pages._qrScanning = false;
+        }).catch(function() { Pages._qrScanning = false; });
+      } catch (e) { Pages._qrScanning = false; }
+    }
+  },
+
+  toggleQRFlash() {
+    if (!Pages._qrScanner || !Pages._qrScanning) return;
+    var btn = document.getElementById('qr-flash-btn');
+    // html5-qrcode doesn't have direct flash API, but we can try
+    var track = null;
+    if (Pages._qrScanner && Pages._qrScanner._element && Pages._qrScanner._element.querySelector('video')) {
+      track = Pages._qrScanner._element.querySelector('video').srcObject && Pages._qrScanner._element.querySelector('video').srcObject.getVideoTracks()[0];
+    }
+    if (track) {
+      var caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) {
+        track.applyConstraints({ advanced: [{ torch: !((track.getSettings && track.getSettings().torch) || false) }] });
+        if (btn) btn.textContent = ((track.getSettings && track.getSettings().torch) ? '\u{1F526} Flash ON' : '\u{1F526} Flash');
+      }
+    }
+  },
+
+  handleQRScan(decodedText, statusId) {
+    // Vibrate feedback
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    var parsed = Pages.parseQRData(decodedText);
+    var statusEl = document.getElementById(statusId);
+
+    if (!parsed) {
+      if (statusEl) {
+        statusEl.innerHTML = '<span style="color:var(--red)">Codigo no reconocido: ' + decodedText.substring(0, 40) + '</span>';
+        setTimeout(function() {
+          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
+        }, 2500);
+      }
+      return;
+    }
+
+    // Find the product
+    var producto = parsed.tipo === 'blend' ? ArcanoDB.getBlend(parsed.id) : ArcanoDB.getEspecia(parsed.id);
+    if (!producto) {
+      if (statusEl) {
+        statusEl.innerHTML = '<span style="color:var(--red)">Producto no encontrado (ID: ' + parsed.id + ')</span>';
+        setTimeout(function() {
+          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
+        }, 2500);
+      }
+      return;
+    }
+
+    // Check stock
+    var stockKey = parsed.talla === 'grande' ? 'stockGrande' : 'stockChico';
+    var precioKey = parsed.talla === 'grande' ? 'precioGrande' : 'precioChico';
+    var stock = producto[stockKey] || 0;
+    var precio = producto[precioKey] || 0;
+
+    if (stock <= 0) {
+      if (statusEl) {
+        statusEl.innerHTML = '<span style="color:var(--red)">Sin stock de ' + producto.nombre + ' (' + parsed.talla + ')</span>';
+        setTimeout(function() {
+          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
+        }, 2500);
+      }
+      return;
+    }
+
+    // Add to cart (check if already scanned same product+talla)
+    var found = false;
+    for (var i = 0; i < Pages._qrCart.length; i++) {
+      if (Pages._qrCart[i].tipo === parsed.tipo && Pages._qrCart[i].productoId === parsed.id && Pages._qrCart[i].talla === parsed.talla) {
+        if (Pages._qrCart[i].cantidad < stock) {
+          Pages._qrCart[i].cantidad++;
+        }
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      Pages._qrCart.push({
+        tipo: parsed.tipo,
+        productoId: parsed.id,
+        talla: parsed.talla,
+        cantidad: 1,
+        precioUnitario: precio
+      });
+    }
+
+    // Update UI
+    if (statusEl) {
+      statusEl.innerHTML = '<span style="color:var(--green)">\u{2705} ' + producto.nombre + ' (' + parsed.talla + ') agregado</span>';
+      setTimeout(function() {
+        if (statusEl && Pages._qrScanning) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
+      }, 1500);
+    }
+    Pages.renderQRCart();
+  },
+
+  renderQRCart() {
+    var cartArea = document.getElementById('qr-cart-area');
+    var cartItems = document.getElementById('qr-cart-items');
+    var totalArea = document.getElementById('qr-total-area');
+    var totalSpan = document.getElementById('qr-venta-total');
+
+    if (Pages._qrCart.length === 0) {
+      if (cartArea) cartArea.style.display = 'none';
+      if (totalArea) totalArea.style.display = 'none';
+      return;
+    }
+
+    if (cartArea) cartArea.style.display = 'block';
+    if (totalArea) totalArea.style.display = 'block';
+
+    var h = '';
+    var total = 0;
+    for (var i = 0; i < Pages._qrCart.length; i++) {
+      var item = Pages._qrCart[i];
+      var prod = item.tipo === 'blend' ? ArcanoDB.getBlend(item.productoId) : ArcanoDB.getEspecia(item.productoId);
+      var nombre = prod ? prod.nombre : '?';
+      var sub = item.cantidad * item.precioUnitario;
+      total += sub;
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div>' +
+          '<div style="font-weight:600;font-size:0.9rem">' + nombre + '</div>' +
+          '<div style="font-size:0.75rem;color:var(--muted)">' + item.talla + ' | $' + item.precioUnitario.toLocaleString() + ' c/u</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<button class="btn btn-sm btn-outline" onclick="Pages.qrCartQty(' + i + ',-1)">-</button>' +
+          '<span style="font-weight:700;min-width:24px;text-align:center">' + item.cantidad + '</span>' +
+          '<button class="btn btn-sm btn-outline" onclick="Pages.qrCartQty(' + i + ',1)">+</button>' +
+          '<span style="font-weight:700;color:var(--gold);min-width:70px;text-align:right">$' + sub.toLocaleString() + '</span>' +
+          '<button class="btn btn-sm btn-red" onclick="Pages.qrCartRemove(' + i + ')">X</button>' +
+        '</div>' +
+      '</div>';
+    }
+    if (cartItems) cartItems.innerHTML = h;
+    if (totalSpan) totalSpan.textContent = total.toLocaleString();
+  },
+
+  qrCartQty(idx, delta) {
+    if (!Pages._qrCart[idx]) return;
+    var item = Pages._qrCart[idx];
+    var newCant = item.cantidad + delta;
+    var producto = item.tipo === 'blend' ? ArcanoDB.getBlend(item.productoId) : ArcanoDB.getEspecia(item.productoId);
+    var stockKey = item.talla === 'grande' ? 'stockGrande' : 'stockChico';
+    var maxStock = producto ? (producto[stockKey] || 0) : 0;
+    if (newCant < 1 || newCant > maxStock) return;
+    item.cantidad = newCant;
+    Pages.renderQRCart();
+  },
+
+  qrCartRemove(idx) {
+    Pages._qrCart.splice(idx, 1);
+    Pages.renderQRCart();
+  },
+
+  confirmarVentaQR() {
+    if (Pages._qrCart.length === 0) { alert('No hay productos en la venta'); return; }
+    if (!confirm('Registrar venta de ' + Pages._qrCart.length + ' producto(s)?')) return;
+    try {
+      ArcanoDB.saveVenta({
+        fecha: new Date().toISOString().slice(0, 10),
+        items: JSON.parse(JSON.stringify(Pages._qrCart))
+      });
+      Pages.closeVentaQR();
+      App.renderPage('ventas');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  },
+
+  closeVentaQR() {
+    Pages.stopQRScanner();
+    var modal = document.getElementById('qr-venta-modal');
+    if (modal) modal.remove();
+    Pages._qrCart = [];
+  },
+
+  /* ================================================================
+     QR LABELS GENERATOR (for printing product QR tags)
+     ================================================================ */
+  showQRLabels(tipo, id) {
+    var producto = tipo === 'blend' ? ArcanoDB.getBlend(id) : ArcanoDB.getEspecia(id);
+    if (!producto) { alert('Producto no encontrado'); return; }
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML =
+      '<div class="modal modal-lg" style="max-width:600px">' +
+        '<div class="modal-header"><h3>\u{1F4F9} Etiquetas QR — ' + producto.nombre + '</h3>' +
+          '<button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+        '<div class="modal-body">' +
+          '<p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Escanea estos codigos con el lector QR para registrar ventas rapidas.</p>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+            '<div class="card" style="text-align:center;padding:20px">' +
+              '<div style="font-weight:700;font-size:0.9rem;margin-bottom:12px">Talla Chico</div>' +
+              '<div style="font-size:0.8rem;color:var(--gold);margin-bottom:12px">$' + (producto.precioChico || 0).toLocaleString() + '</div>' +
+              '<canvas id="qr-canvas-chico" style="margin:0 auto;display:block;border-radius:8px;background:#fff;padding:8px"></canvas>' +
+              '<div style="font-size:0.7rem;color:var(--muted);margin-top:8px">Stock: ' + (producto.stockChico || 0) + ' frascos</div>' +
+            '</div>' +
+            '<div class="card" style="text-align:center;padding:20px">' +
+              '<div style="font-weight:700;font-size:0.9rem;margin-bottom:12px">Talla Grande</div>' +
+              '<div style="font-size:0.8rem;color:var(--gold);margin-bottom:12px">$' + (producto.precioGrande || 0).toLocaleString() + '</div>' +
+              '<canvas id="qr-canvas-grande" style="margin:0 auto;display:block;border-radius:8px;background:#fff;padding:8px"></canvas>' +
+              '<div style="font-size:0.7rem;color:var(--muted);margin-top:8px">Stock: ' + (producto.stockGrande || 0) + ' frascos</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cerrar</button>' +
+          '<button class="btn btn-gold" onclick="Pages.printQRLabels(\'' + tipo + '\',' + id + ')">\u{1F5A8} Imprimir</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    // Generate QR codes
+    setTimeout(function() {
+      var chicoData = Pages.buildQRData(tipo, id, 'chico');
+      var grandeData = Pages.buildQRData(tipo, id, 'grande');
+      var chicoCanvas = document.getElementById('qr-canvas-chico');
+      var grandeCanvas = document.getElementById('qr-canvas-grande');
+      if (typeof QRCode !== 'undefined') {
+        if (chicoCanvas) { new QRCode(chicoCanvas, { text: chicoData, width: 180, height: 180, colorDark: '#1b0b07', colorLight: '#ffffff' }); }
+        if (grandeCanvas) { new QRCode(grandeCanvas, { text: grandeData, width: 180, height: 180, colorDark: '#1b0b07', colorLight: '#ffffff' }); }
+      } else {
+        // Fallback: show data as text
+        if (chicoCanvas) { var ctx1 = chicoCanvas.getContext('2d'); chicoCanvas.width = 200; chicoCanvas.height = 80; ctx1.fillStyle = '#fff'; ctx1.fillRect(0,0,200,80); ctx1.fillStyle = '#1b0b07'; ctx1.font = '11px monospace'; ctx1.fillText(chicoData, 10, 40); }
+        if (grandeCanvas) { var ctx2 = grandeCanvas.getContext('2d'); grandeCanvas.width = 200; grandeCanvas.height = 80; ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,200,80); ctx2.fillStyle = '#1b0b07'; ctx2.font = '11px monospace'; ctx2.fillText(grandeData, 10, 40); }
+      }
+    }, 200);
+  },
+
+  printQRLabels(tipo, id) {
+    var producto = tipo === 'blend' ? ArcanoDB.getBlend(id) : ArcanoDB.getEspecia(id);
+    if (!producto) return;
+    var chicoData = Pages.buildQRData(tipo, id, 'chico');
+    var grandeData = Pages.buildQRData(tipo, id, 'grande');
+
+    var win = window.open('', '_blank');
+    win.document.write('<!DOCTYPE html><html><head><title>QR Labels - ' + producto.nombre + '</title>' +
+      '<style>*{margin:0;padding:0;box-sizing:border-box}' +
+      'body{font-family:Arial,sans-serif;padding:20px}' +
+      '.label{display:inline-block;width:280px;padding:16px;margin:8px;border:2px dashed #333;border-radius:8px;text-align:center;page-break-inside:avoid}' +
+      '.label h3{font-size:14px;margin-bottom:4px}' +
+      '.label .price{font-size:18px;font-weight:700;color:#333;margin-bottom:8px}' +
+      '.label .talla{font-size:11px;color:#666}' +
+      '.label img{margin:8px auto}' +
+      '.label .qr-data{font-size:9px;color:#999;margin-top:4px;font-family:monospace}' +
+      '@media print{.no-print{display:none}.label{border:1px solid #ccc}}' +
+      '</style></head><body>' +
+      '<div class="no-print" style="margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;font-size:16px;cursor:pointer">Imprimir</button></div>');
+    win.document.write(
+      '<div class="label"><h3>' + producto.nombre + '</h3><div class="price">$' + (producto.precioChico||0).toLocaleString() + '</div>' +
+      '<div class="talla">Talla Chico</div><div id="print-qr-chico"></div><div class="qr-data">' + chicoData + '</div></div>' +
+      '<div class="label"><h3>' + producto.nombre + '</h3><div class="price">$' + (producto.precioGrande||0).toLocaleString() + '</div>' +
+      '<div class="talla">Talla Grande</div><div id="print-qr-grande"></div><div class="qr-data">' + grandeData + '</div></div>');
+    win.document.write('<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>' +
+      '<script>' +
+      'new QRCode(document.getElementById("print-qr-chico"),{text:"' + chicoData + '",width:160,height:160,colorDark:"#000",colorLight:"#fff"});' +
+      'new QRCode(document.getElementById("print-qr-grande"),{text:"' + grandeData + '",width:160,height:160,colorDark:"#000",colorLight:"#fff"});' +
+      '<\/script></body></html>');
+    win.document.close();
   },
 
   /* ================================================================
