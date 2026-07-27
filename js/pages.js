@@ -1945,5 +1945,292 @@ const Pages = {
       btn.disabled = false;
       btn.textContent = 'Generar Receta con IA';
     });
+  },
+
+  /* ================================================================
+     ESTADISTICAS DE VENTAS (Chart.js)
+     ================================================================ */
+  _estPeriod: null,
+  _estTab: null,
+  _estCharts: [],
+
+  renderEstadisticas: function(container) {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+
+    if (!Pages._estPeriod) Pages._estPeriod = 'todo';
+    if (!Pages._estTab) Pages._estTab = 'ventas';
+
+    var h = '';
+    h += '<div class="est-tabs">';
+    h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas Admin</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'todo' ? ' active' : '') + '" onclick="Pages._estTab=\'todo\';App.renderPage(\'estadisticas\')">Todo Combinado</button>';
+    h += '</div>';
+    h += '<div id="est-content"></div>';
+    container.innerHTML = h;
+
+    var data;
+    if (Pages._estTab === 'ventas') { data = allSales.filter(function(s) { return s.source === 'admin'; }); }
+    else if (Pages._estTab === 'pedidos') { data = allSales.filter(function(s) { return s.source === 'tienda'; }); }
+    else { data = allSales; }
+
+    Pages._renderEstContent(data, container.querySelector('#est-content'));
+  },
+
+  _getCurrentEstData: function() {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi]; var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi]; if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      allSales.push({ fecha: (p.creado || '').slice(0, 10), creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    if (Pages._estTab === 'ventas') return allSales.filter(function(s) { return s.source === 'admin'; });
+    if (Pages._estTab === 'pedidos') return allSales.filter(function(s) { return s.source === 'tienda'; });
+    return allSales;
+  },
+
+  _filterByPeriod: function(data, period, previous) {
+    var now = new Date();
+    var start, end;
+    if (previous) {
+      switch (period) {
+        case '7d': start = new Date(now); start.setDate(start.getDate() - 14); end = new Date(now); end.setDate(end.getDate() - 7); break;
+        case '30d': start = new Date(now); start.setDate(start.getDate() - 60); end = new Date(now); end.setDate(end.getDate() - 30); break;
+        case '90d': start = new Date(now); start.setDate(start.getDate() - 180); end = new Date(now); end.setDate(end.getDate() - 90); break;
+        case 'mes': start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); break;
+        case 'anio': start = new Date(now.getFullYear() - 1, 0, 1); end = new Date(now.getFullYear() - 1, 11, 31); break;
+        default: return [];
+      }
+    } else {
+      switch (period) {
+        case 'todo': return data;
+        case '7d': start = new Date(now); start.setDate(start.getDate() - 7); end = now; break;
+        case '30d': start = new Date(now); start.setDate(start.getDate() - 30); end = now; break;
+        case '90d': start = new Date(now); start.setDate(start.getDate() - 90); end = now; break;
+        case 'mes': start = new Date(now.getFullYear(), now.getMonth(), 1); end = now; break;
+        case 'anio': start = new Date(now.getFullYear(), 0, 1); end = now; break;
+        default: return data;
+      }
+    }
+    var startStr = start.toISOString().slice(0, 10);
+    var endStr = end.toISOString().slice(0, 10);
+    return data.filter(function(s) { return s.fecha >= startStr && s.fecha <= endStr; });
+  },
+
+  _renderEstContent: function(data, el) {
+    if (!el) return;
+    if (data.length === 0) {
+      el.innerHTML = '<div class="est-empty"><p style="font-size:2rem;margin-bottom:8px">\u{1F4CA}</p><p>Sin datos de ventas en este periodo.</p></div>';
+      return;
+    }
+    var period = Pages._estPeriod;
+    var filtered = Pages._filterByPeriod(data, period);
+
+    var totalIngresos = 0, totalUnidades = 0, totalOps = 0;
+    var productoMap = {}, diaMap = {}, ciudadMap = {}, tipoMap = { especia: 0, blend: 0 };
+    var tallaMap = { chico: 0, grande: 0 };
+    var monthMap = {};
+
+    for (var i = 0; i < filtered.length; i++) {
+      var s = filtered[i];
+      totalIngresos += (s.total || 0);
+      totalOps++;
+      for (var j = 0; j < s.items.length; j++) {
+        var it = s.items[j];
+        var qty = it.cantidad || 0;
+        totalUnidades += qty;
+        if (!productoMap[it.nombre]) productoMap[it.nombre] = { nombre: it.nombre, cantidad: 0, ingreso: 0, tipo: it.tipo };
+        productoMap[it.nombre].cantidad += qty;
+        productoMap[it.nombre].ingreso += (it.subtotal || 0);
+        tipoMap[it.tipo] = (tipoMap[it.tipo] || 0) + qty;
+        tallaMap[it.talla] = (tallaMap[it.talla] || 0) + qty;
+      }
+      var dia = s.fecha || 'Sin fecha';
+      if (!diaMap[dia]) diaMap[dia] = { ingresos: 0, ops: 0, unidades: 0 };
+      diaMap[dia].ingresos += (s.total || 0);
+      diaMap[dia].ops += 1;
+      for (var k = 0; k < s.items.length; k++) diaMap[dia].unidades += (s.items[k].cantidad || 0);
+      var mes = dia.slice(0, 7);
+      if (!monthMap[mes]) monthMap[mes] = { ingresos: 0, ops: 0 };
+      monthMap[mes].ingresos += (s.total || 0);
+      monthMap[mes].ops += 1;
+      if (s.ciudad) {
+        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ingresos: 0, ops: 0 };
+        ciudadMap[s.ciudad].ingresos += (s.total || 0);
+        ciudadMap[s.ciudad].ops += 1;
+      }
+    }
+
+    var ticketProm = totalOps > 0 ? totalIngresos / totalOps : 0;
+    var prevFiltered = Pages._filterByPeriod(data, period, true);
+    var prevIngresos = 0;
+    for (var x = 0; x < prevFiltered.length; x++) prevIngresos += (prevFiltered[x].total || 0);
+    var pctChange = prevIngresos > 0 ? ((totalIngresos - prevIngresos) / prevIngresos * 100).toFixed(1) : 0;
+    var prodArr = Object.values(productoMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+
+    var h = '';
+    h += '<div class="est-period-selector">';
+    var periods = ['todo', '7d', '30d', '90d', 'mes', 'anio'];
+    var periodLabels = { todo: 'Todo', '7d': '7 dias', '30d': '30 dias', '90d': '90 dias', mes: 'Este mes', anio: 'Este ano' };
+    for (var pp = 0; pp < periods.length; pp++) {
+      h += '<button class="est-period-btn' + (period === periods[pp] ? ' active' : '') + '" onclick="Pages._estPeriod=\'' + periods[pp] + '\';Pages._renderEstContent(Pages._getCurrentEstData(),document.getElementById(\'est-content\'))">' + periodLabels[periods[pp]] + '</button>';
+    }
+    h += '</div>';
+
+    var changeArrow = pctChange >= 0 ? '\u2191' : '\u2193';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">' + changeArrow + ' ' + Math.abs(pctChange) + '% vs periodo anterior</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalOps + '</div><div class="est-kpi-label">Total Operaciones</div><div class="est-kpi-sub">' + filtered.length + ' transacciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ticketProm.toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">ingreso por operacion</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalUnidades + '</div><div class="est-kpi-label">Unidades Vendidas</div><div class="est-kpi-sub">' + tallaMap.chico + ' chico / ' + tallaMap.grande + ' grande</div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card est-chart-full"><h4>Ingresos por Dia</h4><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ventas por Producto (Top 10)</h4><div class="est-chart-wrap"><canvas id="chart-products"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Distribucion: Especias vs Blends</h4><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos Mensuales</h4><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Chico vs Grande</h4><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div>';
+    if (Object.keys(ciudadMap).length > 0) {
+      h += '<div class="est-chart-card"><h4>Ventas por Ciudad</h4><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div>';
+    }
+    h += '</div>';
+
+    h += '<div class="card mt-16"><div class="card-header"><h3>Detalle por Producto</h3></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>#</th><th>Producto</th><th>Tipo</th><th>Unidades</th><th>Ingreso</th><th>Participacion</th><th>Barra</th></tr></thead><tbody>';
+    var maxIngreso = prodArr.length > 0 ? prodArr[0].ingreso : 1;
+    for (var pr = 0; pr < prodArr.length; pr++) {
+      var prd = prodArr[pr];
+      var pct = totalIngresos > 0 ? (prd.ingreso / totalIngresos * 100).toFixed(1) : 0;
+      var barW = maxIngreso > 0 ? (prd.ingreso / maxIngreso * 100).toFixed(0) : 0;
+      var tipoLabel = prd.tipo === 'blend' ? 'Blend' : 'Especia';
+      var barColor = prd.tipo === 'blend' ? 'var(--blue)' : 'var(--gold)';
+      h += '<tr><td>' + (pr + 1) + '</td><td class="fw7">' + prd.nombre + '</td><td>' + tipoLabel + '</td><td class="fw7">' + prd.cantidad + '</td><td class="fw7" style="color:var(--gold)">$' + prd.ingreso.toLocaleString() + '</td><td>' + pct + '%</td>';
+      h += '<td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + barW + '%;background:' + barColor + '"></div></div></div></td></tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    var diasArr = Object.keys(diaMap).sort().reverse();
+    if (diasArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Desglose por Dia</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Fecha</th><th>Operaciones</th><th>Unidades</th><th>Ingreso</th><th>Barra</th></tr></thead><tbody>';
+      var maxDiaIngreso = 0;
+      for (var di = 0; di < diasArr.length; di++) { if (diaMap[diasArr[di]].ingresos > maxDiaIngreso) maxDiaIngreso = diaMap[diasArr[di]].ingresos; }
+      for (var di2 = 0; di2 < diasArr.length; di2++) {
+        var dk = diasArr[di2]; var dv = diaMap[dk];
+        var dBarW = maxDiaIngreso > 0 ? (dv.ingresos / maxDiaIngreso * 100).toFixed(0) : 0;
+        h += '<tr><td class="fw7">' + dk + '</td><td>' + dv.ops + '</td><td>' + dv.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + dv.ingresos.toLocaleString() + '</td><td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + dBarW + '%;background:var(--gold)"></div></div></div></td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+    el.innerHTML = h;
+
+    // Destroy existing charts
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    // 1. Daily revenue
+    var diasSorted = Object.keys(diaMap).sort();
+    var dailyLabels = [], dailyData = [], dailyOpsData = [];
+    for (var dd = 0; dd < diasSorted.length; dd++) { dailyLabels.push(diasSorted[dd].slice(5)); dailyData.push(diaMap[diasSorted[dd]].ingresos); dailyOpsData.push(diaMap[diasSorted[dd]].ops); }
+    var ctxDaily = document.getElementById('chart-daily');
+    if (ctxDaily) {
+      Pages._estCharts.push(new Chart(ctxDaily, {
+        type: 'line',
+        data: { labels: dailyLabels, datasets: [
+          { label: 'Ingresos ($)', data: dailyData, borderColor: '#e8b84b', backgroundColor: 'rgba(232,184,75,0.1)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#e8b84b', yAxisID: 'y' },
+          { label: 'Operaciones', data: dailyOpsData, borderColor: '#5dade2', backgroundColor: 'rgba(93,173,226,0.1)', fill: false, tension: 0.3, pointRadius: 2, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { color: 'rgba(58,34,24,0.3)' } } } }
+      }));
+    }
+
+    // 2. Top products bar
+    var top10 = prodArr.slice(0, 10);
+    var ctxProd = document.getElementById('chart-products');
+    if (ctxProd) {
+      var prodLabels = [], prodIngresos = [], prodColors = [];
+      for (var tp = 0; tp < top10.length; tp++) { prodLabels.push(top10[tp].nombre); prodIngresos.push(top10[tp].ingreso); prodColors.push(top10[tp].tipo === 'blend' ? '#5dade2' : '#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxProd, {
+        type: 'bar', data: { labels: prodLabels, datasets: [{ label: 'Ingreso ($)', data: prodIngresos, backgroundColor: prodColors, borderRadius: 4, barThickness: 20 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false } } } }
+      }));
+    }
+
+    // 3. Especia vs Blend doughnut
+    var ctxTypes = document.getElementById('chart-types');
+    if (ctxTypes) {
+      Pages._estCharts.push(new Chart(ctxTypes, {
+        type: 'doughnut', data: { labels: ['Especias', 'Blends'], datasets: [{ data: [tipoMap.especia || 0, tipoMap.blend || 0], backgroundColor: ['#e8b84b', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // 4. Monthly revenue bar
+    var ctxMonthly = document.getElementById('chart-monthly');
+    if (ctxMonthly) {
+      var mesesSorted = Object.keys(monthMap).sort();
+      var mLabels = [], mData = [];
+      for (var mi = 0; mi < mesesSorted.length; mi++) { mLabels.push(mesesSorted[mi]); mData.push(monthMap[mesesSorted[mi]].ingresos); }
+      Pages._estCharts.push(new Chart(ctxMonthly, {
+        type: 'bar', data: { labels: mLabels, datasets: [{ label: 'Ingresos ($)', data: mData, backgroundColor: 'rgba(232,184,75,0.7)', borderColor: '#e8b84b', borderWidth: 1, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // 5. Chico vs Grande pie
+    var ctxTallas = document.getElementById('chart-tallas');
+    if (ctxTallas) {
+      Pages._estCharts.push(new Chart(ctxTallas, {
+        type: 'pie', data: { labels: ['Chico', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // 6. By city
+    var ctxCiudad = document.getElementById('chart-ciudad');
+    if (ctxCiudad) {
+      var ciudades = Object.keys(ciudadMap).sort(function(a, b) { return ciudadMap[b].ingresos - ciudadMap[a].ingresos; });
+      var cLabels = [], cData = [];
+      for (var ci2 = 0; ci2 < ciudades.length; ci2++) { cLabels.push(ciudades[ci2]); cData.push(ciudadMap[ciudades[ci2]].ingresos); }
+      Pages._estCharts.push(new Chart(ctxCiudad, {
+        type: 'bar', data: { labels: cLabels, datasets: [{ label: 'Ingresos ($)', data: cData, backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    var chartCanvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < chartCanvases.length; ch++) { chartCanvases[ch].style.height = chartCanvases[ch].classList.contains('est-chart-full') ? '280px' : '260px'; }
   }
 };
