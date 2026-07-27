@@ -94,19 +94,25 @@ function renderProducts(filter) {
           (hasGrande ? '<div class="price-box"><div class="price-label">Grande</div><div class="price-value">$' + p.precioGrande.toLocaleString() + '</div></div>' : '') +
           (!hasChico && !hasGrande ? '<div class="price-na">Sin precio</div>' : '') +
         '</div>' +
-        (anyStock ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ')">Agregar al pedido</button>'
-        : '<button class="add-btn" disabled>Sin stock</button>') +
+        (hasChico && hasGrande ?
+          '<div class="card-size-btns">' +
+            '<button class="add-btn size-btn" onclick="doAddToCart(' + p.id + ',\'chico\')">Chico $' + p.precioChico.toLocaleString() + '</button>' +
+            '<button class="add-btn size-btn" onclick="doAddToCart(' + p.id + ',\'grande\')">Grande $' + p.precioGrande.toLocaleString() + '</button>' +
+          '</div>' :
+          (hasChico ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ',\'chico\')">Agregar $' + p.precioChico.toLocaleString() + '</button>' :
+          (hasGrande ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ',\'grande\')">Agregar $' + p.precioGrande.toLocaleString() + '</button>' :
+          '<button class="add-btn" disabled>Sin stock</button>'))) +
       '</div></div>';
   }
   grid.innerHTML = h;
 }
 
-function doAddToCart(pid) {
+function doAddToCart(pid, talla) {
   var products = getStoreProducts();
   var product = null;
   for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { product = products[i]; break; } }
   if (!product) return;
-  var talla = (product.stockChico > 0 && product.precioChico > 0) ? 'chico' : 'grande';
+  if (!talla) talla = (product.stockChico > 0 && product.precioChico > 0) ? 'chico' : 'grande';
   addToCart(product, talla);
 }
 
@@ -161,8 +167,14 @@ function openDetail(pid) {
       descHtml +
       (pricesHtml ? '<div class="detail-prices-row">' + pricesHtml + '</div>' : '') +
       (stockHtml ? '<p class="detail-stock">' + stockHtml + '</p>' : '') +
-      (anyStock ? '<button class="detail-add-btn" onclick="doAddToCart(' + p.id + ');document.getElementById(\'detail-overlay\').remove()">Agregar al pedido</button>' :
-        '<button class="detail-add-btn" disabled>Sin stock</button>') +
+      (anyStock ?
+        (hasChico && hasGrande ?
+          '<div class="detail-size-btns">' +
+            '<button class="detail-add-btn detail-size-btn" onclick="doAddToCart(' + p.id + ',\'chico\');document.getElementById(\'detail-overlay\').remove()">Chico $' + p.precioChico.toLocaleString() + '</button>' +
+            '<button class="detail-add-btn detail-size-btn" onclick="doAddToCart(' + p.id + ',\'grande\');document.getElementById(\'detail-overlay\').remove()">Grande $' + p.precioGrande.toLocaleString() + '</button>' +
+          '</div>' :
+          '<button class="detail-add-btn" onclick="doAddToCart(' + p.id + ',\'' + (hasChico ? 'chico' : 'grande') + '\');document.getElementById(\'detail-overlay\').remove()">Agregar al pedido</button>')
+        : '<button class="detail-add-btn" disabled>Sin stock</button>') +
     '</div></div>';
 
   overlay.innerHTML = html;
