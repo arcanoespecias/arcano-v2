@@ -5,6 +5,7 @@ const ARCANO_LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUD
 const App = {
   currentPage: 'dashboard',
   sidebarOpen: true,
+  _deferredPrompt: null,
 
   async init() {
     this.showSplash();
@@ -75,24 +76,50 @@ const App = {
       if (type === 'remote_change') App.renderPage(App.currentPage);
     });
 
-    // Pedidos badge listener + audio notification
+    // PWA install prompt
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      App._deferredPrompt = e;
+      var bar = document.getElementById('pwa-install-bar');
+      if (bar) bar.style.display = 'flex';
+    });
+    window.addEventListener('appinstalled', function() {
+      App._deferredPrompt = null;
+      var bar = document.getElementById('pwa-install-bar');
+      if (bar) bar.style.display = 'none';
+    });
+    // Hide install bar if already installed (standalone mode)
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      var bar = document.getElementById('pwa-install-bar');
+      if (bar) bar.style.display = 'none';
+    }
+
+    // Audio notification for new pedidos
     function _playNotifSound() {
       try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Two-tone notification: high note then higher note
-        var times = [0, 0.15, 0.35];
-        var freqs = [880, 1100, 880];
-        for (var i = 0; i < times.length; i++) {
+        // Triple ascending tone - more noticeable
+        var notes = [
+          { t: 0, f: 660, d: 0.18 },
+          { t: 0.22, f: 880, d: 0.18 },
+          { t: 0.44, f: 1100, d: 0.25 }
+        ];
+        for (var i = 0; i < notes.length; i++) {
+          var n = notes[i];
           var osc = ctx.createOscillator();
           var gain = ctx.createGain();
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.frequency.value = freqs[i];
+          osc.frequency.value = n.f;
           osc.type = 'sine';
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + times[i]);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + 0.14);
-          osc.start(ctx.currentTime + times[i]);
-          osc.stop(ctx.currentTime + times[i] + 0.15);
+          gain.gain.setValueAtTime(0.5, ctx.currentTime + n.t);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
+          osc.start(ctx.currentTime + n.t);
+          osc.stop(ctx.currentTime + n.t + n.d + 0.02);
+        }
+        // Vibrate if available
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200, 100, 300]);
         }
       } catch (e) {}
     }
@@ -106,7 +133,7 @@ const App = {
         else { badge.style.display = 'none'; }
       }
       // Audio + visual alert when a NEW pedido arrives (not on initial load)
-      if (isNew && _lastPedidoNuevoCount >= 0) {
+      if (isNew && count > _lastPedidoNuevoCount && _lastPedidoNuevoCount >= 0) {
         _playNotifSound();
         // Flash browser tab title
         var origTitle = document.title;
@@ -227,6 +254,18 @@ const App = {
   logout() {
     ArcanoDB.logoutUser();
     this.showLogin();
+  },
+
+  installPWA() {
+    if (!this._deferredPrompt) return;
+    this._deferredPrompt.prompt();
+    this._deferredPrompt.userChoice.then(function(choice) {
+      if (choice.outcome === 'accepted') {
+        var bar = document.getElementById('pwa-install-bar');
+        if (bar) bar.style.display = 'none';
+      }
+      App._deferredPrompt = null;
+    });
   },
 
   renderPage(page) {
