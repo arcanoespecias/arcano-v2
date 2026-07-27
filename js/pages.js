@@ -1612,7 +1612,7 @@ const Pages = {
     var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">' + enTiendaCount + '</div><div class="stat-label">Productos en Tienda</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + productos.length + '</div><div class="stat-label">Disponibles (con stock)</div></div>' +
-      '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
+      '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/tienda</div><div class="stat-label">URL Publica</div></div>' +
       '</div>';
 
     h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
