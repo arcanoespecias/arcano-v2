@@ -2212,7 +2212,6 @@ const Pages = {
      RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
      ================================================================ */
   renderRecetasAdmin(container) {
-    var savedKey = localStorage.getItem('arcano_groq_key') || '';
     var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
 
     // Build list of available products for context
@@ -2224,9 +2223,9 @@ const Pages = {
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
+        '<p class="text-sm text-muted mb-12">Modelo: <b>Llama 3.3 70B</b> via Groq.</p>' +
         '<div class="form-group"><label>Groq API Key</label>' +
-        '<input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx...">' +
+        '<input type="password" class="input" id="ra-groq-key" placeholder="gsk_xxxx...">' +
         '</div>' +
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
@@ -2257,8 +2256,32 @@ const Pages = {
 
     container.innerHTML = h;
 
+    // Load Groq key from Firebase (persistent storage)
+    Pages._loadGroqKey();
     // Load existing recipes from Firebase
     Pages._loadRecetasAdmin();
+  },
+
+  _loadGroqKey: function() {
+    var keyInput = document.getElementById('ra-groq-key');
+    if (!keyInput) return;
+    // Try Firebase first (persistent across devices)
+    firebase.database().ref('arcano/config/groq_key').once('value', function(snap) {
+      var fbKey = snap.val();
+      if (fbKey) {
+        keyInput.value = fbKey;
+      } else {
+        // Fallback to localStorage
+        var localKey = localStorage.getItem('arcano_groq_key') || '';
+        if (localKey) keyInput.value = localKey;
+      }
+    });
+  },
+
+  _saveGroqKey: function(apiKey) {
+    // Save to both Firebase (persistent) and localStorage (backup)
+    localStorage.setItem('arcano_groq_key', apiKey);
+    firebase.database().ref('arcano/config/groq_key').set(apiKey);
   },
 
   _loadRecetasAdmin: function() {
@@ -2324,7 +2347,7 @@ const Pages = {
     var idioma = idiomaSelect.value;
 
     if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
-    localStorage.setItem('arcano_groq_key', apiKey);
+    Pages._saveGroqKey(apiKey);
 
     // Build product context
     var productos = ArcanoDB.getTiendaProductos();
