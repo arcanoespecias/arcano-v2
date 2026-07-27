@@ -170,6 +170,7 @@ const App = {
             '<button class="btn btn-sm btn-outline" onclick="App.logout()">Salir</button>' +
           '</div>' +
         '</aside>' +
+        '<div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeMobileSidebar()"></div>' +
         '<main class="main-content">' +
           '<header class="top-bar">' +
             '<button class="btn btn-ghost" onclick="App.toggleSidebar()">☰</button>' +
@@ -182,11 +183,12 @@ const App = {
             '<div class="loader-center"><div class="loader"></div></div>' +
           '</div>' +
         '</main>' +
-      '</div>';
+      '</div';
   },
 
   navigate(page) {
     this.currentPage = page;
+    this.closeMobileSidebar();
     document.querySelectorAll('.nav-item').forEach(function(el) {
       el.classList.toggle('active', el.dataset.page === page);
     });
@@ -198,9 +200,28 @@ const App = {
     this.renderPage(page);
   },
 
+  _isMobile() {
+    return window.innerWidth <= 768;
+  },
+
   toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    if (this._isMobile()) {
+      var sidebar = document.getElementById('sidebar');
+      var overlay = document.getElementById('sidebar-overlay');
+      if (sidebar) sidebar.classList.toggle('mobile-open');
+      if (overlay) overlay.style.display = sidebar && sidebar.classList.contains('mobile-open') ? 'block' : 'none';
+    } else {
+      this.sidebarOpen = !this.sidebarOpen;
+      document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    }
+  },
+
+  closeMobileSidebar() {
+    if (!this._isMobile()) return;
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.style.display = 'none';
   },
 
   logout() {
