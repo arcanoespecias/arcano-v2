@@ -343,7 +343,14 @@ select.input { cursor: pointer; }
 }
 
 /* ---------- Responsive sidebar ---------- */
+.sidebar-overlay {
+  display: none;
+}
 @media (max-width: 768px) {
+  .sidebar-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); z-index: 499;
+  }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 500;
     width: var(--sidebar-w) !important;
@@ -352,6 +359,7 @@ select.input { cursor: pointer; }
   }
   .sidebar.mobile-open { transform: translateX(0); }
   .sidebar-closed .sidebar { transform: translateX(-100%); }
+  .page-content { padding: 12px; }
 }
 
 /* ==================== ETIQUETAS ==================== */
