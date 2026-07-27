@@ -912,7 +912,210 @@ const Pages = {
      ================================================================ */
   _camStream: null,
   _camCart: [],
-  _camOcrRunning: false,
+  /** Levenshtein distance for fuzzy matching */
+  _levenshtein: function(a, b) {
+    var m = [];
+    for (var i = 0; i <= b.length; i++) m[i] = [i];
+    for (var j = 0; j <= a.length; j++) m[0][j] = j;
+    for (var i = 1; i <= b.length; i++) {
+      for (var j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          m[i][j] = m[i - 1][j - 1];
+        } else {
+          m[i][j] = Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
+        }
+      }
+    }
+    return m[b.length][a.length];
+  },
+
+  /** Fuzzy match OCR text against a product name */
+  _fuzzyScore: function(ocrText, productName) {
+    var oL = ocrText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var tL = productName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!tL || tL.length < 2) return 0;
+    if (!oL || oL.length < 2) return 0;
+    // Exact substring — best score
+    if (oL.indexOf(tL) !== -1) return 1.0;
+    var words = tL.split(/\s+/).filter(function(w) { return w.length >= 2; });
+    if (words.length === 0) return 0;
+    var ocrWords = oL.split(/\s+/).filter(function(w) { return w.length >= 2; });
+    var matched = 0;
+    for (var w = 0; w < words.length; w++) {
+      var best = 0;
+      // Exact word in OCR
+      if (oL.indexOf(words[w]) !== -1) {
+        best = 1.0;
+      } else {
+        // Levenshtein against each OCR word
+        for (var ow = 0; ow < ocrWords.length; ow++) {
+          var dist = Pages._levenshtein(words[w], ocrWords[ow]);
+          var maxLen = Math.max(words[w].length, ocrWords[ow].length);
+          var ratio = 1 - (dist / maxLen);
+          if (ratio > best) best = ratio;
+        }
+        // Also check if word is contained within any OCR word (partial match)
+        if (best < 0.7) {
+          for (var ow = 0; ow < ocrWords.length; ow++) {
+            if (ocrWords[ow].indexOf(words[w]) !== -1 || words[w].indexOf(ocrWords[ow]) !== -1) {
+              if (0.8 > best) best = 0.8;
+            }
+          }
+        }
+      }
+      if (best >= 0.55) matched++;
+    }
+    return matched / words.length;
+  },
+
+  /** Pre-process canvas image for better OCR on dark labels */
+  _preprocessCanvas: function(ctx, w, h, invert) {
+    var imgData = ctx.getImageData(0, 0, w, h);
+    var d = imgData.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+      if (invert) gray = 255 - gray;
+      // Adaptive threshold: boost contrast
+      var val = gray > 90 ? 255 : 0;
+      d[i] = val; d[i + 1] = val; d[i + 2] = val;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  },
+
+  captureAndRead() {
+    if (Pages._camOcrRunning) return;
+    var video = document.getElementById('cam-video');
+    var canvas = document.getElementById('cam-canvas');
+    var statusEl = document.getElementById('cam-status');
+    if (!video || !canvas || video.readyState < 2) return;
+    if (navigator.vibrate) navigator.vibrate(50);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    // Save original pixels for retry
+    var origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Pre-process: invert + threshold (ARCANO labels are light text on dark bg)
+    Pages._preprocessCanvas(ctx, canvas.width, canvas.height, true);
+    var processedImage = canvas.toDataURL('image/png');
+    Pages._camOcrRunning = true;
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
+    if (typeof Tesseract === 'undefined') {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
+      Pages._camOcrRunning = false;
+      return;
+    }
+    // Try inverted first (for dark ARCANO labels)
+    Tesseract.recognize(processedImage, 'spa+eng', {
+      logger: function() {}
+    }).then(function(result) {
+      var text = (result && result.data && result.data.text) || '';
+      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      // Check if we found something useful (product match or "arcano" detected)
+      var hasMatch = Pages._hasProductMatch(text);
+      var hasBrand = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf('arcano') !== -1;
+      if (hasMatch || (hasBrand && text.length > 10)) {
+        Pages._camOcrRunning = false;
+        Pages.handleOCRResult(text);
+      } else if (!Pages._camRetryDone) {
+        // Retry with original (non-inverted) image
+        Pages._camRetryDone = true;
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Reintentando...</span>';
+        ctx.putImageData(origData, 0, 0);
+        var origImage = canvas.toDataURL('image/png');
+        Tesseract.recognize(origImage, 'spa+eng', {
+          logger: function() {}
+        }).then(function(result2) {
+          Pages._camRetryDone = false;
+          Pages._camOcrRunning = false;
+          var text2 = (result2 && result2.data && result2.data.text) || '';
+          text2 = text2.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+          // Use whichever result is better
+          var t2hasMatch = Pages._hasProductMatch(text2);
+          var t2hasBrand = text2.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf('arcano') !== -1;
+          if (t2hasMatch || (t2hasBrand && text2.length > text.length)) {
+            Pages.handleOCRResult(text2);
+          } else {
+            Pages.handleOCRResult(text.length >= text2.length ? text : text2);
+          }
+        }).catch(function(err) {
+          Pages._camRetryDone = false;
+          Pages._camOcrRunning = false;
+          Pages.handleOCRResult(text); // fallback to first result
+        });
+      } else {
+        Pages._camRetryDone = false;
+        Pages._camOcrRunning = false;
+        Pages.handleOCRResult(text);
+      }
+    }).catch(function(err) {
+      Pages._camOcrRunning = false;
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
+    });
+  },
+
+  /** Quick check if any product matches the OCR text */
+  _hasProductMatch: function(text) {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var all = especias.concat(blends);
+    for (var i = 0; i < all.length; i++) {
+      if (Pages._fuzzyScore(text, all[i].nombre) >= 0.5) return true;
+    }
+    return false;
+  },
+
+  handleOCRResult: function(text) {
+    var statusEl = document.getElementById('cam-status');
+    var confirmArea = document.getElementById('cam-confirm-area');
+    var detectedTextEl = document.getElementById('cam-detected-text');
+    var prodSelect = document.getElementById('cam-prod-select');
+    if (!text || text.length < 2) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
+      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
+      return;
+    }
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var allProducts = [];
+    for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
+    for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
+    // Fuzzy matching with Levenshtein distance
+    var scored = [];
+    for (var i = 0; i < allProducts.length; i++) {
+      var p = allProducts[i];
+      var score = Pages._fuzzyScore(text, p.producto.nombre);
+      if (score >= 0.4) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
+    }
+    // Bonus: if "arcano" brand is detected, boost confidence
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var brandDetected = ocrLower.indexOf('arcano') !== -1;
+    scored.sort(function(a, b) { return b.score - a.score; });
+    if (confirmArea) confirmArea.style.display = 'block';
+    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 100) + (text.length > 100 ? '...' : '') + '"' + (brandDetected ? ' [Marca ARCANO detectada]' : '');
+    if (prodSelect) {
+      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
+      if (scored.length > 0) {
+        for (var i = 0; i < Math.min(scored.length, 5); i++) {
+          var s = scored[i];
+          var pct = Math.round(s.score * 100);
+          prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
+        }
+        if (scored[0].score >= 0.6) {
+          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
+        }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
+        for (var i = 0; i < allProducts.length; i++) {
+          var ap = allProducts[i];
+          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
+        }
+      }
+    }
+  },
+
+  _camRetryDone: false,
 
   /** Open camera modal for label-reading sale */
   formVentaQR() {
@@ -1002,93 +1205,7 @@ const Pages = {
     }
   },
 
-  captureAndRead() {
-    if (Pages._camOcrRunning) return;
-    var video = document.getElementById('cam-video');
-    var canvas = document.getElementById('cam-canvas');
-    var statusEl = document.getElementById('cam-status');
-    if (!video || !canvas || video.readyState < 2) return;
-    if (navigator.vibrate) navigator.vibrate(50);
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    var ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    var imageData = canvas.toDataURL('image/png');
-    Pages._camOcrRunning = true;
-    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
-    if (typeof Tesseract === 'undefined') {
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
-      Pages._camOcrRunning = false;
-      return;
-    }
-    Tesseract.recognize(imageData, 'spa+eng', {
-      logger: function() {}
-    }).then(function(result) {
-      Pages._camOcrRunning = false;
-      var text = (result && result.data && result.data.text) || '';
-      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-      Pages.handleOCRResult(text);
-    }).catch(function(err) {
-      Pages._camOcrRunning = false;
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
-    });
-  },
 
-  handleOCRResult(text) {
-    var statusEl = document.getElementById('cam-status');
-    var confirmArea = document.getElementById('cam-confirm-area');
-    var detectedTextEl = document.getElementById('cam-detected-text');
-    var prodSelect = document.getElementById('cam-prod-select');
-    if (!text || text.length < 2) {
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
-      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
-      return;
-    }
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var allProducts = [];
-    for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
-    for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
-    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var scored = [];
-    for (var i = 0; i < allProducts.length; i++) {
-      var p = allProducts[i];
-      var name = (p.producto.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      var nameWords = name.split(/\s+/);
-      var matchCount = 0;
-      for (var w = 0; w < nameWords.length; w++) {
-        if (nameWords[w].length < 2) continue;
-        if (ocrLower.indexOf(nameWords[w]) !== -1) matchCount++;
-      }
-      var score = nameWords.length > 0 ? matchCount / nameWords.length : 0;
-      if (ocrLower.indexOf(name) !== -1) score = Math.max(score, 1.0);
-      if (name.length >= 3 && ocrLower.indexOf(name.substring(0, Math.min(name.length, 6))) !== -1) score = Math.max(score, 0.7);
-      if (score >= 0.5) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
-    }
-    scored.sort(function(a, b) { return b.score - a.score; });
-    if (confirmArea) confirmArea.style.display = 'block';
-    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 80) + (text.length > 80 ? '...' : '') + '"';
-    if (prodSelect) {
-      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
-      if (scored.length > 0) {
-        for (var i = 0; i < Math.min(scored.length, 5); i++) {
-          var s = scored[i];
-          var pct = Math.round(s.score * 100);
-          prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
-        }
-        if (scored[0].score >= 0.7) {
-          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
-        }
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
-      } else {
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
-        for (var i = 0; i < allProducts.length; i++) {
-          var ap = allProducts[i];
-          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
-        }
-      }
-    }
-  },
 
   cancelCamDetect() {
     var confirmArea = document.getElementById('cam-confirm-area');
