@@ -126,7 +126,6 @@ const Pages = {
             '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.showQRLabels(\'especia\',' + e.id + ')" title="QR Label">QR</button>' +
               '<button class="btn btn-sm "' + (e.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
@@ -156,7 +155,6 @@ const Pages = {
             '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.showQRLabels(\'blend\',' + b.id + ')" title="QR Label">QR</button>' +
               '<button class="btn btn-sm "' + (b.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
@@ -909,369 +907,300 @@ const Pages = {
   },
 
   /* ================================================================
-     VENTA POR QR
+  /* ================================================================
+     VENTA POR CAMARA (OCR - lectura de etiquetas)
      ================================================================ */
-  _qrScanner: null,
-  _qrCart: [],
-  _qrScanning: false,
+  _camStream: null,
+  _camCart: [],
+  _camOcrRunning: false,
 
-  /** Build QR data string for a product: ARCANO|tipo|id|talla */
-  buildQRData(tipo, id, talla) {
-    return 'ARCANO|' + tipo + '|' + id + '|' + talla;
-  },
-
-  /** Parse QR data string, returns {tipo, id, talla} or null */
-  parseQRData(raw) {
-    if (!raw) return null;
-    var parts = raw.split('|');
-    if (parts.length < 4 || parts[0] !== 'ARCANO') return null;
-    return { tipo: parts[1], id: Number(parts[2]), talla: parts[3] };
-  },
-
-  /** Open QR scanner modal for selling */
+  /** Open camera modal for label-reading sale */
   formVentaQR() {
-    Pages._qrCart = [];
+    Pages._camCart = [];
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.id = 'qr-venta-modal';
+    modal.id = 'cam-venta-modal';
     modal.innerHTML =
-      '<div class="modal modal-lg" style="max-width:480px">' +
-        '<div class="modal-header"><h3>\u{1F4F7} Venta por QR</h3>' +
-          '<button class="btn btn-ghost" onclick="Pages.closeVentaQR()">X</button></div>' +
+      '<div class="modal modal-lg" style="max-width:520px">' +
+        '<div class="modal-header"><h3>\u{1F4F7} Venta por Camara</h3>' +
+          '<button class="btn btn-ghost" onclick="Pages.closeVentaCam()">X</button></div>' +
         '<div class="modal-body" style="padding:0">' +
-          '<!-- Scanner area -->' +
-          '<div id="qr-reader-venta" style="width:100%;border-bottom:1px solid var(--border)"></div>' +
-          '<div id="qr-scan-status" style="padding:12px 16px;background:var(--bg-card);color:var(--muted);font-size:0.85rem;text-align:center">' +
-            'Apunta la camara al codigo QR del producto' +
+          '<div style="position:relative;background:#000">' +
+            '<video id="cam-video" autoplay playsinline style="width:100%;display:block;max-height:320px;object-fit:cover"></video>' +
+            '<canvas id="cam-canvas" style="display:none"></canvas>' +
+            '<div id="cam-scan-line" style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:var(--gold);opacity:0.6;transform:translateY(-50%);animation:scanLine 2s ease-in-out infinite;pointer-events:none"></div>' +
+            '<style>@keyframes scanLine{0%,100%{top:calc(50% - 50px)}50%{top:calc(50% + 50px)}}</style>' +
           '</div>' +
-          '<!-- Flash toggle -->' +
-          '<div style="display:flex;justify-content:center;padding:4px 0;background:var(--bg-card)">' +
-            '<button class="btn btn-sm btn-outline" id="qr-flash-btn" onclick="Pages.toggleQRFlash()">\u{1F526} Flash</button>' +
+          '<div id="cam-status" style="padding:12px 16px;background:var(--bg-card);color:var(--muted);font-size:0.85rem;text-align:center">' +
+            'Apunta la camara a la etiqueta del producto' +
+          '</div>' +
+          '<div style="display:flex;justify-content:center;gap:8px;padding:8px 16px;background:var(--bg-card)">' +
+            '<button class="btn btn-sm btn-outline" id="cam-flash-btn" onclick="Pages.toggleCamFlash()">\u{1F526} Flash</button>' +
+            '<button class="btn btn-sm btn-gold" onclick="Pages.captureAndRead()">\u{1F4F7} Capturar</button>' +
+          '</div>' +
+          '<!-- Confirmation area -->' +
+          '<div id="cam-confirm-area" style="padding:12px 16px;display:none">' +
+            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Producto detectado</div>' +
+            '<div id="cam-detected-text" style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;font-style:italic"></div>' +
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+              '<select class="input" id="cam-prod-select" style="flex:1;min-width:140px"><option value="">Seleccionar producto</option></select>' +
+              '<select class="input" id="cam-talla-select" style="width:120px"><option value="chico">Chico</option><option value="grande">Grande</option></select>' +
+              '<button class="btn btn-sm btn-gold" onclick="Pages.addCamProduct()">+ Agregar</button>' +
+              '<button class="btn btn-sm btn-outline" onclick="Pages.cancelCamDetect()">Seguir leyendo</button>' +
+            '</div>' +
           '</div>' +
           '<!-- Cart -->' +
-          '<div id="qr-cart-area" style="padding:12px 16px;max-height:200px;overflow-y:auto;display:none">' +
-            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Productos escaneados</div>' +
-            '<div id="qr-cart-items"></div>' +
+          '<div id="cam-cart-area" style="padding:12px 16px;max-height:200px;overflow-y:auto;display:none">' +
+            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Productos agregados</div>' +
+            '<div id="cam-cart-items"></div>' +
           '</div>' +
           '<!-- Total and confirm -->' +
-          '<div id="qr-total-area" style="padding:12px 16px;border-top:1px solid var(--border);display:none">' +
-            '<div class="venta-total-box">Total: $<span id="qr-venta-total">0</span></div>' +
-            '<button class="btn btn-gold btn-block mt-8" id="qr-confirm-btn" onclick="Pages.confirmarVentaQR()">\u{2705} Confirmar Venta</button>' +
+          '<div id="cam-total-area" style="padding:12px 16px;border-top:1px solid var(--border);display:none">' +
+            '<div class="venta-total-box">Total: $<span id="cam-venta-total">0</span></div>' +
+            '<button class="btn btn-gold btn-block mt-8" onclick="Pages.confirmarVentaCam()">\u{2705} Confirmar Venta</button>' +
           '</div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
-
-    // Start scanner after a small delay to let modal render
-    setTimeout(function() { Pages.startQRScanner('qr-reader-venta', 'qr-scan-status'); }, 300);
+    setTimeout(function() { Pages.startCamera(); }, 300);
   },
 
-  startQRScanner(readerId, statusId) {
-    if (Pages._qrScanning) return;
-    if (typeof Html5Qrcode === 'undefined') {
-      var el = document.getElementById(statusId);
-      if (el) el.innerHTML = '<span style="color:var(--red)">Error: Libreria QR no disponible. Verifica conexion a internet.</span>';
+  startCamera() {
+    var video = document.getElementById('cam-video');
+    if (!video) return;
+    var statusEl = document.getElementById('cam-status');
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    }).then(function(stream) {
+      Pages._camStream = stream;
+      video.srcObject = stream;
+      video.play();
+      if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto';
+    }).catch(function(err) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se pudo acceder a la camara: ' + err.message + '</span>';
+    });
+  },
+
+  stopCamera() {
+    if (Pages._camStream) {
+      Pages._camStream.getTracks().forEach(function(t) { t.stop(); });
+      Pages._camStream = null;
+    }
+    Pages._camOcrRunning = false;
+  },
+
+  toggleCamFlash() {
+    if (!Pages._camStream) return;
+    var track = Pages._camStream.getVideoTracks()[0];
+    if (!track) return;
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.torch) {
+      var isOn = (track.getSettings && track.getSettings().torch) || false;
+      track.applyConstraints({ advanced: [{ torch: !isOn }] });
+      var btn = document.getElementById('cam-flash-btn');
+      if (btn) btn.textContent = isOn ? '\u{1F526} Flash' : '\u{1F526} Flash ON';
+    }
+  },
+
+  captureAndRead() {
+    if (Pages._camOcrRunning) return;
+    var video = document.getElementById('cam-video');
+    var canvas = document.getElementById('cam-canvas');
+    var statusEl = document.getElementById('cam-status');
+    if (!video || !canvas || video.readyState < 2) return;
+    if (navigator.vibrate) navigator.vibrate(50);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    var imageData = canvas.toDataURL('image/png');
+    Pages._camOcrRunning = true;
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
+    if (typeof Tesseract === 'undefined') {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
+      Pages._camOcrRunning = false;
       return;
     }
-    try {
-      Pages._qrScanner = new Html5Qrcode(readerId);
-      Pages._qrScanning = true;
-
-      var config = {
-        fps: 15,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.5,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
-      };
-
-      Pages._qrScanner.start(
-        { facingMode: 'environment' },
-        config,
-        function(decodedText) {
-          Pages.handleQRScan(decodedText, statusId);
-        },
-        function() {}
-      ).catch(function(err) {
-        var el = document.getElementById(statusId);
-        if (el) el.innerHTML = '<span style="color:var(--red)">No se pudo acceder a la camara: ' + err.message + '</span>';
-        Pages._qrScanning = false;
-      });
-    } catch (err) {
-      var el2 = document.getElementById(statusId);
-      if (el2) el2.innerHTML = '<span style="color:var(--red)">Error al iniciar escaner: ' + err.message + '</span>';
-      Pages._qrScanning = false;
-    }
+    Tesseract.recognize(imageData, 'spa+eng', {
+      logger: function() {}
+    }).then(function(result) {
+      Pages._camOcrRunning = false;
+      var text = (result && result.data && result.data.text) || '';
+      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      Pages.handleOCRResult(text);
+    }).catch(function(err) {
+      Pages._camOcrRunning = false;
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
+    });
   },
 
-  stopQRScanner() {
-    if (Pages._qrScanner && Pages._qrScanning) {
-      try {
-        Pages._qrScanner.stop().then(function() {
-          Pages._qrScanner.clear();
-          Pages._qrScanning = false;
-        }).catch(function() { Pages._qrScanning = false; });
-      } catch (e) { Pages._qrScanning = false; }
+  handleOCRResult(text) {
+    var statusEl = document.getElementById('cam-status');
+    var confirmArea = document.getElementById('cam-confirm-area');
+    var detectedTextEl = document.getElementById('cam-detected-text');
+    var prodSelect = document.getElementById('cam-prod-select');
+    if (!text || text.length < 2) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
+      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
+      return;
     }
-  },
-
-  toggleQRFlash() {
-    if (!Pages._qrScanner || !Pages._qrScanning) return;
-    var btn = document.getElementById('qr-flash-btn');
-    // html5-qrcode doesn't have direct flash API, but we can try
-    var track = null;
-    if (Pages._qrScanner && Pages._qrScanner._element && Pages._qrScanner._element.querySelector('video')) {
-      track = Pages._qrScanner._element.querySelector('video').srcObject && Pages._qrScanner._element.querySelector('video').srcObject.getVideoTracks()[0];
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var allProducts = [];
+    for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
+    for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var scored = [];
+    for (var i = 0; i < allProducts.length; i++) {
+      var p = allProducts[i];
+      var name = (p.producto.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      var nameWords = name.split(/\s+/);
+      var matchCount = 0;
+      for (var w = 0; w < nameWords.length; w++) {
+        if (nameWords[w].length < 2) continue;
+        if (ocrLower.indexOf(nameWords[w]) !== -1) matchCount++;
+      }
+      var score = nameWords.length > 0 ? matchCount / nameWords.length : 0;
+      if (ocrLower.indexOf(name) !== -1) score = Math.max(score, 1.0);
+      if (name.length >= 3 && ocrLower.indexOf(name.substring(0, Math.min(name.length, 6))) !== -1) score = Math.max(score, 0.7);
+      if (score >= 0.5) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
     }
-    if (track) {
-      var caps = track.getCapabilities ? track.getCapabilities() : {};
-      if (caps.torch) {
-        track.applyConstraints({ advanced: [{ torch: !((track.getSettings && track.getSettings().torch) || false) }] });
-        if (btn) btn.textContent = ((track.getSettings && track.getSettings().torch) ? '\u{1F526} Flash ON' : '\u{1F526} Flash');
+    scored.sort(function(a, b) { return b.score - a.score; });
+    if (confirmArea) confirmArea.style.display = 'block';
+    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 80) + (text.length > 80 ? '...' : '') + '"';
+    if (prodSelect) {
+      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
+      if (scored.length > 0) {
+        for (var i = 0; i < Math.min(scored.length, 5); i++) {
+          var s = scored[i];
+          var pct = Math.round(s.score * 100);
+          prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
+        }
+        if (scored[0].score >= 0.7) {
+          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
+        }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
+        for (var i = 0; i < allProducts.length; i++) {
+          var ap = allProducts[i];
+          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
+        }
       }
     }
   },
 
-  handleQRScan(decodedText, statusId) {
-    // Vibrate feedback
-    if (navigator.vibrate) navigator.vibrate(100);
+  cancelCamDetect() {
+    var confirmArea = document.getElementById('cam-confirm-area');
+    if (confirmArea) confirmArea.style.display = 'none';
+    var statusEl = document.getElementById('cam-status');
+    if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto';
+  },
 
-    var parsed = Pages.parseQRData(decodedText);
-    var statusEl = document.getElementById(statusId);
-
-    if (!parsed) {
-      if (statusEl) {
-        statusEl.innerHTML = '<span style="color:var(--red)">Codigo no reconocido: ' + decodedText.substring(0, 40) + '</span>';
-        setTimeout(function() {
-          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
-        }, 2500);
-      }
-      return;
-    }
-
-    // Find the product
-    var producto = parsed.tipo === 'blend' ? ArcanoDB.getBlend(parsed.id) : ArcanoDB.getEspecia(parsed.id);
-    if (!producto) {
-      if (statusEl) {
-        statusEl.innerHTML = '<span style="color:var(--red)">Producto no encontrado (ID: ' + parsed.id + ')</span>';
-        setTimeout(function() {
-          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
-        }, 2500);
-      }
-      return;
-    }
-
-    // Check stock
-    var stockKey = parsed.talla === 'grande' ? 'stockGrande' : 'stockChico';
-    var precioKey = parsed.talla === 'grande' ? 'precioGrande' : 'precioChico';
+  addCamProduct() {
+    var prodVal = document.getElementById('cam-prod-select').value;
+    var tallaVal = document.getElementById('cam-talla-select').value;
+    if (!prodVal) { alert('Selecciona un producto'); return; }
+    var parts = prodVal.split('|');
+    var tipo = parts[0];
+    var prodId = Number(parts[1]);
+    var producto = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
+    if (!producto) { alert('Producto no encontrado'); return; }
+    var stockKey = tallaVal === 'grande' ? 'stockGrande' : 'stockChico';
+    var precioKey = tallaVal === 'grande' ? 'precioGrande' : 'precioChico';
     var stock = producto[stockKey] || 0;
     var precio = producto[precioKey] || 0;
-
-    if (stock <= 0) {
-      if (statusEl) {
-        statusEl.innerHTML = '<span style="color:var(--red)">Sin stock de ' + producto.nombre + ' (' + parsed.talla + ')</span>';
-        setTimeout(function() {
-          if (statusEl) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
-        }, 2500);
-      }
-      return;
-    }
-
-    // Add to cart (check if already scanned same product+talla)
+    if (stock <= 0) { alert('Sin stock de ' + producto.nombre + ' (' + tallaVal + ')'); return; }
     var found = false;
-    for (var i = 0; i < Pages._qrCart.length; i++) {
-      if (Pages._qrCart[i].tipo === parsed.tipo && Pages._qrCart[i].productoId === parsed.id && Pages._qrCart[i].talla === parsed.talla) {
-        if (Pages._qrCart[i].cantidad < stock) {
-          Pages._qrCart[i].cantidad++;
-        }
+    for (var i = 0; i < Pages._camCart.length; i++) {
+      if (Pages._camCart[i].tipo === tipo && Pages._camCart[i].productoId === prodId && Pages._camCart[i].talla === tallaVal) {
+        if (Pages._camCart[i].cantidad < stock) Pages._camCart[i].cantidad++;
         found = true;
         break;
       }
     }
     if (!found) {
-      Pages._qrCart.push({
-        tipo: parsed.tipo,
-        productoId: parsed.id,
-        talla: parsed.talla,
-        cantidad: 1,
-        precioUnitario: precio
-      });
+      Pages._camCart.push({ tipo: tipo, productoId: prodId, talla: tallaVal, cantidad: 1, precioUnitario: precio });
     }
-
-    // Update UI
-    if (statusEl) {
-      statusEl.innerHTML = '<span style="color:var(--green)">\u{2705} ' + producto.nombre + ' (' + parsed.talla + ') agregado</span>';
-      setTimeout(function() {
-        if (statusEl && Pages._qrScanning) statusEl.innerHTML = 'Apunta la camara al codigo QR del producto';
-      }, 1500);
-    }
-    Pages.renderQRCart();
+    if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+    Pages.renderCamCart();
+    Pages.cancelCamDetect();
   },
 
-  renderQRCart() {
-    var cartArea = document.getElementById('qr-cart-area');
-    var cartItems = document.getElementById('qr-cart-items');
-    var totalArea = document.getElementById('qr-total-area');
-    var totalSpan = document.getElementById('qr-venta-total');
-
-    if (Pages._qrCart.length === 0) {
+  renderCamCart() {
+    var cartArea = document.getElementById('cam-cart-area');
+    var cartItems = document.getElementById('cam-cart-items');
+    var totalArea = document.getElementById('cam-total-area');
+    var totalSpan = document.getElementById('cam-venta-total');
+    if (Pages._camCart.length === 0) {
       if (cartArea) cartArea.style.display = 'none';
       if (totalArea) totalArea.style.display = 'none';
       return;
     }
-
     if (cartArea) cartArea.style.display = 'block';
     if (totalArea) totalArea.style.display = 'block';
-
     var h = '';
     var total = 0;
-    for (var i = 0; i < Pages._qrCart.length; i++) {
-      var item = Pages._qrCart[i];
+    for (var i = 0; i < Pages._camCart.length; i++) {
+      var item = Pages._camCart[i];
       var prod = item.tipo === 'blend' ? ArcanoDB.getBlend(item.productoId) : ArcanoDB.getEspecia(item.productoId);
       var nombre = prod ? prod.nombre : '?';
       var sub = item.cantidad * item.precioUnitario;
       total += sub;
       h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
-        '<div>' +
-          '<div style="font-weight:600;font-size:0.9rem">' + nombre + '</div>' +
-          '<div style="font-size:0.75rem;color:var(--muted)">' + item.talla + ' | $' + item.precioUnitario.toLocaleString() + ' c/u</div>' +
-        '</div>' +
+        '<div><div style="font-weight:600;font-size:0.9rem">' + nombre + '</div>' +
+        '<div style="font-size:0.75rem;color:var(--muted)">' + item.talla + ' | $' + item.precioUnitario.toLocaleString() + ' c/u</div></div>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
-          '<button class="btn btn-sm btn-outline" onclick="Pages.qrCartQty(' + i + ',-1)">-</button>' +
-          '<span style="font-weight:700;min-width:24px;text-align:center">' + item.cantidad + '</span>' +
-          '<button class="btn btn-sm btn-outline" onclick="Pages.qrCartQty(' + i + ',1)">+</button>' +
-          '<span style="font-weight:700;color:var(--gold);min-width:70px;text-align:right">$' + sub.toLocaleString() + '</span>' +
-          '<button class="btn btn-sm btn-red" onclick="Pages.qrCartRemove(' + i + ')">X</button>' +
-        '</div>' +
-      '</div>';
+        '<button class="btn btn-sm btn-outline" onclick="Pages.camCartQty(' + i + ',-1)">-</button>' +
+        '<span style="font-weight:700;min-width:24px;text-align:center">' + item.cantidad + '</span>' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages.camCartQty(' + i + ',1)">+</button>' +
+        '<span style="font-weight:700;color:var(--gold);min-width:70px;text-align:right">$' + sub.toLocaleString() + '</span>' +
+        '<button class="btn btn-sm btn-red" onclick="Pages.camCartRemove(' + i + ')">X</button>' +
+        '</div></div>';
     }
     if (cartItems) cartItems.innerHTML = h;
     if (totalSpan) totalSpan.textContent = total.toLocaleString();
   },
 
-  qrCartQty(idx, delta) {
-    if (!Pages._qrCart[idx]) return;
-    var item = Pages._qrCart[idx];
+  camCartQty(idx, delta) {
+    if (!Pages._camCart[idx]) return;
+    var item = Pages._camCart[idx];
     var newCant = item.cantidad + delta;
     var producto = item.tipo === 'blend' ? ArcanoDB.getBlend(item.productoId) : ArcanoDB.getEspecia(item.productoId);
     var stockKey = item.talla === 'grande' ? 'stockGrande' : 'stockChico';
     var maxStock = producto ? (producto[stockKey] || 0) : 0;
     if (newCant < 1 || newCant > maxStock) return;
     item.cantidad = newCant;
-    Pages.renderQRCart();
+    Pages.renderCamCart();
   },
 
-  qrCartRemove(idx) {
-    Pages._qrCart.splice(idx, 1);
-    Pages.renderQRCart();
+  camCartRemove(idx) {
+    Pages._camCart.splice(idx, 1);
+    Pages.renderCamCart();
   },
 
-  confirmarVentaQR() {
-    if (Pages._qrCart.length === 0) { alert('No hay productos en la venta'); return; }
-    if (!confirm('Registrar venta de ' + Pages._qrCart.length + ' producto(s)?')) return;
+  confirmarVentaCam() {
+    if (Pages._camCart.length === 0) { alert('No hay productos en la venta'); return; }
+    if (!confirm('Registrar venta de ' + Pages._camCart.length + ' producto(s)?')) return;
     try {
       ArcanoDB.saveVenta({
         fecha: new Date().toISOString().slice(0, 10),
-        items: JSON.parse(JSON.stringify(Pages._qrCart))
+        items: JSON.parse(JSON.stringify(Pages._camCart))
       });
-      Pages.closeVentaQR();
+      Pages.closeVentaCam();
       App.renderPage('ventas');
     } catch (err) {
       alert('Error: ' + err.message);
     }
   },
 
-  closeVentaQR() {
-    Pages.stopQRScanner();
-    var modal = document.getElementById('qr-venta-modal');
+  closeVentaCam() {
+    Pages.stopCamera();
+    var modal = document.getElementById('cam-venta-modal');
     if (modal) modal.remove();
-    Pages._qrCart = [];
+    Pages._camCart = [];
   },
 
-  /* ================================================================
-     QR LABELS GENERATOR (for printing product QR tags)
-     ================================================================ */
-  showQRLabels(tipo, id) {
-    var producto = tipo === 'blend' ? ArcanoDB.getBlend(id) : ArcanoDB.getEspecia(id);
-    if (!producto) { alert('Producto no encontrado'); return; }
-
-    var modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML =
-      '<div class="modal modal-lg" style="max-width:600px">' +
-        '<div class="modal-header"><h3>\u{1F4F9} Etiquetas QR — ' + producto.nombre + '</h3>' +
-          '<button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
-        '<div class="modal-body">' +
-          '<p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Escanea estos codigos con el lector QR para registrar ventas rapidas.</p>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
-            '<div class="card" style="text-align:center;padding:20px">' +
-              '<div style="font-weight:700;font-size:0.9rem;margin-bottom:12px">Talla Chico</div>' +
-              '<div style="font-size:0.8rem;color:var(--gold);margin-bottom:12px">$' + (producto.precioChico || 0).toLocaleString() + '</div>' +
-              '<canvas id="qr-canvas-chico" style="margin:0 auto;display:block;border-radius:8px;background:#fff;padding:8px"></canvas>' +
-              '<div style="font-size:0.7rem;color:var(--muted);margin-top:8px">Stock: ' + (producto.stockChico || 0) + ' frascos</div>' +
-            '</div>' +
-            '<div class="card" style="text-align:center;padding:20px">' +
-              '<div style="font-weight:700;font-size:0.9rem;margin-bottom:12px">Talla Grande</div>' +
-              '<div style="font-size:0.8rem;color:var(--gold);margin-bottom:12px">$' + (producto.precioGrande || 0).toLocaleString() + '</div>' +
-              '<canvas id="qr-canvas-grande" style="margin:0 auto;display:block;border-radius:8px;background:#fff;padding:8px"></canvas>' +
-              '<div style="font-size:0.7rem;color:var(--muted);margin-top:8px">Stock: ' + (producto.stockGrande || 0) + ' frascos</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="modal-footer">' +
-          '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cerrar</button>' +
-          '<button class="btn btn-gold" onclick="Pages.printQRLabels(\'' + tipo + '\',' + id + ')">\u{1F5A8} Imprimir</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(modal);
-
-    // Generate QR codes
-    setTimeout(function() {
-      var chicoData = Pages.buildQRData(tipo, id, 'chico');
-      var grandeData = Pages.buildQRData(tipo, id, 'grande');
-      var chicoCanvas = document.getElementById('qr-canvas-chico');
-      var grandeCanvas = document.getElementById('qr-canvas-grande');
-      if (typeof QRCode !== 'undefined') {
-        if (chicoCanvas) { new QRCode(chicoCanvas, { text: chicoData, width: 180, height: 180, colorDark: '#1b0b07', colorLight: '#ffffff' }); }
-        if (grandeCanvas) { new QRCode(grandeCanvas, { text: grandeData, width: 180, height: 180, colorDark: '#1b0b07', colorLight: '#ffffff' }); }
-      } else {
-        // Fallback: show data as text
-        if (chicoCanvas) { var ctx1 = chicoCanvas.getContext('2d'); chicoCanvas.width = 200; chicoCanvas.height = 80; ctx1.fillStyle = '#fff'; ctx1.fillRect(0,0,200,80); ctx1.fillStyle = '#1b0b07'; ctx1.font = '11px monospace'; ctx1.fillText(chicoData, 10, 40); }
-        if (grandeCanvas) { var ctx2 = grandeCanvas.getContext('2d'); grandeCanvas.width = 200; grandeCanvas.height = 80; ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,200,80); ctx2.fillStyle = '#1b0b07'; ctx2.font = '11px monospace'; ctx2.fillText(grandeData, 10, 40); }
-      }
-    }, 200);
-  },
-
-  printQRLabels(tipo, id) {
-    var producto = tipo === 'blend' ? ArcanoDB.getBlend(id) : ArcanoDB.getEspecia(id);
-    if (!producto) return;
-    var chicoData = Pages.buildQRData(tipo, id, 'chico');
-    var grandeData = Pages.buildQRData(tipo, id, 'grande');
-
-    var win = window.open('', '_blank');
-    win.document.write('<!DOCTYPE html><html><head><title>QR Labels - ' + producto.nombre + '</title>' +
-      '<style>*{margin:0;padding:0;box-sizing:border-box}' +
-      'body{font-family:Arial,sans-serif;padding:20px}' +
-      '.label{display:inline-block;width:280px;padding:16px;margin:8px;border:2px dashed #333;border-radius:8px;text-align:center;page-break-inside:avoid}' +
-      '.label h3{font-size:14px;margin-bottom:4px}' +
-      '.label .price{font-size:18px;font-weight:700;color:#333;margin-bottom:8px}' +
-      '.label .talla{font-size:11px;color:#666}' +
-      '.label img{margin:8px auto}' +
-      '.label .qr-data{font-size:9px;color:#999;margin-top:4px;font-family:monospace}' +
-      '@media print{.no-print{display:none}.label{border:1px solid #ccc}}' +
-      '</style></head><body>' +
-      '<div class="no-print" style="margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;font-size:16px;cursor:pointer">Imprimir</button></div>');
-    win.document.write(
-      '<div class="label"><h3>' + producto.nombre + '</h3><div class="price">$' + (producto.precioChico||0).toLocaleString() + '</div>' +
-      '<div class="talla">Talla Chico</div><div id="print-qr-chico"></div><div class="qr-data">' + chicoData + '</div></div>' +
-      '<div class="label"><h3>' + producto.nombre + '</h3><div class="price">$' + (producto.precioGrande||0).toLocaleString() + '</div>' +
-      '<div class="talla">Talla Grande</div><div id="print-qr-grande"></div><div class="qr-data">' + grandeData + '</div></div>');
-    win.document.write('<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>' +
-      '<script>' +
-      'new QRCode(document.getElementById("print-qr-chico"),{text:"' + chicoData + '",width:160,height:160,colorDark:"#000",colorLight:"#fff"});' +
-      'new QRCode(document.getElementById("print-qr-grande"),{text:"' + grandeData + '",width:160,height:160,colorDark:"#000",colorLight:"#fff"});' +
-      '<\/script></body></html>');
-    win.document.close();
-  },
 
   /* ================================================================
      STOCK
@@ -2369,143 +2298,93 @@ const Pages = {
     var pedidos = ArcanoDB.getPedidos();
     var allSales = [];
     for (var vi = 0; vi < ventas.length; vi++) {
-      var v = ventas[vi]; var vItems = [];
+      var v = ventas[vi];
+      var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
       allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
     }
     for (var pi = 0; pi < pedidos.length; pi++) {
-      var p = pedidos[pi]; if (p.estado === 'cancelado') continue;
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
       var pItems = [];
       if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
-      allSales.push({ fecha: (p.creado || '').slice(0, 10), creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
     }
     allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
-    if (Pages._estTab === 'ventas') return allSales.filter(function(s) { return s.source === 'admin'; });
-    if (Pages._estTab === 'pedidos') return allSales.filter(function(s) { return s.source === 'tienda'; });
     return allSales;
-  },
-
-  _filterByPeriod: function(data, period, previous) {
-    var now = new Date();
-    var start, end;
-    if (previous) {
-      switch (period) {
-        case '7d': start = new Date(now); start.setDate(start.getDate() - 14); end = new Date(now); end.setDate(end.getDate() - 7); break;
-        case '30d': start = new Date(now); start.setDate(start.getDate() - 60); end = new Date(now); end.setDate(end.getDate() - 30); break;
-        case '90d': start = new Date(now); start.setDate(start.getDate() - 180); end = new Date(now); end.setDate(end.getDate() - 90); break;
-        case 'mes': start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); break;
-        case 'anio': start = new Date(now.getFullYear() - 1, 0, 1); end = new Date(now.getFullYear() - 1, 11, 31); break;
-        default: return [];
-      }
-    } else {
-      switch (period) {
-        case 'todo': return data;
-        case '7d': start = new Date(now); start.setDate(start.getDate() - 7); end = now; break;
-        case '30d': start = new Date(now); start.setDate(start.getDate() - 30); end = now; break;
-        case '90d': start = new Date(now); start.setDate(start.getDate() - 90); end = now; break;
-        case 'mes': start = new Date(now.getFullYear(), now.getMonth(), 1); end = now; break;
-        case 'anio': start = new Date(now.getFullYear(), 0, 1); end = now; break;
-        default: return data;
-      }
-    }
-    var startStr = start.toISOString().slice(0, 10);
-    var endStr = end.toISOString().slice(0, 10);
-    return data.filter(function(s) { return s.fecha >= startStr && s.fecha <= endStr; });
   },
 
   _renderEstContent: function(data, el) {
     if (!el) return;
-    if (data.length === 0) {
-      el.innerHTML = '<div class="est-empty"><p style="font-size:2rem;margin-bottom:8px">\u{1F4CA}</p><p>Sin datos de ventas en este periodo.</p></div>';
-      return;
-    }
-    var period = Pages._estPeriod;
-    var filtered = Pages._filterByPeriod(data, period);
-
-    var totalIngresos = 0, totalUnidades = 0, totalOps = 0;
-    var productoMap = {}, diaMap = {}, ciudadMap = {}, tipoMap = { especia: 0, blend: 0 };
-    var tallaMap = { chico: 0, grande: 0 };
-    var monthMap = {};
-
-    for (var i = 0; i < filtered.length; i++) {
-      var s = filtered[i];
+    var totalIngresos = 0, totalOps = 0, totalUnidades = 0;
+    var prodMap = {}, tipoMap = {}, tallaMap = {}, diaMap = {}, monthMap = {}, ciudadMap = {};
+    for (var d = 0; d < data.length; d++) {
+      var s = data[d];
       totalIngresos += (s.total || 0);
       totalOps++;
-      for (var j = 0; j < s.items.length; j++) {
-        var it = s.items[j];
-        var qty = it.cantidad || 0;
-        totalUnidades += qty;
-        if (!productoMap[it.nombre]) productoMap[it.nombre] = { nombre: it.nombre, cantidad: 0, ingreso: 0, tipo: it.tipo };
-        productoMap[it.nombre].cantidad += qty;
-        productoMap[it.nombre].ingreso += (it.subtotal || 0);
-        tipoMap[it.tipo] = (tipoMap[it.tipo] || 0) + qty;
-        tallaMap[it.talla] = (tallaMap[it.talla] || 0) + qty;
+      if (s.items) { for (var it = 0; it < s.items.length; it++) {
+        var item = s.items[it];
+        totalUnidades += (item.cantidad || 0);
+        var key = item.nombre + '|' + item.tipo + '|' + item.talla;
+        if (!prodMap[key]) prodMap[key] = { nombre: item.nombre, tipo: item.tipo, talla: item.talla, unidades: 0, ingreso: 0 };
+        prodMap[key].unidades += (item.cantidad || 0);
+        prodMap[key].ingreso += (item.subtotal || 0);
+        tipoMap[item.tipo] = (tipoMap[item.tipo] || 0) + (item.cantidad || 0);
+        tallaMap[item.talla || 'chico'] = (tallaMap[item.talla || 'chico'] || 0) + (item.cantidad || 0);
+      }}
+      if (s.fecha) {
+        if (!diaMap[s.fecha]) diaMap[s.fecha] = { ops: 0, unidades: 0, ingresos: 0 };
+        diaMap[s.fecha].ops++;
+        diaMap[s.fecha].unidades += totalUnidades;
+        diaMap[s.fecha].ingresos += (s.total || 0);
+        var mn = s.fecha.substring(0, 7);
+        if (!monthMap[mn]) monthMap[mn] = { ops: 0, ingresos: 0 };
+        monthMap[mn].ops++;
+        monthMap[mn].ingresos += (s.total || 0);
       }
-      var dia = s.fecha || 'Sin fecha';
-      if (!diaMap[dia]) diaMap[dia] = { ingresos: 0, ops: 0, unidades: 0 };
-      diaMap[dia].ingresos += (s.total || 0);
-      diaMap[dia].ops += 1;
-      for (var k = 0; k < s.items.length; k++) diaMap[dia].unidades += (s.items[k].cantidad || 0);
-      var mes = dia.slice(0, 7);
-      if (!monthMap[mes]) monthMap[mes] = { ingresos: 0, ops: 0 };
-      monthMap[mes].ingresos += (s.total || 0);
-      monthMap[mes].ops += 1;
       if (s.ciudad) {
-        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ingresos: 0, ops: 0 };
+        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ops: 0, ingresos: 0 };
+        ciudadMap[s.ciudad].ops++;
         ciudadMap[s.ciudad].ingresos += (s.total || 0);
-        ciudadMap[s.ciudad].ops += 1;
       }
     }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
 
-    var ticketProm = totalOps > 0 ? totalIngresos / totalOps : 0;
-    var prevFiltered = Pages._filterByPeriod(data, period, true);
-    var prevIngresos = 0;
-    for (var x = 0; x < prevFiltered.length; x++) prevIngresos += (prevFiltered[x].total || 0);
-    var pctChange = prevIngresos > 0 ? ((totalIngresos - prevIngresos) / prevIngresos * 100).toFixed(1) : 0;
-    var prodArr = Object.values(productoMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+    var h = '<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">' +
+      '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + totalIngresos.toLocaleString() + '</div><div class="stat-label">Ingresos Totales</div><div class="stat-sub">' + totalOps + ' operaciones</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + totalUnidades + '</div><div class="stat-label">Unidades Vendidas</div><div class="stat-sub">' + prodArr.length + ' productos</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="stat-label">Ticket Promedio</div><div class="stat-sub">por operacion</div></div></div>';
 
-    var h = '';
-    h += '<div class="est-period-selector">';
-    var periods = ['todo', '7d', '30d', '90d', 'mes', 'anio'];
-    var periodLabels = { todo: 'Todo', '7d': '7 dias', '30d': '30 dias', '90d': '90 dias', mes: 'Este mes', anio: 'Este ano' };
-    for (var pp = 0; pp < periods.length; pp++) {
-      h += '<button class="est-period-btn' + (period === periods[pp] ? ' active' : '') + '" onclick="Pages._estPeriod=\'' + periods[pp] + '\';Pages._renderEstContent(Pages._getCurrentEstData(),document.getElementById(\'est-content\'))">' + periodLabels[periods[pp]] + '</button>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div></div>' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div></div></div>';
+
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap est-chart-full"><canvas id="chart-products"></canvas></div></div></div>' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div></div></div>';
+
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div></div>' +
+      '<div class="card"><div class="card-body"><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div></div></div>';
+
+    // Top products table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Top Productos por Ingreso</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Unidades</th><th>Ingreso</th><th>Barra</th></tr></thead><tbody>';
+      var maxIngreso = prodArr[0].ingreso || 1;
+      for (var pi = 0; pi < Math.min(prodArr.length, 15); pi++) {
+        var pp = prodArr[pi];
+        var barW = ((pp.ingreso / maxIngreso) * 100).toFixed(0);
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td>' + pp.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + pp.ingreso.toLocaleString() + '</td><td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + barW + '%;background:' + (pp.tipo === 'blend' ? 'var(--blue)' : 'var(--gold)') + '"></div></div></div></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else {
+      h += '<p class="text-muted text-center">Sin datos</p>';
     }
-    h += '</div>';
+    h += '</div></div>';
 
-    var changeArrow = pctChange >= 0 ? '\u2191' : '\u2193';
-    h += '<div class="est-kpi-grid">';
-    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">' + changeArrow + ' ' + Math.abs(pctChange) + '% vs periodo anterior</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalOps + '</div><div class="est-kpi-label">Total Operaciones</div><div class="est-kpi-sub">' + filtered.length + ' transacciones</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ticketProm.toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">ingreso por operacion</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalUnidades + '</div><div class="est-kpi-label">Unidades Vendidas</div><div class="est-kpi-sub">' + tallaMap.chico + ' chico / ' + tallaMap.grande + ' grande</div></div>';
-    h += '</div>';
-
-    h += '<div class="est-charts-grid">';
-    h += '<div class="est-chart-card est-chart-full"><h4>Ingresos por Dia</h4><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div>';
-    h += '<div class="est-chart-card"><h4>Ventas por Producto (Top 10)</h4><div class="est-chart-wrap"><canvas id="chart-products"></canvas></div></div>';
-    h += '<div class="est-chart-card"><h4>Distribucion: Especias vs Blends</h4><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div>';
-    h += '<div class="est-chart-card"><h4>Ingresos Mensuales</h4><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div>';
-    h += '<div class="est-chart-card"><h4>Chico vs Grande</h4><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div>';
-    if (Object.keys(ciudadMap).length > 0) {
-      h += '<div class="est-chart-card"><h4>Ventas por Ciudad</h4><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div>';
-    }
-    h += '</div>';
-
-    h += '<div class="card mt-16"><div class="card-header"><h3>Detalle por Producto</h3></div><div class="card-body">';
-    h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>#</th><th>Producto</th><th>Tipo</th><th>Unidades</th><th>Ingreso</th><th>Participacion</th><th>Barra</th></tr></thead><tbody>';
-    var maxIngreso = prodArr.length > 0 ? prodArr[0].ingreso : 1;
-    for (var pr = 0; pr < prodArr.length; pr++) {
-      var prd = prodArr[pr];
-      var pct = totalIngresos > 0 ? (prd.ingreso / totalIngresos * 100).toFixed(1) : 0;
-      var barW = maxIngreso > 0 ? (prd.ingreso / maxIngreso * 100).toFixed(0) : 0;
-      var tipoLabel = prd.tipo === 'blend' ? 'Blend' : 'Especia';
-      var barColor = prd.tipo === 'blend' ? 'var(--blue)' : 'var(--gold)';
-      h += '<tr><td>' + (pr + 1) + '</td><td class="fw7">' + prd.nombre + '</td><td>' + tipoLabel + '</td><td class="fw7">' + prd.cantidad + '</td><td class="fw7" style="color:var(--gold)">$' + prd.ingreso.toLocaleString() + '</td><td>' + pct + '%</td>';
-      h += '<td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + barW + '%;background:' + barColor + '"></div></div></div></td></tr>';
-    }
-    h += '</tbody></table></div></div></div>';
-
+    // Daily breakdown
     var diasArr = Object.keys(diaMap).sort().reverse();
     if (diasArr.length > 0) {
       h += '<div class="card mt-16"><div class="card-header"><h3>Desglose por Dia</h3></div><div class="card-body">';
@@ -2521,15 +2400,12 @@ const Pages = {
     }
     el.innerHTML = h;
 
-    // Destroy existing charts
     if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
     Pages._estCharts = [];
-
     Chart.defaults.color = '#9a8a78';
     Chart.defaults.borderColor = '#3a2218';
     Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
-    // 1. Daily revenue
     var diasSorted = Object.keys(diaMap).sort();
     var dailyLabels = [], dailyData = [], dailyOpsData = [];
     for (var dd = 0; dd < diasSorted.length; dd++) { dailyLabels.push(diasSorted[dd].slice(5)); dailyData.push(diaMap[diasSorted[dd]].ingresos); dailyOpsData.push(diaMap[diasSorted[dd]].ops); }
@@ -2545,7 +2421,6 @@ const Pages = {
       }));
     }
 
-    // 2. Top products bar
     var top10 = prodArr.slice(0, 10);
     var ctxProd = document.getElementById('chart-products');
     if (ctxProd) {
@@ -2557,7 +2432,6 @@ const Pages = {
       }));
     }
 
-    // 3. Especia vs Blend doughnut
     var ctxTypes = document.getElementById('chart-types');
     if (ctxTypes) {
       Pages._estCharts.push(new Chart(ctxTypes, {
@@ -2566,7 +2440,6 @@ const Pages = {
       }));
     }
 
-    // 4. Monthly revenue bar
     var ctxMonthly = document.getElementById('chart-monthly');
     if (ctxMonthly) {
       var mesesSorted = Object.keys(monthMap).sort();
@@ -2578,7 +2451,6 @@ const Pages = {
       }));
     }
 
-    // 5. Chico vs Grande pie
     var ctxTallas = document.getElementById('chart-tallas');
     if (ctxTallas) {
       Pages._estCharts.push(new Chart(ctxTallas, {
@@ -2587,7 +2459,6 @@ const Pages = {
       }));
     }
 
-    // 6. By city
     var ctxCiudad = document.getElementById('chart-ciudad');
     if (ctxCiudad) {
       var ciudades = Object.keys(ciudadMap).sort(function(a, b) { return ciudadMap[b].ingresos - ciudadMap[a].ingresos; });
