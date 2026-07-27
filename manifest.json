@@ -1,12 +1,17 @@
 {
-  "name": "Arcano Especias",
+  "name": "Arcano Admin",
   "short_name": "Arcano",
-  "start_url": "/",
+  "description": "Plataforma de gestion - Arcano Especias",
+  "start_url": "./",
+  "scope": "/arcano-v2/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#1b0b07",
   "theme_color": "#1b0b07",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
