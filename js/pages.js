@@ -1080,19 +1080,70 @@ const Pages = {
     var allProducts = [];
     for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
     for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
-    // Fuzzy matching with Levenshtein distance
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var brandDetected = ocrLower.indexOf('arcano') !== -1;
+
+    // === BRAND-AWARE PRODUCT NAME EXTRACTION ===
+    // ARCANO labels layout: ARCANO > COMPLICE DEL SABOR > PRODUCT_NAME > ingredients
+    // Extract only the product name, skip tagline and ingredients
+    var extractedName = '';
+    var brandIdx = ocrLower.indexOf('arcano');
+    if (brandIdx !== -1) {
+      var afterBrand = ocrLower.substring(brandIdx + 6).trim();
+      var taglineWords = ['complice', 'del', 'sabor', 'specias', 'especias', 'artesanal', 'natural'];
+      // Common ingredient keywords to stop extraction
+      var stopWords = ['paprika', 'pimienta', 'cayena', 'jengibre', 'cilantro', 'fenogreco',
+        'clavo', 'clavos', 'comino', 'curry', 'ajo', 'mostaza', 'nuez', 'canela',
+        'anís', 'anis', 'cardamomo', 'cúrcuma', 'curcuma', 'tomillo', 'orégano',
+        'oregano', 'romero', 'laurel', 'azafran', 'azafrán', 'pimienta', 'negra',
+        'negro', 'blanca', 'blanco', 'tropical', 'ahumado', 'dulce', 'picante',
+        'semilla', 'hojas', 'entero', 'entera', 'molida', 'molido', 'polvo', 'en', 'de'];
+      var tokens = afterBrand.split(/[\s·\-]+/);
+      var nameTokens = [];
+      var taglineZone = true;
+      for (var t = 0; t < tokens.length && nameTokens.length < 3; t++) {
+        var tk = tokens[t].replace(/[^a-záéíóúñü]/gi, '').toLowerCase();
+        if (tk.length < 3) continue;
+        if (taglineWords.indexOf(tk) !== -1) continue;
+        if (stopWords.indexOf(tk) !== -1) break; // Hit ingredients list - stop
+        taglineZone = false;
+        nameTokens.push(tk);
+      }
+      if (nameTokens.length > 0) extractedName = nameTokens.join(' ');
+    }
+
+    // === FUZZY MATCHING ===
     var scored = [];
     for (var i = 0; i < allProducts.length; i++) {
       var p = allProducts[i];
       var score = Pages._fuzzyScore(text, p.producto.nombre);
+      // If we extracted a name, also score against it with a boost
+      if (extractedName) {
+        var extScore = Pages._fuzzyScore(extractedName, p.producto.nombre);
+        score = Math.max(score, extScore * 1.3); // Boost extracted name
+      }
       if (score >= 0.4) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
     }
-    // Bonus: if "arcano" brand is detected, boost confidence
-    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var brandDetected = ocrLower.indexOf('arcano') !== -1;
+
+    // === INGREDIENT FILTER ===
+    // If many individual spices matched, it's reading ingredients not the product name
+    // In that case: boost blends, penalize individual spices
+    var spiceCount = 0;
+    var blendCount = 0;
+    for (var s = 0; s < scored.length; s++) {
+      if (scored[s].tipo === 'especia' && scored[s].score >= 0.7) spiceCount++;
+      if (scored[s].tipo === 'blend' && scored[s].score >= 0.5) blendCount++;
+    }
+    if (spiceCount >= 3) {
+      for (var s = 0; s < scored.length; s++) {
+        if (scored[s].tipo === 'especia') scored[s].score *= 0.25;
+        if (scored[s].tipo === 'blend') scored[s].score *= 1.5;
+      }
+    }
+
     scored.sort(function(a, b) { return b.score - a.score; });
     if (confirmArea) confirmArea.style.display = 'block';
-    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 100) + (text.length > 100 ? '...' : '') + '"' + (brandDetected ? ' [Marca ARCANO detectada]' : '');
+    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 100) + (text.length > 100 ? '...' : '') + '"' + (brandDetected ? ' [ARCANO]' : '') + (extractedName ? ' > ' + extractedName.toUpperCase() : '');
     if (prodSelect) {
       prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
       if (scored.length > 0) {
