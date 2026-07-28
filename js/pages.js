@@ -566,7 +566,6 @@ const Pages = {
           var stkSel = detailDiv.querySelector('.ent-stk-nombre');
           var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
           var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
-          var stkTalla = detailDiv.querySelectorAll('.ent-talla')[0];
           stkSel.addEventListener('change', function() {
             if (this.value === '__new__') {
               this.style.display = 'none';
@@ -2561,3 +2560,4 @@ const Pages = {
     for (var ch = 0; ch < chartCanvases.length; ch++) { chartCanvases[ch].style.height = chartCanvases[ch].classList.contains('est-chart-full') ? '280px' : '260px'; }
   }
 };
+window.Pages = Pages;
