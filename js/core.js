@@ -125,6 +125,11 @@ const App = {
     // Initial badge update after a short delay to let pedidos load
     setTimeout(_updatePedidosBadge, 2000);
 
+    // Lock portrait orientation on mobile
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait').catch(function() {});
+    }
+
     this.renderShell(user);
     this.renderPage('dashboard');
   },
@@ -187,6 +192,8 @@ const App = {
 
   navigate(page) {
     this.currentPage = page;
+    // Close mobile sidebar after navigation
+    if (this._isMobile()) this.closeMobileSidebar();
     document.querySelectorAll('.nav-item').forEach(function(el) {
       el.classList.toggle('active', el.dataset.page === page);
     });
@@ -198,9 +205,49 @@ const App = {
     this.renderPage(page);
   },
 
+  _isMobile() {
+    return window.innerWidth <= 768;
+  },
+
+  _showBackdrop() {
+    if (document.getElementById('sidebar-backdrop')) return;
+    var bd = document.createElement('div');
+    bd.id = 'sidebar-backdrop';
+    bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:499;opacity:0;transition:opacity .2s';
+    bd.addEventListener('click', function() { App.closeMobileSidebar(); });
+    document.body.appendChild(bd);
+    requestAnimationFrame(function() { bd.style.opacity = '1'; });
+  },
+
+  _hideBackdrop() {
+    var bd = document.getElementById('sidebar-backdrop');
+    if (!bd) return;
+    bd.style.opacity = '0';
+    setTimeout(function() { if (bd.parentNode) bd.parentNode.removeChild(bd); }, 200);
+  },
+
+  closeMobileSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    this._hideBackdrop();
+  },
+
   toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    if (this._isMobile()) {
+      var sidebar = document.getElementById('sidebar');
+      if (!sidebar) return;
+      var isOpen = sidebar.classList.contains('mobile-open');
+      if (isOpen) {
+        sidebar.classList.remove('mobile-open');
+        this._hideBackdrop();
+      } else {
+        sidebar.classList.add('mobile-open');
+        this._showBackdrop();
+      }
+    } else {
+      this.sidebarOpen = !this.sidebarOpen;
+      document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    }
   },
 
   logout() {
