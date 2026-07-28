@@ -12,14 +12,14 @@ const Pages = {
 
     var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">';
     h += '<div class="stat-card" style="border-left-color: var(--gold)"><div class="stat-value">$' + s.totalVentasHoy.toLocaleString() + '</div><div class="stat-label">Ventas Hoy</div><div class="stat-sub">' + s.ventasHoy + ' ops</div></div>';
-    h += '<div class="stat-card" style="border-left-color: var(--green)"><div class="stat-value">' + s.totalFrascos + '</div><div class="stat-label">Frascos Listos</div><div class="stat-sub">' + s.frascosChico + ' ch / ' + s.frascosGrande + ' gr</div></div>';
+    h += '<div class="stat-card" style="border-left-color: var(--green)"><div class="stat-value">' + s.totalFrascos + '</div><div class="stat-label">Frascos Listos</div><div class="stat-sub">' + s.frascosChico + ' pq / ' + s.frascosGrande + ' gr</div></div>';
     h += '<div class="stat-card" style="border-left-color: var(--blue)"><div class="stat-value">$' + s.totalVentasMes.toLocaleString() + '</div><div class="stat-label">Ventas del Mes</div><div class="stat-sub">' + s.ventasMes + ' ops</div></div>';
     h += '</div>';
 
     h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">';
     h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem">' + s.totalEspecias + '</div><div class="stat-label">Especias</div></div>';
     h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem">' + s.totalBlends + '</div><div class="stat-label">Blends</div></div>';
-    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">' + s.envasesChico + '</div><div class="stat-label">Env. Chicos</div></div>';
+    h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">' + s.envasesChico + '</div><div class="stat-label">Env. Pequeños</div></div>';
     h += '<div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:var(--blue)">' + s.envasesGrande + '</div><div class="stat-label">Env. Grandes</div></div>';
     var bolsaBajaColor = s.especiasBolsaBaja.length > 0 ? 'var(--red)' : 'var(--green)';
     var bolsaBajaNombres = s.especiasBolsaBaja.map(function(e){return e.nombre}).join(', ') || 'OK';
@@ -112,7 +112,7 @@ const Pages = {
       if (especias.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin especias. Crea una o importa desde Excel.</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Chico</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < especias.length; i++) {
           var e = especias[i];
           h += '<tr>' +
@@ -141,7 +141,7 @@ const Pages = {
       if (blends.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin blends. Crea uno nuevo.</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Chico</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < blends.length; i++) {
           var b = blends[i];
           var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
@@ -207,13 +207,13 @@ const Pages = {
           '<option value="Infusiones"' + (isEdit && esp.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
           '<option value="Cocteleria"' + (isEdit && esp.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
         '</select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Frasco Chico ($)</label><input type="number" class="input" id="f-esp-pc" value="' + (isEdit ? esp.precioChico : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Frasco Pequeño ($)</label><input type="number" class="input" id="f-esp-pc" value="' + (isEdit ? esp.precioChico : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Frasco Grande ($)</label><input type="number" class="input" id="f-esp-pg" value="' + (isEdit ? esp.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
-        '<div class="g2"><div class="form-group"><label>Gramos por Frasco Chico</label><input type="number" class="input" id="f-esp-gc" value="' + (isEdit ? esp.gramosChico : '') + '" placeholder="Ej: 30" min="0"></div>' +
+        '<div class="g2"><div class="form-group"><label>Gramos por Frasco Pequeño</label><input type="number" class="input" id="f-esp-gc" value="' + (isEdit ? esp.gramosChico : '') + '" placeholder="Ej: 30" min="0"></div>' +
         '<div class="form-group"><label>Gramos por Frasco Grande</label><input type="number" class="input" id="f-esp-gg" value="' + (isEdit ? esp.gramosGrande : '') + '" placeholder="Ej: 80" min="0"></div></div>' +
         '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
         '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-esp-tienda"><option value="0"' + (isEdit && esp.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && esp.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-esp-tg" value="' + (isEdit ? (esp.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-esp"><input type="file" accept="image/*" id="f-esp-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-esp\')">' +
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
@@ -222,7 +222,7 @@ const Pages = {
         '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', esp.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
-        (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g pala, ' + (esp.stockChico||0) + ' fr chico, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
+        (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g pala, ' + (esp.stockChico||0) + ' fr pequeño, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
         '<button class="btn btn-gold" id="btn-save-esp">Guardar</button>' +
@@ -301,13 +301,13 @@ const Pages = {
           '<div class="form-group"><label>Region (opcional)</label><input type="text" class="input" id="f-bl-region" value="' + (isEdit ? (bl.region||'') : '') + '" placeholder="Ej: India"></div>' +
         '</div>' +
         '<div class="form-group"><label>Uso (opcional)</label><input type="text" class="input" id="f-bl-uso" value="' + (isEdit ? (bl.uso||'') : '') + '" placeholder="Ej: Carnes, Currys"></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Chico ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="form-group"><label>Ingredientes</label><div id="blend-ings"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ing">+ Ingrediente</button></div>' +
         '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
         '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && bl.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Tienda Chico ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
         '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-bl-tg" value="' + (isEdit ? (bl.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
         '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-bl"><input type="file" accept="image/*" id="f-bl-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-bl\')">' +
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
@@ -315,7 +315,7 @@ const Pages = {
         '</div></div>' +
         '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', bl.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
-        (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr chico, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
+        (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr pequeño, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
         '<button class="btn btn-gold" id="btn-save-bl">Guardar</button>' +
@@ -336,7 +336,7 @@ const Pages = {
       var selVal = ing ? ing.especiaId : '';
       div.innerHTML =
         '<div class="form-group" style="margin:0"><label>Especia</label><select class="input ing-esp">' + espOptsHTML + '</select></div>' +
-        '<div class="form-group" style="margin:0"><label>Grs/Chico</label><input type="number" class="input ing-gc" value="' + gc + '" placeholder="0" min="0"></div>' +
+        '<div class="form-group" style="margin:0"><label>Grs/Pequeño</label><input type="number" class="input ing-gc" value="' + gc + '" placeholder="0" min="0"></div>' +
         '<div class="form-group" style="margin:0"><label>Grs/Grande</label><input type="number" class="input ing-gg" value="' + gg + '" placeholder="0" min="0"></div>' +
         '<div><button class="btn btn-sm btn-red btn-rm-ing">X</button></div>';
       if (selVal) div.querySelector('.ing-esp').value = selVal;
@@ -411,7 +411,7 @@ const Pages = {
 
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button></div>';
     h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">' +
-      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Chicos</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.chico||0) + '</div><div class="stat-label">Bolsas Chicas</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.grande||0) + '</div><div class="stat-label">Bolsas Grandes</div></div></div>';
@@ -434,7 +434,7 @@ const Pages = {
     h += '<div class="card"><div class="card-header"><h3>Stickers</h3></div><div class="card-body">';
     if (etiqList.length === 0) { h += '<p class="text-muted text-center text-sm">Sin productos</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Chico</th><th>Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Pequeño</th><th>Grande</th></tr></thead><tbody>';
       for (var i = 0; i < etiqList.length; i++) {
         var et = etiqList[i];
         h += '<tr><td class="fw7">' + et.nombre + '</td><td><span class="badge ' + (et.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (et.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
@@ -493,6 +493,7 @@ const Pages = {
       var o = '';
       var esps = ArcanoDB.getEspecias();
       for (var i = 0; i < esps.length; i++) o += '<option value="' + esps[i].id + '">' + esps[i].nombre + '</option>';
+      o += '<option value="__new__">+ Nueva especia...</option>';
       return o;
     }
 
@@ -502,14 +503,15 @@ const Pages = {
       var bls = ArcanoDB.getBlends();
       if (esps.length > 0) {
         o += '<optgroup label="Especias">';
-        for (var i = 0; i < esps.length; i++) o += '<option value="' + esps[i].nombre + '">' + esps[i].nombre + '</option>';
+        for (var i = 0; i < esps.length; i++) o += '<option value="especia|' + esps[i].id + '">' + esps[i].nombre + '</option>';
         o += '</optgroup>';
       }
       if (bls.length > 0) {
         o += '<optgroup label="Blends">';
-        for (var i = 0; i < bls.length; i++) o += '<option value="' + bls[i].nombre + '">' + bls[i].nombre + '</option>';
+        for (var i = 0; i < bls.length; i++) o += '<option value="blend|' + bls[i].id + '">' + bls[i].nombre + '</option>';
         o += '</optgroup>';
       }
+      o += '<option value="__new__">+ Nuevo producto...</option>';
       return o;
     }
 
@@ -535,13 +537,55 @@ const Pages = {
       function renderDetail() {
         var t = tipoSel.value;
         if (t === 'especia_grs') {
-          detailDiv.innerHTML = '<label>Especia</label><select class="input ent-especia"><option value="">Seleccionar</option>' + buildEspOpts() + '</select>';
+          detailDiv.innerHTML = '<label>Especia</label><select class="input ent-especia"><option value="">Seleccionar</option>' + buildEspOpts() + '</select><input type="text" class="input ent-especia-new" placeholder="Nombre nueva especia..." style="display:none;margin-top:6px">';
+          var espSel2 = detailDiv.querySelector('.ent-especia');
+          var newInput = detailDiv.querySelector('.ent-especia-new');
+          espSel2.addEventListener('change', function() {
+            if (this.value === '__new__') {
+              this.style.display = 'none';
+              newInput.style.display = 'block';
+              newInput.focus();
+            }
+          });
+          newInput.addEventListener('blur', function() {
+            if (!this.value.trim()) {
+              this.style.display = 'none';
+              espSel2.style.display = 'block';
+              espSel2.value = '';
+            }
+          });
+          newInput.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') { this.value = ''; this.blur(); }
+          });
         } else if (t === 'envase') {
-          detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select>';
+          detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
         } else if (t === 'bolsa') {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Chica</option><option value="grande">Grande</option></select>';
         } else {
-          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select>';
+          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
+          var stkSel = detailDiv.querySelector('.ent-stk-nombre');
+          var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
+          var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
+          var stkTalla = detailDiv.querySelectorAll('.ent-talla')[0];
+          stkSel.addEventListener('change', function() {
+            if (this.value === '__new__') {
+              this.style.display = 'none';
+              stkNewTipo.style.display = 'block';
+              stkNewNombre.style.display = 'block';
+              stkNewNombre.focus();
+            }
+          });
+          stkNewNombre.addEventListener('blur', function() {
+            if (!this.value.trim()) {
+              this.style.display = 'none';
+              stkNewTipo.style.display = 'none';
+              stkSel.style.display = 'block';
+              stkSel.value = '';
+            }
+          });
+          stkNewNombre.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') { this.value = ''; this.blur(); }
+          });
         }
       }
       tipoSel.addEventListener('change', renderDetail);
@@ -570,6 +614,7 @@ const Pages = {
       var items = [];
       var total = 0;
       var esps = ArcanoDB.getEspecias();
+      var bls = ArcanoDB.getBlends();
 
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
@@ -579,19 +624,61 @@ const Pages = {
         var item = { tipo: tipo, cantidad: cant, costoUnitario: cost };
         total += cant * cost;
         if (tipo === 'especia_grs') {
+          var newEspInput = rows[i].querySelector('.ent-especia-new');
           var espSel = rows[i].querySelector('.ent-especia');
-          if (!espSel) { alert('Falta especia en item ' + (i+1)); return; }
-          item.especiaId = Number(espSel.value);
-          var espObj = null;
-          for (var s = 0; s < esps.length; s++) { if (esps[s].id === item.especiaId) { espObj = esps[s]; break; } }
-          item.especiaNombre = espObj ? espObj.nombre : '?';
+          if (newEspInput && newEspInput.style.display !== 'none' && newEspInput.value.trim()) {
+            var newName = newEspInput.value.trim();
+            var existingEsp = null;
+            for (var s = 0; s < esps.length; s++) { if (esps[s].nombre.toLowerCase() === newName.toLowerCase()) { existingEsp = esps[s]; break; } }
+            if (existingEsp) {
+              item.especiaId = existingEsp.id;
+              item.especiaNombre = existingEsp.nombre;
+            } else {
+              var newEsp = ArcanoDB.saveEspecia({ nombre: newName });
+              item.especiaId = newEsp.id;
+              item.especiaNombre = newEsp.nombre;
+              esps = ArcanoDB.getEspecias();
+            }
+          } else if (espSel && espSel.value && espSel.value !== '__new__') {
+            item.especiaId = Number(espSel.value);
+            var espObj = null;
+            for (var s = 0; s < esps.length; s++) { if (esps[s].id === item.especiaId) { espObj = esps[s]; break; } }
+            item.especiaNombre = espObj ? espObj.nombre : '?';
+          } else {
+            alert('Falta especia en item ' + (i+1)); return;
+          }
+          if (!item.especiaId) { alert('Falta especia en item ' + (i+1)); return; }
         } else if (tipo === 'envase') {
           item.talla = rows[i].querySelector('.ent-talla').value;
         } else if (tipo === 'bolsa') {
           item.talla = rows[i].querySelector('.ent-talla').value;
         } else if (tipo === 'sticker') {
-          item.stickerNombre = (rows[i].querySelector('.ent-stk-nombre').value || '').trim();
-          if (!item.stickerNombre) { alert('Falta nombre de sticker en item ' + (i+1)); return; }
+          var stkSel = rows[i].querySelector('.ent-stk-nombre');
+          var stkNewNombre = rows[i].querySelector('.ent-stk-new-nombre');
+          var stkNewTipo = rows[i].querySelector('.ent-stk-new-tipo');
+          if (stkSel && stkSel.style.display !== 'none') {
+            var stkVal = stkSel.value || '';
+            if (!stkVal || stkVal === '__new__') { alert('Falta producto de sticker en item ' + (i+1)); return; }
+            var stkParts = stkVal.split('|');
+            item.stickerTipo = stkParts[0];
+            var stkId = Number(stkParts[1]);
+            var stkObj = stkParts[0] === 'blend' ? ArcanoDB.getBlend(stkId) : ArcanoDB.getEspecia(stkId);
+            item.stickerNombre = stkObj ? stkObj.nombre : '?';
+          } else if (stkNewNombre && stkNewNombre.style.display !== 'none' && stkNewNombre.value.trim()) {
+            var newProdName = stkNewNombre.value.trim();
+            var newProdTipo = stkNewTipo ? stkNewTipo.value : 'especia';
+            item.stickerTipo = newProdTipo;
+            if (newProdTipo === 'blend') {
+              var newBl = ArcanoDB.saveBlend({ nombre: newProdName });
+              item.stickerNombre = newBl.nombre;
+            } else {
+              var newEsp2 = ArcanoDB.saveEspecia({ nombre: newProdName });
+              item.stickerNombre = newEsp2.nombre;
+            }
+          } else {
+            alert('Falta producto de sticker en item ' + (i+1)); return;
+          }
+          if (!item.stickerNombre) { alert('Falta producto de sticker en item ' + (i+1)); return; }
           item.talla = rows[i].querySelector('.ent-talla').value;
         }
         items.push(item);
@@ -654,7 +741,7 @@ const Pages = {
       '<div class="modal-body">' +
         '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option></select></div>' +
         '<div class="form-group"><label>Producto</label><select class="input" id="f-prod-prod"><option value="">Seleccionar</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Chico</option><option value="grande">Grande</option></select></div>' +
+        '<div class="g2"><div class="form-group"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
         '<div class="form-group"><label>Cantidad de frascos</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
         '<div id="f-prod-preview" class="mt-12"></div>' +
       '</div><div class="modal-footer">' +
@@ -912,261 +999,7 @@ const Pages = {
      ================================================================ */
   _camStream: null,
   _camCart: [],
-  /** Levenshtein distance for fuzzy matching */
-  _levenshtein: function(a, b) {
-    var m = [];
-    for (var i = 0; i <= b.length; i++) m[i] = [i];
-    for (var j = 0; j <= a.length; j++) m[0][j] = j;
-    for (var i = 1; i <= b.length; i++) {
-      for (var j = 1; j <= a.length; j++) {
-        if (b.charAt(i - 1) === a.charAt(j - 1)) {
-          m[i][j] = m[i - 1][j - 1];
-        } else {
-          m[i][j] = Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
-        }
-      }
-    }
-    return m[b.length][a.length];
-  },
-
-  /** Fuzzy match OCR text against a product name */
-  _fuzzyScore: function(ocrText, productName) {
-    var oL = ocrText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var tL = productName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (!tL || tL.length < 2) return 0;
-    if (!oL || oL.length < 2) return 0;
-    // Exact substring — best score
-    if (oL.indexOf(tL) !== -1) return 1.0;
-    var words = tL.split(/\s+/).filter(function(w) { return w.length >= 2; });
-    if (words.length === 0) return 0;
-    var ocrWords = oL.split(/\s+/).filter(function(w) { return w.length >= 2; });
-    var matched = 0;
-    for (var w = 0; w < words.length; w++) {
-      var best = 0;
-      // Exact word in OCR
-      if (oL.indexOf(words[w]) !== -1) {
-        best = 1.0;
-      } else {
-        // Levenshtein against each OCR word
-        for (var ow = 0; ow < ocrWords.length; ow++) {
-          var dist = Pages._levenshtein(words[w], ocrWords[ow]);
-          var maxLen = Math.max(words[w].length, ocrWords[ow].length);
-          var ratio = 1 - (dist / maxLen);
-          if (ratio > best) best = ratio;
-        }
-        // Also check if word is contained within any OCR word (partial match)
-        if (best < 0.7) {
-          for (var ow = 0; ow < ocrWords.length; ow++) {
-            if (ocrWords[ow].indexOf(words[w]) !== -1 || words[w].indexOf(ocrWords[ow]) !== -1) {
-              if (0.8 > best) best = 0.8;
-            }
-          }
-        }
-      }
-      if (best >= 0.55) matched++;
-    }
-    return matched / words.length;
-  },
-
-  /** Pre-process canvas image for better OCR on dark labels */
-  _preprocessCanvas: function(ctx, w, h, invert) {
-    var imgData = ctx.getImageData(0, 0, w, h);
-    var d = imgData.data;
-    for (var i = 0; i < d.length; i += 4) {
-      var gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-      if (invert) gray = 255 - gray;
-      // Adaptive threshold: boost contrast
-      var val = gray > 90 ? 255 : 0;
-      d[i] = val; d[i + 1] = val; d[i + 2] = val;
-    }
-    ctx.putImageData(imgData, 0, 0);
-  },
-
-  captureAndRead() {
-    if (Pages._camOcrRunning) return;
-    var video = document.getElementById('cam-video');
-    var canvas = document.getElementById('cam-canvas');
-    var statusEl = document.getElementById('cam-status');
-    if (!video || !canvas || video.readyState < 2) return;
-    if (navigator.vibrate) navigator.vibrate(50);
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    var ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    // Save original pixels for retry
-    var origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // Pre-process: invert + threshold (ARCANO labels are light text on dark bg)
-    Pages._preprocessCanvas(ctx, canvas.width, canvas.height, true);
-    var processedImage = canvas.toDataURL('image/png');
-    Pages._camOcrRunning = true;
-    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
-    if (typeof Tesseract === 'undefined') {
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
-      Pages._camOcrRunning = false;
-      return;
-    }
-    // Try inverted first (for dark ARCANO labels)
-    Tesseract.recognize(processedImage, 'spa+eng', {
-      logger: function() {}
-    }).then(function(result) {
-      var text = (result && result.data && result.data.text) || '';
-      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-      // Check if we found something useful (product match or "arcano" detected)
-      var hasMatch = Pages._hasProductMatch(text);
-      var hasBrand = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf('arcano') !== -1;
-      if (hasMatch || (hasBrand && text.length > 10)) {
-        Pages._camOcrRunning = false;
-        Pages.handleOCRResult(text);
-      } else if (!Pages._camRetryDone) {
-        // Retry with original (non-inverted) image
-        Pages._camRetryDone = true;
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Reintentando...</span>';
-        ctx.putImageData(origData, 0, 0);
-        var origImage = canvas.toDataURL('image/png');
-        Tesseract.recognize(origImage, 'spa+eng', {
-          logger: function() {}
-        }).then(function(result2) {
-          Pages._camRetryDone = false;
-          Pages._camOcrRunning = false;
-          var text2 = (result2 && result2.data && result2.data.text) || '';
-          text2 = text2.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-          // Use whichever result is better
-          var t2hasMatch = Pages._hasProductMatch(text2);
-          var t2hasBrand = text2.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf('arcano') !== -1;
-          if (t2hasMatch || (t2hasBrand && text2.length > text.length)) {
-            Pages.handleOCRResult(text2);
-          } else {
-            Pages.handleOCRResult(text.length >= text2.length ? text : text2);
-          }
-        }).catch(function(err) {
-          Pages._camRetryDone = false;
-          Pages._camOcrRunning = false;
-          Pages.handleOCRResult(text); // fallback to first result
-        });
-      } else {
-        Pages._camRetryDone = false;
-        Pages._camOcrRunning = false;
-        Pages.handleOCRResult(text);
-      }
-    }).catch(function(err) {
-      Pages._camOcrRunning = false;
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
-    });
-  },
-
-  /** Quick check if any product matches the OCR text */
-  _hasProductMatch: function(text) {
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var all = especias.concat(blends);
-    for (var i = 0; i < all.length; i++) {
-      if (Pages._fuzzyScore(text, all[i].nombre) >= 0.5) return true;
-    }
-    return false;
-  },
-
-  handleOCRResult: function(text) {
-    var statusEl = document.getElementById('cam-status');
-    var confirmArea = document.getElementById('cam-confirm-area');
-    var detectedTextEl = document.getElementById('cam-detected-text');
-    var prodSelect = document.getElementById('cam-prod-select');
-    if (!text || text.length < 2) {
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
-      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
-      return;
-    }
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var allProducts = [];
-    for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
-    for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
-    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var brandDetected = ocrLower.indexOf('arcano') !== -1;
-
-    // === BRAND-AWARE PRODUCT NAME EXTRACTION ===
-    // ARCANO labels layout: ARCANO > COMPLICE DEL SABOR > PRODUCT_NAME > ingredients
-    // Extract only the product name, skip tagline and ingredients
-    var extractedName = '';
-    var brandIdx = ocrLower.indexOf('arcano');
-    if (brandIdx !== -1) {
-      var afterBrand = ocrLower.substring(brandIdx + 6).trim();
-      var taglineWords = ['complice', 'del', 'sabor', 'specias', 'especias', 'artesanal', 'natural'];
-      // Common ingredient keywords to stop extraction
-      var stopWords = ['paprika', 'pimienta', 'cayena', 'jengibre', 'cilantro', 'fenogreco',
-        'clavo', 'clavos', 'comino', 'curry', 'ajo', 'mostaza', 'nuez', 'canela',
-        'anís', 'anis', 'cardamomo', 'cúrcuma', 'curcuma', 'tomillo', 'orégano',
-        'oregano', 'romero', 'laurel', 'azafran', 'azafrán', 'pimienta', 'negra',
-        'negro', 'blanca', 'blanco', 'tropical', 'ahumado', 'dulce', 'picante',
-        'semilla', 'hojas', 'entero', 'entera', 'molida', 'molido', 'polvo', 'en', 'de'];
-      var tokens = afterBrand.split(/[\s·\-]+/);
-      var nameTokens = [];
-      var taglineZone = true;
-      for (var t = 0; t < tokens.length && nameTokens.length < 3; t++) {
-        var tk = tokens[t].replace(/[^a-záéíóúñü]/gi, '').toLowerCase();
-        if (tk.length < 3) continue;
-        if (taglineWords.indexOf(tk) !== -1) continue;
-        if (stopWords.indexOf(tk) !== -1) break; // Hit ingredients list - stop
-        taglineZone = false;
-        nameTokens.push(tk);
-      }
-      if (nameTokens.length > 0) extractedName = nameTokens.join(' ');
-    }
-
-    // === FUZZY MATCHING ===
-    var scored = [];
-    for (var i = 0; i < allProducts.length; i++) {
-      var p = allProducts[i];
-      var score = Pages._fuzzyScore(text, p.producto.nombre);
-      // If we extracted a name, also score against it with a boost
-      if (extractedName) {
-        var extScore = Pages._fuzzyScore(extractedName, p.producto.nombre);
-        score = Math.max(score, extScore * 1.3); // Boost extracted name
-      }
-      if (score >= 0.4) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
-    }
-
-    // === INGREDIENT FILTER ===
-    // If many individual spices matched, it's reading ingredients not the product name
-    // In that case: boost blends, penalize individual spices
-    var spiceCount = 0;
-    var blendCount = 0;
-    for (var s = 0; s < scored.length; s++) {
-      if (scored[s].tipo === 'especia' && scored[s].score >= 0.7) spiceCount++;
-      if (scored[s].tipo === 'blend' && scored[s].score >= 0.5) blendCount++;
-    }
-    if (spiceCount >= 3) {
-      for (var s = 0; s < scored.length; s++) {
-        if (scored[s].tipo === 'especia') scored[s].score *= 0.25;
-        if (scored[s].tipo === 'blend') scored[s].score *= 1.5;
-      }
-    }
-
-    scored.sort(function(a, b) { return b.score - a.score; });
-    if (confirmArea) confirmArea.style.display = 'block';
-    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 100) + (text.length > 100 ? '...' : '') + '"' + (brandDetected ? ' [ARCANO]' : '') + (extractedName ? ' > ' + extractedName.toUpperCase() : '');
-    if (prodSelect) {
-      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
-      if (scored.length > 0) {
-        for (var i = 0; i < Math.min(scored.length, 5); i++) {
-          var s = scored[i];
-          var pct = Math.round(s.score * 100);
-          prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
-        }
-        if (scored[0].score >= 0.6) {
-          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
-        }
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
-      } else {
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
-        for (var i = 0; i < allProducts.length; i++) {
-          var ap = allProducts[i];
-          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
-        }
-      }
-    }
-  },
-
-  _camRetryDone: false,
+  _camOcrRunning: false,
 
   /** Open camera modal for label-reading sale */
   formVentaQR() {
@@ -1198,7 +1031,7 @@ const Pages = {
             '<div id="cam-detected-text" style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;font-style:italic"></div>' +
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
               '<select class="input" id="cam-prod-select" style="flex:1;min-width:140px"><option value="">Seleccionar producto</option></select>' +
-              '<select class="input" id="cam-talla-select" style="width:120px"><option value="chico">Chico</option><option value="grande">Grande</option></select>' +
+              '<select class="input" id="cam-talla-select" style="width:120px"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>' +
               '<button class="btn btn-sm btn-gold" onclick="Pages.addCamProduct()">+ Agregar</button>' +
               '<button class="btn btn-sm btn-outline" onclick="Pages.cancelCamDetect()">Seguir leyendo</button>' +
             '</div>' +
@@ -1256,7 +1089,93 @@ const Pages = {
     }
   },
 
+  captureAndRead() {
+    if (Pages._camOcrRunning) return;
+    var video = document.getElementById('cam-video');
+    var canvas = document.getElementById('cam-canvas');
+    var statusEl = document.getElementById('cam-status');
+    if (!video || !canvas || video.readyState < 2) return;
+    if (navigator.vibrate) navigator.vibrate(50);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    var imageData = canvas.toDataURL('image/png');
+    Pages._camOcrRunning = true;
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
+    if (typeof Tesseract === 'undefined') {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
+      Pages._camOcrRunning = false;
+      return;
+    }
+    Tesseract.recognize(imageData, 'spa+eng', {
+      logger: function() {}
+    }).then(function(result) {
+      Pages._camOcrRunning = false;
+      var text = (result && result.data && result.data.text) || '';
+      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      Pages.handleOCRResult(text);
+    }).catch(function(err) {
+      Pages._camOcrRunning = false;
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
+    });
+  },
 
+  handleOCRResult(text) {
+    var statusEl = document.getElementById('cam-status');
+    var confirmArea = document.getElementById('cam-confirm-area');
+    var detectedTextEl = document.getElementById('cam-detected-text');
+    var prodSelect = document.getElementById('cam-prod-select');
+    if (!text || text.length < 2) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
+      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
+      return;
+    }
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var allProducts = [];
+    for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
+    for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var scored = [];
+    for (var i = 0; i < allProducts.length; i++) {
+      var p = allProducts[i];
+      var name = (p.producto.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      var nameWords = name.split(/\s+/);
+      var matchCount = 0;
+      for (var w = 0; w < nameWords.length; w++) {
+        if (nameWords[w].length < 2) continue;
+        if (ocrLower.indexOf(nameWords[w]) !== -1) matchCount++;
+      }
+      var score = nameWords.length > 0 ? matchCount / nameWords.length : 0;
+      if (ocrLower.indexOf(name) !== -1) score = Math.max(score, 1.0);
+      if (name.length >= 3 && ocrLower.indexOf(name.substring(0, Math.min(name.length, 6))) !== -1) score = Math.max(score, 0.7);
+      if (score >= 0.5) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
+    }
+    scored.sort(function(a, b) { return b.score - a.score; });
+    if (confirmArea) confirmArea.style.display = 'block';
+    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 80) + (text.length > 80 ? '...' : '') + '"';
+    if (prodSelect) {
+      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
+      if (scored.length > 0) {
+        for (var i = 0; i < Math.min(scored.length, 5); i++) {
+          var s = scored[i];
+          var pct = Math.round(s.score * 100);
+          prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
+        }
+        if (scored[0].score >= 0.7) {
+          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
+        }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
+        for (var i = 0; i < allProducts.length; i++) {
+          var ap = allProducts[i];
+          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
+        }
+      }
+    }
+  },
 
   cancelCamDetect() {
     var confirmArea = document.getElementById('cam-confirm-area');
@@ -1391,7 +1310,7 @@ const Pages = {
     h += '<div class="card mt-8"><div class="card-header"><h3>Especias</h3></div><div class="card-body">';
     if (especias.length === 0) { h += '<p class="text-muted text-center">Sin especias</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (grs)</th><th>Fr.Chico</th><th>Fr.Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (grs)</th><th>Fr.Pequeño</th><th>Fr.Grande</th></tr></thead><tbody>';
       for (var i = 0; i < especias.length; i++) {
         var e = especias[i];
         h += '<tr><td class="fw7">' + e.nombre + '</td>' +
@@ -1408,7 +1327,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Blends</h3></div><div class="card-body">';
     if (blends.length === 0) { h += '<p class="text-muted text-center">Sin blends</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Chico</th><th>Fr.Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Pequeño</th><th>Fr.Grande</th></tr></thead><tbody>';
       for (var i = 0; i < blends.length; i++) {
         var b = blends[i];
         h += '<tr><td class="fw7">' + b.nombre + '</td>' +
@@ -1423,7 +1342,7 @@ const Pages = {
     // === SECTION 2: PACKAGING ===
     h += '<h3 style="color:var(--gold);margin:24px 0 12px;font-size:1.1rem">Packaging</h3>';
     h += '<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr)">' +
-      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Chicos</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.chico||0) + '</div><div class="stat-label">Bolsas Chicas</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.grande||0) + '</div><div class="stat-label">Bolsas Grandes</div></div></div>';
@@ -1432,7 +1351,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Stickers</h3></div><div class="card-body">';
     if (etiqList.length === 0) { h += '<p class="text-muted text-center">Sin stickers</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Stk.Chico</th><th>Stk.Grande</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Stk.Pequeño</th><th>Stk.Grande</th></tr></thead><tbody>';
       for (var i = 0; i < etiqList.length; i++) {
         var et = etiqList[i];
         h += '<tr><td class="fw7">' + et.nombre + '</td><td><span class="badge ' + (et.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (et.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
@@ -1452,7 +1371,7 @@ const Pages = {
       for (var i = 0; i < Math.min(ajustes.length, 50); i++) {
         var aj = ajustes[i];
         var catLabel = aj.categoria === 'especia' ? 'Especia' : aj.categoria === 'blend' ? 'Blend' : aj.categoria === 'envase' ? 'Frascos' : aj.categoria === 'bolsa' ? 'Bolsas' : 'Sticker';
-        var subLabel = aj.subtipo === 'pala' ? 'Pala' : aj.subtipo === 'chico' ? 'Chico' : 'Grande';
+        var subLabel = aj.subtipo === 'pala' ? 'Pala' : aj.subtipo === 'chico' ? 'Pequeño' : 'Grande';
         var cantColor = (aj.cantidad > 0) ? 'text-green' : 'text-red';
         var cantSign = (aj.cantidad > 0) ? '+' : '';
         var unidad = aj.subtipo === 'pala' ? 'g' : 'u';
@@ -1545,9 +1464,9 @@ const Pages = {
 
       // Subtipo options
       if (cat === 'especia') {
-        subSel.innerHTML = '<option value="pala">Pala (gramos)</option><option value="chico">Frasco Chico (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
+        subSel.innerHTML = '<option value="pala">Pala (gramos)</option><option value="chico">Frasco Pequeño (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
       } else if (cat === 'blend') {
-        subSel.innerHTML = '<option value="chico">Frasco Chico (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
+        subSel.innerHTML = '<option value="chico">Frasco Pequeño (unidades)</option><option value="grande">Frasco Grande (unidades)</option>';
       } else if (cat === 'envase') {
         subSel.innerHTML = '<option value="chico">Chico (unidades)</option><option value="grande">Grande (unidades)</option>';
       } else if (cat === 'bolsa') {
@@ -1722,7 +1641,7 @@ const Pages = {
     h += '<div class="table-wrap mt-8"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
     for (var i = 0; i < (p.items || []).length; i++) {
       var it = p.items[i];
-      var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Chico';
+      var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Pequeño';
       h += '<tr><td class="fw7">' + (it.nombre || '?') + '</td><td>' + tallaLabel + '</td><td>' + (it.qty || 0) + '</td><td>$' + (it.precio || 0).toLocaleString() + '</td><td class="fw7">$' + (it.subtotal || 0).toLocaleString() + '</td></tr>';
     }
     h += '</tbody></table></div>';
@@ -1780,14 +1699,14 @@ const Pages = {
     var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">' + enTiendaCount + '</div><div class="stat-label">Productos en Tienda</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + productos.length + '</div><div class="stat-label">Disponibles (con stock)</div></div>' +
-      '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/tienda</div><div class="stat-label">URL Publica</div></div>' +
+      '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
       '</div>';
 
     h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
     if (productos.length === 0) {
       h += '<p class="text-muted text-center">No hay productos visibles. Activa "Tienda" en Productos > Editar.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cat.</th><th>Precio Chico</th><th>Precio Grande</th><th>Stock Ch</th><th>Stock Gr</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cat.</th><th>Precio Pequeño</th><th>Precio Grande</th><th>Stock Pq</th><th>Stock Gr</th></tr></thead><tbody>';
       for (var i = 0; i < productos.length; i++) {
         var p = productos[i];
         h += '<tr>' +
@@ -1818,7 +1737,7 @@ const Pages = {
         '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
         '<input type="file" class="input" id="f-import-file" accept=".xlsx,.xls"></div>' +
         '<div class="g2">' +
-          '<div class="form-group"><label>Grs por Frasco Chico</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
+          '<div class="form-group"><label>Grs por Frasco Pequeño</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
           '<div class="form-group"><label>Grs por Frasco Grande</label><input type="number" class="input" id="f-import-gg" value="80" min="1"></div>' +
         '</div>' +
         '<div id="f-import-status" class="mt-12"></div>' +
@@ -2212,6 +2131,7 @@ const Pages = {
      RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
      ================================================================ */
   renderRecetasAdmin(container) {
+    var savedKey = localStorage.getItem('arcano_groq_key') || '';
     var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
 
     // Build list of available products for context
@@ -2223,9 +2143,9 @@ const Pages = {
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Modelo: <b>Llama 3.3 70B</b> via Groq.</p>' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
         '<div class="form-group"><label>Groq API Key</label>' +
-        '<input type="password" class="input" id="ra-groq-key" placeholder="gsk_xxxx...">' +
+        '<input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx...">' +
         '</div>' +
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
@@ -2256,32 +2176,8 @@ const Pages = {
 
     container.innerHTML = h;
 
-    // Load Groq key from Firebase (persistent storage)
-    Pages._loadGroqKey();
     // Load existing recipes from Firebase
     Pages._loadRecetasAdmin();
-  },
-
-  _loadGroqKey: function() {
-    var keyInput = document.getElementById('ra-groq-key');
-    if (!keyInput) return;
-    // Try Firebase first (persistent across devices)
-    firebase.database().ref('arcano/config/groq_key').once('value', function(snap) {
-      var fbKey = snap.val();
-      if (fbKey) {
-        keyInput.value = fbKey;
-      } else {
-        // Fallback to localStorage
-        var localKey = localStorage.getItem('arcano_groq_key') || '';
-        if (localKey) keyInput.value = localKey;
-      }
-    });
-  },
-
-  _saveGroqKey: function(apiKey) {
-    // Save to both Firebase (persistent) and localStorage (backup)
-    localStorage.setItem('arcano_groq_key', apiKey);
-    firebase.database().ref('arcano/config/groq_key').set(apiKey);
   },
 
   _loadRecetasAdmin: function() {
@@ -2347,7 +2243,7 @@ const Pages = {
     var idioma = idiomaSelect.value;
 
     if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
-    Pages._saveGroqKey(apiKey);
+    localStorage.setItem('arcano_groq_key', apiKey);
 
     // Build product context
     var productos = ArcanoDB.getTiendaProductos();
@@ -2645,7 +2541,7 @@ const Pages = {
     var ctxTallas = document.getElementById('chart-tallas');
     if (ctxTallas) {
       Pages._estCharts.push(new Chart(ctxTallas, {
-        type: 'pie', data: { labels: ['Chico', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        type: 'pie', data: { labels: ['Pequeño', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
       }));
     }
