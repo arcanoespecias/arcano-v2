@@ -232,5 +232,6 @@ const App = {
     }
   }
 };
+window.App = App;
 
 document.addEventListener('DOMContentLoaded', function() { App.init(); });
