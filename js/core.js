@@ -5,7 +5,6 @@ const ARCANO_LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUD
 const App = {
   currentPage: 'dashboard',
   sidebarOpen: true,
-  _deferredPrompt: null,
 
   async init() {
     this.showSplash();
@@ -76,50 +75,24 @@ const App = {
       if (type === 'remote_change') App.renderPage(App.currentPage);
     });
 
-    // PWA install prompt
-    window.addEventListener('beforeinstallprompt', function(e) {
-      e.preventDefault();
-      App._deferredPrompt = e;
-      var bar = document.getElementById('pwa-install-bar');
-      if (bar) bar.style.display = 'flex';
-    });
-    window.addEventListener('appinstalled', function() {
-      App._deferredPrompt = null;
-      var bar = document.getElementById('pwa-install-bar');
-      if (bar) bar.style.display = 'none';
-    });
-    // Hide install bar if already installed (standalone mode)
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-      var bar = document.getElementById('pwa-install-bar');
-      if (bar) bar.style.display = 'none';
-    }
-
-    // Audio notification for new pedidos
+    // Pedidos badge listener + audio notification
     function _playNotifSound() {
       try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Triple ascending tone - more noticeable
-        var notes = [
-          { t: 0, f: 660, d: 0.18 },
-          { t: 0.22, f: 880, d: 0.18 },
-          { t: 0.44, f: 1100, d: 0.25 }
-        ];
-        for (var i = 0; i < notes.length; i++) {
-          var n = notes[i];
+        // Two-tone notification: high note then higher note
+        var times = [0, 0.15, 0.35];
+        var freqs = [880, 1100, 880];
+        for (var i = 0; i < times.length; i++) {
           var osc = ctx.createOscillator();
           var gain = ctx.createGain();
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.frequency.value = n.f;
+          osc.frequency.value = freqs[i];
           osc.type = 'sine';
-          gain.gain.setValueAtTime(0.5, ctx.currentTime + n.t);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
-          osc.start(ctx.currentTime + n.t);
-          osc.stop(ctx.currentTime + n.t + n.d + 0.02);
-        }
-        // Vibrate if available
-        if (navigator.vibrate) {
-          navigator.vibrate([200, 100, 200, 100, 300]);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + times[i]);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + 0.14);
+          osc.start(ctx.currentTime + times[i]);
+          osc.stop(ctx.currentTime + times[i] + 0.15);
         }
       } catch (e) {}
     }
@@ -133,7 +106,7 @@ const App = {
         else { badge.style.display = 'none'; }
       }
       // Audio + visual alert when a NEW pedido arrives (not on initial load)
-      if (isNew && count > _lastPedidoNuevoCount && _lastPedidoNuevoCount >= 0) {
+      if (isNew && _lastPedidoNuevoCount >= 0) {
         _playNotifSound();
         // Flash browser tab title
         var origTitle = document.title;
@@ -197,7 +170,6 @@ const App = {
             '<button class="btn btn-sm btn-outline" onclick="App.logout()">Salir</button>' +
           '</div>' +
         '</aside>' +
-        '<div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeMobileSidebar()"></div>' +
         '<main class="main-content">' +
           '<header class="top-bar">' +
             '<button class="btn btn-ghost" onclick="App.toggleSidebar()">☰</button>' +
@@ -210,12 +182,11 @@ const App = {
             '<div class="loader-center"><div class="loader"></div></div>' +
           '</div>' +
         '</main>' +
-      '</div';
+      '</div>';
   },
 
   navigate(page) {
     this.currentPage = page;
-    this.closeMobileSidebar();
     document.querySelectorAll('.nav-item').forEach(function(el) {
       el.classList.toggle('active', el.dataset.page === page);
     });
@@ -227,45 +198,14 @@ const App = {
     this.renderPage(page);
   },
 
-  _mobileSidebarOpen: false,
-
   toggleSidebar() {
-    var sidebar = document.getElementById('sidebar');
-    var overlay = document.getElementById('sidebar-overlay');
-    if (window.innerWidth <= 768) {
-      this._mobileSidebarOpen = !this._mobileSidebarOpen;
-      if (sidebar) sidebar.style.transform = this._mobileSidebarOpen ? 'translateX(0)' : 'translateX(-100%)';
-      if (overlay) overlay.style.display = this._mobileSidebarOpen ? 'block' : 'none';
-    } else {
-      this.sidebarOpen = !this.sidebarOpen;
-      document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
-    }
-  },
-
-  closeMobileSidebar() {
-    if (!this._mobileSidebarOpen) return;
-    this._mobileSidebarOpen = false;
-    var sidebar = document.getElementById('sidebar');
-    var overlay = document.getElementById('sidebar-overlay');
-    if (sidebar) sidebar.style.transform = 'translateX(-100%)';
-    if (overlay) overlay.style.display = 'none';
+    this.sidebarOpen = !this.sidebarOpen;
+    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
   },
 
   logout() {
     ArcanoDB.logoutUser();
     this.showLogin();
-  },
-
-  installPWA() {
-    if (!this._deferredPrompt) return;
-    this._deferredPrompt.prompt();
-    this._deferredPrompt.userChoice.then(function(choice) {
-      if (choice.outcome === 'accepted') {
-        var bar = document.getElementById('pwa-install-bar');
-        if (bar) bar.style.display = 'none';
-      }
-      App._deferredPrompt = null;
-    });
   },
 
   renderPage(page) {
