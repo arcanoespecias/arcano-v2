@@ -126,7 +126,7 @@ const Pages = {
             '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm "' + (e.enTienda ? "'btn-green'" : "'btn-outline'") + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? "'Tienda ON'" : "'Tienda'") + '</button>' +
+              '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
@@ -155,7 +155,7 @@ const Pages = {
             '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm mr-4" style="color:var(--gold)" onclick="Pages.formBlend(' + b.id + ')" title="Editar">Editar</button>' +
+              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formBlend(' + b.id + ')" title="Editar">Editar</button>' +
               '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
@@ -1615,7 +1615,7 @@ const Pages = {
           '<td class="text-gold fw7">$' + (p.total || 0).toLocaleString() + '</td>' +
           '<td><span class="badge ' + estClass + '" style="border:1px solid">' + estLabel + '</span></td>' +
           '<td><button class="btn btn-sm btn-gold" onclick="Pages.verPedido(\'' + p._key + '\')">Ver</button>' +
-          '<button class="btn btn-sm" style="color:var(--red);border:1px solid var(--red);margin-left:4px" onclick="Pages.eliminarPedido(\'' + p._key + '\')">Eliminar</button></td>' +
+          '<button class="btn btn-sm btn-red" style="margin-left:4px" onclick="Pages.eliminarPedido(\'' + p._key + '\')">Eliminar</button></td>' +
           '</tr>';
       }
       h += '</tbody></table></div>';
@@ -1666,7 +1666,7 @@ const Pages = {
 
     h += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'pedido-modal\').remove()">Cerrar</button>';
     h += '<a class="btn btn-gold" href="tel:' + (cl.telefono || '') + '" target="_blank">Llamar Cliente</a>';
-    h += '<button class="btn btn-sm" style="color:var(--red);border:1px solid var(--red);margin-left:auto" onclick="Pages.eliminarPedido(\'' + pedidoKey + '\')">Eliminar Pedido</button>';
+    h += '<button class="btn btn-sm btn-red" style="margin-left:auto" onclick="Pages.eliminarPedido(\'' + pedidoKey + '\')">Eliminar Pedido</button>';
     h += '</div></div>';
 
     var modal = document.createElement('div');
