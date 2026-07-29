@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arcano-v3-13';
+const CACHE_NAME = 'arcano-v3-14';
 const ASSETS = [
   '/',
   '/index.html',
@@ -28,10 +28,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  var url = e.request.url;
-
-  // Firebase: network-first with cache fallback
-  if (url.includes('firebaseio.com')) {
+  if (e.request.url.includes('firebaseio.com')) {
     e.respondWith(
       fetch(e.request)
         .then(r => {
@@ -43,23 +40,13 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
-  // App assets: network-first (ensures fresh code after deploy)
-  if (url.includes(self.location.origin)) {
-    e.respondWith(
-      fetch(e.request).then(resp => {
-        if (resp && resp.status === 200) {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  // External CDN: cache-first
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+      if (resp.status === 200) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    }))
   );
 });
