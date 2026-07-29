@@ -207,19 +207,22 @@ const Pages = {
           '<option value="Infusiones"' + (isEdit && esp.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
           '<option value="Cocteleria"' + (isEdit && esp.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
         '</select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Frasco Pequeño ($)</label><input type="number" class="input" id="f-esp-pc" value="' + (isEdit ? esp.precioChico : '') + '" placeholder="0" min="0"></div>' +
-        '<div class="form-group"><label>Precio Frasco Grande ($)</label><input type="number" class="input" id="f-esp-pg" value="' + (isEdit ? esp.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="card" style="border-color:var(--gold)"><div class="card-header"><h3>Precios de Venta</h3></div><div class="card-body">' +
+        '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-esp-pc" value="' + (isEdit ? esp.precioChico : '') + '" placeholder="Ej: 8000" min="0"></div>' +
+        '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-esp-pg" value="' + (isEdit ? esp.precioGrande : '') + '" placeholder="Ej: 18000" min="0"></div></div>' +
+        '<p class="text-xs text-muted">Estos son los precios que se mostraran en la tienda.</p></div></div>' +
         '<div class="g2"><div class="form-group"><label>Gramos por Frasco Pequeño</label><input type="number" class="input" id="f-esp-gc" value="' + (isEdit ? esp.gramosChico : '') + '" placeholder="Ej: 30" min="0"></div>' +
         '<div class="form-group"><label>Gramos por Frasco Grande</label><input type="number" class="input" id="f-esp-gg" value="' + (isEdit ? esp.gramosGrande : '') + '" placeholder="Ej: 80" min="0"></div></div>' +
-        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
-        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-esp-tienda"><option value="0"' + (isEdit && esp.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && esp.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
-        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-esp-tg" value="' + (isEdit ? (esp.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda Online</h3></div><div class="card-body">' +
+        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-esp-tienda"><option value="0"' + (isEdit && !esp.enTienda ? ' selected' : '') + '>No</option><option value="1"' + (isEdit && esp.enTienda ? ' selected' : (!isEdit ? ' selected' : '')) + '>Si</option></select></div>' +
+        '<p class="text-xs text-muted mb-8">Precio especial para la tienda online (opcional). Si lo dejas vacio se usara el precio de venta.</p>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-esp-tc" value="' + (isEdit ? (esp.precioTiendaChico||'') : '') + '" placeholder="Igual al de venta" min="0"></div>' +
+        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-esp-tg" value="' + (isEdit ? (esp.precioTiendaGrande||'') : '') + '" placeholder="Igual al de venta" min="0"></div></div>' +
         '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-esp"><input type="file" accept="image/*" id="f-esp-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-esp\')">' +
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', (esp && esp.tags) || []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', esp.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g pala, ' + (esp.stockChico||0) + ' fr pequeño, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
@@ -242,7 +245,7 @@ const Pages = {
         precioGrande: Number(document.getElementById('f-esp-pg').value) || 0,
         gramosChico: Number(document.getElementById('f-esp-gc').value) || 0,
         gramosGrande: Number(document.getElementById('f-esp-gg').value) || 0,
-        enTienda: document.getElementById('f-esp-tienda').value === '1',
+        enTienda: document.getElementById('f-esp-tienda').value === '1' || (Number(document.getElementById('f-esp-pc').value) || Number(document.getElementById('f-esp-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
         imagen: previewEl ? previewEl.src : '',
@@ -301,19 +304,22 @@ const Pages = {
           '<div class="form-group"><label>Region (opcional)</label><input type="text" class="input" id="f-bl-region" value="' + (isEdit ? (bl.region||'') : '') + '" placeholder="Ej: India"></div>' +
         '</div>' +
         '<div class="form-group"><label>Uso (opcional)</label><input type="text" class="input" id="f-bl-uso" value="' + (isEdit ? (bl.uso||'') : '') + '" placeholder="Ej: Carnes, Currys"></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="0" min="0"></div>' +
-        '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="card" style="border-color:var(--gold)"><div class="card-header"><h3>Precios de Venta</h3></div><div class="card-body">' +
+        '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="Ej: 8000" min="0"></div>' +
+        '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="Ej: 18000" min="0"></div></div>' +
+        '<p class="text-xs text-muted">Estos son los precios que se mostraran en la tienda.</p></div></div>' +
         '<div class="form-group"><label>Ingredientes</label><div id="blend-ings"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ing">+ Ingrediente</button></div>' +
-        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda</h3></div><div class="card-body">' +
-        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && bl.enTienda ? '' : ' selected') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : '') + '>Si</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="0" min="0"></div>' +
-        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-bl-tg" value="' + (isEdit ? (bl.precioTiendaGrande||'') : '') + '" placeholder="0" min="0"></div></div>' +
+        '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda Online</h3></div><div class="card-body">' +
+        '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && !bl.enTienda ? ' selected' : '') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : (!isEdit ? ' selected' : '')) + '>Si</option></select></div>' +
+        '<p class="text-xs text-muted mb-8">Precio especial para la tienda online (opcional). Si lo dejas vacio se usara el precio de venta.</p>' +
+        '<div class="g2"><div class="form-group"><label>Precio Tienda Pequeño ($)</label><input type="number" class="input" id="f-bl-tc" value="' + (isEdit ? (bl.precioTiendaChico||'') : '') + '" placeholder="Igual al de venta" min="0"></div>' +
+        '<div class="form-group"><label>Precio Tienda Grande ($)</label><input type="number" class="input" id="f-bl-tg" value="' + (isEdit ? (bl.precioTiendaGrande||'') : '') + '" placeholder="Igual al de venta" min="0"></div></div>' +
         '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-bl"><input type="file" accept="image/*" id="f-bl-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-bl\')">' +
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', (bl && bl.tags) || []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', bl.tags || []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr pequeño, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -370,7 +376,7 @@ const Pages = {
         precioChico: Number(document.getElementById('f-bl-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-bl-pg').value) || 0,
         ingredientes: ingredientes,
-        enTienda: document.getElementById('f-bl-tienda').value === '1',
+        enTienda: document.getElementById('f-bl-tienda').value === '1' || (Number(document.getElementById('f-bl-pc').value) || Number(document.getElementById('f-bl-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
         imagen: (document.getElementById('img-preview-bl') || {}).src || '',
@@ -566,6 +572,7 @@ const Pages = {
           var stkSel = detailDiv.querySelector('.ent-stk-nombre');
           var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
           var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
+          var stkTalla = detailDiv.querySelectorAll('.ent-talla')[0];
           stkSel.addEventListener('change', function() {
             if (this.value === '__new__') {
               this.style.display = 'none';
@@ -1120,67 +1127,6 @@ const Pages = {
     });
   },
 
-  /** Levenshtein distance */
-  _levenshtein(a, b) {
-    if (!a || !b) return Math.max((a||'').length, (b||'').length);
-    var m = a.length, n = b.length;
-    if (m > n) { var t = a; a = b; b = t; m = n; n = b.length; }
-    var prev = [];
-    for (var i = 0; i <= m; i++) prev[i] = i;
-    for (var j = 1; j <= n; j++) {
-      var curr = [j];
-      for (var i = 1; i <= m; i++) {
-        var cost = a[i-1] === b[j-1] ? 0 : 1;
-        curr[i] = Math.min(prev[i] + 1, curr[i-1] + 1, prev[i-1] + cost);
-      }
-      prev = curr;
-    }
-    return prev[m];
-  },
-
-  /** Fuzzy word search in text */
-  _fuzzyFind(word, text, maxDist) {
-    if (text.indexOf(word) !== -1) return true;
-    if (maxDist == null) maxDist = Math.max(1, Math.floor(word.length * 0.3));
-    if (word.length < 3) return text.indexOf(word) !== -1;
-    var tLen = text.length, wLen = word.length, win;
-    for (var i = 0; i <= tLen - wLen; i++) {
-      win = text.substring(i, i + wLen);
-      if (Pages._levenshtein(word, win) <= maxDist) return true;
-    }
-    if (tLen > wLen) {
-      for (var i = 0; i <= tLen - wLen - 1; i++) {
-        win = text.substring(i, i + wLen + 1);
-        if (Pages._levenshtein(word, win) <= maxDist) return true;
-      }
-    }
-    if (wLen > 2) {
-      for (var i = 0; i <= tLen - wLen + 1; i++) {
-        win = text.substring(i, i + wLen - 1);
-        if (Pages._levenshtein(word, win) <= maxDist) return true;
-      }
-    }
-    return false;
-  },
-
-  /** Clean OCR text: remove label noise, numbers, special chars */
-  _cleanOCR(text) {
-    var t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var noise = ['arcano','especias','blend','artesanal','gramos','gr','neto','peso',
-      'contenido','ingredientes','almacenar','lugar','seco','fresco',
-      'consumir','preferiblemente','antes','fecha','lote','fabricante',
-      'importado','producto','colombia','bogota','calidad','premium',
-      'natural','organico','origen','puro','info'];
-    for (var i = 0; i < noise.length; i++) {
-      t = t.replace(new RegExp('\\b' + noise[i] + '\\b', 'g'), ' ');
-    }
-    t = t.replace(/\d+[,.]?\d*\s*g/g, ' ');
-    t = t.replace(/\d+/g, ' ');
-    t = t.replace(/[^a-z\s]/g, ' ');
-    t = t.replace(/\s+/g, ' ').trim();
-    return t;
-  },
-
   handleOCRResult(text) {
     var statusEl = document.getElementById('cam-status');
     var confirmArea = document.getElementById('cam-confirm-area');
@@ -1196,65 +1142,22 @@ const Pages = {
     var allProducts = [];
     for (var i = 0; i < especias.length; i++) { allProducts.push({ tipo: 'especia', producto: especias[i] }); }
     for (var i = 0; i < blends.length; i++) { allProducts.push({ tipo: 'blend', producto: blends[i] }); }
-
-    // Clean OCR text for better matching
-    var ocrClean = Pages._cleanOCR(text);
-    var ocrRaw = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     var scored = [];
     for (var i = 0; i < allProducts.length; i++) {
       var p = allProducts[i];
       var name = (p.producto.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      var nameWords = name.split(/\s+/).filter(function(w) { return w.length >= 2; });
-      if (nameWords.length === 0) continue;
-
-      // Strategy 1: Full name exact match in raw OCR
-      if (ocrRaw.indexOf(name) !== -1) {
-        scored.push({ tipo: p.tipo, producto: p.producto, score: 1.0 });
-        continue;
-      }
-
-      // Strategy 2: Full name exact match in cleaned OCR
-      if (ocrClean.indexOf(name) !== -1) {
-        scored.push({ tipo: p.tipo, producto: p.producto, score: 0.95 });
-        continue;
-      }
-
-      // Strategy 3: Fuzzy full-name match (Levenshtein on whole name)
-      var nameDist = Pages._levenshtein(name, ocrClean);
-      var nameLen = Math.max(name.length, ocrClean.length);
-      var nameFuzzyScore = nameLen > 0 ? 1 - (nameDist / nameLen) : 0;
-      if (nameFuzzyScore > 0.75) {
-        scored.push({ tipo: p.tipo, producto: p.producto, score: nameFuzzyScore * 0.9 });
-        continue;
-      }
-
-      // Strategy 4: Fuzzy word-by-word matching
-      var totalWeight = 0;
-      var matchedWeight = 0;
+      var nameWords = name.split(/\s+/);
+      var matchCount = 0;
       for (var w = 0; w < nameWords.length; w++) {
-        var nw = nameWords[w];
-        var weight = nw.length >= 5 ? 2 : 1;
-        totalWeight += weight;
-        if (ocrRaw.indexOf(nw) !== -1) { matchedWeight += weight; continue; }
-        if (ocrClean.indexOf(nw) !== -1) { matchedWeight += weight * 0.9; continue; }
-        if (Pages._fuzzyFind(nw, ocrClean)) { matchedWeight += weight * 0.7; }
+        if (nameWords[w].length < 2) continue;
+        if (ocrLower.indexOf(nameWords[w]) !== -1) matchCount++;
       }
-      var wordScore = totalWeight > 0 ? matchedWeight / totalWeight : 0;
-
-      // Strategy 5: Prefix match for short names (e.g. "Curcuma")
-      var prefixLen = Math.min(name.length, Math.max(4, Math.floor(name.length * 0.6)));
-      var prefix = name.substring(0, prefixLen);
-      var prefixScore = 0;
-      if (ocrClean.indexOf(prefix) !== -1) { prefixScore = 0.6; }
-      else if (Pages._fuzzyFind(prefix, ocrClean)) { prefixScore = 0.5; }
-
-      var finalScore = Math.max(wordScore, prefixScore);
-      if (finalScore >= 0.4) {
-        scored.push({ tipo: p.tipo, producto: p.producto, score: finalScore });
-      }
+      var score = nameWords.length > 0 ? matchCount / nameWords.length : 0;
+      if (ocrLower.indexOf(name) !== -1) score = Math.max(score, 1.0);
+      if (name.length >= 3 && ocrLower.indexOf(name.substring(0, Math.min(name.length, 6))) !== -1) score = Math.max(score, 0.7);
+      if (score >= 0.5) scored.push({ tipo: p.tipo, producto: p.producto, score: score });
     }
-
     scored.sort(function(a, b) { return b.score - a.score; });
     if (confirmArea) confirmArea.style.display = 'block';
     if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 80) + (text.length > 80 ? '...' : '') + '"';
@@ -1266,7 +1169,7 @@ const Pages = {
           var pct = Math.round(s.score * 100);
           prodSelect.innerHTML += '<option value="' + s.tipo + '|' + s.producto.id + '">' + s.producto.nombre + ' (' + pct + '%)</option>';
         }
-        if (scored[0].score >= 0.6) {
+        if (scored[0].score >= 0.7) {
           prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
         }
         if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
@@ -2664,4 +2567,3 @@ const Pages = {
     for (var ch = 0; ch < chartCanvases.length; ch++) { chartCanvases[ch].style.height = chartCanvases[ch].classList.contains('est-chart-full') ? '280px' : '260px'; }
   }
 };
-window.Pages = Pages;
