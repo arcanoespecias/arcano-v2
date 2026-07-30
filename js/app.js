@@ -92,6 +92,7 @@ function handleLogout() {
   if (!confirm('Cerrar sesion?')) return;
   currentUser = null;
   cart = [];
+  localStorage.removeItem('arcano_user');
   showStorefront();
 }
 
@@ -1005,7 +1006,7 @@ function submitOrder() {
   DB.init(function() {
     DB.seed();
     if (statusEl) statusEl.textContent = '';
-    var saved = sessionStorage.getItem('arcano_user');
+    var saved = localStorage.getItem('arcano_user');
     if (saved) {
       try {
         var user = JSON.parse(saved);
@@ -1022,7 +1023,7 @@ function submitOrder() {
     var user = DB.find('usuarios', window._pinTarget);
     if (user && user.pin === window._pinVal) {
       currentUser = user;
-      sessionStorage.setItem('arcano_user', JSON.stringify({id:user.id,pin:user.pin}));
+      localStorage.setItem('arcano_user', JSON.stringify({id:user.id,pin:user.pin}));
       enterApp();
     } else {
       var err = document.getElementById('pin-error');
