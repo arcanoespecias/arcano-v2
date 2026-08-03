@@ -1,11 +1,5 @@
-const CACHE_NAME = 'arcano-v3-20';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/db.js',
-  '/js/pages.js',
-  '/js/core.js',
+const CACHE_NAME = 'arcano-v4-1';
+const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/favicon.png',
   '/icons/icon-192.png',
@@ -13,7 +7,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
   self.skipWaiting();
 });
 
@@ -28,7 +22,11 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  if (e.request.url.includes('firebaseio.com')) {
+
+  const url = new URL(e.request.url);
+
+  // Firebase: network-first
+  if (url.hostname.includes('firebaseio.com')) {
     e.respondWith(
       fetch(e.request)
         .then(r => {
@@ -40,6 +38,24 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+
+  // JS, CSS, HTML: NETWORK-FIRST (always get latest)
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(resp => {
+          if (resp.status === 200) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          }
+          return resp;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Static assets: CACHE-FIRST
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if (resp.status === 200) {
