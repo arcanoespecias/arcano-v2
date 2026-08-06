@@ -1,5 +1,5 @@
 {
-  "version": "v4.2-fix-readonly",
+  "version": "v4.3-search-fix",
   "build": "2026-07-17",
   "notes": "Reescritura completa. Modelo simplificado: Productos, Insumos, Produccion, Ventas, Stock."
 }
