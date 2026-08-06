@@ -1,1 +1,5 @@
-{"version": "3.0.0", "build": "2026-07-17", "notes": "Reescritura completa. Modelo simplificado: Productos, Insumos, Produccion, Ventas, Stock."}
+{
+  "version": "v4.2-fix-readonly",
+  "build": "2026-07-17",
+  "notes": "Reescritura completa. Modelo simplificado: Productos, Insumos, Produccion, Ventas, Stock."
+}
