@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arcano-v4-4';
+const CACHE_NAME = 'arcano-v4-5';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/favicon.png',
@@ -39,24 +39,14 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML: network-first + inject patch.js
+  // HTML: network-first (no injection)
   if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
     e.respondWith(
       fetch(e.request)
         .then(resp => {
           if (resp.status === 200) {
             const clone = resp.clone();
-            // Inject patch.js into HTML pages
-            const modified = resp.text().then(html => {
-              if (html.includes('patch.js')) return html;
-              return html.replace('<script src="js/core.js"></script>', '<script src="js/core.js"></script>\n<script src="js/patch.js"></script>');
-            });
             caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-            return modified.then(h => new Response(h, {
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: resp.headers
-            }));
           }
           return resp;
         })

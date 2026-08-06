@@ -291,88 +291,25 @@ const Pages = {
     var blends = ArcanoDB.getBlends();
     var tab = window._prodTab || 'especias';
 
-    var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
-      '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
-        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
-        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
-        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage('productos')">Etiquetas de uso</button>` +
-      '</div>' +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
-        (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
-      '</div></div>';
-
-    h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
-
-    // --- TAB: ESPECIAS ---
-    if (tab === 'especias') {
-      if (especias.length === 0) {
-        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin especias. Crea una o importa desde Excel.</p></div></div>';
-      } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < especias.length; i++) {
-          var e = especias[i];
-          h += '<tr>' +
-            '<td class="fw7">' + e.nombre + '</td>' +
-            '<td><span class="badge badge-gold">' + (e.categoria||'—') + '</span></td>' +
-            '<td>' + (e.stockBolsa||0) + 'g</td>' +
-            '<td>' + (e.gramosChico||0) + 'g</td>' +
-            '<td>' + (e.gramosGrande||0) + 'g</td>' +
-            '<td>$' + (e.precioChico||0).toLocaleString() + '</td>' +
-            '<td>$' + (e.precioGrande||0).toLocaleString() + '</td>' +
-            '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
-            '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
-            '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
-              '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
-              '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
-            '</td></tr>';
-        }
-        h += '</tbody></table></div>';
-      }
-    }
-
-    // --- TAB: BLENDS ---
-    if (tab === 'blends') {
-      if (blends.length === 0) {
-        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin blends. Crea uno nuevo.</p></div></div>';
-      } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < blends.length; i++) {
-          var b = blends[i];
-          var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
-          h += '<tr>' +
-            '<td class="fw7">' + b.nombre + '</td>' +
-            '<td><span class="badge badge-blue">' + (b.categoria||'—') + '</span></td>' +
-            '<td class="text-sm text-muted">' + (b.region||'—') + '</td>' +
-            '<td class="text-sm text-muted">' + (ingN||'—') + '</td>' +
-            '<td>$' + (b.precioChico||0).toLocaleString() + '</td>' +
-            '<td>$' + (b.precioGrande||0).toLocaleString() + '</td>' +
-            '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
-            '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
-            '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formBlend(' + b.id + ')" title="Editar">Editar</button>' +
-              '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
-              '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
-            '</td></tr>';
-        }
-        h += '</tbody></table></div>';
-      }
-    }
-
-    // --- TAB: ETIQUETAS DE USO ---
+    // --- TAB: ETIQUETAS DE USO (sin busqueda) ---
     if (tab === 'uso') {
+      window._prodSearch = '';
       var allTags = ArcanoDB.getProductTags();
       var catKeys = ['Comidas', 'Infusiones', 'Cocteleria'];
-      h += '<div class="card"><div class="card-body">';
+      var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
+          '<button class="tab" onclick="window._prodTab=\'especias\';App.renderPage(\'productos\')">Especias<span class="tab-count">' + especias.length + '</span></button>' +
+          '<button class="tab" onclick="window._prodTab=\'blends\';App.renderPage(\'productos\')">Blends<span class="tab-count">' + blends.length + '</span></button>' +
+          '<button class="tab active" onclick="window._prodTab=\'uso\';App.renderPage(\'productos\')">Etiquetas de uso</button>' +
+        '</div></div>' +
+        '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>' +
+        '<div class="card"><div class="card-body">';
       for (var ci = 0; ci < catKeys.length; ci++) {
         var cat = catKeys[ci];
         var tags = allTags[cat] || [];
         h += '<div style="margin-bottom:20px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge badge-gold" style="min-width:100px;text-align:center">' + cat + '</span>' +
-          `<input type="text" class="input" id="new-tag-${ci}" placeholder="Nueva etiqueta de uso..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key==='Enter')Pages.doAddTag('${cat}',${ci})">` +
-          `<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag('${cat}',${ci})">+ Agregar</button></div>` +
+          '<input type="text" class="input" id="new-tag-' + ci + '" placeholder="Nueva etiqueta de uso..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key===\'Enter\')Pages.doAddTag(\'' + cat + '\',' + ci + ')">' +
+          '<button class="btn btn-sm btn-outline" onclick="Pages.doAddTag(\'' + cat + '\',' + ci + ')">+ Agregar</button></div>' +
           '<div style="display:flex;flex-wrap:wrap;gap:6px">';
         for (var ti = 0; ti < tags.length; ti++) {
           h += '<span class="tag-chip-admin"><span>' + tags[ti] + '</span><button onclick="Pages.doRemoveTag(\'' + cat + '\',\'' + tags[ti].replace(/'/g, '&apos;') + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">X</button></span>';
@@ -381,9 +318,176 @@ const Pages = {
         h += '</div></div>';
       }
       h += '</div></div>';
+      container.innerHTML = h;
+      return;
+    }
+
+    // --- ESPECIAS O BLENDS: si ya existe el tbody, solo actualizar tabla ---
+    var existingTbody = document.getElementById('prod-tbody');
+    if (existingTbody) {
+      Pages._renderProductTable();
+      return;
+    }
+
+    // --- Render completo (primera vez o cambio de tab) ---
+    var searchVal = (window._prodSearch || '').replace(/"/g, '&quot;');
+    var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+      '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
+        '<button class="tab' + (tab==='especias' ? ' active' : '') + '" onclick="window._prodTab=\'especias\';window._prodSearch=\'\';App.renderPage(\'productos\')">Especias<span class="tab-count">' + especias.length + '</span></button>' +
+        '<button class="tab' + (tab==='blends' ? ' active' : '') + '" onclick="window._prodTab=\'blends\';window._prodSearch=\'\';App.renderPage(\'productos\')">Blends<span class="tab-count">' + blends.length + '</span></button>' +
+        '<button class="tab" onclick="window._prodTab=\'uso\';App.renderPage(\'productos\')">Etiquetas de uso</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
+        (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
+      '</div></div>';
+
+    h += '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 12px;flex-wrap:wrap">' +
+      '<div style="position:relative;flex:1;min-width:200px">' +
+        '<svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;opacity:0.4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+        '<input type="text" class="input" id="prod-search" placeholder="Buscar por nombre..." value="' + searchVal + '" style="padding-left:34px;width:100%">' +
+      '</div>' +
+      '<button class="btn btn-outline" id="prod-export-btn" style="border-color:var(--blue);color:var(--blue);white-space:nowrap">Exportar ' + (tab==='especias' ? 'Especias' : 'Blends') + '</button>' +
+      '<span class="text-sm text-muted" id="prod-count"></span>' +
+    '</div>';
+
+    h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
+
+    if (tab === 'especias') {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody"></tbody></table></div>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody"></tbody></table></div>';
     }
 
     container.innerHTML = h;
+
+    // Conectar el buscador (una sola vez)
+    var searchInput = document.getElementById('prod-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        window._prodSearch = this.value;
+        Pages._renderProductTable();
+      });
+    }
+
+    // Conectar boton exportar
+    var exportBtn = document.getElementById('prod-export-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function() {
+        Pages.exportarProductosExcel(window._prodTab || 'especias');
+      });
+    }
+
+    // Renderizar tabla por primera vez
+    Pages._renderProductTable();
+  },
+
+  _renderProductTable() {
+    var tbody = document.getElementById('prod-tbody');
+    var countEl = document.getElementById('prod-count');
+    if (!tbody) return;
+
+    var tab = window._prodTab || 'especias';
+    var search = (window._prodSearch || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var list, totalCount;
+
+    if (tab === 'especias') {
+      list = especias.filter(function(e) { return !search || e.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(search) !== -1; });
+      totalCount = especias.length;
+    } else {
+      list = blends.filter(function(b) { return !search || b.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(search) !== -1; });
+      totalCount = blends.length;
+    }
+
+    if (countEl) {
+      countEl.textContent = search ? (list.length + '/' + totalCount) : '';
+    }
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10"><p class="text-muted text-center" style="padding:32px">' + (search ? 'No se encontraron resultados para "' + (window._prodSearch||'') + '"' : 'Sin registros. Crea uno nuevo.') + '</p></td></tr>';
+      return;
+    }
+
+    var html = '';
+    if (tab === 'especias') {
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        html += '<tr>' +
+          '<td class="fw7">' + e.nombre + '</td>' +
+          '<td><span class="badge badge-gold">' + (e.categoria||'—') + '</span></td>' +
+          '<td>' + (e.stockBolsa||0) + 'g</td>' +
+          '<td>' + (e.gramosChico||0) + 'g</td>' +
+          '<td>' + (e.gramosGrande||0) + 'g</td>' +
+          '<td>$' + (e.precioChico||0).toLocaleString() + '</td>' +
+          '<td>$' + (e.precioGrande||0).toLocaleString() + '</td>' +
+          '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
+          '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
+          '<td style="white-space:nowrap">' +
+            '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
+            '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
+            '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
+            '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
+          '</td></tr>';
+      }
+    } else {
+      for (var i = 0; i < list.length; i++) {
+        var b = list[i];
+        var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
+        html += '<tr>' +
+          '<td class="fw7">' + b.nombre + '</td>' +
+          '<td><span class="badge badge-blue">' + (b.categoria||'—') + '</span></td>' +
+          '<td class="text-sm text-muted">' + (b.region||'—') + '</td>' +
+          '<td class="text-sm text-muted">' + (ingN||'—') + '</td>' +
+          '<td>$' + (b.precioChico||0).toLocaleString() + '</td>' +
+          '<td>$' + (b.precioGrande||0).toLocaleString() + '</td>' +
+          '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
+          '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
+          '<td style="white-space:nowrap">' +
+            '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formBlend(' + b.id + ')" title="Editar">Editar</button>' +
+            '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
+            '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
+            '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
+          '</td></tr>';
+      }
+    }
+    tbody.innerHTML = html;
+  },
+
+  exportarProductosExcel(tipo) {
+    var ws_data, fn, sn;
+    if (tipo === 'especias') {
+      var list = ArcanoDB.getEspecias();
+      ws_data = [['Nombre','Categoria','Pala (g)','Grs/Chico','Grs/Grande','Precio Chico','Precio Grande','Stock Chico','Stock Grande','En Tienda']];
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        ws_data.push([e.nombre||'', e.categoria||'', e.stockBolsa||0, e.gramosChico||0, e.gramosGrande||0, e.precioChico||0, e.precioGrande||0, e.stockChico||0, e.stockGrande||0, e.enTienda?'Si':'No']);
+      }
+      fn = 'especias_arcano.xlsx'; sn = 'ESPECIAS';
+    } else {
+      var list = ArcanoDB.getBlends();
+      ws_data = [['Nombre','Categoria','Region','Ingredientes','Precio Chico','Precio Grande','Stock Chico','Stock Grande','En Tienda']];
+      for (var i = 0; i < list.length; i++) {
+        var b = list[i];
+        var ings = (b.ingredientes||[]).map(function(x){ return (x.especiaNombre||'?') + ' ' + (x.gramosChico||0) + 'g/Ch ' + (x.gramosGrande||0) + 'g/Gr'; }).join('; ');
+        ws_data.push([b.nombre||'', b.categoria||'', b.region||'', ings, b.precioChico||0, b.precioGrande||0, b.stockChico||0, b.stockGrande||0, b.enTienda?'Si':'No']);
+      }
+      fn = 'blends_arcano.xlsx'; sn = 'BLENDS';
+    }
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!cols'] = [];
+    for (var c = 0; c < ws_data[0].length; c++) {
+      var mx = ws_data[0][c].length;
+      for (var r = 1; r < ws_data.length; r++) {
+        var cl = String(ws_data[r][c]||'').length;
+        if (cl > mx) mx = cl;
+      }
+      ws['!cols'].push({ wch: Math.min(mx + 2, 40) });
+    }
+    XLSX.utils.book_append_sheet(wb, ws, sn);
+    XLSX.writeFile(wb, fn);
   },
 
   /* ==================== ESPECIA FORM ====================  /* ==================== ESPECIA FORM ==================== */
