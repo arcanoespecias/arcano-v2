@@ -291,6 +291,11 @@ const Pages = {
     var blends = ArcanoDB.getBlends();
     var tab = window._prodTab || 'especias';
 
+    var search = window._prodSearch || '';
+    var searchNorm = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var filteredEsp = especias.filter(function(e){ return !searchNorm || e.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(searchNorm) !== -1; });
+    var filteredBl = blends.filter(function(b){ return !searchNorm || b.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(searchNorm) !== -1; });
+
     var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
         `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
@@ -302,16 +307,30 @@ const Pages = {
         (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
       '</div></div>';
 
+    // Search bar + Export button
+    if (tab !== 'uso') {
+      var totalCount = tab==='especias' ? filteredEsp.length : filteredBl.length;
+      var totalCountAll = tab==='especias' ? especias.length : blends.length;
+      h += '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 12px;flex-wrap:wrap">' +
+        '<div style="position:relative;flex:1;min-width:200px">' +
+          '<svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;opacity:0.4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+          '<input type="text" class="input" id="prod-search" placeholder="Buscar por nombre..." value="' + search.replace(/"/g, '&quot;') + '" style="padding-left:34px;width:100%" oninput="window._prodSearch=this.value;App.renderPage(\'productos\')">' +
+        '</div>' +
+        '<button class="btn btn-outline" style="border-color:var(--blue);color:var(--blue);white-space:nowrap" onclick="Pages.exportarProductosExcel(\'' + tab + '\')">Exportar ' + (tab==='especias' ? 'Especias' : 'Blends') + '</button>' +
+        (search ? '<span class="text-sm text-muted">' + totalCount + '/' + totalCountAll + '</span>' : '') +
+      '</div>';
+    }
+
     h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
 
     // --- TAB: ESPECIAS ---
     if (tab === 'especias') {
-      if (especias.length === 0) {
-        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin especias. Crea una o importa desde Excel.</p></div></div>';
+      if (filteredEsp.length === 0) {
+        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">' + (search ? 'No se encontraron especias para "' + search + '"' : 'Sin especias. Crea una o importa desde Excel.') + '</p></div></div>';
       } else {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < especias.length; i++) {
-          var e = especias[i];
+        for (var i = 0; i < filteredEsp.length; i++) {
+          var e = filteredEsp[i];
           h += '<tr>' +
             '<td class="fw7">' + e.nombre + '</td>' +
             '<td><span class="badge badge-gold">' + (e.categoria||'—') + '</span></td>' +
@@ -335,12 +354,12 @@ const Pages = {
 
     // --- TAB: BLENDS ---
     if (tab === 'blends') {
-      if (blends.length === 0) {
-        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin blends. Crea uno nuevo.</p></div></div>';
+      if (filteredBl.length === 0) {
+        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">' + (search ? 'No se encontraron blends para "' + search + '"' : 'Sin blends. Crea uno nuevo.') + '</p></div></div>';
       } else {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < blends.length; i++) {
-          var b = blends[i];
+        for (var i = 0; i < filteredBl.length; i++) {
+          var b = filteredBl[i];
           var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
           h += '<tr>' +
             '<td class="fw7">' + b.nombre + '</td>' +
@@ -3360,4 +3379,45 @@ const Pages = {
     // Redirect to ventas tab for backward compat
     Pages._estTab = 'ventas';
     Pages._renderVentas(data, el);
-  }};
+  },
+
+  exportarProductosExcel: function(tipo) {
+    var ws_data, filename, sheetName;
+    if (tipo === 'especias') {
+      var list = ArcanoDB.getEspecias();
+      ws_data = [['Nombre','Categoria','Pala (g)','Grs/Chico','Grs/Grande','Precio Chico','Precio Grande','Stock Chico','Stock Grande','En Tienda']];
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        ws_data.push([e.nombre||'', e.categoria||'', e.stockBolsa||0, e.gramosChico||0, e.gramosGrande||0, e.precioChico||0, e.precioGrande||0, e.stockChico||0, e.stockGrande||0, e.enTienda?'Sí':'No']);
+      }
+      filename = 'especias_arcano.xlsx';
+      sheetName = 'ESPECIAS';
+    } else {
+      var list = ArcanoDB.getBlends();
+      ws_data = [['Nombre','Categoria','Region','Ingredientes','Precio Chico','Precio Grande','Stock Chico','Stock Grande','En Tienda']];
+      for (var i = 0; i < list.length; i++) {
+        var b = list[i];
+        var ings = (b.ingredientes||[]).map(function(x){ return (x.especiaNombre||'?') + ' ' + (x.gramosChico||0) + 'g/Ch ' + (x.gramosGrande||0) + 'g/Gr'; }).join('; ');
+        ws_data.push([b.nombre||'', b.categoria||'', b.region||'', ings, b.precioChico||0, b.precioGrande||0, b.stockChico||0, b.stockGrande||0, b.enTienda?'Sí':'No']);
+      }
+      filename = 'blends_arcano.xlsx';
+      sheetName = 'BLENDS';
+    }
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!cols'] = [];
+    for (var c = 0; c < ws_data[0].length; c++) {
+      var maxLen = ws_data[0][c].length;
+      for (var r = 1; r < ws_data.length; r++) {
+        var cellLen = String(ws_data[r][c]||'').length;
+        if (cellLen > maxLen) maxLen = cellLen;
+      }
+      ws['!cols'].push({ wch: Math.min(maxLen + 2, 40) });
+    }
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, filename);
+  },
+
+  // Limpiar búsqueda al cambiar de página
+  _origRenderPage: undefined
+};
