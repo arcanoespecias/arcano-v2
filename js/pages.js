@@ -298,8 +298,8 @@ const Pages = {
 
     var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
-        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
-        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
+        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';window._prodSearch='';window._prodCursor=0;App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
+        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';window._prodSearch='';window._prodCursor=0;App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
         `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage('productos')">Etiquetas de uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
@@ -314,7 +314,7 @@ const Pages = {
       h += '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 12px;flex-wrap:wrap">' +
         '<div style="position:relative;flex:1;min-width:200px">' +
           '<svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;opacity:0.4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-          '<input type="text" class="input" id="prod-search" placeholder="Buscar por nombre..." value="' + search.replace(/"/g, '&quot;') + '" style="padding-left:34px;width:100%" oninput="window._prodSearch=this.value;App.renderPage(\'productos\')">' +
+          '<input type="text" class="input" id="prod-search" placeholder="Buscar por nombre..." value="' + search.replace(/"/g, '&quot;') + '" style="padding-left:34px;width:100%">' +
         '</div>' +
         '<button class="btn btn-outline" style="border-color:var(--blue);color:var(--blue);white-space:nowrap" onclick="Pages.exportarProductosExcel(\'' + tab + '\')">Exportar ' + (tab==='especias' ? 'Especias' : 'Blends') + '</button>' +
         (search ? '<span class="text-sm text-muted">' + totalCount + '/' + totalCountAll + '</span>' : '') +
@@ -403,9 +403,22 @@ const Pages = {
     }
 
     container.innerHTML = h;
+
+    // Restaurar foco y cursor del buscador despues del render
+    var si = document.getElementById('prod-search');
+    if (si) {
+      var cursorPos = window._prodCursor || search.length;
+      si.focus();
+      si.setSelectionRange(cursorPos, cursorPos);
+      si.addEventListener('input', function() {
+        window._prodSearch = this.value;
+        window._prodCursor = this.selectionStart;
+        Pages.renderProductos(container);
+      });
+    }
   },
 
-  /* ==================== ESPECIA FORM ====================  /* ==================== ESPECIA FORM ==================== */
+  /* ==================== ESPECIA FORM ==================== */
   formEspecia(editId) {
     var esp = (editId != null) ? ArcanoDB.getEspecia(editId) : null;
     var isEdit = (esp != null);
