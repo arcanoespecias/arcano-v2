@@ -161,6 +161,8 @@ const App = {
               '<span class="nav-icon">📊</span><span class="nav-label">Estadisticas</span></a>' +
             '<a class="nav-item" data-page="usuarios" onclick="App.navigate(\'usuarios\')">' +
               '<span class="nav-icon">👥</span><span class="nav-label">Usuarios</span></a>' +
+            '<a class="nav-item" data-page="puntosdeventa" onclick="App.navigate(\'puntosdeventa\')">' +
+              '<span class="nav-icon">🏪</span><span class="nav-label">P. Venta</span></a>' +
           '</nav>' +
           '<div class="sidebar-footer">' +
             '<div class="user-info">' +
@@ -192,7 +194,7 @@ const App = {
     });
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos',
-      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios'
+      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -224,6 +226,7 @@ const App = {
         case 'recetas': Pages.renderRecetasAdmin(container); break;
         case 'estadisticas': Pages.renderEstadisticas(container); break;
         case 'usuarios': Pages.renderUsuarios(container); break;
+        case 'puntosdeventa': PDV.render(container); break;
         default: container.innerHTML = '<p>Pagina no encontrada</p>';
       }
     } catch (e) {
