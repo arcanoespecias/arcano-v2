@@ -158,6 +158,8 @@ var PDV = {
     h += '<p class="text-muted text-sm" style="margin:4px 0 0">' + this.esc(pdv.ubicacion || '') + '</p>';
     h += '<div style="display:flex;gap:6px;margin:12px 0;flex-wrap:wrap">' +
       '<button class="btn btn-gold" onclick="PDV.formMoverStock()">Mover Stock al PDV</button>' +
+      '<button class="btn btn-green" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stats\')">Stats</button>' +
       '<button class="btn btn-outline" onclick="PDV.formDevolverStock()">Devolver Stock</button>' +
       '<button class="btn btn-outline" onclick="PDV.formEditar(' + pdv.id + ')">Editar</button>' +
       '<button class="btn btn-red" onclick="PDV.doEliminar(' + pdv.id + ')">Eliminar</button>' +
@@ -313,6 +315,8 @@ var PDV = {
     h += '<div style="display:flex;gap:6px;margin:12px 0;flex-wrap:wrap">' +
       '<button class="btn btn-gold" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="PDV.showQR(' + pdv.id + ')">Mostrar QR</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stock\')">Stock</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stats\')">Stats</button>' +
       '</div>';
     h += '<div style="border-bottom:2px solid var(--border);margin:0 0 16px"></div>';
     // Summary cards
@@ -502,75 +506,219 @@ var PDV = {
     } catch (e) { toast(e.message, 'err'); }
   },
 
-  /* ==================== ESTADÍSTICAS ==================== */
+  /* ==================== ESTADISTICAS ==================== */
   renderStats(container) {
     var pdv = this.currentPDV;
     if (!pdv) return;
     var stats = ArcanoDB.getPDVStats(pdv.id);
+    var ventas = ArcanoDB.getPDVVentas(pdv.id);
     var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
       '<button class="btn btn-ghost" onclick="PDV.go(null)">← Puntos de Venta</button>' +
       '<h3 style="margin:0">' + this.esc(pdv.nombre) + '</h3>' +
-      '<span class="badge badge-blue">Estadisticas</span></div>';
-    h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
-    // KPIs
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px">' +
-      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.5em;color:var(--gold)">$' + stats.totalIngresos.toLocaleString() + '</div><div class="text-muted text-sm">Ingresos Totales</div></div></div>' +
-      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.5em">' + stats.totalVentas + '</div><div class="text-muted text-sm">Total Ventas</div></div></div>' +
-      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.5em">$' + Math.round(stats.ticketPromedio).toLocaleString() + '</div><div class="text-muted text-sm">Ticket Promedio</div></div></div>' +
-      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.5em">' + stats.productosEnStock + '</div><div class="text-muted text-sm">Productos en Stock</div></div></div>' +
-      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.5em">' + stats.totalItemsEnStock + '</div><div class="text-muted text-sm">Unidades en Stock</div></div></div>' +
+      '<span class="badge badge-blue">Estadisticas</span></div>' +
+      '<div style="display:flex;gap:6px;margin:8px 0 0;flex-wrap:wrap">' +
+      '<button class="btn btn-sm btn-green" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="PDV.go(' + pdv.id + ',\'stock\')">Stock</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="PDV.go(' + pdv.id + ',\'ventas\')">Ventas</button>' +
       '</div>';
-    // Top productos
-    h += '<h4 style="margin:20px 0 8px">Productos Mas Vendidos</h4>';
-    if (stats.topProductos.length === 0) {
-      h += '<p class="text-muted">Sin datos de ventas</p>';
-    } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Producto</th><th>Unidades</th><th>Monto</th><th>% del Total</th></tr></thead><tbody>';
-      for (var i = 0; i < stats.topProductos.length; i++) {
+    h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
+    h += '<div style="display:flex;gap:4px;margin-bottom:16px;background:var(--bg2);border-radius:var(--radius);padding:4px">' +
+      '<button class="est-tab active" onclick="PDV._statsTab(this,\'resumen\')" data-tab="resumen">Resumen</button>' +
+      '<button class="est-tab" onclick="PDV._statsTab(this,\'productos\')" data-tab="productos">Productos</button>' +
+      '<button class="est-tab" onclick="PDV._statsTab(this,\'diario\')" data-tab="diario">Ventas por Dia</button>' +
+      '<button class="est-tab" onclick="PDV._statsTab(this,\'stock\')" data-tab="stock">Stock</button>' +
+      '</div>';
+    h += '<div id="pdv-stats-content">';
+    h += this._renderStatsResumen(stats, ventas, pdv);
+    h += '</div>';
+    container.innerHTML = h;
+    setTimeout(function() { PDV._renderStatsCharts(stats, ventas, pdv); }, 100);
+  },
+
+  _statsTab(btn, tab) {
+    var tabs = btn.parentElement.querySelectorAll('.est-tab');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    btn.classList.add('active');
+    var contentEl = document.getElementById('pdv-stats-content');
+    if (!contentEl) return;
+    var pdv = this.currentPDV;
+    var stats = ArcanoDB.getPDVStats(pdv.id);
+    var ventas = ArcanoDB.getPDVVentas(pdv.id);
+    switch (tab) {
+      case 'resumen': contentEl.innerHTML = this._renderStatsResumen(stats, ventas, pdv); setTimeout(function() { PDV._renderStatsCharts(stats, ventas, pdv); }, 50); break;
+      case 'productos': contentEl.innerHTML = this._renderStatsProductos(stats, ventas, pdv); setTimeout(function() { PDV._renderPieChart(stats); }, 50); break;
+      case 'diario': contentEl.innerHTML = this._renderStatsDiario(stats, ventas, pdv); setTimeout(function() { PDV._renderDiarioChart(stats); }, 50); break;
+      case 'stock': contentEl.innerHTML = this._renderStatsStock(stats, ventas, pdv); break;
+    }
+  },
+
+  _renderStatsResumen(stats, ventas, pdv) {
+    var h = '';
+    h += '<div class="est-kpi-grid">' +
+      '<div class="est-kpi up"><div class="est-kpi-value">$' + stats.totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">' + stats.totalVentas + '</div><div class="est-kpi-label">Total Ventas</div><div class="est-kpi-sub">transacciones realizadas</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">$' + Math.round(stats.ticketPromedio).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">ingreso por venta</div></div>' +
+      '<div class="est-kpi ' + (stats.totalItemsEnStock < 10 ? 'down' : 'up') + '"><div class="est-kpi-value">' + stats.totalItemsEnStock + '</div><div class="est-kpi-label">Unidades en Stock</div><div class="est-kpi-sub">' + stats.productosEnStock + ' productos</div></div>' +
+      '</div>';
+    h += '<div class="est-charts-grid">' +
+      '<div class="est-chart-card"><h4>Ingresos Diarios</h4><div class="est-chart-wrap" style="height:220px"><canvas id="pdv-chart-ingresos"></canvas></div></div>' +
+      '<div class="est-chart-card"><h4>Productos Mas Vendidos</h4><div class="est-chart-wrap" style="height:220px"><canvas id="pdv-chart-top"></canvas></div></div>' +
+      '</div>';
+    if (stats.topProductos.length > 0) {
+      h += '<h4 style="margin:20px 0 8px">Top 5 Productos</h4>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Producto</th><th>Unidades</th><th>Monto</th><th>%</th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(5, stats.topProductos.length); i++) {
         var tp = stats.topProductos[i];
-        var pct = stats.totalIngresos > 0 ? ((tp.monto / stats.totalIngresos) * 100).toFixed(1) : 0;
+        var pct = stats.totalIngresos > 0 ? ((tp.monto / stats.totalIngresos) * 100).toFixed(1) : '0';
         h += '<tr><td>' + (i + 1) + '</td><td class="fw7">' + this.esc(tp.nombre) + '</td><td>' + tp.cantidad + '</td>' +
           '<td>$' + tp.monto.toLocaleString() + '</td><td>' + pct + '%</td></tr>';
       }
       h += '</tbody></table></div>';
     }
-    // Ventas por dia
-    var dias = Object.keys(stats.diario).sort();
-    if (dias.length > 0) {
-      h += '<h4 style="margin:20px 0 8px">Ventas por Dia</h4>';
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Ventas</th><th>Ingresos</th><th>Ticket Prom.</th></tr></thead><tbody>';
-      for (var d = 0; d < dias.length; d++) {
-        var di = stats.diario[dias[d]];
-        h += '<tr><td>' + dias[d] + '</td><td>' + di.ventas + '</td>' +
-          '<td>$' + di.ingresos.toLocaleString() + '</td>' +
-          '<td>$' + (di.ventas > 0 ? Math.round(di.ingresos / di.ventas) : 0).toLocaleString() + '</td></tr>';
+    if (ventas.length > 0) {
+      h += '<h4 style="margin:20px 0 8px">Ultimas 5 Ventas</h4>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Fecha</th><th>Items</th><th>Total</th></tr></thead><tbody>';
+      var recent = ventas.slice(-5).reverse();
+      for (var r = 0; r < recent.length; r++) {
+        var rv = recent[r];
+        var itemNames = (rv.items || []).map(function(it) { return it.productoNombre; }).join(', ');
+        h += '<tr><td>' + rv.id + '</td><td>' + (rv.fecha || '').slice(0, 16) + '</td><td class="text-sm">' + this.esc(itemNames) + '</td><td class="fw7">$' + (rv.total || 0).toLocaleString() + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
-    // Valorizacion del stock actual
-    h += '<h4 style="margin:20px 0 8px">Valorizacion del Stock Actual</h4>';
+    return h;
+  },
+
+  _renderStatsProductos(stats, ventas, pdv) {
+    var h = '<h4 style="margin:0 0 12px">Ranking Completo de Productos</h4>';
+    if (stats.topProductos.length === 0) {
+      return h + '<p class="text-muted">Sin datos de ventas</p>';
+    }
+    var maxMonto = stats.topProductos[0].monto || 1;
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Producto</th><th>Unidades</th><th>Ingresos</th><th>% del Total</th><th>Barra</th></tr></thead><tbody>';
+    for (var i = 0; i < stats.topProductos.length; i++) {
+      var tp = stats.topProductos[i];
+      var pct = stats.totalIngresos > 0 ? ((tp.monto / stats.totalIngresos) * 100).toFixed(1) : '0';
+      var barW = Math.round((tp.monto / maxMonto) * 100);
+      h += '<tr><td>' + (i + 1) + '</td><td class="fw7">' + this.esc(tp.nombre) + '</td><td>' + tp.cantidad + '</td>' +
+        '<td class="fw7">$' + tp.monto.toLocaleString() + '</td><td>' + pct + '%</td>' +
+        '<td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + barW + '%;background:var(--gold)"></div></div></div></td></tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '<div class="est-chart-card" style="margin-top:16px"><h4>Distribucion de Ingresos por Producto</h4><div class="est-chart-wrap" style="height:300px"><canvas id="pdv-chart-pie"></canvas></div></div>';
+    return h;
+  },
+
+  _renderStatsDiario(stats, ventas, pdv) {
+    var dias = Object.keys(stats.diario).sort();
+    var h = '<h4 style="margin:0 0 12px">Ventas por Dia</h4>';
+    if (dias.length === 0) {
+      return h + '<p class="text-muted">Sin datos de ventas</p>';
+    }
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Ventas</th><th>Ingresos</th><th>Ticket Prom.</th></tr></thead><tbody>';
+    var totalIng = 0;
+    for (var d = 0; d < dias.length; d++) {
+      var di = stats.diario[dias[d]];
+      totalIng += di.ingresos;
+      var ticketP = di.ventas > 0 ? Math.round(di.ingresos / di.ventas) : 0;
+      h += '<tr><td>' + dias[d].slice(0, 10) + '</td><td>' + di.ventas + '</td>' +
+        '<td class="fw7">$' + di.ingresos.toLocaleString() + '</td>' +
+        '<td>$' + ticketP.toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '<div class="est-kpi-grid" style="margin-top:16px">' +
+      '<div class="est-kpi"><div class="est-kpi-value">' + dias.length + '</div><div class="est-kpi-label">Dias con Venta</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">$' + (dias.length > 0 ? Math.round(totalIng / dias.length) : 0).toLocaleString() + '</div><div class="est-kpi-label">Promedio Diario</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">$' + (dias.length > 0 ? Math.min.apply(null, dias.map(function(dd) { return stats.diario[dd].ingresos; })) : 0).toLocaleString() + '</div><div class="est-kpi-label">Dia Menor</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">$' + (dias.length > 0 ? Math.max.apply(null, dias.map(function(dd) { return stats.diario[dd].ingresos; })) : 0).toLocaleString() + '</div><div class="est-kpi-label">Dia Mayor</div></div>' +
+      '</div>';
+    h += '<div class="est-chart-card" style="margin-top:16px"><h4>Evolucion de Ingresos Diarios</h4><div class="est-chart-wrap" style="height:280px"><canvas id="pdv-chart-diario"></canvas></div></div>';
+    return h;
+  },
+
+  _renderStatsStock(stats, ventas, pdv) {
+    var h = '<h4 style="margin:0 0 12px">Valorizacion del Stock Actual</h4>';
     var stock = pdv.stock || {};
     var stockKeys = Object.keys(stock).filter(function(k) { return stock[k] > 0; });
     var stockValor = 0;
     if (stockKeys.length === 0) {
-      h += '<p class="text-muted">Sin stock</p>';
-    } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>P.Unit</th><th>Valor</th></tr></thead><tbody>';
-      for (var s = 0; s < stockKeys.length; s++) {
-        var sk = stockKeys[s];
-        var parts = sk.split('_');
-        var tipo = parts[0], prodId = Number(parts[1]), talla = parts[2];
-        var prod = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
-        var precio = prod ? (talla === 'grande' ? prod.precioGrande : prod.precioChico) || 0 : 0;
-        var valor = precio * stock[sk];
-        stockValor += valor;
-        h += '<tr><td>' + this.esc(prod ? prod.nombre : '?') + '</td><td>' + talla + '</td><td>' + stock[sk] + '</td>' +
-          '<td>$' + precio.toLocaleString() + '</td><td class="fw7">$' + valor.toLocaleString() + '</td></tr>';
-      }
-      h += '</tbody></table></div>';
-      h += '<p class="fw7" style="margin-top:8px;font-size:1.1em">Valor total en stock: $' + stockValor.toLocaleString() + '</p>';
+      return h + '<p class="text-muted">Sin stock en este PDV</p>';
     }
-    container.innerHTML = h;
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Cant.</th><th>P.Unit</th><th>Valor</th></tr></thead><tbody>';
+    for (var s = 0; s < stockKeys.length; s++) {
+      var sk = stockKeys[s];
+      var parts = sk.split('_');
+      var tipo = parts[0], prodId = Number(parts[1]), talla = parts[2];
+      var prod = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
+      var precio = prod ? (talla === 'grande' ? prod.precioGrande : prod.precioChico) || 0 : 0;
+      var valor = precio * stock[sk];
+      stockValor += valor;
+      h += '<tr><td class="fw7">' + this.esc(prod ? prod.nombre : '?') + '</td>' +
+        '<td><span class="badge ' + (tipo === 'especia' ? 'badge-gold' : 'badge-blue') + '">' + tipo + '</span></td>' +
+        '<td>' + talla + '</td><td>' + stock[sk] + '</td>' +
+        '<td>$' + precio.toLocaleString() + '</td><td class="fw7">$' + valor.toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '<div class="est-kpi-grid" style="margin-top:16px">' +
+      '<div class="est-kpi up"><div class="est-kpi-value">$' + stockValor.toLocaleString() + '</div><div class="est-kpi-label">Valor Total Stock</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">' + stockKeys.length + '</div><div class="est-kpi-label">Lineas de Stock</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">' + stats.totalItemsEnStock + '</div><div class="est-kpi-label">Unidades Totales</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">$' + (stats.totalItemsEnStock > 0 ? Math.round(stockValor / stats.totalItemsEnStock) : 0).toLocaleString() + '</div><div class="est-kpi-label">Valor Promedio/Unit</div></div>' +
+      '</div>';
+    return h;
+  },
+
+  _renderStatsCharts(stats, ventas, pdv) {
+    if (typeof Chart === 'undefined') return;
+    var dias = Object.keys(stats.diario).sort();
+    var ctx1 = document.getElementById('pdv-chart-ingresos');
+    if (ctx1 && dias.length > 0) {
+      new Chart(ctx1, {
+        type: 'line',
+        data: { labels: dias.map(function(d) { return d.slice(5, 10); }), datasets: [{ label: 'Ingresos', data: dias.map(function(d) { return stats.diario[d].ingresos; }), borderColor: '#e8b84b', backgroundColor: 'rgba(232,184,75,0.1)', fill: true, tension: 0.3, pointRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); }, color: '#9a8a78' }, grid: { color: 'rgba(58,34,24,0.4)' } }, x: { ticks: { color: '#9a8a78' }, grid: { display: false } } } }
+      });
+    }
+    var ctx2 = document.getElementById('pdv-chart-top');
+    if (ctx2 && stats.topProductos.length > 0) {
+      var top5 = stats.topProductos.slice(0, 5);
+      new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: top5.map(function(p) { return p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre; }), datasets: [{ label: 'Monto', data: top5.map(function(p) { return p.monto; }), backgroundColor: ['rgba(232,184,75,0.8)', 'rgba(201,150,58,0.8)', 'rgba(160,120,40,0.8)', 'rgba(130,96,32,0.8)', 'rgba(100,72,24,0.8)'], borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); }, color: '#9a8a78' }, grid: { color: 'rgba(58,34,24,0.4)' } }, y: { ticks: { color: '#ece0d0' }, grid: { display: false } } } }
+      });
+    }
+  },
+
+  _renderDiarioChart(stats) {
+    if (typeof Chart === 'undefined') return;
+    var dias = Object.keys(stats.diario).sort();
+    var ctx = document.getElementById('pdv-chart-diario');
+    if (!ctx || dias.length === 0) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: dias.map(function(d) { return d.slice(5, 10); }),
+        datasets: [
+          { label: 'Ingresos', data: dias.map(function(d) { return stats.diario[d].ingresos; }), backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+          { label: 'Ventas', data: dias.map(function(d) { return stats.diario[d].ventas; }), type: 'line', borderColor: '#5dade2', backgroundColor: 'rgba(93,173,226,0.1)', tension: 0.3, pointRadius: 3, yAxisID: 'y1' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, color: '#9a8a78' } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); }, color: '#9a8a78' }, grid: { color: 'rgba(58,34,24,0.4)' } }, y1: { position: 'right', ticks: { stepSize: 1, color: '#5dade2' }, grid: { drawOnChartArea: false } }, x: { ticks: { color: '#9a8a78' }, grid: { display: false } } } }
+    });
+  },
+
+  _renderPieChart(stats) {
+    if (typeof Chart === 'undefined') return;
+    var ctx = document.getElementById('pdv-chart-pie');
+    if (!ctx || stats.topProductos.length === 0) return;
+    var colors = ['#e8b84b', '#c9963a', '#5dade2', '#27ae60', '#e74c3c', '#f0c040', '#a07828', '#3a2218', '#9a8a78', '#ece0d0'];
+    var top = stats.topProductos.slice(0, 10);
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: top.map(function(p) { return p.nombre.length > 25 ? p.nombre.slice(0, 25) + '...' : p.nombre; }), datasets: [{ data: top.map(function(p) { return p.monto; }), backgroundColor: colors.slice(0, top.length) }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 8, color: '#ece0d0', font: { size: 11 } } } } }
+    });
   },
 
   /* ==================== QR ==================== */
