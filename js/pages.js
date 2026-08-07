@@ -322,9 +322,10 @@ const Pages = {
       return;
     }
 
-    // --- ESPECIAS O BLENDS: si ya existe el tbody, solo actualizar tabla ---
+    // --- ESPECIAS O BLENDS: si ya existe el tbody Y el tab no cambio, solo actualizar tabla ---
     var existingTbody = document.getElementById('prod-tbody');
-    if (existingTbody) {
+    var renderedTab = existingTbody ? (existingTbody.getAttribute('data-tab') || '') : '';
+    if (existingTbody && renderedTab === tab) {
       Pages._renderProductTable();
       return;
     }
@@ -354,9 +355,9 @@ const Pages = {
     h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
 
     if (tab === 'especias') {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody"></tbody></table></div>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody" data-tab="especias"></tbody></table></div>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody"></tbody></table></div>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody" data-tab="blends"></tbody></table></div>';
     }
 
     container.innerHTML = h;
