@@ -3456,6 +3456,8 @@ const Pages = {
             '<select class="input" onchange="Pages.calcPackCost()"><option value="chico"' + (c.talla === 'grande' ? '' : ' selected') + '>Pequeno</option><option value="grande"' + (c.talla === 'grande' ? ' selected' : '') + '>Grande</option></select></div>' +
           '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
             '<input type="number" class="input" value="' + (c.cantidad || 1) + '" min="1" onchange="Pages.calcPackCost()"></div>' +
+          '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
+            '<input type="number" class="input" value="' + (c.costoUnitario || c._precio || 0) + '" min="0" step="100" onchange="Pages.calcPackCost()" data-costo="1"></div>' +
           '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
         '</div></div>';
     }
@@ -3513,8 +3515,15 @@ const Pages = {
       else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
       if (!producto) continue;
 
-      var precio = Number(talla === 'grande' ? producto.precioGrande : producto.precioChico) || 0;
-      var sub = precio * cant;
+      // Use costo input if set, otherwise use product precio
+      var costoInputs = card.querySelectorAll('[data-costo]');
+      var costoUnit = costoInputs.length > 0 ? (Number(costoInputs[0].value) || 0) : 0;
+      if (costoUnit <= 0 && producto) {
+        costoUnit = Number(talla === 'grande' ? producto.precioGrande : producto.precioChico) || 0;
+        // Auto-fill the costo input so user can see/adjust it
+        if (costoInputs.length > 0) costoInputs[0].value = costoUnit;
+      }
+      var sub = costoUnit * cant;
       costoTotal += sub;
       totalFrascos += cant;
       detalles.push(producto.nombre + ' (' + (talla === 'grande' ? 'Grande' : 'Pequeno') + ') x' + cant + ' = $' + sub.toLocaleString());
@@ -3569,7 +3578,10 @@ const Pages = {
       var nombreProd = '';
       if (tipo === 'especia') { producto = ArcanoDB.getEspecia(prodId); nombreProd = producto ? producto.nombre : ''; }
       else if (tipo === 'blend') { producto = ArcanoDB.getBlend(prodId); nombreProd = producto ? producto.nombre : ''; }
-      componentes.push({ tipo: tipo, productoId: prodId, nombre: nombreProd, talla: talla, cantidad: cant });
+      // Get costo unitario from input
+      var costoInputs = card.querySelectorAll('[data-costo]');
+      var costoUnitario = costoInputs.length > 0 ? (Number(costoInputs[0].value) || 0) : 0;
+      componentes.push({ tipo: tipo, productoId: prodId, nombre: nombreProd, talla: talla, cantidad: cant, costoUnitario: costoUnitario });
     }
 
     if (componentes.length === 0) { toast('Agrega al menos un componente al pack', 'err'); return; }
