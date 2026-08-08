@@ -83,6 +83,45 @@ const Pages = {
       }}
     }
 
+    // === PDV DATA ===
+    var pdvs = ArcanoDB.getPuntosDeVenta();
+    var pdvIngresoTotal = 0, pdvVentasTotal = 0, pdvVentasHoyCount = 0;
+    var pdvMap = {};
+    for (var pvi = 0; pvi < pdvs.length; pvi++) {
+      var pdvSt = ArcanoDB.getPDVStats(pdvs[pvi].id);
+      pdvIngresoTotal += pdvSt.totalIngresos;
+      pdvVentasTotal += pdvSt.totalVentas;
+      pdvMap[pdvs[pvi].nombre] = { ventas: pdvSt.totalVentas, ingresos: pdvSt.totalIngresos, stock: pdvSt.totalItemsEnStock };
+      var pdvVtas = ArcanoDB.getPDVVentas(pdvs[pvi].id);
+      for (var pvj = 0; pvj < pdvVtas.length; pvj++) {
+        var pv = pdvVtas[pvj];
+        var pvf = pv.fecha || '';
+        totalIngresos += (pv.total || 0);
+        totalOps++;
+        if (pvf.slice(0,10) === today) { ventasHoy.push(pv); pdvVentasHoyCount++; }
+        if (pvf && pvf.startsWith(mes)) { ventasMes.push(pv); }
+        if (pvf) {
+          if (!diaMap[pvf]) diaMap[pvf] = {ops: 0, ingresos: 0};
+          diaMap[pvf].ops++;
+          diaMap[pvf].ingresos += (pv.total || 0);
+          var pmn = pvf.substring(0, 7);
+          if (!monthMap[pmn]) monthMap[pmn] = {ops: 0, ingresos: 0};
+          monthMap[pmn].ops++;
+          monthMap[pmn].ingresos += (pv.total || 0);
+        }
+        if (pv.items) { for (var pvk = 0; pvk < pv.items.length; pvk++) {
+          var pvi2 = pv.items[pvk];
+          var pvCant = pvi2.cantidad || 0;
+          totalUnidades += pvCant;
+          tipoCount[pvi2.tipo || 'especia'] = (tipoCount[pvi2.tipo || 'especia'] || 0) + pvCant;
+          tallaCount[pvi2.talla || 'chico'] = (tallaCount[pvi2.talla || 'chico'] || 0) + pvCant;
+          var pvkey = pvi2.productoNombre || '?';
+          if (!prodVentaMap[pvkey]) prodVentaMap[pvkey] = 0;
+          prodVentaMap[pvkey] += (pvi2.subtotal || 0);
+        }}
+      }
+    }
+
     var ingresosHoy = 0;
     for (var vi3 = 0; vi3 < ventasHoy.length; vi3++) ingresosHoy += (ventasHoy[vi3].total || 0);
     var ingresosMes = 0, opsMes = 0;
@@ -140,6 +179,8 @@ const Pages = {
     h += '<div class="dash-mini"><div class="dash-mini-val">' + prodMesCount + '</div><div class="dash-mini-lbl">Producciones Mes</div><div class="dash-mini-sub">' + prodMesUds + ' frascos</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalFrascos + '</div><div class="dash-mini-lbl">Frascos en Stock</div><div class="dash-mini-sub">' + stats.frascosChico + ' pq / ' + stats.frascosGrande + ' gr</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalProductos + '</div><div class="dash-mini-lbl">Productos Activos</div><div class="dash-mini-sub">' + stats.totalEspecias + ' esp + ' + stats.totalBlends + ' bl</div></div>';
+    h += '<div class="dash-mini"><div class="dash-mini-val">' + pdvs.length + '</div><div class="dash-mini-lbl">Puntos de Venta</div><div class="dash-mini-sub">' + pdvVentasTotal + ' ventas</div></div>';
+    h += '<div class="dash-mini"><div class="dash-mini-val">$' + pdvIngresoTotal.toLocaleString() + '</div><div class="dash-mini-lbl">Ingresos PDV</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
     h += '</div>';
 
@@ -147,7 +188,9 @@ const Pages = {
     h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--blue)"></span>Analisis de Ventas</div>';
     h += '<div class="dash-grid-2">';
     h += '<div class="dash-card"><h4>Canal de Venta</h4>';
-    var totalCanal = adminIngreso + tiendaIngreso;
+    var pdvIngresoHoy = 0;
+    for (var vht = 0; vht < ventasHoy.length; vht++) { if (ventasHoy[vht].puntoDeVentaId) pdvIngresoHoy += (ventasHoy[vht].total || 0); }
+    var totalCanal = adminIngreso + tiendaIngreso + pdvIngresoTotal;
     var admPct = totalCanal > 0 ? Math.round(adminIngreso / totalCanal * 100) : 0;
     var tiePct = totalCanal > 0 ? Math.round(tiendaIngreso / totalCanal * 100) : 0;
     h += '<div class="dash-canal-row"><div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + admPct + '%;background:var(--gold)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">Ventas Admin</span><span class="dash-canal-val">$' + adminIngreso.toLocaleString() + ' (' + admPct + '%)</span></div></div>';
@@ -222,6 +265,23 @@ const Pages = {
       h += '</div>';
     } else { h += '<div class="est-empty">Todo el inventario esta OK</div>'; }
     h += '</div></div>';
+
+    // Puntos de Venta
+    if (pdvs.length > 0) {
+      h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--green)"></span>Puntos de Venta</div>';
+      h += '<div class="dash-grid-3">';
+      for (var pdvi = 0; pdvi < pdvs.length; pdvi++) {
+        var pdvInfo = pdvMap[pdvs[pdvi].nombre] || { ventas: 0, ingresos: 0, stock: 0 };
+        h += '<div class="dash-card" style="cursor:pointer" onclick="App.navigate(\'puntosdeventa\');PDV.go(' + pdvs[pdvi].id + ',\'stats\')"><h4>' + pdvs[pdvi].nombre + '</h4>';
+        h += '<div class="dash-stock-row"><span>Ventas</span><span class="dash-stock-val">' + pdvInfo.ventas + '</span></div>';
+        h += '<div class="dash-stock-row"><span>Ingresos</span><span class="dash-stock-val" style="color:var(--gold)">$' + pdvInfo.ingresos.toLocaleString() + '</span></div>';
+        h += '<div class="dash-stock-row"><span>Stock</span><span class="dash-stock-val" style="color:' + (pdvInfo.stock < 10 ? 'var(--red)' : 'var(--green)') + '">' + pdvInfo.stock + ' uds</span></div>';
+        var pdvTicket = pdvInfo.ventas > 0 ? Math.round(pdvInfo.ingresos / pdvInfo.ventas) : 0;
+        h += '<div class="dash-stock-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)"><span>Ticket Prom.</span><span class="dash-stock-val">$' + pdvTicket.toLocaleString() + '</span></div>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
 
     // Ultimas operaciones
     h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--text3)"></span>Ultimas Operaciones</div>';
@@ -2719,7 +2779,7 @@ const Pages = {
     container.innerHTML = h;
 
     var data;
-    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
+    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario' || Pages._estTab === 'pdv') {
       data = allSales;
     } else {
       data = allSales.filter(function(s) { return s.source === 'tienda'; });
@@ -2730,6 +2790,7 @@ const Pages = {
     else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
     else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
     else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
+    else if (Pages._estTab === 'pdv') Pages._renderPDVEstadisticas(container.querySelector('#est-content'));
   },
 
   /* ================================================================
@@ -3468,6 +3529,99 @@ const Pages = {
     }
     allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
     return allSales;
+  },
+
+  /* ================================================================
+     PDV ESTADISTICAS TAB
+     ================================================================ */
+  _renderPDVEstadisticas: function(el) {
+    if (!el) return;
+    var pdvs = ArcanoDB.getPuntosDeVenta();
+    var totalPDVIngresos = 0, totalPDVVentas = 0, totalPDVStock = 0;
+    var pdvData = [];
+    for (var i = 0; i < pdvs.length; i++) {
+      var st = ArcanoDB.getPDVStats(pdvs[i].id);
+      totalPDVIngresos += st.totalIngresos;
+      totalPDVVentas += st.totalVentas;
+      totalPDVStock += st.totalItemsEnStock;
+      pdvData.push({ nombre: pdvs[i].nombre, id: pdvs[i].id, ubicacion: pdvs[i].ubicacion, activo: pdvs[i].activo !== false, stats: st });
+    }
+    pdvData.sort(function(a, b) { return b.stats.totalIngresos - a.stats.totalIngresos; });
+
+    var h = '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi up"><div class="est-kpi-value">$' + totalPDVIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales PDV</div><div class="est-kpi-sub">' + pdvs.length + ' puntos de venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPDVVentas + '</div><div class="est-kpi-label">Ventas Totales PDV</div><div class="est-kpi-sub">transacciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalPDVVentas > 0 ? Math.round(totalPDVIngresos / totalPDVVentas) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio PDV</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPDVStock + '</div><div class="est-kpi-label">Stock Total PDV</div><div class="est-kpi-sub">unidades en todos los PDV</div></div>';
+    h += '</div>';
+
+    // Table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Rendimiento por Punto de Venta</h3></div><div class="card-body">';
+    if (pdvData.length === 0) {
+      h += '<p class="text-muted text-center">Sin puntos de venta</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>PDV</th><th>Ubicacion</th><th>Ventas</th><th>Ingresos</th><th>Ticket Prom.</th><th>Stock</th><th>Top Producto</th><th></th></tr></thead><tbody>';
+      for (var j = 0; j < pdvData.length; j++) {
+        var d = pdvData[j];
+        var s = d.stats;
+        var ticket = s.totalVentas > 0 ? Math.round(s.totalIngresos / s.totalVentas) : 0;
+        var topProd = s.topProductos.length > 0 ? s.topProductos[0].nombre : '-';
+        h += '<tr><td class="fw7">' + d.nombre + '</td><td class="text-sm text-muted">' + (d.ubicacion || '-') + '</td>';
+        h += '<td>' + s.totalVentas + '</td>';
+        h += '<td class="fw7" style="color:var(--gold)">$' + s.totalIngresos.toLocaleString() + '</td>';
+        h += '<td>$' + ticket.toLocaleString() + '</td>';
+        h += '<td style="color:' + (s.totalItemsEnStock < 10 ? 'var(--red)' : 'var(--green)') + '">' + s.totalItemsEnStock + '</td>';
+        h += '<td class="text-sm">' + topProd + '</td>';
+        h += '<td><button class="btn btn-sm btn-outline" onclick="App.navigate(\'puntosdeventa\');PDV.go(' + d.id + ',\'stats\')">Ver</button></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // Chart: PDV comparison
+    h += '<div class="est-chart-card" style="margin-top:16px"><h4>Comparativa de Ingresos por PDV</h4><div class="est-chart-wrap" style="height:300px"><canvas id="est-pdv-chart"></canvas></div></div>';
+
+    // Daily PDV chart
+    h += '<div class="est-chart-card" style="margin-top:16px"><h4>Ventas Diarias (todos los PDV)</h4><div class="est-chart-wrap" style="height:250px"><canvas id="est-pdv-daily-chart"></canvas></div></div>';
+
+    el.innerHTML = h;
+
+    // Charts
+    if (typeof Chart !== 'undefined') {
+      var ctx1 = document.getElementById('est-pdv-chart');
+      if (ctx1 && pdvData.length > 0) {
+        var colors = ['#e8b84b', '#5dade2', '#27ae60', '#e74c3c', '#f0c040', '#a07828', '#9b59b6', '#1abc9c'];
+        new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: pdvData.map(function(p) { return p.nombre; }),
+            datasets: [{ label: 'Ingresos', data: pdvData.map(function(p) { return p.stats.totalIngresos; }), backgroundColor: pdvData.map(function(_, i) { return colors[i % colors.length] + 'cc'; }), borderColor: pdvData.map(function(_, i) { return colors[i % colors.length]; }), borderWidth: 1, borderRadius: 6 }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); }, color: '#9a8a78' }, grid: { color: 'rgba(58,34,24,0.4)' } }, y: { ticks: { color: '#ece0d0' }, grid: { display: false } } } }
+        });
+      }
+      var ctx2 = document.getElementById('est-pdv-daily-chart');
+      if (ctx2) {
+        var allPDVDias = {};
+        for (var k = 0; k < pdvs.length; k++) {
+          var pdvV = ArcanoDB.getPDVVentas(pdvs[k].id);
+          for (var m = 0; m < pdvV.length; m++) {
+            var df = (pdvV[m].fecha || '').slice(0, 10);
+            if (!df) continue;
+            if (!allPDVDias[df]) allPDVDias[df] = 0;
+            allPDVDias[df] += (pdvV[m].total || 0);
+          }
+        }
+        var sortedDias = Object.keys(allPDVDias).sort().slice(-15);
+        if (sortedDias.length > 0) {
+          new Chart(ctx2, {
+            type: 'bar',
+            data: { labels: sortedDias.map(function(d) { return d.slice(5); }), datasets: [{ label: 'Ingresos PDV', data: sortedDias.map(function(d) { return allPDVDias[d]; }), backgroundColor: 'rgba(39,174,96,0.6)', borderColor: '#27ae60', borderWidth: 1, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); }, color: '#9a8a78' }, grid: { color: 'rgba(58,34,24,0.4)' } }, x: { ticks: { color: '#9a8a78' }, grid: { display: false } } } }
+          });
+        }
+      }
+    }
   },
 
   _renderEstContent: function(data, el) {
