@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arcano-v4-5';
+const CACHE_NAME = 'arcano-v4-6';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/favicon.png',
@@ -22,10 +22,10 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-
+  
   const url = new URL(e.request.url);
-
-  // Firebase: network-first
+  
+  // Firebase: network-first, cache fallback
   if (url.hostname.includes('firebaseio.com')) {
     e.respondWith(
       fetch(e.request)
@@ -38,9 +38,9 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
-  // HTML: network-first (no injection)
-  if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
+  
+  // JS and CSS files: NETWORK-FIRST (always get latest)
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
     e.respondWith(
       fetch(e.request)
         .then(resp => {
@@ -54,24 +54,8 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
-  // JS, CSS: NETWORK-FIRST
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(resp => {
-          if (resp.status === 200) {
-            const clone = resp.clone();
-            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-          }
-          return resp;
-        })
-        .catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  // Static assets: CACHE-FIRST
+  
+  // Static assets (images, etc): CACHE-FIRST
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if (resp.status === 200) {
