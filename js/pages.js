@@ -3517,11 +3517,12 @@ const Pages = {
       else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
       if (!producto) continue;
 
-      // Use costo input if set, otherwise use product precio
+      // Use costo input if set, otherwise calculate real cost from purchase data
       var costoInputs = card.querySelectorAll('[data-costo]');
       var costoUnit = costoInputs.length > 0 ? (Number(costoInputs[0].value) || 0) : 0;
       if (costoUnit <= 0 && producto) {
-        costoUnit = Number(talla === 'grande' ? producto.precioGrande : producto.precioChico) || 0;
+        var costoInfo = ArcanoDB.getCostoProducto(producto, tipo);
+        costoUnit = Number(talla === 'grande' ? costoInfo.grande : costoInfo.chico) || 0;
         // Auto-fill the costo input so user can see/adjust it
         if (costoInputs.length > 0) costoInputs[0].value = costoUnit;
       }
