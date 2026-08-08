@@ -1324,32 +1324,92 @@ function getPack(id) {
   return (_db.packs || {})[id] || null;
 }
 
-/** Calculate total cost of a pack based on its components */
+
+/**
+ * Calculate average cost per gram for all especias based on entradas (purchases).
+ * Returns { especiaNombre: costoPorGramo }
+ * Only considers 'especia_grs' type entries with costoUnitario > 0.
+ */
+function getCostoPorGramo() {
+  var costoPorGramo = {};
+  var gramosComprados = {};
+  var entradas = _filterValid(Object.values(_db.entradas || {}));
+  for (var i = 0; i < entradas.length; i++) {
+    var items = entradas[i].items || [];
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      if (it.tipo !== 'especia_grs' || !it.especiaNombre) continue;
+      var grs = Number(it.cantidad) || 0;
+      var cpg = Number(it.costoUnitario) || 0;
+      if (grs <= 0 || cpg <= 0) continue;
+      var nombre = it.especiaNombre;
+      gramosComprados[nombre] = (gramosComprados[nombre] || 0) + grs;
+      costoPorGramo[nombre] = (costoPorGramo[nombre] || 0) + (grs * cpg);
+    }
+  }
+  // Divide total cost by total grams to get weighted average
+  var keys = Object.keys(costoPorGramo);
+  for (var k = 0; k < keys.length; k++) {
+    var nombre = keys[k];
+    if (gramosComprados[nombre] > 0) {
+      costoPorGramo[nombre] = costoPorGramo[nombre] / gramosComprados[nombre];
+    }
+  }
+  return costoPorGramo;
+}
+
+/**
+ * Get the real cost of a single frasco (especia or blend) based on purchase data.
+ * For especia: costo = gramosFrasco * costoPorGramo(nombre)
+ * For blend: costo = sum(gramosIngrediente * costoPorGramo(nombreIngrediente)) for each ingredient
+ * Returns { chico: number, grande: number }
+ */
+function getCostoProducto(producto, tipo, costoPorGramoMap) {
+  var cpg = costoPorGramoMap || getCostoPorGramo();
+  if (tipo === 'especia') {
+    var cpgEsp = cpg[producto.nombre] || 0;
+    return {
+      chico: Math.round((Number(producto.gramosChico) || 0) * cpgEsp),
+      grande: Math.round((Number(producto.gramosGrande) || 0) * cpgEsp)
+    };
+  } else if (tipo === 'blend') {
+    var ings = producto.ingredientes || [];
+    var costoChico = 0, costoGrande = 0;
+    for (var i = 0; i < ings.length; i++) {
+      var ing = ings[i];
+      var cpgIng = cpg[ing.especiaNombre] || 0;
+      costoChico += (Number(ing.gramosChico) || 0) * cpgIng;
+      costoGrande += (Number(ing.gramosGrande) || 0) * cpgIng;
+    }
+    return { chico: Math.round(costoChico), grande: Math.round(costoGrande) };
+  }
+  return { chico: 0, grande: 0 };
+}
+
+/** Calculate total cost of a pack based on real component costs from purchase data */
 function getPackCosto(pack) {
   if (!pack || !pack.componentes) return 0;
+  var cpg = getCostoPorGramo();
   var total = 0;
   for (var i = 0; i < pack.componentes.length; i++) {
     var c = pack.componentes[i];
     var producto = null;
-    if (c.tipo === 'especia') {
-      producto = _db.especias[c.productoId];
-    } else if (c.tipo === 'blend') {
-      producto = _db.blends[c.productoId];
+    var tipo = c.tipo || 'especia';
+    if (tipo === 'especia') {
+      producto = (_db.especias || {})[c.productoId];
+    } else if (tipo === 'blend') {
+      producto = (_db.blends || {})[c.productoId];
     }
     if (!producto) continue;
-    // Use component's costoUnitario if set, otherwise use product precio
-    var costoUnitario = Number(c.costoUnitario) || 0;
-    if (costoUnitario <= 0) {
-      if (c.talla === 'grande') {
-        costoUnitario = Number(producto.precioGrande) || 0;
-      } else {
-        costoUnitario = Number(producto.precioChico) || 0;
-      }
-    }
+    var costo = getCostoProducto(producto, tipo, cpg);
+    var talla = c.talla || 'chico';
+    var costoUnitario = (talla === 'grande') ? costo.grande : costo.chico;
+    // If no purchase data exists, costoUnitario will be 0 — that's correct (unknown cost)
     total += costoUnitario * (Number(c.cantidad) || 1);
   }
-  return total;
+  return Math.round(total);
 }
+
 
 function savePack(data) {
   _ensureStructure();
