@@ -3396,7 +3396,7 @@ const Pages = {
     var html = '<div class="modal-overlay" id="packModal">' +
       '<div class="modal modal-lg">' +
       '<div class="modal-header"><h3>' + (isEdit ? 'Editar Pack: ' + (pack.nombre || '') : 'Nuevo Pack de Productos') + '</h3>' +
-      '<button class="btn btn-sm btn-outline" onclick="document.getElementById('packModal').remove()">X</button></div>' +
+        '<button class="btn btn-sm btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body" style="max-height:70vh;overflow-y:auto">' +
 
       '<div class="form-group"><label>Nombre del Pack</label>' +
@@ -3420,7 +3420,7 @@ const Pages = {
       '</div>' +
       '<div class="modal-footer">' +
         '<button class="btn btn-gold" onclick="Pages.doSavePack(' + (isEdit ? editId : 'null') + ')">Guardar Pack</button>' +
-        '<button class="btn btn-outline" onclick="document.getElementById('packModal').remove()">Cancelar</button>' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
       '</div></div></div>';
 
     document.body.insertAdjacentHTML('beforeend', html);
@@ -3453,7 +3453,7 @@ const Pages = {
             '<select class="input" onchange="Pages.calcPackCost()"><option value="chico"' + (c.talla === 'grande' ? '' : ' selected') + '>Pequeno</option><option value="grande"' + (c.talla === 'grande' ? ' selected' : '') + '>Grande</option></select></div>' +
           '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
             '<input type="number" class="input" value="' + (c.cantidad || 1) + '" min="1" onchange="Pages.calcPackCost()"></div>' +
-          '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.closest('[data-comp-idx]').remove();Pages.calcPackCost()">X</button>' +
+          '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
         '</div></div>';
     }
     return h;
@@ -3480,7 +3480,7 @@ const Pages = {
           '<select class="input" onchange="Pages.calcPackCost()"><option value="chico" selected>Pequeno</option><option value="grande">Grande</option></select></div>' +
         '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
           '<input type="number" class="input" value="1" min="1" onchange="Pages.calcPackCost()"></div>' +
-        '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.closest('[data-comp-idx]').remove();Pages.calcPackCost()">X</button>' +
+        '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
       '</div></div>';
     container.insertAdjacentHTML('beforeend', compHTML);
   },
