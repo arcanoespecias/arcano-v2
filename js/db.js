@@ -1337,13 +1337,16 @@ function getPackCosto(pack) {
       producto = _db.blends[c.productoId];
     }
     if (!producto) continue;
-    var precio = 0;
-    if (c.talla === 'grande') {
-      precio = Number(producto.precioGrande) || 0;
-    } else {
-      precio = Number(producto.precioChico) || 0;
+    // Use component's costoUnitario if set, otherwise use product precio
+    var costoUnitario = Number(c.costoUnitario) || 0;
+    if (costoUnitario <= 0) {
+      if (c.talla === 'grande') {
+        costoUnitario = Number(producto.precioGrande) || 0;
+      } else {
+        costoUnitario = Number(producto.precioChico) || 0;
+      }
     }
-    total += precio * (Number(c.cantidad) || 1);
+    total += costoUnitario * (Number(c.cantidad) || 1);
   }
   return total;
 }
