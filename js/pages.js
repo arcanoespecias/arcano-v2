@@ -3451,13 +3451,13 @@ const Pages = {
       h += '<div class="card" style="margin-bottom:8px;padding:12px" data-comp-idx="' + i + '">' +
         '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
           '<div style="flex:2;min-width:180px"><label class="text-sm text-muted">Producto</label>' +
-            '<select class="input" onchange="Pages.calcPackCost()">' + prodOptions + '</select></div>' +
+            '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()">' + prodOptions + '</select></div>' +
           '<div style="flex:1;min-width:100px"><label class="text-sm text-muted">Talla</label>' +
-            '<select class="input" onchange="Pages.calcPackCost()"><option value="chico"' + (c.talla === 'grande' ? '' : ' selected') + '>Pequeno</option><option value="grande"' + (c.talla === 'grande' ? ' selected' : '') + '>Grande</option></select></div>' +
+            '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()"><option value="chico"' + (c.talla === 'grande' ? '' : ' selected') + '>Pequeno</option><option value="grande"' + (c.talla === 'grande' ? ' selected' : '') + '>Grande</option></select></div>' +
           '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
             '<input type="number" class="input" value="' + (c.cantidad || 1) + '" min="1" onchange="Pages.calcPackCost()"></div>' +
           '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
-            '<input type="number" class="input" value="' + (c.costoUnitario || c._precio || 0) + '" min="0" step="100" onchange="Pages.calcPackCost()" data-costo="1"></div>' +
+            '<input type="number" class="input" value="' + (c.costoUnitario || c._precio || 0) + '" min="0" step="100" readonly data-costo="1" style="background:var(--bg-body);opacity:0.7"></div>' +
           '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
         '</div></div>';
     }
@@ -3480,13 +3480,13 @@ const Pages = {
     var compHTML = '<div class="card" style="margin-bottom:8px;padding:12px" data-comp-idx="' + idx + '">' +
       '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
         '<div style="flex:2;min-width:180px"><label class="text-sm text-muted">Producto</label>' +
-          '<select class="input" onchange="Pages.calcPackCost()">' + prodOptions + '</select></div>' +
+          '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()">' + prodOptions + '</select></div>' +
         '<div style="flex:1;min-width:100px"><label class="text-sm text-muted">Talla</label>' +
-          '<select class="input" onchange="Pages.calcPackCost()"><option value="chico" selected>Pequeno</option><option value="grande">Grande</option></select></div>' +
+          '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()"><option value="chico" selected>Pequeno</option><option value="grande">Grande</option></select></div>' +
         '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
           '<input type="number" class="input" value="1" min="1" onchange="Pages.calcPackCost()"></div>' +
         '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
-          '<input type="number" class="input" value="0" min="0" step="100" onchange="Pages.calcPackCost()" data-costo="1"></div>' +
+          '<input type="number" class="input" value="0" min="0" step="100" readonly data-costo="1" style="background:var(--bg-body);opacity:0.7"></div>' +
         '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
       '</div></div>';
     container.insertAdjacentHTML('beforeend', compHTML);
