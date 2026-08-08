@@ -394,16 +394,14 @@ const Pages = {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Componentes</th><th>Frascos</th><th>Costo</th><th>P. Venta</th><th>Margen</th><th>Acciones</th></tr></thead><tbody>';
         for (var pi = 0; pi < packs.length; pi++) {
           var pk = packs[pi];
-          var compN = (pk.componentes || []).map(function(c) { return (c.cantidad || 1) + 'x ' + (c.nombre || '?'); }).join(', ');
-          var margenClass = (pk.margen || 0) >= 0 ? 'text-green' : 'text-red';
-          h += '<tr>' +
-            '<td class="fw7">' + (pk.nombre || 'Sin nombre') + '</td>' +
-            '<td class="text-sm text-muted">' + (compN || '—') + '</td>' +
+          h += '<tr><td>' + (pk.imagen ? '<img src="' + pk.imagen + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:6px"> ' : '') + '<span class="fw7">' + pk.nombre + '</span></td>' +
+            '<td>' + (pk.componentes || []).length + ' items</td>' +
             '<td>' + (pk.totalFrascos || 0) + '</td>' +
             '<td>$' + (pk.costoTotal || 0).toLocaleString() + '</td>' +
             '<td class="fw7">$' + (pk.precioVenta || 0).toLocaleString() + '</td>' +
-            '<td class="' + margenClass + ' fw7">$' + (pk.margen || 0).toLocaleString() + '</td>' +
-            '<td style="white-space:nowrap">' +
+            '<td class="' + ((pk.margen || 0) >= 0 ? 'text-green' : 'text-red') + '">$' + (pk.margen || 0).toLocaleString() + '</td>' +
+            '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" style="margin-bottom:4px" onclick="ArcanoDB.toggleTienda('pack',' + pk.id + ');App.renderPage('productos')">' + (pk.enTienda ? 'En Tienda' : 'Publicar') + '</button></td>' +
+            '<td>' +
               '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.doDeletePack(' + pk.id + ')">X</button>' +
             '</td></tr>';
@@ -3407,6 +3405,12 @@ const Pages = {
 
       '<div class="form-group"><label>Precio de Venta ($)</label>' +
       '<input type="number" class="input" id="packPrecio" value="' + (isEdit ? (pack.precioVenta || 0) : '') + '" min="0" step="100" oninput="Pages.calcPackCost()"></div>' +
+      ' + 
+      '<div class="form-group"><label>Imagen del Pack</label>' +
+      '<div id="img-area-pk" class="img-upload-area">' +
+        (isEdit && pack.imagen ? '<img src="' + pack.imagen + '" class="img-preview" id="img-preview-pk"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-pk\',\'f-pk-img\')">Quitar imagen</button>' : '') +
+        '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-pk-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
+      '<input type="file" id="f-pk-img" accept="image/*" style="display:none" onchange="Pages.handlePackImage(this)">'
 
       '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">' +
         '<label class="fw7">Componentes del Pack</label>' +
@@ -3575,7 +3579,8 @@ const Pages = {
       nombre: nombre,
       descripcion: (document.getElementById('packDesc').value || '').trim(),
       precioVenta: Number(document.getElementById('packPrecio').value) || 0,
-      componentes: componentes
+      componentes: componentes,
+      imagen: (document.getElementById('img-preview-pk') || {}).src || ''      componentes: componentes
     };
     if (editId != null) data.id = editId;
 
