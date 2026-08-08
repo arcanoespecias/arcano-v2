@@ -360,6 +360,9 @@ var PDV = {
 
   /* ==================== POS (PUNTO DE VENTA) ==================== */
   _posCart: [],
+  _pdvCamStream: null,
+  _pdvCamCart: [],
+  _pdvCamOcrRunning: false,
 
   renderPos(container) {
     var pdv = this.currentPDV;
@@ -376,6 +379,7 @@ var PDV = {
     // Productos disponibles en PDV
     h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">' +
       '<input type="text" class="input" id="pos-search" placeholder="Buscar producto..." style="flex:1" oninput="PDV.filterPos()">' +
+      '<button class="btn btn-gold" onclick="PDV.formVentaCam()" title="Venta por camara">Camara</button>' +
       '</div>';
     h += '<div id="pos-products" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:50vh;overflow-y:auto">';
     var products = [];
@@ -744,6 +748,328 @@ var PDV = {
       img.style.height = '200px';
       qrContainer.appendChild(img);
     }
+  },
+
+
+  /* ==================== VENTA POR CAMARA (OCR) ==================== */
+  formVentaCam() {
+    var pdv = this.currentPDV;
+    if (!pdv) return;
+    this._pdvCamCart = [];
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'pdv-cam-venta-modal';
+    modal.innerHTML =
+      '<div class="modal modal-lg" style="max-width:520px">' +
+        '<div class="modal-header"><h3>Venta por Camara — ' + this.esc(pdv.nombre) + '</h3>' +
+          '<button class="btn btn-ghost" onclick="PDV.closeVentaCam()">X</button></div>' +
+        '<div class="modal-body" style="padding:0">' +
+          '<div style="position:relative;background:#000">' +
+            '<video id="pdv-cam-video" autoplay playsinline style="width:100%;display:block;max-height:320px;object-fit:cover"></video>' +
+            '<canvas id="pdv-cam-canvas" style="display:none"></canvas>' +
+            '<div id="pdv-cam-scan-line" style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:var(--gold);opacity:0.6;transform:translateY(-50%);animation:pdvScanLine 2s ease-in-out infinite;pointer-events:none"></div>' +
+            '<style>@keyframes pdvScanLine{0%,100%{top:calc(50% - 50px)}50%{top:calc(50% + 50px)}}</style>' +
+          '</div>' +
+          '<div id="pdv-cam-status" style="padding:12px 16px;background:var(--bg-card);color:var(--muted);font-size:0.85rem;text-align:center">' +
+            'Apunta la camara a la etiqueta del producto' +
+          '</div>' +
+          '<div style="display:flex;justify-content:center;gap:8px;padding:8px 16px;background:var(--bg-card)">' +
+            '<button class="btn btn-sm btn-outline" id="pdv-cam-flash-btn" onclick="PDV.togglePDVCamFlash()">Flash</button>' +
+            '<button class="btn btn-sm btn-gold" onclick="PDV.captureAndReadPDV()">Capturar</button>' +
+          '</div>' +
+          '<div id="pdv-cam-confirm-area" style="padding:12px 16px;display:none">' +
+            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Producto detectado</div>' +
+            '<div id="pdv-cam-detected-text" style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;font-style:italic"></div>' +
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+              '<select class="input" id="pdv-cam-prod-select" style="flex:1;min-width:140px"><option value="">Seleccionar producto</option></select>' +
+              '<select class="input" id="pdv-cam-talla-select" style="width:120px"><option value="chico">Pequeno</option><option value="grande">Grande</option></select>' +
+              '<button class="btn btn-sm btn-gold" onclick="PDV.addPDVCamProduct()">+ Agregar</button>' +
+              '<button class="btn btn-sm btn-outline" onclick="PDV.cancelPDVCamDetect()">Seguir leyendo</button>' +
+            '</div>' +
+          '</div>' +
+          '<div id="pdv-cam-cart-area" style="padding:12px 16px;max-height:200px;overflow-y:auto;display:none">' +
+            '<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Productos agregados</div>' +
+            '<div id="pdv-cam-cart-items"></div>' +
+          '</div>' +
+          '<div id="pdv-cam-total-area" style="padding:12px 16px;border-top:1px solid var(--border);display:none">' +
+            '<div class="venta-total-box">Total: $<span id="pdv-cam-venta-total">0</span></div>' +
+            '<button class="btn btn-gold btn-block" style="margin-top:8px" onclick="PDV.confirmarVentaCamPDV()">Confirmar Venta</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    setTimeout(function() { PDV.startPDVCamera(); }, 300);
+  },
+
+  startPDVCamera() {
+    var video = document.getElementById('pdv-cam-video');
+    if (!video) return;
+    var statusEl = document.getElementById('pdv-cam-status');
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    }).then(function(stream) {
+      PDV._pdvCamStream = stream;
+      video.srcObject = stream;
+      video.play();
+      if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto';
+    }).catch(function(err) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se pudo acceder a la camara: ' + err.message + '</span>';
+    });
+  },
+
+  stopPDVCamera() {
+    if (PDV._pdvCamStream) {
+      PDV._pdvCamStream.getTracks().forEach(function(t) { t.stop(); });
+      PDV._pdvCamStream = null;
+    }
+    PDV._pdvCamOcrRunning = false;
+  },
+
+  togglePDVCamFlash() {
+    if (!PDV._pdvCamStream) return;
+    var track = PDV._pdvCamStream.getVideoTracks()[0];
+    if (!track) return;
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.torch) {
+      var isOn = (track.getSettings && track.getSettings().torch) || false;
+      track.applyConstraints({ advanced: [{ torch: !isOn }] });
+      var btn = document.getElementById('pdv-cam-flash-btn');
+      if (btn) btn.textContent = isOn ? 'Flash' : 'Flash ON';
+    }
+  },
+
+  captureAndReadPDV() {
+    if (PDV._pdvCamOcrRunning) return;
+    var video = document.getElementById('pdv-cam-video');
+    var canvas = document.getElementById('pdv-cam-canvas');
+    var statusEl = document.getElementById('pdv-cam-status');
+    if (!video || !canvas || video.readyState < 2) return;
+    if (navigator.vibrate) navigator.vibrate(50);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    var imageData = canvas.toDataURL('image/png');
+    PDV._pdvCamOcrRunning = true;
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Leyendo etiqueta...</span>';
+    if (typeof Tesseract === 'undefined') {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Libreria OCR no disponible. Verifica conexion a internet.</span>';
+      PDV._pdvCamOcrRunning = false;
+      return;
+    }
+    Tesseract.recognize(imageData, 'spa+eng', {
+      logger: function() {}
+    }).then(function(result) {
+      PDV._pdvCamOcrRunning = false;
+      var text = (result && result.data && result.data.text) || '';
+      text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      PDV.handlePDVOCRResult(text);
+    }).catch(function(err) {
+      PDV._pdvCamOcrRunning = false;
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al leer: ' + err.message + '</span>';
+    });
+  },
+
+  handlePDVOCRResult(text) {
+    var pdv = this.currentPDV;
+    var statusEl = document.getElementById('pdv-cam-status');
+    var confirmArea = document.getElementById('pdv-cam-confirm-area');
+    var detectedTextEl = document.getElementById('pdv-cam-detected-text');
+    var prodSelect = document.getElementById('pdv-cam-prod-select');
+    if (!text || text.length < 2) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se detecto texto. Intenta de nuevo.</span>';
+      setTimeout(function() { if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto'; }, 2000);
+      return;
+    }
+    // Build product list from PDV stock only
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var pdvStock = pdv.stock || {};
+    var allProducts = [];
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var keyCh = 'especia_' + e.id + '_chico';
+      var keyGr = 'especia_' + e.id + '_grande';
+      if ((pdvStock[keyCh] || 0) > 0 || (pdvStock[keyGr] || 0) > 0) {
+        allProducts.push({ tipo: 'especia', producto: e, tallas: [] });
+        if ((pdvStock[keyCh] || 0) > 0) allProducts[allProducts.length - 1].tallas.push('chico');
+        if ((pdvStock[keyGr] || 0) > 0) allProducts[allProducts.length - 1].tallas.push('grande');
+      }
+    }
+    for (var j = 0; j < blends.length; j++) {
+      var b = blends[j];
+      var keyCh2 = 'blend_' + b.id + '_chico';
+      var keyGr2 = 'blend_' + b.id + '_grande';
+      if ((pdvStock[keyCh2] || 0) > 0 || (pdvStock[keyGr2] || 0) > 0) {
+        allProducts.push({ tipo: 'blend', producto: b, tallas: [] });
+        if ((pdvStock[keyCh2] || 0) > 0) allProducts[allProducts.length - 1].tallas.push('chico');
+        if ((pdvStock[keyGr2] || 0) > 0) allProducts[allProducts.length - 1].tallas.push('grande');
+      }
+    }
+    var ocrLower = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var scored = [];
+    for (var k = 0; k < allProducts.length; k++) {
+      var p = allProducts[k];
+      var name = (p.producto.nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      var nameWords = name.split(/\s+/);
+      var matchCount = 0;
+      for (var w = 0; w < nameWords.length; w++) {
+        if (nameWords[w].length < 2) continue;
+        if (ocrLower.indexOf(nameWords[w]) !== -1) matchCount++;
+      }
+      var score = nameWords.length > 0 ? matchCount / nameWords.length : 0;
+      if (ocrLower.indexOf(name) !== -1) score = Math.max(score, 1.0);
+      if (name.length >= 3 && ocrLower.indexOf(name.substring(0, Math.min(name.length, 6))) !== -1) score = Math.max(score, 0.7);
+      if (score >= 0.5) scored.push({ tipo: p.tipo, producto: p.producto, score: score, tallas: p.tallas });
+    }
+    scored.sort(function(a, b) { return b.score - a.score; });
+    if (confirmArea) confirmArea.style.display = 'block';
+    if (detectedTextEl) detectedTextEl.textContent = 'Texto leido: "' + text.substring(0, 80) + (text.length > 80 ? '...' : '') + '"';
+    if (prodSelect) {
+      prodSelect.innerHTML = '<option value="">Seleccionar producto</option>';
+      if (scored.length > 0) {
+        for (var s = 0; s < Math.min(scored.length, 5); s++) {
+          var sc = scored[s];
+          var pct = Math.round(sc.score * 100);
+          prodSelect.innerHTML += '<option value="' + sc.tipo + '|' + sc.producto.id + '">' + sc.producto.nombre + ' (' + pct + '%)</option>';
+        }
+        if (scored[0].score >= 0.7) {
+          prodSelect.value = scored[0].tipo + '|' + scored[0].producto.id;
+        }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Producto detectado - confirma abajo</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No se encontro producto. Selecciona manualmente.</span>';
+        for (var a = 0; a < allProducts.length; a++) {
+          var ap = allProducts[a];
+          prodSelect.innerHTML += '<option value="' + ap.tipo + '|' + ap.producto.id + '">' + ap.producto.nombre + '</option>';
+        }
+      }
+    }
+  },
+
+  cancelPDVCamDetect() {
+    var confirmArea = document.getElementById('pdv-cam-confirm-area');
+    if (confirmArea) confirmArea.style.display = 'none';
+    var statusEl = document.getElementById('pdv-cam-status');
+    if (statusEl) statusEl.textContent = 'Apunta la camara a la etiqueta del producto';
+  },
+
+  addPDVCamProduct() {
+    var pdv = this.currentPDV;
+    var prodVal = document.getElementById('pdv-cam-prod-select').value;
+    var tallaVal = document.getElementById('pdv-cam-talla-select').value;
+    if (!prodVal) { toast('Selecciona un producto', 'err'); return; }
+    var parts = prodVal.split('|');
+    var tipo = parts[0];
+    var prodId = Number(parts[1]);
+    var producto = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
+    if (!producto) { toast('Producto no encontrado', 'err'); return; }
+    // Check PDV stock
+    var pdvStock = pdv.stock || {};
+    var stockKey = tipo + '_' + prodId + '_' + tallaVal;
+    var stock = pdvStock[stockKey] || 0;
+    var precioKey = tallaVal === 'grande' ? 'precioGrande' : 'precioChico';
+    var precio = producto[precioKey] || 0;
+    if (stock <= 0) { toast('Sin stock de ' + producto.nombre + ' (' + tallaVal + ') en este PDV', 'err'); return; }
+    var found = false;
+    for (var i = 0; i < this._pdvCamCart.length; i++) {
+      if (this._pdvCamCart[i].tipo === tipo && this._pdvCamCart[i].productoId === prodId && this._pdvCamCart[i].talla === tallaVal) {
+        // Check current cart qty + 1 vs PDV stock
+        if (this._pdvCamCart[i].cantidad >= stock) { toast('Stock maximo en PDV: ' + stock, 'err'); return; }
+        this._pdvCamCart[i].cantidad++;
+        this._pdvCamCart[i].subtotal = this._pdvCamCart[i].precioUnitario * this._pdvCamCart[i].cantidad;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      this._pdvCamCart.push({ tipo: tipo, productoId: prodId, talla: tallaVal, productoNombre: producto.nombre, cantidad: 1, precioUnitario: precio, subtotal: precio });
+    }
+    if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+    this.renderPDVCamCart();
+    this.cancelPDVCamDetect();
+  },
+
+  renderPDVCamCart() {
+    var cartArea = document.getElementById('pdv-cam-cart-area');
+    var cartItems = document.getElementById('pdv-cam-cart-items');
+    var totalArea = document.getElementById('pdv-cam-total-area');
+    var totalSpan = document.getElementById('pdv-cam-venta-total');
+    if (this._pdvCamCart.length === 0) {
+      if (cartArea) cartArea.style.display = 'none';
+      if (totalArea) totalArea.style.display = 'none';
+      return;
+    }
+    if (cartArea) cartArea.style.display = 'block';
+    if (totalArea) totalArea.style.display = 'block';
+    var h = '';
+    var total = 0;
+    for (var i = 0; i < this._pdvCamCart.length; i++) {
+      var item = this._pdvCamCart[i];
+      var sub = item.cantidad * item.precioUnitario;
+      total += sub;
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div><div style="font-weight:600;font-size:0.9rem">' + this.esc(item.productoNombre) + '</div>' +
+        '<div style="font-size:0.75rem;color:var(--muted)">' + item.talla + ' | $' + item.precioUnitario.toLocaleString() + ' c/u</div></div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<button class="btn btn-sm btn-outline" onclick="PDV.pdvCamCartQty(' + i + ',-1)">-</button>' +
+        '<span style="font-weight:700;min-width:24px;text-align:center">' + item.cantidad + '</span>' +
+        '<button class="btn btn-sm btn-outline" onclick="PDV.pdvCamCartQty(' + i + ',1)">+</button>' +
+        '<span style="font-weight:700;color:var(--gold);min-width:70px;text-align:right">$' + sub.toLocaleString() + '</span>' +
+        '<button class="btn btn-sm btn-red" onclick="PDV.pdvCamCartRemove(' + i + ')">X</button>' +
+        '</div></div>';
+    }
+    if (cartItems) cartItems.innerHTML = h;
+    if (totalSpan) totalSpan.textContent = total.toLocaleString();
+  },
+
+  pdvCamCartQty(idx, delta) {
+    if (!this._pdvCamCart[idx]) return;
+    var item = this._pdvCamCart[idx];
+    var newCant = item.cantidad + delta;
+    // Check PDV stock
+    var pdv = this.currentPDV;
+    var stockKey = item.tipo + '_' + item.productoId + '_' + item.talla;
+    var maxStock = (pdv.stock || {})[stockKey] || 0;
+    if (newCant < 1 || newCant > maxStock) return;
+    item.cantidad = newCant;
+    item.subtotal = item.precioUnitario * item.cantidad;
+    this.renderPDVCamCart();
+  },
+
+  pdvCamCartRemove(idx) {
+    this._pdvCamCart.splice(idx, 1);
+    this.renderPDVCamCart();
+  },
+
+  confirmarVentaCamPDV() {
+    if (this._pdvCamCart.length === 0) { toast('No hay productos en la venta', 'err'); return; }
+    var pdv = this.currentPDV;
+    if (!pdv) return;
+    var total = this._pdvCamCart.reduce(function(s, it) { return s + it.subtotal; }, 0);
+    if (!confirm('Registrar venta por $' + total.toLocaleString() + ' en ' + pdv.nombre + '?')) return;
+    try {
+      var venta = ArcanoDB.savePDVVenta({
+        puntoDeVentaId: pdv.id,
+        puntoDeVentaNombre: pdv.nombre,
+        items: this._pdvCamCart.map(function(it) {
+          return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario };
+        })
+      });
+      this.closeVentaCam();
+      toast('Venta registrada! #' + venta.id);
+      this.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
+      this.render(document.getElementById('page-content'));
+    } catch (err) {
+      toast('Error: ' + err.message, 'err');
+    }
+  },
+
+  closeVentaCam() {
+    this.stopPDVCamera();
+    var modal = document.getElementById('pdv-cam-venta-modal');
+    if (modal) modal.remove();
+    this._pdvCamCart = [];
   },
 
   /* ==================== HELPERS ==================== */
