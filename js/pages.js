@@ -289,6 +289,7 @@ const Pages = {
   renderProductos(container) {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
+    var packs = ArcanoDB.getPacks();
     var tab = window._prodTab || 'especias';
 
     // --- TAB: ETIQUETAS DE USO (sin busqueda) ---
@@ -341,6 +342,7 @@ const Pages = {
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
         (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
+        (tab==='packs' ? '<button class="btn btn-gold" onclick="Pages.formPack()">+ Pack</button>' : '') +
       '</div></div>';
 
     h += '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 12px;flex-wrap:wrap">' +
@@ -353,6 +355,13 @@ const Pages = {
     '</div>';
 
     h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
+
+    // --- TAB: PACKS ---
+    if (tab === 'packs') {
+      window._prodSearch = '';
+      Pages.renderPacksTab(container, packs);
+      return;
+    }
 
     if (tab === 'especias') {
       h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeno</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody id="prod-tbody" data-tab="especias"></tbody></table></div>';
@@ -3465,4 +3474,209 @@ const Pages = {
     // Redirect to ventas tab for backward compat
     Pages._estTab = 'ventas';
     Pages._renderVentas(data, el);
-  }};
+  },
+
+  /* ================================================================
+     PACKS DE PRODUCTOS
+     ================================================================ */
+  renderPacksTab(container, packs) {
+    var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+      '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
+        '<button class="tab" onclick="window._prodTab=\'especias\';App.renderPage(\'productos\')">Especias<span class="tab-count">' + ArcanoDB.getEspecias().length + '</span></button>' +
+        '<button class="tab" onclick="window._prodTab=\'blends\';App.renderPage(\'productos\')">Blends<span class="tab-count">' + ArcanoDB.getBlends().length + '</span></button>' +
+        '<button class="tab active" onclick="window._prodTab=\'packs\';App.renderPage(\'productos\')">Packs<span class="tab-count">' + packs.length + '</span></button>' +
+        '<button class="tab" onclick="window._prodTab=\'uso\';App.renderPage(\'productos\')">Etiquetas de uso</button>' +
+      '</div></div>';
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">' +
+      '<button class="btn btn-gold" onclick="Pages.formPack()">+ Pack</button></div>';
+    h += '<div style="border-bottom:2px solid var(--border);margin:0 0 16px"></div>';
+    if (packs.length === 0) {
+      h += '<div class="card"><div class="card-body text-center text-muted" style="padding:40px">' +
+        '<p style="font-size:48px;margin-bottom:12px">📦</p>' +
+        '<p>No hay packs creados</p>' +
+        '<p class="text-sm">Crea un pack combinando multiples productos con precio especial</p></div></div>';
+    } else {
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">';
+      for (var i = 0; i < packs.length; i++) {
+        var pk = packs[i];
+        var compNames = [];
+        for (var j = 0; j < (pk.componentes || []).length; j++) {
+          var c = pk.componentes[j];
+          var prod = c.tipo === 'especia' ? ArcanoDB.getEspecia(c.productoId) : ArcanoDB.getBlend(c.productoId);
+          var nm = prod ? prod.nombre : '?';
+          compNames.push(nm + ' (' + c.talla + ') x' + c.cantidad);
+        }
+        var margen = (pk.precioVenta || 0) - (pk.costoTotal || 0);
+        var margenPct = pk.costoTotal > 0 ? Math.round((margen / pk.costoTotal) * 100) : 0;
+        h += '<div class="card">' +
+          '<div class="card-body">' +
+          '<div style="display:flex;justify-content:space-between;align-items:start">' +
+          '<div><h4 style="margin:0 0 4px">' + (pk.nombre || 'Sin nombre') + '</h4>' +
+          '<p class="text-muted text-sm">' + (pk.totalFrascos || 0) + ' frascos</p></div>' +
+          '<span class="badge badge-gold">$' + (pk.precioVenta || 0).toLocaleString() + '</span></div>' +
+          '<div style="margin:8px 0;padding:8px;background:var(--bg2);border-radius:var(--radius-sm);font-size:0.8rem">' +
+          compNames.join('<br>') + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px">' +
+          '<div class="text-center"><div class="text-muted text-sm">Costo</div><div class="fw7">$' + (pk.costoTotal || 0).toLocaleString() + '</div></div>' +
+          '<div class="text-center"><div class="text-muted text-sm">Margen</div><div class="fw7" style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toLocaleString() + ' (' + margenPct + '%)</div></div>' +
+          '<div class="text-center"><div class="text-muted text-sm">Venta</div><div class="fw7">$' + (pk.precioVenta || 0).toLocaleString() + '</div></div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;margin-top:10px">' +
+          '<button class="btn btn-sm btn-outline" style="flex:1" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
+          '<button class="btn btn-sm btn-red" onclick="Pages.doDeletePack(' + pk.id + ')">Eliminar</button>' +
+          '</div></div></div>';
+      }
+      h += '</div>';
+    }
+    container.innerHTML = h;
+  },
+
+  formPack(editId) {
+    var pack = editId ? ArcanoDB.getPack(editId) : null;
+    var isEdit = !!pack;
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var comps = isEdit ? (pack.componentes || []) : [];
+
+    // Build product options
+    var prodOpts = '<optgroup label="Especias">';
+    for (var i = 0; i < especias.length; i++) {
+      prodOpts += '<option value="especia|' + especias[i].id + '">' + especias[i].nombre + '</option>';
+    }
+    prodOpts += '</optgroup><optgroup label="Blends">';
+    for (var j = 0; j < blends.length; j++) {
+      prodOpts += '<option value="blend|' + blends[j].id + '">' + blends[j].nombre + '</option>';
+    }
+    prodOpts += '</optgroup>';
+
+    var h = '<div class="form-group"><label>Nombre del Pack</label>' +
+      '<input type="text" class="input" id="f-pk-nombre" value="' + (isEdit ? (pack.nombre || '').replace(/"/g, '&quot;') : '') + '" placeholder="Ej: Pack Fundador, Pack Feria..."></div>';
+    h += '<div class="form-group"><label>Descripcion (opcional)</label>' +
+      '<input type="text" class="input" id="f-pk-desc" value="' + (isEdit ? (pack.descripcion || '').replace(/"/g, '&quot;') : '') + '" placeholder="Descripcion breve del pack"></div>';
+    h += '<div class="g2"><div class="form-group"><label>Precio de Venta ($)</label>' +
+      '<input type="number" class="input" id="f-pk-precio" value="' + (isEdit ? (pack.precioVenta || 0) : '') + '" placeholder="0" min="0" oninput="Pages.calcPackCost()"></div>' +
+      '<div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end"><div id="pk-costo-display" style="padding:8px;background:var(--bg2);border-radius:var(--radius-sm);font-size:0.85rem"><span class="text-muted">Costo auto:</span> <strong id="pk-costo-val">$0</strong> <span class="text-muted" style="margin-left:8px">Margen:</span> <strong id="pk-margen-val" style="color:var(--green)">$0</strong></div></div></div>';
+
+    // Components
+    h += '<div style="margin:12px 0 8px;display:flex;align-items:center;justify-content:space-between">' +
+      '<label style="font-weight:700">Componentes del Pack</label>' +
+      '<button class="btn btn-sm btn-outline" onclick="Pages.addPackComponent()">+ Agregar</button></div>';
+    h += '<div id="pk-comps">';
+    for (var c = 0; c < comps.length; c++) {
+      h += Pages._packCompHTML(c, comps[c], prodOpts);
+    }
+    h += '</div>';
+    if (comps.length === 0) {
+      h += '<p class="text-muted text-sm text-center" style="padding:12px" id="pk-no-comps">Agrega componentes al pack</p>';
+    }
+
+    h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
+      '<button class="btn btn-outline" onclick="App.renderPage(\'productos\')">Cancelar</button>' +
+      '<button class="btn btn-gold" onclick="Pages.doSavePack(' + (editId || 'null') + ')">Guardar Pack</button></div>';
+
+    openModal(isEdit ? 'Editar Pack' : 'Nuevo Pack', h);
+    Pages._packProdOpts = prodOpts;
+    setTimeout(function() { Pages.calcPackCost(); }, 100);
+  },
+
+  _packCompHTML(idx, comp, prodOpts) {
+    if (!prodOpts) prodOpts = Pages._packProdOpts || '';
+    var selVal = (comp.tipo || 'especia') + '|' + (comp.productoId || 0);
+    return '<div class="pk-comp-row" data-idx="' + idx + '" style="display:flex;align-items:center;gap:6px;margin:4px 0;padding:8px;background:var(--bg2);border-radius:var(--radius-sm);flex-wrap:wrap">' +
+      '<select class="input pk-comp-prod" style="flex:1;min-width:140px" onchange="Pages.calcPackCost()">' + prodOpts.replace('value="' + selVal + '"', 'value="' + selVal + '" selected') + '</select>' +
+      '<select class="input pk-comp-talla" style="width:100px" onchange="Pages.calcPackCost()"><option value="chico"' + (comp.talla === 'chico' ? ' selected' : '') + '>Pequeno</option><option value="grande"' + (comp.talla === 'grande' ? ' selected' : '') + '>Grande</option></select>' +
+      '<div style="display:flex;align-items:center;gap:4px"><label class="text-sm text-muted">Cant:</label>' +
+      '<input type="number" class="input pk-comp-cant" style="width:60px" value="' + (comp.cantidad || 1) + '" min="1" max="99" onchange="Pages.calcPackCost()"></div>' +
+      '<span class="pk-comp-precio text-sm" style="min-width:70px;text-align:right"></span>' +
+      '<button class="btn btn-sm btn-red" onclick="this.parentElement.remove();Pages.calcPackCost()">X</button></div>';
+  },
+
+  addPackComponent() {
+    var noComps = document.getElementById('pk-no-comps');
+    if (noComps) noComps.remove();
+    var container = document.getElementById('pk-comps');
+    if (!container) return;
+    var idx = container.children.length;
+    var div = document.createElement('div');
+    div.innerHTML = Pages._packCompHTML(idx, {}, Pages._packProdOpts);
+    container.appendChild(div.firstElementChild);
+    Pages.calcPackCost();
+  },
+
+  calcPackCost() {
+    var rows = document.querySelectorAll('.pk-comp-row');
+    var totalCosto = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var prodSel = row.querySelector('.pk-comp-prod');
+      var tallaSel = row.querySelector('.pk-comp-talla');
+      var cantInp = row.querySelector('.pk-comp-cant');
+      var precioSpan = row.querySelector('.pk-comp-precio');
+      if (!prodSel || !prodSel.value) { if (precioSpan) precioSpan.textContent = ''; continue; }
+      var parts = prodSel.value.split('|');
+      var tipo = parts[0];
+      var prodId = Number(parts[1]);
+      var talla = tallaSel ? tallaSel.value : 'chico';
+      var cant = Number(cantInp ? cantInp.value : 1) || 1;
+      var prod = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
+      var precio = prod ? (talla === 'grande' ? (Number(prod.precioGrande) || 0) : (Number(prod.precioChico) || 0)) : 0;
+      var sub = precio * cant;
+      totalCosto += sub;
+      if (precioSpan) precioSpan.textContent = '$' + sub.toLocaleString() + ' (' + (prod ? prod.nombre : '?') + ')';
+    }
+    var costoVal = document.getElementById('pk-costo-val');
+    var margenVal = document.getElementById('pk-margen-val');
+    var precioInp = document.getElementById('f-pk-precio');
+    var precioVenta = Number(precioInp ? precioInp.value : 0) || 0;
+    var margen = precioVenta - totalCosto;
+    if (costoVal) costoVal.textContent = '$' + totalCosto.toLocaleString();
+    if (margenVal) {
+      margenVal.textContent = '$' + margen.toLocaleString() + (totalCosto > 0 ? ' (' + Math.round((margen / totalCosto) * 100) + '%)' : '');
+      margenVal.style.color = margen >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+  },
+
+  doSavePack(editId) {
+    var nombre = (document.getElementById('f-pk-nombre').value || '').trim();
+    var desc = (document.getElementById('f-pk-desc').value || '').trim();
+    var precio = Number(document.getElementById('f-pk-precio').value) || 0;
+    if (!nombre) { toast('Ingresa un nombre para el pack', 'err'); return; }
+    var rows = document.querySelectorAll('.pk-comp-row');
+    if (rows.length === 0) { toast('Agrega al menos un componente', 'err'); return; }
+    var componentes = [];
+    for (var i = 0; i < rows.length; i++) {
+      var prodSel = rows[i].querySelector('.pk-comp-prod');
+      var tallaSel = rows[i].querySelector('.pk-comp-talla');
+      var cantInp = rows[i].querySelector('.pk-comp-cant');
+      if (!prodSel || !prodSel.value) continue;
+      var parts = prodSel.value.split('|');
+      componentes.push({
+        tipo: parts[0],
+        productoId: Number(parts[1]),
+        talla: tallaSel ? tallaSel.value : 'chico',
+        cantidad: Number(cantInp ? cantInp.value : 1) || 1
+      });
+    }
+    if (componentes.length === 0) { toast('Agrega al menos un componente valido', 'err'); return; }
+    var data = { nombre: nombre, descripcion: desc, precioVenta: precio, componentes: componentes };
+    if (editId) data.id = editId;
+    try {
+      ArcanoDB.savePack(data);
+      closeModal();
+      toast('Pack guardado');
+      window._prodTab = 'packs';
+      App.renderPage('productos');
+    } catch (e) { toast(e.message, 'err'); }
+  },
+
+  doDeletePack(id) {
+    var pk = ArcanoDB.getPack(id);
+    if (!pk) return;
+    if (!confirm('Eliminar pack "' + pk.nombre + '"?')) return;
+    ArcanoDB.deletePack(id);
+    toast('Pack eliminado');
+    window._prodTab = 'packs';
+    App.renderPage('productos');
+  }
+
+};
