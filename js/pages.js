@@ -3409,7 +3409,7 @@ const Pages = {
       '<div id="img-area-pk" class="img-upload-area">' +
         (isEdit && pack.imagen ? '<img src="' + pack.imagen + '" class="img-preview" id="img-preview-pk"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-pk\',\'f-pk-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-pk-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
-      '<input type="file" id="f-pk-img" accept="image/*" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-pk\')">'
+      '<input type="file" id="f-pk-img" accept="image/*" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-pk\')">' +
 
       '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">' +
         '<label class="fw7">Componentes del Pack</label>' +
