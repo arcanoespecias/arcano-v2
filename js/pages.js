@@ -294,10 +294,10 @@ const Pages = {
 
     var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
-        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
-        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
-        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage('productos')">Etiquetas de uso</button>` +
-        `<button class="tab${tab==='packs' ? ' active' : ''}" onclick="window._prodTab='packs';App.renderPage('productos')">Packs<span class="tab-count">${packs.length}</span></button>` +
+        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage(\'productos\')">Especias<span class="tab-count">${especias.length}</span></button>` +
+        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage(\'productos\')">Blends<span class="tab-count">${blends.length}</span></button>` +
+        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage(\'productos\')">Etiquetas de uso</button>` +
+        `<button class="tab${tab==='packs' ? ' active' : ''}" onclick="window._prodTab='packs';App.renderPage(\'productos\')">Packs<span class="tab-count">${packs.length}</span></button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
@@ -400,7 +400,7 @@ const Pages = {
             '<td>$' + (pk.costoTotal || 0).toLocaleString() + '</td>' +
             '<td class="fw7">$' + (pk.precioVenta || 0).toLocaleString() + '</td>' +
             '<td class="' + ((pk.margen || 0) >= 0 ? 'text-green' : 'text-red') + '">$' + (pk.margen || 0).toLocaleString() + '</td>' +
-            '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" style="margin-bottom:4px" onclick="ArcanoDB.toggleTienda('pack',' + pk.id + ');App.renderPage('productos')">' + (pk.enTienda ? 'En Tienda' : 'Publicar') + '</button></td>' +
+            '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" style="margin-bottom:4px" onclick="ArcanoDB.toggleTienda(\'pack\',' + pk.id + ');App.renderPage(\'productos\')">' + (pk.enTienda ? 'En Tienda' : 'Publicar') + '</button></td>' +
             '<td>' +
               '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.doDeletePack(' + pk.id + ')">X</button>' +
@@ -3405,7 +3405,6 @@ const Pages = {
 
       '<div class="form-group"><label>Precio de Venta ($)</label>' +
       '<input type="number" class="input" id="packPrecio" value="' + (isEdit ? (pack.precioVenta || 0) : '') + '" min="0" step="100" oninput="Pages.calcPackCost()"></div>' +
-      ' + 
       '<div class="form-group"><label>Imagen del Pack</label>' +
       '<div id="img-area-pk" class="img-upload-area">' +
         (isEdit && pack.imagen ? '<img src="' + pack.imagen + '" class="img-preview" id="img-preview-pk"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-pk\',\'f-pk-img\')">Quitar imagen</button>' : '') +
@@ -3580,7 +3579,8 @@ const Pages = {
       descripcion: (document.getElementById('packDesc').value || '').trim(),
       precioVenta: Number(document.getElementById('packPrecio').value) || 0,
       componentes: componentes,
-      imagen: (document.getElementById('img-preview-pk') || {}).src || ''      componentes: componentes
+      imagen: (document.getElementById('img-preview-pk') || {}).src || '',
+      componentes: componentes
     };
     if (editId != null) data.id = editId;
 
