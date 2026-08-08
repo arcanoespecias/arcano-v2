@@ -3485,6 +3485,8 @@ const Pages = {
           '<select class="input" onchange="Pages.calcPackCost()"><option value="chico" selected>Pequeno</option><option value="grande">Grande</option></select></div>' +
         '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
           '<input type="number" class="input" value="1" min="1" onchange="Pages.calcPackCost()"></div>' +
+        '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
+          '<input type="number" class="input" value="0" min="0" step="100" onchange="Pages.calcPackCost()" data-costo="1"></div>' +
         '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
       '</div></div>';
     container.insertAdjacentHTML('beforeend', compHTML);
