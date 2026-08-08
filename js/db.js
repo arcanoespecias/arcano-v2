@@ -30,7 +30,7 @@ var _saveTimer = null;
 var _listeners = [];
 var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosdeventa: 1, pdvVentas: 1, packs: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, packs: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -39,7 +39,7 @@ function _filterValid(arr) {
 }
 
 function _cleanNulls() {
-var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'stickers', 'ajustes', 'puntosdeventa', 'pdvVentas', 'packs'];
+  var cols = ['especias', 'blends', 'producciones', 'ventas', 'entradas', 'stickers', 'ajustes', 'packs'];
   for (var c = 0; c < cols.length; c++) {
     var col = cols[c];
     if (!_db[col]) { _db[col] = {}; continue; }
@@ -71,10 +71,9 @@ function _ensureStructure() {
   if (!_db.ventas) _db.ventas = {};
   if (!_db.entradas) _db.entradas = {};
   if (!_db.stickers) _db.stickers = {};
-if (!_db.ajustes) _db.ajustes = {};
-  if (!_db.puntosdeventa) _db.puntosdeventa = {};
-  if (!_db.pdvVentas) _db.pdvVentas = {};
-  if (!_db.packs) _db.packs = {};  // Migration: copy old etiquetas data to stickers
+  if (!_db.ajustes) _db.ajustes = {};
+  if (!_db.packs) _db.packs = {};
+  // Migration: copy old etiquetas data to stickers
   if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
     _db.stickers = _db.etiquetas;
   }
@@ -96,7 +95,7 @@ if (!_db.ajustes) _db.ajustes = {};
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosdeventa: {}, pdvVentas: {}, packs: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, packs: {},
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     productTags: {
@@ -1164,206 +1163,40 @@ function compressImage(file, maxW, quality, cb) {
 }
 
 
-/* ==================== PUNTOS DE VENTA ==================== */
-
-function getPuntosDeVenta() {
-  return _filterValid(Object.values(_db.puntosdeventa || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
-}
-function getPuntoDeVenta(id) { return _db.puntosdeventa[id] || null; }
-
-function savePuntoDeVenta(data) {
-  _ensureStructure();
-  var isNew = !data.id;
-  if (isNew) {
-    data.id = nextId('puntosdeventa');
-    data.creado = new Date().toISOString();
-    data.stock = data.stock || {};
-    data.activo = data.activo !== false;
-  }
-  data.nombre = (data.nombre || '').trim();
-  data.ubicacion = (data.ubicacion || '').trim();
-  if (!data.stock) data.stock = {};
-  _db.puntosdeventa[data.id] = data;
-  _saveToFirebase(); _cacheLocal();
-  _notify(isNew ? 'create' : 'update', 'puntosdeventa', data.id);
-  return data;
-}
-
-function deletePuntoDeVenta(id) {
-  if (!_db.puntosdeventa[id]) return false;
-  var pdv = _db.puntosdeventa[id];
-  // Devolver todo el stock al inventario principal
-  if (pdv.stock) {
-    var keys = Object.keys(pdv.stock);
-    for (var i = 0; i < keys.length; i++) {
-      var parts = keys[i].split('_');
-      var tipo = parts[0];
-      var prodId = Number(parts[1]);
-      var talla = parts[2];
-      var cantidad = pdv.stock[keys[i]] || 0;
-      if (cantidad <= 0) continue;
-      var col = tipo === 'especia' ? 'especias' : 'blends';
-      var producto = _db[col][prodId];
-      if (producto) {
-        var stockKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-        producto[stockKey] = (producto[stockKey] || 0) + cantidad;
-      }
-    }
-  }
-  delete _db.puntosdeventa[id];
-  _saveToFirebase(); _cacheLocal();
-  _notify('delete', 'puntosdeventa', id);
-  return true;
-}
-
-function moverStockAPDV(pdvId, items) {
-  // items: [{ tipo: 'especia'|'blend', productoId: 5, talla: 'chico'|'grande', cantidad: 10 }]
-  var pdv = _db.puntosdeventa[pdvId];
-  if (!pdv) throw new Error('Punto de venta no encontrado');
-  if (!pdv.stock) pdv.stock = {};
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var col = item.tipo === 'especia' ? 'especias' : 'blends';
-    var producto = _db[col][item.productoId];
-    if (!producto) throw new Error('Producto no encontrado: ' + item.tipo + ' ' + item.productoId);
-    var stockKey = item.talla === 'grande' ? 'stockGrande' : 'stockChico';
-    var cant = Number(item.cantidad) || 0;
-    if (cant <= 0) continue;
-    if ((producto[stockKey] || 0) < cant) {
-      throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + item.talla + '): quiere mover ' + cant + ', disponible ' + (producto[stockKey] || 0));
-    }
-    producto[stockKey] = (producto[stockKey] || 0) - cant;
-    var pdvKey = item.tipo + '_' + item.productoId + '_' + item.talla;
-    pdv.stock[pdvKey] = (pdv.stock[pdvKey] || 0) + cant;
-  }
-  _db.puntosdeventa[pdvId] = pdv;
-  _saveToFirebase(); _cacheLocal();
-  return pdv;
-}
-
-function devolverStockDePDV(pdvId, items) {
-  var pdv = _db.puntosdeventa[pdvId];
-  if (!pdv) throw new Error('Punto de venta no encontrado');
-  if (!pdv.stock) pdv.stock = {};
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var pdvKey = item.tipo + '_' + item.productoId + '_' + item.talla;
-    var cant = Number(item.cantidad) || 0;
-    if (cant <= 0) continue;
-    if ((pdv.stock[pdvKey] || 0) < cant) {
-      throw new Error('Stock insuficiente en PDV para devolver');
-    }
-    pdv.stock[pdvKey] = (pdv.stock[pdvKey] || 0) - cant;
-    if (pdv.stock[pdvKey] <= 0) delete pdv.stock[pdvKey];
-    var col = item.tipo === 'especia' ? 'especias' : 'blends';
-    var producto = _db[col][item.productoId];
-    if (producto) {
-      var stockKey = item.talla === 'grande' ? 'stockGrande' : 'stockChico';
-      producto[stockKey] = (producto[stockKey] || 0) + cant;
-    }
-  }
-  _db.puntosdeventa[pdvId] = pdv;
-  _saveToFirebase(); _cacheLocal();
-  return pdv;
-}
-
-function getPDVVentas(pdvId) {
-  return _filterValid(Object.values(_db.pdvVentas || {}))
-    .filter(function(v) { return v.puntoDeVentaId === pdvId; })
-    .sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
-}
-
-function savePDVVenta(data) {
-  _ensureStructure();
-  var isNew = !data.id;
-  if (isNew) {
-    data.id = nextId('pdvVentas');
-    data.creado = new Date().toISOString();
-    data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
-    data.items = data.items || [];
-    data.total = Number(data.total) || 0;
-  }
-  var pdv = _db.puntosdeventa[data.puntoDeVentaId];
-  if (!pdv) throw new Error('Punto de venta no encontrado');
-  if (!pdv.stock) pdv.stock = {};
-  if (isNew) {
-    for (var i = 0; i < data.items.length; i++) {
-      var item = data.items[i];
-      var col = item.tipo === 'especia' ? 'especias' : 'blends';
-      var producto = _db[col][item.productoId];
-      if (!producto) throw new Error('Producto no encontrado: ' + item.tipo + ' ' + item.productoId);
-      item.productoNombre = producto.nombre;
-      var cant = Number(item.cantidad) || 0;
-      var talla = item.talla || 'chico';
-      var pdvKey = item.tipo + '_' + item.productoId + '_' + talla;
-      if ((pdv.stock[pdvKey] || 0) < cant) {
-        throw new Error('Stock insuficiente en PDV de ' + producto.nombre + ' (' + talla + '): solicita ' + cant + ', disponible ' + (pdv.stock[pdvKey] || 0));
-      }
-      pdv.stock[pdvKey] = (pdv.stock[pdvKey] || 0) - cant;
-      item.precioUnitario = Number(item.precioUnitario) || (talla === 'grande' ? producto.precioGrande : producto.precioChico) || 0;
-      item.subtotal = item.precioUnitario * cant;
-    }
-    data.total = data.items.reduce(function(s, it) { return s + (it.subtotal || 0); }, 0);
-    // Clean zero-stock entries
-    var stockKeys = Object.keys(pdv.stock);
-    for (var j = 0; j < stockKeys.length; j++) {
-      if (pdv.stock[stockKeys[j]] <= 0) delete pdv.stock[stockKeys[j]];
-    }
-    _db.puntosdeventa[data.puntoDeVentaId] = pdv;
-  }
-  _db.pdvVentas[data.id] = data;
-  _saveToFirebase(); _cacheLocal();
-  _notify(isNew ? 'create' : 'update', 'pdvVentas', data.id);
-  return data;
-}
-
-function getPDVStats(pdvId) {
-  var ventas = getPDVVentas(pdvId);
-  var totalVentas = ventas.length;
-  var totalIngresos = 0;
-  var productoVentaCount = {};
-  var productoVentaMonto = {};
-  var diario = {};
-  for (var i = 0; i < ventas.length; i++) {
-    var v = ventas[i];
-    totalIngresos += v.total || 0;
-    var dia = v.fecha || v.creado;
-    if (!diario[dia]) diario[dia] = { ventas: 0, ingresos: 0 };
-    diario[dia].ventas++;
-    diario[dia].ingresos += v.total || 0;
-    for (var j = 0; j < (v.items || []).length; j++) {
-      var it = v.items[j];
-      var key = it.productoNombre + ' (' + it.talla + ')';
-      productoVentaCount[key] = (productoVentaCount[key] || 0) + it.cantidad;
-      productoVentaMonto[key] = (productoVentaMonto[key] || 0) + (it.subtotal || 0);
-    }
-  }
-  var topProductos = Object.keys(productoVentaCount).map(function(k) {
-    return { nombre: k, cantidad: productoVentaCount[k], monto: productoVentaMonto[k] || 0 };
-  }).sort(function(a, b) { return b.monto - a.monto; });
-  var pdv = _db.puntosdeventa[pdvId];
-  var totalItemsEnStock = 0;
-  if (pdv && pdv.stock) {
-    var sk = Object.keys(pdv.stock);
-    for (var x = 0; x < sk.length; x++) totalItemsEnStock += pdv.stock[sk[x]] || 0;
-  }
-  return {
-    totalVentas: totalVentas,
-    totalIngresos: totalIngresos,
-    ticketPromedio: totalVentas > 0 ? totalIngresos / totalVentas : 0,
-    productosEnStock: Object.keys(pdv && pdv.stock || {}).length,
-    totalItemsEnStock: totalItemsEnStock,
-    topProductos: topProductos.slice(0, 10),
-    diario: diario
-  };
-}
 
 /* ==================== PACKS ==================== */
 
 function getPacks() {
-  return _filterValid(Object.values(_db.packs || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+  return _filterValid(Object.values(_db.packs || {}));
 }
-function getPack(id) { return _db.packs[id] || null; }
+
+function getPack(id) {
+  return (_db.packs || {})[id] || null;
+}
+
+/** Calculate total cost of a pack based on its components */
+function getPackCosto(pack) {
+  if (!pack || !pack.componentes) return 0;
+  var total = 0;
+  for (var i = 0; i < pack.componentes.length; i++) {
+    var c = pack.componentes[i];
+    var producto = null;
+    if (c.tipo === 'especia') {
+      producto = _db.especias[c.productoId];
+    } else if (c.tipo === 'blend') {
+      producto = _db.blends[c.productoId];
+    }
+    if (!producto) continue;
+    var precio = 0;
+    if (c.talla === 'grande') {
+      precio = Number(producto.precioGrande) || 0;
+    } else {
+      precio = Number(producto.precioChico) || 0;
+    }
+    total += precio * (Number(c.cantidad) || 1);
+  }
+  return total;
+}
 
 function savePack(data) {
   _ensureStructure();
@@ -1371,34 +1204,18 @@ function savePack(data) {
   if (isNew) {
     data.id = nextId('packs');
     data.creado = new Date().toISOString();
-  } else {
-    var existing = _db.packs[data.id];
-    if (existing) { data.creado = existing.creado; }
   }
-  data.nombre = (data.nombre || '').trim();
-  data.descripcion = (data.descripcion || '').trim();
-  data.precioVenta = Number(data.precioVenta) || 0;
   data.componentes = data.componentes || [];
+  // Auto-calculate cost and margin
+  data.costoTotal = getPackCosto(data);
+  data.precioVenta = Number(data.precioVenta) || 0;
+  data.margen = data.precioVenta - data.costoTotal;
+  // Calculate total frascos
+  var totalFrascos = 0;
   for (var i = 0; i < data.componentes.length; i++) {
-    var c = data.componentes[i];
-    c.tipo = c.tipo || 'especia';
-    c.productoId = Number(c.productoId) || 0;
-    c.talla = c.talla || 'chico';
-    c.cantidad = Number(c.cantidad) || 1;
+    totalFrascos += Number(data.componentes[i].cantidad) || 1;
   }
-  // Auto-calcular costo total
-  data.costoTotal = 0;
-  for (var j = 0; j < data.componentes.length; j++) {
-    var comp = data.componentes[j];
-    var col2 = comp.tipo === 'especia' ? 'especias' : 'blends';
-    var prod = _db[col2][comp.productoId];
-    if (prod) {
-      var precio = comp.talla === 'grande' ? (Number(prod.precioGrande) || 0) : (Number(prod.precioChico) || 0);
-      data.costoTotal += precio * comp.cantidad;
-    }
-  }
-  data.margen = data.precioVenta > 0 ? data.precioVenta - data.costoTotal : 0;
-  data.totalFrascos = data.componentes.reduce(function(s, c) { return s + c.cantidad; }, 0);
+  data.totalFrascos = totalFrascos;
   _db.packs[data.id] = data;
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'packs', data.id);
@@ -1406,35 +1223,12 @@ function savePack(data) {
 }
 
 function deletePack(id) {
-  if (!_db.packs[id]) return false;
+  if (!_db.packs || !_db.packs[id]) return false;
   delete _db.packs[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'packs', id);
   return true;
 }
-
-function getPackCosto(packId) {
-  var pack = _db.packs[packId];
-  if (!pack) return { costoTotal: 0, componentes: [] };
-  var costoTotal = 0;
-  var detalle = [];
-  for (var i = 0; i < (pack.componentes || []).length; i++) {
-    var c = pack.componentes[i];
-    var col = c.tipo === 'especia' ? 'especias' : 'blends';
-    var prod = _db[col][c.productoId];
-    var precio = 0;
-    var nombre = '?';
-    if (prod) {
-      nombre = prod.nombre;
-      precio = c.talla === 'grande' ? (Number(prod.precioGrande) || 0) : (Number(prod.precioChico) || 0);
-    }
-    var sub = precio * c.cantidad;
-    costoTotal += sub;
-    detalle.push({ nombre: nombre, talla: c.talla, cantidad: c.cantidad, precioUnitario: precio, subtotal: sub });
-  }
-  return { costoTotal: costoTotal, componentes: detalle };
-}
-
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -1449,10 +1243,6 @@ window.ArcanoDB = {
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
-  getPuntosDeVenta: getPuntosDeVenta, getPuntoDeVenta: getPuntoDeVenta, savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
-  moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
-  getPDVVentas: getPDVVentas, savePDVVenta: savePDVVenta, getPDVStats: getPDVStats,
-  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, getPackCosto: getPackCosto,
   getUsuarios: getUsuarios, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
   authenticateUser: authenticateUser, getCurrentUser: getCurrentUser, logoutUser: logoutUser,
   getStats: getStats,
@@ -1462,6 +1252,7 @@ window.ArcanoDB = {
   toggleTienda: toggleTienda,
   getProductTags: getProductTags, getTagsForCategoria: getTagsForCategoria,
   addProductTag: addProductTag, removeProductTag: removeProductTag,
+  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, getPackCosto: getPackCosto,
   compressImage: compressImage,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH
 };
