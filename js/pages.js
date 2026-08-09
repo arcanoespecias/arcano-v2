@@ -7,6 +7,7 @@ const Pages = {
   _dashCharts: [],
 
   renderDashboard(container) {
+    Pages._syncGlobalConfig();
     if (Pages._dashCharts) { for (var _ci = 0; _ci < Pages._dashCharts.length; _ci++) { try { Pages._dashCharts[_ci].destroy(); } catch(e) {} } }
     Pages._dashCharts = [];
 
@@ -1194,6 +1195,22 @@ const Pages = {
 
   // --- QR PAGO CONFIG ---
   _qrPagoImage: null,
+  _configLoaded: false,
+
+  _syncGlobalConfig: function() {
+    if (Pages._configLoaded) return;
+    Pages._configLoaded = true;
+    try {
+      firebase.database().ref('arcano/config').once('value').then(function(snap) {
+        var cfg = snap.val() || {};
+        if (cfg.groqKey) { localStorage.setItem('arcano_groq_key', cfg.groqKey); }
+        if (cfg.qrPagoImage) {
+          Pages._qrPagoImage = cfg.qrPagoImage;
+          localStorage.setItem('arcano_qr_pago_image', cfg.qrPagoImage);
+        }
+      }).catch(function() {});
+    } catch(e) {}
+  },
 
   _loadQRPagoConfig: function() {
     var cached = localStorage.getItem('arcano_qr_pago_image');
