@@ -2818,21 +2818,39 @@ const Pages = {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
 
-    // === COMBINE ALL SALES ===
+    // === COMBINE ALL SALES (admin + tienda + PDV) ===
     var allSales = [];
+    // Admin ventas
     for (var vi = 0; vi < ventas.length; vi++) {
       var v = ventas[vi];
       var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
       allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin', metodoPago: v.metodoPago || 'efectivo' });
     }
+    // Tienda pedidos
     for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
       if (p.estado === 'cancelado') continue;
       var pItems = [];
       if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
       var pFecha = p.creado ? p.creado.slice(0, 10) : '';
-      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', metodoPago: p.metodoPago || '', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    // PDV ventas
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    var pdvVentasAll = [];
+    for (var pvi = 0; pvi < pdvs.length; pvi++) {
+      var pdvV = ArcanoDB.getPDVVentas(pdvs[pvi].id);
+      for (var pvj = 0; pvj < pdvV.length; pvj++) {
+        var pv = pdvV[pvj];
+        var pvItems = [];
+        if (pv.items) { for (var pvk = 0; pvk < pv.items.length; pvk++) {
+          var pvIt = pv.items[pvk];
+          pvItems.push({ nombre: pvIt.productoNombre || '?', tipo: pvIt.tipo || 'especia', talla: pvIt.talla || 'chico', cantidad: pvIt.cantidad || 0, precio: pvIt.precioUnitario || 0, subtotal: pvIt.subtotal || 0 });
+        }}
+        allSales.push({ fecha: pv.fecha || '', creado: pv.creado || '', total: pv.total || 0, items: pvItems, source: 'pdv', metodoPago: pv.metodoPago || 'efectivo', pdvNombre: pdvs[pvi].nombre || 'PDV' });
+      }
+      pdvVentasAll = pdvVentasAll.concat(pdvV);
     }
     allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 
@@ -2840,6 +2858,7 @@ const Pages = {
 
     var h = '<div class="est-tabs">';
     h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'pdv' ? ' active' : '') + '" onclick="Pages._estTab=\'pdv\';App.renderPage(\'estadisticas\')">P. de Venta</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'costos' ? ' active' : '') + '" onclick="Pages._estTab=\'costos\';App.renderPage(\'estadisticas\')">Costos y Margen</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
@@ -2848,17 +2867,11 @@ const Pages = {
     h += '<div id="est-content"></div>';
     container.innerHTML = h;
 
-    var data;
-    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
-      data = allSales;
-    } else {
-      data = allSales.filter(function(s) { return s.source === 'tienda'; });
-    }
-
-    if (Pages._estTab === 'ventas') Pages._renderVentas(data, container.querySelector('#est-content'));
-    else if (Pages._estTab === 'costos') Pages._renderCostos(data, container.querySelector('#est-content'), entradas, especias, blends, producciones);
-    else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
-    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
+    if (Pages._estTab === 'ventas') Pages._renderVentas(allSales, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'pdv') Pages._renderPDVEstadisticas(container.querySelector('#est-content'), pdvs);
+    else if (Pages._estTab === 'costos') Pages._renderCostos(allSales, container.querySelector('#est-content'), entradas, especias, blends, producciones);
+    else if (Pages._estTab === 'produccion') Pages._renderProduccion(allSales, container.querySelector('#est-content'), producciones);
+    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(allSales, container.querySelector('#est-content'));
     else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
   },
 
@@ -2939,27 +2952,29 @@ const Pages = {
     h += '<div class="est-kpi ' + (tendenciaMensual >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendMSign + tendenciaMensual + '%</div><div class="est-kpi-label">Variacion Mensual</div><div class="est-kpi-sub">' + (ingresosMesActual >= ingresosMesAnterior ? 'crecimiento' : 'caida') + '</div></div>';
     h += '</div></div></div>';
 
-    // Source breakdown (admin vs tienda)
+    // Source breakdown (admin vs tienda vs pdv)
     h += '<div class="card mt-16"><div class="card-header"><h3>Canal de Venta</h3></div><div class="card-body">';
-    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
-    var adminIngreso = 0, tiendaIngreso = 0;
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr">';
+    var adminIngreso = 0, tiendaIngreso = 0, pdvIngreso = 0, adminOps = 0, tiendaOps = 0, pdvOps = 0;
     for (var d = 0; d < data.length; d++) {
-      if (data[d].source === 'admin') adminIngreso += data[d].total || 0;
-      else tiendaIngreso += data[d].total || 0;
+      if (data[d].source === 'admin') { adminIngreso += data[d].total || 0; adminOps++; }
+      else if (data[d].source === 'pdv') { pdvIngreso += data[d].total || 0; pdvOps++; }
+      else { tiendaIngreso += data[d].total || 0; tiendaOps++; }
     }
-    var totalCh = adminIngreso + tiendaIngreso;
-    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
-    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    var totalCh = adminIngreso + tiendaIngreso + pdvIngreso;
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + adminOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + tiendaOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--purple)"><div class="stat-value">$' + pdvIngreso.toLocaleString() + '</div><div class="stat-label">Puntos de Venta</div><div class="stat-sub">' + pdvOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(pdvIngreso/totalCh*100) + '%)' : '') + '</div></div>';
     h += '</div></div></div>';
-    // Metodo de pago (admin ventas)
+    // Metodo de pago (admin + pdv ventas)
     var efectivoIng = 0, qrIng = 0, efectivoOps = 0, qrOps = 0;
     for (var d = 0; d < data.length; d++) {
-      if (data[d].source !== 'admin') continue;
+      if (data[d].source === 'tienda') continue;
       if (data[d].metodoPago === 'qr') { qrIng += data[d].total || 0; qrOps++; }
       else { efectivoIng += data[d].total || 0; efectivoOps++; }
     }
     var _mpT = efectivoIng + qrIng;
-    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago (Ventas Admin)</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago (Admin + PDV)</h3></div><div class="card-body">';
     h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
     h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + efectivoIng.toLocaleString() + '</div><div class="stat-label">Efectivo</div><div class="stat-sub">' + efectivoOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(efectivoIng/_mpT*100) + '%)' : '') + '</div></div>';
     h += '<div class="stat-card" style="border-left-color:#8e44ad"><div class="stat-value">$' + qrIng.toLocaleString() + '</div><div class="stat-label">QR</div><div class="stat-sub">' + qrOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(qrIng/_mpT*100) + '%)' : '') + '</div></div>';
@@ -3088,6 +3103,137 @@ const Pages = {
 
     var canvases = el.querySelectorAll('.est-chart-wrap');
     for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = canvases[ch].classList.contains('est-chart-full') ? '300px' : '260px'; }
+  },
+
+  /* ================================================================
+     PUNTOS DE VENTA TAB
+     ================================================================ */
+  _renderPDVEstadisticas: function(el, pdvs) {
+    if (!el) return;
+    var totalPDVIngreso = 0, totalPDVOps = 0, totalPDVUnidades = 0;
+    var totalPDVEfectivo = 0, totalPDVQR = 0;
+    var totalStockPDV = 0, totalProductosEnPDV = 0;
+    var pdvDataArr = [];
+
+    for (var pvi = 0; pvi < pdvs.length; pvi++) {
+      var pdv = pdvs[pvi];
+      var stats = ArcanoDB.getPDVStats(pdv.id);
+      var stock = (pdv.stock) ? pdv.stock : {};
+      var stockKeys = Object.keys(stock).filter(function(k) { return stock[k] > 0; });
+      var stockTotal = 0;
+      for (var sk = 0; sk < stockKeys.length; sk++) stockTotal += stock[stockKeys[sk]];
+
+      pdvDataArr.push({
+        id: pdv.id, nombre: pdv.nombre || 'PDV', ubicacion: pdv.ubicacion || '', activo: pdv.activo !== false,
+        totalVentas: stats.totalVentas, totalIngresos: stats.totalIngresos,
+        totalItems: stats.totalItems, efectivoIngresos: stats.efectivoIngresos, qrIngresos: stats.qrIngresos,
+        ticketPromedio: stats.ticketPromedio, productosEnStock: stockKeys.length, stockTotal: stockTotal,
+        topProductos: stats.topProductos || [], diario: stats.diario || {}
+      });
+      totalPDVIngreso += stats.totalIngresos;
+      totalPDVOps += stats.totalVentas;
+      totalPDVUnidades += stats.totalItems;
+      totalPDVEfectivo += stats.efectivoIngresos;
+      totalPDVQR += stats.qrIngresos;
+      totalStockPDV += stockTotal;
+      totalProductosEnPDV += stockKeys.length;
+    }
+
+    var h = '';
+    // KPIs generales
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalPDVIngreso.toLocaleString() + '</div><div class="est-kpi-label">Ingresos PDV</div><div class="est-kpi-sub">' + pdvs.length + ' punto(s) de venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPDVOps + '</div><div class="est-kpi-label">Ventas PDV</div><div class="est-kpi-sub">' + totalPDVUnidades + ' unidades vendidas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalPDVOps > 0 ? Math.round(totalPDVIngreso / totalPDVOps) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio PDV</div><div class="est-kpi-sub">por venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalStockPDV + '</div><div class="est-kpi-label">Stock en PDVs</div><div class="est-kpi-sub">' + totalProductosEnPDV + ' productos distintos</div></div>';
+    h += '</div>';
+
+    // Metodo de pago PDV
+    var pdvPagoTotal = totalPDVEfectivo + totalPDVQR;
+    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago en PDVs</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + totalPDVEfectivo.toLocaleString() + '</div><div class="stat-label">Efectivo</div><div class="stat-sub">' + (pdvPagoTotal > 0 ? Math.round(totalPDVEfectivo/pdvPagoTotal*100) + '%' : '0%') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:#8e44ad"><div class="stat-value">$' + totalPDVQR.toLocaleString() + '</div><div class="stat-label">QR</div><div class="stat-sub">' + (pdvPagoTotal > 0 ? Math.round(totalPDVQR/pdvPagoTotal*100) + '%' : '0%') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Per-PDV cards
+    for (var i = 0; i < pdvDataArr.length; i++) {
+      var pd = pdvDataArr[i];
+      var pdColor = pd.activo ? 'var(--green)' : 'var(--red)';
+      h += '<div class="card mt-16"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><h3>' + pd.nombre + '</h3><span style="width:10px;height:10px;border-radius:50%;background:' + pdColor + '" title="' + (pd.activo ? 'Activo' : 'Inactivo') + '"></span></div><div class="card-body">';
+      if (pd.ubicacion) h += '<p class="text-sm text-muted" style="margin-bottom:10px">' + pd.ubicacion + '</p>';
+      h += '<div class="est-kpi-grid" style="grid-template-columns:repeat(3,1fr)">';
+      h += '<div class="est-kpi"><div class="est-kpi-value">$' + pd.totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos</div><div class="est-kpi-sub">' + pd.totalVentas + ' ventas</div></div>';
+      h += '<div class="est-kpi"><div class="est-kpi-value">$' + Math.round(pd.ticketPromedio).toLocaleString() + '</div><div class="est-kpi-label">Ticket Prom.</div><div class="est-kpi-sub">' + pd.totalItems + ' unidades</div></div>';
+      h += '<div class="est-kpi"><div class="est-kpi-value">' + pd.stockTotal + '</div><div class="est-kpi-label">Stock Actual</div><div class="est-kpi-sub">' + pd.productosEnStock + ' productos</div></div>';
+      h += '</div>';
+
+      // Efectivo vs QR bar
+      var pdPagoT = pd.efectivoIngresos + pd.qrIngresos;
+      if (pdPagoT > 0) {
+        var efPct = Math.round(pd.efectivoIngresos / pdPagoT * 100);
+        var qrPct = 100 - efPct;
+        h += '<div class="mt-12" style="background:var(--bg);border-radius:8px;overflow:hidden;height:24px;display:flex">';
+        h += '<div style="width:' + efPct + '%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.75rem;font-weight:700">Ef ' + efPct + '%</div>';
+        h += '<div style="width:' + qrPct + '%;background:#8e44ad;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.75rem;font-weight:700">QR ' + qrPct + '%</div>';
+        h += '</div>';
+      }
+
+      // Top productos
+      if (pd.topProductos.length > 0) {
+        h += '<h4 class="mt-12" style="font-size:0.9rem">Top Productos</h4>';
+        h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Unidades</th><th>Ingreso</th></tr></thead><tbody>';
+        for (var tp = 0; tp < Math.min(pd.topProductos.length, 5); tp++) {
+          var tpp = pd.topProductos[tp];
+          h += '<tr><td class="fw7">' + tpp.nombre + '</td><td>' + tpp.cantidad + '</td><td style="color:var(--gold)">$' + tpp.monto.toLocaleString() + '</td></tr>';
+        }
+        h += '</tbody></table></div>';
+      }
+      h += '</div></div>';
+    }
+
+    if (pdvs.length === 0) {
+      h += '<div class="card mt-16"><div class="card-body" style="text-align:center;padding:40px"><p class="text-muted">No hay puntos de venta registrados</p></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // Charts for PDVs
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+
+    if (pdvDataArr.length >= 2) {
+      var pdvLabels = [], pdvIngresoData = [], pdvOpsData = [];
+      for (var ci = 0; ci < pdvDataArr.length; ci++) {
+        pdvLabels.push(pdvDataArr[ci].nombre);
+        pdvIngresoData.push(pdvDataArr[ci].totalIngresos);
+        pdvOpsData.push(pdvDataArr[ci].totalVentas);
+      }
+      var h2 = '<div class="card mt-16"><div class="card-header"><h3>Comparativa entre PDVs</h3></div><div class="card-body">';
+      h2 += '<div class="est-charts-grid"><div class="est-chart-card"><h4>Ingresos por PDV</h4><div class="est-chart-wrap"><canvas id="chart-pdv-ingresos"></canvas></div></div>';
+      h2 += '<div class="est-chart-card"><h4>Ventas por PDV</h4><div class="est-chart-wrap"><canvas id="chart-pdv-ops"></canvas></div></div></div>';
+      h2 += '</div></div>';
+      el.insertAdjacentHTML('beforeend', h2);
+
+      var ctxI = document.getElementById('chart-pdv-ingresos');
+      if (ctxI) {
+        Pages._estCharts.push(new Chart(ctxI, {
+          type: 'bar', data: { labels: pdvLabels, datasets: [{ label: 'Ingresos ($)', data: pdvIngresoData, backgroundColor: 'rgba(142,68,173,0.7)', borderColor: '#8e44ad', borderWidth: 1, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+        }));
+      }
+      var ctxO = document.getElementById('chart-pdv-ops');
+      if (ctxO) {
+        Pages._estCharts.push(new Chart(ctxO, {
+          type: 'bar', data: { labels: pdvLabels, datasets: [{ label: 'Ventas', data: pdvOpsData, backgroundColor: 'rgba(93,173,226,0.7)', borderColor: '#5dade2', borderWidth: 1, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+        }));
+      }
+      var cvPdv = el.querySelectorAll('.est-chart-wrap');
+      for (var ch = 0; ch < cvPdv.length; ch++) cvPdv[ch].style.height = '260px';
+    }
   },
 
   /* ================================================================
