@@ -154,7 +154,14 @@ const Pages = {
     var admPct = totalCanal > 0 ? Math.round(adminIngreso / totalCanal * 100) : 0;
     var tiePct = totalCanal > 0 ? Math.round(tiendaIngreso / totalCanal * 100) : 0;
     h += '<div class="dash-canal-row"><div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + admPct + '%;background:var(--gold)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">Ventas Admin</span><span class="dash-canal-val">$' + adminIngreso.toLocaleString() + ' (' + admPct + '%)</span></div></div>';
-    h += '<div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + tiePct + '%;background:var(--blue)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">Tienda Online</span><span class="dash-canal-val">$' + tiendaIngreso.toLocaleString() + ' (' + tiePct + '%)</span></div></div></div></div>';
+    h += '<div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + tiePct + '%;background:var(--blue)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">Tienda Online</span><span class="dash-canal-val">$' + tiendaIngreso.toLocaleString() + ' (' + tiePct + '%)</span></div></div></div>' +
+    '<div class="dash-canal-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Metodo de Pago (Admin)</div></div>' +
+    '<div class="dash-canal-row">';
+    var _efT = efectivoIngreso + qrIngreso;
+    var _efP = _efT > 0 ? Math.round(efectivoIngreso / _efT * 100) : 0;
+    var _qrP = _efT > 0 ? Math.round(qrIngreso / _efT * 100) : 0;
+    h += '<div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + _efP + '%;background:var(--green)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">Efectivo</span><span class="dash-canal-val">$' + efectivoIngreso.toLocaleString() + ' (' + _efP + '%)</span></div></div>' +
+    '<div class="dash-canal-item"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + _qrP + '%;background:#8e44ad"></div></div><div class="dash-canal-info"><span class="dash-canal-name">QR</span><span class="dash-canal-val">$' + qrIngreso.toLocaleString() + ' (' + _qrP + '%)</span></div></div></div></div>';
 
     // Composicion con SVG rings
     h += '<div class="dash-card"><h4>Composicion de Ventas</h4><div class="dash-comp-grid">';
