@@ -1323,7 +1323,7 @@ const Pages = {
       : '<div style="padding:20px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted)">No hay QR configurado.<br>Ve a Ventas > Configuracion de Pago para subirlo.</div>';
     pm.innerHTML =
       '<div class="modal" style="max-width:420px;text-align:center">' +
-        '<div class="modal-header"><h3>Metodo de Pago</h3></div>' +
+        '<div class="modal-header"><button class="btn btn-ghost" id="pago-volver-btn" style="margin-right:auto;padding:4px 12px;font-size:0.85rem">< Volver</button><h3>Metodo de Pago</h3></div>' +
         '<div class="modal-body">' +
           '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
           '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago</p>' +
@@ -1360,6 +1360,9 @@ const Pages = {
       document.getElementById('pago-qr-area').style.display = 'none';
       document.getElementById('pago-efectivo-btn').style.display = '';
       document.getElementById('pago-qr-btn').style.display = '';
+    });
+    document.getElementById('pago-volver-btn').addEventListener('click', function() {
+      pm.remove();
     });
   },
 
