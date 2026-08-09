@@ -1306,18 +1306,44 @@ function getPDVStats(pdvId) {
   var stock = (pdv && pdv.stock) ? pdv.stock : {};
   var totalVentas = 0, totalIngresos = 0, totalItems = 0;
   var efectivoIngresos = 0, qrIngresos = 0;
+  var diario = {};
+  var prodMap = {};
   for (var i = 0; i < ventas.length; i++) {
     totalVentas++;
     totalIngresos += (ventas[i].total || 0);
     if (ventas[i].metodoPago === 'qr') qrIngresos += (ventas[i].total || 0);
     else efectivoIngresos += (ventas[i].total || 0);
     var vitems = ventas[i].items || [];
-    for (var j = 0; j < vitems.length; j++) totalItems += (vitems[j].cantidad || 0);
+    for (var j = 0; j < vitems.length; j++) {
+      var it = vitems[j];
+      var cant = it.cantidad || 0;
+      var sub = it.subtotal || 0;
+      totalItems += cant;
+      var pNombre = it.productoNombre || '?';
+      if (!prodMap[pNombre]) prodMap[pNombre] = { nombre: pNombre, cantidad: 0, monto: 0 };
+      prodMap[pNombre].cantidad += cant;
+      prodMap[pNombre].monto += sub;
+    }
+    var vf = ventas[i].fecha || '';
+    if (vf) {
+      if (!diario[vf]) diario[vf] = { ops: 0, ingresos: 0 };
+      diario[vf].ops++;
+      diario[vf].ingresos += (ventas[i].total || 0);
+    }
   }
+  var topProductos = Object.values(prodMap).sort(function(a, b) { return b.monto - a.monto; });
+  var stockKeys = Object.keys(stock).filter(function(k) { return stock[k] > 0; });
+  var totalItemsEnStock = 0;
+  for (var s = 0; s < stockKeys.length; s++) totalItemsEnStock += (stock[stockKeys[s]] || 0);
   return {
     totalVentas: totalVentas, totalIngresos: totalIngresos, totalItems: totalItems,
     efectivoIngresos: efectivoIngresos, qrIngresos: qrIngresos,
-    stockItems: Object.keys(stock).filter(function(k) { return stock[k] > 0; }).length,
+    ticketPromedio: totalVentas > 0 ? totalIngresos / totalVentas : 0,
+    totalItemsEnStock: totalItemsEnStock,
+    productosEnStock: stockKeys.length,
+    topProductos: topProductos,
+    diario: diario,
+    stockItems: stockKeys.length,
     stockTotal: Object.values(stock).reduce(function(a, b) { return a + (b || 0); }, 0)
   };
 }
