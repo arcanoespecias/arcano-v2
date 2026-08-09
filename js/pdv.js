@@ -499,7 +499,7 @@ var PDV = {
       total += (Number(saleData.items[i].precioUnitario) || 0) * (Number(saleData.items[i].cantidad) || 0);
     }
     saleData.total = total;
-    var qrImg = (typeof Pages !== 'undefined' && Pages._qrPagoImage) ? Pages._qrPagoImage : null;
+    var qrImg = (typeof Pages !== 'undefined' && Pages._qrPagoImage) ? Pages._qrPagoImage : localStorage.getItem('arcano_qr_pago_image');
     var qrContent = qrImg
       ? '<div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Muestra este QR al cliente:</div>' +
         '<div style="margin-bottom:16px"><img src="' + qrImg + '" style="max-width:260px;max-height:260px;border-radius:8px;border:1px solid var(--border)"></div>'
