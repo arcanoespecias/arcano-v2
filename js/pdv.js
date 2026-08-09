@@ -519,7 +519,10 @@ var PDV = {
           '</div>' +
           '<div id="pdv-pago-qr-area" style="display:none;margin-top:20px">' +
             qrContent +
-            '<button class="btn btn-gold btn-block" id="pdv-pago-recibido-btn" style="padding:14px;font-size:1rem;font-weight:700">RECIBIDO</button>' +
+            '<div style="display:flex;gap:12px;justify-content:center;margin-top:12px">' +
+              '<button class="btn btn-gold" id="pdv-pago-recibido-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Pago Recibido</button>' +
+              '<button class="btn btn-outline" id="pdv-pago-qr-cancel-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Cancelar</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -538,6 +541,11 @@ var PDV = {
       saleData.metodoPago = 'qr';
       pm.remove();
       onSuccess(saleData);
+    });
+    document.getElementById('pdv-pago-qr-cancel-btn').addEventListener('click', function() {
+      document.getElementById('pdv-pago-qr-area').style.display = 'none';
+      document.getElementById('pdv-pago-efectivo-btn').style.display = '';
+      document.getElementById('pdv-pago-qr-btn').style.display = '';
     });
   },
 
