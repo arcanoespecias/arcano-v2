@@ -2789,6 +2789,19 @@ const Pages = {
     h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
     h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
     h += '</div></div></div>';
+    // Metodo de pago (admin ventas)
+    var efectivoIng = 0, qrIng = 0, efectivoOps = 0, qrOps = 0;
+    for (var d = 0; d < data.length; d++) {
+      if (data[d].source !== 'admin') continue;
+      if (data[d].metodoPago === 'qr') { qrIng += data[d].total || 0; qrOps++; }
+      else { efectivoIng += data[d].total || 0; efectivoOps++; }
+    }
+    var _mpT = efectivoIng + qrIng;
+    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago (Ventas Admin)</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + efectivoIng.toLocaleString() + '</div><div class="stat-label">Efectivo</div><div class="stat-sub">' + efectivoOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(efectivoIng/_mpT*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:#8e44ad"><div class="stat-value">$' + qrIng.toLocaleString() + '</div><div class="stat-label">QR</div><div class="stat-sub">' + qrOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(qrIng/_mpT*100) + '%)' : '') + '</div></div>';
+    h += '</div></div></div>';
 
     // Charts
     h += '<div class="est-charts-grid">';
