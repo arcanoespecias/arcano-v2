@@ -1272,19 +1272,23 @@ function devolverStockDePDV(pdvId, items) {
 }
 
 function savePDVVenta(data) {
-  var pdv = (_db.pdvs || {})[data.pdvId];
+  var pdv = (_db.pdvs || {})[data.puntoDeVentaId || data.pdvId];
   if (!pdv) throw new Error('PDV no encontrado');
   if (!pdv.ventas) pdv.ventas = {};
   if (!pdv.stock) pdv.stock = {};
   if (!data.id) data.id = nextId('ventas');
   if (!data.fecha) data.fecha = new Date().toISOString().slice(0, 10);
   var items = data.items || [];
+  var calcTotal = 0;
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
     if (!item.cantidad || item.cantidad <= 0) continue;
     var stockKey = item.tipo + '_' + item.productoId + '_' + item.talla;
     pdv.stock[stockKey] = Math.max(0, (pdv.stock[stockKey] || 0) - item.cantidad);
+    item.subtotal = (Number(item.precioUnitario) || 0) * (Number(item.cantidad) || 0);
+    calcTotal += item.subtotal;
   }
+  data.total = calcTotal;
   pdv.ventas[data.id] = data;
   _saveToFirebase(); _cacheLocal();
   return data;
@@ -1301,14 +1305,18 @@ function getPDVStats(pdvId) {
   var pdv = (_db.pdvs || {})[pdvId];
   var stock = (pdv && pdv.stock) ? pdv.stock : {};
   var totalVentas = 0, totalIngresos = 0, totalItems = 0;
+  var efectivoIngresos = 0, qrIngresos = 0;
   for (var i = 0; i < ventas.length; i++) {
     totalVentas++;
     totalIngresos += (ventas[i].total || 0);
+    if (ventas[i].metodoPago === 'qr') qrIngresos += (ventas[i].total || 0);
+    else efectivoIngresos += (ventas[i].total || 0);
     var vitems = ventas[i].items || [];
     for (var j = 0; j < vitems.length; j++) totalItems += (vitems[j].cantidad || 0);
   }
   return {
     totalVentas: totalVentas, totalIngresos: totalIngresos, totalItems: totalItems,
+    efectivoIngresos: efectivoIngresos, qrIngresos: qrIngresos,
     stockItems: Object.keys(stock).filter(function(k) { return stock[k] > 0; }).length,
     stockTotal: Object.values(stock).reduce(function(a, b) { return a + (b || 0); }, 0)
   };
