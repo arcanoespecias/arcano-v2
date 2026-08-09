@@ -2055,13 +2055,38 @@ const Pages = {
     h += '</tbody></table></div>';
     h += '<div style="text-align:right;margin-top:12px;font-size:1.2rem" class="fw7">Total: $' + (p.total || 0).toLocaleString() + '</div>';
 
+    // Metodo de pago
+    var pagoMetodo = p.metodoPago || '';
+    var pagoConfirmado = pagoMetodo === 'efectivo' || pagoMetodo === 'qr';
+    h += '<div class="mt-16 card" style="padding:14px;background:var(--bg-card)"><h4 style="margin-bottom:10px">Metodo de Pago</h4>';
+    if (pagoConfirmado) {
+      var pagoLabel = pagoMetodo === 'qr' ? 'QR' : 'Efectivo';
+      var pagoColor = pagoMetodo === 'qr' ? 'var(--purple)' : 'var(--green)';
+      var pagoIcon = pagoMetodo === 'qr' ? '&#9641;' : '&#9733;';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;border-radius:8px;background:' + pagoColor + ';color:#fff;font-weight:700">';
+      h += '<span style="font-size:1.3em">' + pagoIcon + '</span> ' + pagoLabel + ' <span style="font-weight:400;opacity:0.8">(confirmado)</span></div>';
+      h += '<button class="btn btn-outline btn-sm mt-8" style="color:var(--red);border-color:var(--red)" onclick="Pages._pedidoResetPago(\'' + pedidoKey + '\')">Cambiar Metodo</button>';
+    } else {
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      h += '<button class="btn btn-sm" style="padding:16px;font-size:1rem;font-weight:700;background:var(--green);color:#fff;border:none;border-radius:8px" onclick="Pages._pedidoConfirmarPago(\'' + pedidoKey + '\',\'efectivo\')">&#9733; Efectivo</button>';
+      h += '<button class="btn btn-sm" style="padding:16px;font-size:1rem;font-weight:700;background:var(--purple);color:#fff;border:none;border-radius:8px" onclick="Pages._pedidoConfirmarPago(\'' + pedidoKey + '\',\'qr\')">&#9641; QR</button>';
+      h += '</div>';
+      h += '<p class="text-sm text-muted mt-8" style="text-align:center">Debes confirmar el metodo de pago antes de marcar como Entregado</p>';
+    }
+    h += '</div>';
+
     // Estado buttons
     h += '<div class="mt-16"><h4>Cambiar Estado</h4><div class="mt-8" style="display:flex;gap:8px;flex-wrap:wrap">';
     for (var ei = 0; ei < estados.length; ei++) {
       var est = estados[ei];
       var isActive = p.estado === est;
-      var btnClass = isActive ? 'btn btn-gold' : 'btn btn-outline';
-      h += '<button class="' + btnClass + ' btn-sm" onclick="Pages.cambiarEstadoPedido(\'' + pedidoKey + '\',\'' + est + '\')">' + estadoLabels[est] + '</button>';
+      var isEntregado = est === 'entregado';
+      if (isEntregado && !pagoConfirmado) {
+        h += '<button class="btn btn-sm btn-outline" style="opacity:0.4;cursor:not-allowed" disabled title="Confirma el metodo de pago primero">' + estadoLabels[est] + '</button>';
+      } else {
+        var btnClass = isActive ? 'btn btn-gold' : 'btn btn-outline';
+        h += '<button class="' + btnClass + ' btn-sm" onclick="Pages.cambiarEstadoPedido(\'' + pedidoKey + '\',\'' + est + '\')">' + estadoLabels[est] + '</button>';
+      }
     }
     h += '</div></div>';
 
@@ -2076,6 +2101,21 @@ const Pages = {
     modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
     modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' + h + '</div>';
     document.body.appendChild(modal);
+  },
+
+  _pedidoConfirmarPago(pedidoKey, metodo) {
+    ArcanoDB.updatePedidoMetodoPago(pedidoKey, metodo);
+    var modal = document.getElementById('pedido-modal');
+    if (modal) modal.remove();
+    Pages.verPedido(pedidoKey);
+    toast(metodo === 'qr' ? 'Pago QR confirmado' : 'Pago Efectivo confirmado');
+  },
+
+  _pedidoResetPago(pedidoKey) {
+    ArcanoDB.updatePedidoMetodoPago(pedidoKey, '');
+    var modal = document.getElementById('pedido-modal');
+    if (modal) modal.remove();
+    Pages.verPedido(pedidoKey);
   },
 
   cambiarEstadoPedido(pedidoKey, nuevoEstado) {
