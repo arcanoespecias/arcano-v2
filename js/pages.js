@@ -3228,7 +3228,7 @@ const Pages = {
       if (ctxO) {
         Pages._estCharts.push(new Chart(ctxO, {
           type: 'bar', data: { labels: pdvLabels, datasets: [{ label: 'Ventas', data: pdvOpsData, backgroundColor: 'rgba(93,173,226,0.7)', borderColor: '#5dade2', borderWidth: 1, borderRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } }
         }));
       }
       var cvPdv = el.querySelectorAll('.est-chart-wrap');
