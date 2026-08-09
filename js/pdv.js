@@ -509,7 +509,7 @@ var PDV = {
     pm.id = 'pdv-pago-modal';
     pm.innerHTML =
       '<div class="modal" style="max-width:420px;text-align:center">' +
-        '<div class="modal-header"><h3>Metodo de Pago</h3></div>' +
+        '<div class="modal-header"><button class="btn btn-ghost" id="pdv-pago-volver-btn" style="margin-right:auto;padding:4px 12px;font-size:0.85rem">< Volver</button><h3>Metodo de Pago</h3></div>' +
         '<div class="modal-body">' +
           '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
           '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago</p>' +
@@ -546,6 +546,9 @@ var PDV = {
       document.getElementById('pdv-pago-qr-area').style.display = 'none';
       document.getElementById('pdv-pago-efectivo-btn').style.display = '';
       document.getElementById('pdv-pago-qr-btn').style.display = '';
+    });
+    document.getElementById('pdv-pago-volver-btn').addEventListener('click', function() {
+      pm.remove();
     });
   },
 
