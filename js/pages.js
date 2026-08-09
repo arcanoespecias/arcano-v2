@@ -3821,6 +3821,238 @@ const Pages = {
     toast('Pack eliminado', 'ok');
     App.renderPage('productos');
   },
+
+
+  /* ================================================================
+     TESTING / SANDBOX
+     ================================================================ */
+  renderTesting(container) {
+    var db = ArcanoDB.getDB();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+
+    var h = '<div style="margin-bottom:16px">' +
+      '<h3 style="margin:0 0 4px">Testing y Sandbox</h3>' +
+      '<p class="text-muted text-sm">Genera datos de prueba, reinicia stocks y prueba todas las funciones del sistema.</p>' +
+      '</div>';
+
+    // Current state
+    h += '<div class="card"><div class="card-header"><h3>Estado Actual</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--gold)">' + especias.length + '</div><div class="text-muted text-sm">Especias</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--blue)">' + blends.length + '</div><div class="text-muted text-sm">Blends</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">' + ventas.length + '</div><div class="text-muted text-sm">Ventas Admin</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pedidos.length + '</div><div class="text-muted text-sm">Pedidos Tienda</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pdvs.length + '</div><div class="text-muted text-sm">P. de Venta</div></div>';
+    h += '</div></div></div>';
+
+    // Generate test data
+    h += '<div class="card mt-16"><div class="card-header"><h3>Generar Datos de Prueba</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Especias</label><input type="number" class="input" id="test-esp" value="8" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Blends</label><input type="number" class="input" id="test-blend" value="5" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas Admin</label><input type="number" class="input" id="test-ventas" value="20" min="0" max="200"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Pedidos Tienda</label><input type="number" class="input" id="test-pedidos" value="10" min="0" max="100"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">PDVs</label><input type="number" class="input" id="test-pdvs" value="2" min="0" max="10"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas por PDV</label><input type="number" class="input" id="test-pdv-ventas" value="15" min="0" max="100"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px"><label class="text-sm fw7" style="display:block;margin-bottom:4px">Antiguedad (dias)</label>';
+    h += '<input type="range" id="test-dias" min="1" max="90" value="30" style="width:100%" oninput="document.getElementById('test-dias-val').textContent=this.value+' dias'"><span id="test-dias-val" class="text-sm text-muted">30 dias</span></div>';
+    h += '<button class="btn btn-gold btn-block mt-12" onclick="Pages._testGenerarTodo()" style="padding:14px;font-size:1rem;font-weight:700">Generar Todo</button>';
+    h += '</div></div>';
+
+    // Individual actions
+    h += '<div class="card mt-16"><div class="card-header"><h3>Acciones Individuales</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProductos()">Crear 10 Productos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarVentas()">Crear 20 Ventas</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarPedidos()">Crear 10 Pedidos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearPDVs()">Crear 2 PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testAgregarStock()">Agregar Stock PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProducciones()">Crear 5 Producciones</button>';
+    h += '</div></div></div>';
+
+    // Danger zone
+    h += '<div class="card mt-16"><div class="card-header"><h3 style="color:var(--red)">Zona de Peligro</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Estas acciones eliminan datos de forma permanente.</p>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testResetStocks()">Reiniciar Stocks a 0</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearVentas()">Borrar Todas las Ventas</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearPedidos()">Borrar Todos los Pedidos</button>';
+    h += '<button class="btn btn-red" onclick="Pages._testNuclearReset()">RESET NUCLEAR - Borrar Todo</button>';
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  _testRandomDate(d) { var dt = new Date(); dt.setDate(dt.getDate() - Math.floor(Math.random() * d)); return dt.toISOString().slice(0, 10); },
+
+  _testGenerarTodo() {
+    var esp = Number(document.getElementById('test-esp').value) || 0;
+    var blend = Number(document.getElementById('test-blend').value) || 0;
+    var vtas = Number(document.getElementById('test-ventas').value) || 0;
+    var peds = Number(document.getElementById('test-pedidos').value) || 0;
+    var npdv = Number(document.getElementById('test-pdvs').value) || 0;
+    var pv = Number(document.getElementById('test-pdv-ventas').value) || 0;
+    var dias = Number(document.getElementById('test-dias').value) || 30;
+    Pages._testCrearProductosN(esp, blend);
+    Pages._testGenerarVentasN(vtas, dias);
+    Pages._testGenerarPedidosN(peds, dias);
+    Pages._testCrearPDVsN(npdv, pv, dias);
+    Pages._testCrearProduccionesN(5, dias);
+    toast('Datos de prueba generados! Revisa Dashboard, Ventas, P.Venta y Stats.');
+  },
+
+  _testCrearProductos() { Pages._testCrearProductosN(6, 4); toast('Productos creados'); },
+
+  _testCrearProductosN(nEsp, nBlend) {
+    var nms = ['Canela','Curcuma','Pimienta Negra','Comino','Oregano','Clavo','Nuez Moscada','Jengibre','Cacao','Vanilla','Cardamomo','Cilantro','Paprika','Azafran','Laurel','Tomillo','Romero','Salvia','Hinojo','Anis'];
+    var cats = ['Especias','Dulces','Saladas','Exoticas'];
+    for (var i = 0; i < nEsp; i++) {
+      var nm = nms[i % nms.length] + (i >= nms.length ? ' ' + Math.ceil((i+1)/nms.length) : '');
+      var pc = Math.floor(Math.random() * 8000 + 3000);
+      ArcanoDB.saveEspecia({ nombre: nm, categoria: cats[i % cats.length], precioChico: pc, precioGrande: Math.floor(pc * 1.7), stockBolsa: Math.floor(Math.random() * 500 + 100), stockChico: Math.floor(Math.random() * 15 + 2), stockGrande: Math.floor(Math.random() * 10 + 1), enTienda: Math.random() > 0.3 });
+    }
+    var nmsB = ['Arcano Mix','Fuego Interior','Dulce Despertar','Noche Estelar','Camino Sagrado','Raiz Ancestral','Brisa Otono','Sol Naciente','Luna Llena','Tierra Fertil'];
+    for (var j = 0; j < nBlend; j++) {
+      var nb = nmsB[j % nmsB.length] + (j >= nmsB.length ? ' ' + Math.ceil((j+1)/nmsB.length) : '');
+      var pb = Math.floor(Math.random() * 12000 + 5000);
+      ArcanoDB.saveBlend({ nombre: nb, categoria: 'Blends', precioChico: pb, precioGrande: Math.floor(pb * 1.6), stockChico: Math.floor(Math.random() * 12 + 2), stockGrande: Math.floor(Math.random() * 8 + 1), enTienda: Math.random() > 0.3 });
+    }
+  },
+
+  _testGenerarVentas() { Pages._testGenerarVentasN(20, 30); toast('Ventas creadas'); },
+
+  _testGenerarVentasN(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var v = 0; v < count; v++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 3) + 1;
+        var pu = tl === 'grande' ? pr.pg : pr.pc;
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.saveVenta({ fecha: Pages._testRandomDate(dias), items: items, total: tot, metodoPago: Math.random() > 0.5 ? 'efectivo' : 'qr' });
+    }
+  },
+
+  _testGenerarPedidos() { Pages._testGenerarPedidosN(10, 30); toast('Pedidos creados'); },
+
+  _testGenerarPedidosN(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    var ests = ['nuevo','confirmado','preparando','enviado','entregado'];
+    for (var i = 0; i < count; i++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 2) + 1;
+        var pu = tl === 'grande' ? (pr.precioGrande||0) : (pr.precioChico||0);
+        items.push({ tipo: pr.tipo||'especia', productoId: pr.id, productoNombre: pr.nombre, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.savePedido({ nombre: 'Cliente Test ' + (i+1), telefono: '300' + Math.floor(Math.random()*9000000+1000000), direccion: 'Calle Test #' + (i+1), items: items, total: tot, estado: ests[Math.min(Math.floor(Math.random()*ests.length), ests.length-1)], creado: new Date(Date.now() - Math.floor(Math.random()*dias*86400000)).toISOString() });
+    }
+  },
+
+  _testCrearPDVs() { Pages._testCrearPDVsN(2, 15, 30); toast('PDVs creados'); },
+
+  _testCrearPDVsN(count, vp, dias) {
+    var locs = ['Feria Central','Plaza Principal','Mercado Municipal','Centro Comercial','Parque Norte'];
+    var existentes = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < count; p++) {
+      var pdv = ArcanoDB.savePuntoDeVenta({ nombre: 'PDV Test ' + (existentes.length + p + 1), ubicacion: locs[p % locs.length], activo: true });
+      var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+      var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+      var si = [];
+      for (var s = 0; s < Math.min(8, all.length); s++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        si.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+2 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdv.id, si); } catch(e) {}
+      for (var v = 0; v < vp; v++) {
+        var nI = Math.floor(Math.random()*2)+1, items = [];
+        for (var it = 0; it < nI; it++) {
+          var pr2 = all[Math.floor(Math.random()*all.length)];
+          var cn2 = Math.floor(Math.random()*2)+1;
+          items.push({ tipo: pr2.tipo, productoId: pr2.id, talla: 'chico', cantidad: cn2, precioUnitario: pr2.pc, subtotal: pr2.pc*cn2 });
+        }
+        ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, fecha: Pages._testRandomDate(dias), items: items, metodoPago: Math.random()>0.5?'efectivo':'qr' });
+      }
+    }
+  },
+
+  _testAgregarStock() {
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    if (!pdvs.length) { toast('Crea PDVs primero','err'); return; }
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id};}), bl.map(function(b){return{tipo:'blend',id:b.id};}));
+    for (var p = 0; p < pdvs.length; p++) {
+      var items = [];
+      for (var s = 0; s < Math.min(6,all.length); s++) {
+        var pr = all[Math.floor(Math.random()*all.length)];
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+3 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdvs[p].id, items); } catch(e) {}
+    }
+    toast('Stock agregado a ' + pdvs.length + ' PDVs');
+  },
+
+  _testCrearProducciones() { Pages._testCrearProduccionesN(5, 30); toast('Producciones creadas'); },
+
+  _testCrearProduccionesN(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var i = 0; i < count; i++) {
+      var pr = all[Math.floor(Math.random()*all.length)];
+      ArcanoDB.saveProduccion({ tipo: pr.tipo||'especia', productoId: pr.id, fecha: Pages._testRandomDate(dias), cantidad: Math.floor(Math.random()*20)+5, frascosChico: Math.floor(Math.random()*10)+2, frascosGrande: Math.floor(Math.random()*5)+1 });
+    }
+  },
+
+  _testResetStocks() {
+    if (!confirm('Reiniciar todos los stocks a 0?')) return;
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    for (var i = 0; i < esp.length; i++) ArcanoDB.saveEspecia({ id: esp[i].id, stockBolsa: 0, stockChico: 0, stockGrande: 0 });
+    for (var j = 0; j < bl.length; j++) ArcanoDB.saveBlend({ id: bl[j].id, stockChico: 0, stockGrande: 0 });
+    toast('Stocks reiniciados a 0'); App.renderPage('testing');
+  },
+
+  _testClearVentas() {
+    if (!confirm('Borrar TODAS las ventas (admin y PDV)?')) return;
+    var v = ArcanoDB.getVentas();
+    for (var i = 0; i < v.length; i++) ArcanoDB.deleteVenta(v[i].id);
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < pdvs.length; p++) pdvs[p].ventas = {};
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Ventas eliminadas'); App.renderPage('testing');
+  },
+
+  _testClearPedidos() {
+    if (!confirm('Borrar TODOS los pedidos?')) return;
+    var p = ArcanoDB.getPedidos();
+    for (var i = 0; i < p.length; i++) ArcanoDB.deletePedido(p[i].id);
+    toast('Pedidos eliminados'); App.renderPage('testing');
+  },
+
+  _testNuclearReset() {
+    if (!confirm('RESET NUCLEAR: Se borrarán TODOS los datos. Continuar?')) return;
+    if (!confirm('Estas SEGURO? Se perderán productos, ventas, pedidos, PDVs, todo.')) return;
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Reset completo. Recargando...');
+    setTimeout(function() { location.reload(); }, 1500);
+  },
+
   _renderEstContent: function(data, el) {
     // Redirect to ventas tab for backward compat
     Pages._estTab = 'ventas';
