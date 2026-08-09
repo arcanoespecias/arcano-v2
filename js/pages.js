@@ -26,6 +26,7 @@ const Pages = {
     var ventasHoy = [], ventasMes = [], pedidosNuevos = [];
     var totalIngresos = 0, totalUnidades = 0, totalOps = 0;
     var adminIngreso = 0, tiendaIngreso = 0;
+    var efectivoIngreso = 0, qrIngreso = 0;
     var prodVentaMap = {}, tipoCount = {especia: 0, blend: 0}, tallaCount = {chico: 0, grande: 0};
     var diaMap = {}, monthMap = {};
 
@@ -35,6 +36,8 @@ const Pages = {
       totalIngresos += (v.total || 0);
       totalOps++;
       adminIngreso += (v.total || 0);
+      if (v.metodoPago === 'qr') qrIngreso += (v.total || 0);
+      else efectivoIngreso += (v.total || 0);
       if (vf === today) ventasHoy.push(v);
       if (vf && vf.startsWith(mes)) ventasMes.push(v);
       if (vf) {
@@ -680,7 +683,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas</h3></div><div class="card-body">';
     if (entradas.length === 0) { h += '<p class="text-muted text-center">Sin entradas.</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Metodo</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < Math.min(entradas.length, 30); i++) {
         var en = entradas[i];
         var desc = (en.items||[]).map(function(it) {
@@ -1115,11 +1118,12 @@ const Pages = {
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Metodo</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < Math.min(ventas.length, 30); i++) {
         var v = ventas[i];
         var desc = (v.items||[]).map(function(it){ return (it.productoNombre||'?')+' '+(it.talla||'chico')+' x'+(it.cantidad||0)+' ($'+(it.subtotal||0).toLocaleString()+')'; }).join(' | ');
-        h += '<tr><td>' + (v.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
+        var metodoTag = v.metodoPago === 'qr' ? '<span style="color:var(--blue);font-size:0.75rem;font-weight:600">QR</span>' : '<span style="color:var(--green);font-size:0.75rem;font-weight:600">Efectivo</span>';
+        h += '<tr><td>' + (v.fecha||'') + '</td><td>' + metodoTag + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
           '<td><button class="btn btn-sm btn-red" onclick="Pages.delVenta(' + v.id + ')">X</button></td></tr>';
       }
       h += '</tbody></table></div>';
@@ -1141,7 +1145,7 @@ const Pages = {
         '<div class="venta-total-box mt-12">Total: $<span id="v-total">0</span></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
-        '<button class="btn btn-gold" id="btn-save-v">Vender</button>' +
+        '<button class="btn btn-gold" id="btn-save-v">Cobrar</button>' +
       '</div></div>';
     document.body.appendChild(modal);
 
@@ -1210,11 +1214,8 @@ const Pages = {
         items.push({ tipo: parts[0], productoId: Number(parts[1]), talla: parts[2], cantidad: cant, precioUnitario: precio });
       }
       if (items.length === 0) { alert('Agrega al menos un item'); return; }
-      try {
-        ArcanoDB.saveVenta({ fecha: document.getElementById('f-v-fecha').value, items: items });
-        modal.remove();
-        App.renderPage('ventas');
-      } catch (err) { alert('Error: ' + err.message); }
+      var saleData = { fecha: document.getElementById('f-v-fecha').value, items: items };
+      Pages._showPagoModal(saleData, function() { modal.remove(); });
     });
   },
 
@@ -1224,7 +1225,60 @@ const Pages = {
     App.renderPage('ventas');
   },
 
-  /* ================================================================
+  _showPagoModal: function(saleData, onClose) {
+    var total = 0;
+    for (var i = 0; i < saleData.items.length; i++) {
+      total += (Number(saleData.items[i].precioUnitario) || 0) * (Number(saleData.items[i].cantidad) || 0);
+    }
+    saleData.total = total;
+    var pm = document.createElement('div');
+    pm.className = 'modal-overlay';
+    pm.id = 'pago-modal';
+    pm.innerHTML =
+      '<div class="modal" style="max-width:400px;text-align:center">' +
+        '<div class="modal-header"><h3>Metodo de Pago</h3></div>' +
+        '<div class="modal-body">' +
+          '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
+          '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago</p>' +
+          '<div style="display:flex;gap:12px;justify-content:center">' +
+            '<button class="btn btn-gold" id="pago-efectivo-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700">Efectivo</button>' +
+            '<button class="btn btn-outline" id="pago-qr-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700;border-color:var(--gold);color:var(--gold)">QR</button>' +
+          '</div>' +
+          '<div id="pago-qr-area" style="display:none;margin-top:20px">' +
+            '<div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px">Muestra el QR al cliente o sube una captura</div>' +
+            '<div id="pago-qr-preview" style="margin-bottom:12px"></div>' +
+            '<label class="btn btn-outline btn-block" style="cursor:pointer;display:block;margin-bottom:12px">Subir QR del Cliente<input type="file" accept="image/*" id="pago-qr-file" style="display:none"></label>' +
+            '<button class="btn btn-gold btn-block" id="pago-recibido-btn" style="padding:14px;font-size:1rem;font-weight:700">RECIBIDO</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(pm);
+    document.getElementById('pago-efectivo-btn').addEventListener('click', function() {
+      saleData.metodoPago = 'efectivo';
+      try { ArcanoDB.saveVenta(saleData); pm.remove(); if (onClose) onClose(); else App.renderPage('ventas'); }
+      catch (err) { alert('Error: ' + err.message); }
+    });
+    document.getElementById('pago-qr-btn').addEventListener('click', function() {
+      document.getElementById('pago-qr-area').style.display = 'block';
+      document.getElementById('pago-efectivo-btn').style.display = 'none';
+      document.getElementById('pago-qr-btn').style.display = 'none';
+    });
+    document.getElementById('pago-qr-file').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('pago-qr-preview').innerHTML = '<img src="' + ev.target.result + '" style="max-width:100%;max-height:250px;border-radius:8px;border:1px solid var(--border)">';
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById('pago-recibido-btn').addEventListener('click', function() {
+      saleData.metodoPago = 'qr';
+      try { ArcanoDB.saveVenta(saleData); pm.remove(); if (onClose) onClose(); else App.renderPage('ventas'); }
+      catch (err) { alert('Error: ' + err.message); }
+    });
+  },
+
   /* ================================================================
      VENTA POR CAMARA (OCR - lectura de etiquetas)
      ================================================================ */
@@ -1499,17 +1553,11 @@ const Pages = {
 
   confirmarVentaCam() {
     if (Pages._camCart.length === 0) { alert('No hay productos en la venta'); return; }
-    if (!confirm('Registrar venta de ' + Pages._camCart.length + ' producto(s)?')) return;
-    try {
-      ArcanoDB.saveVenta({
-        fecha: new Date().toISOString().slice(0, 10),
-        items: JSON.parse(JSON.stringify(Pages._camCart))
-      });
-      Pages.closeVentaCam();
-      App.renderPage('ventas');
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+    var saleData = {
+      fecha: new Date().toISOString().slice(0, 10),
+      items: JSON.parse(JSON.stringify(Pages._camCart))
+    };
+    Pages._showPagoModal(saleData, function() { Pages.closeVentaCam(); });
   },
 
   closeVentaCam() {
@@ -2607,7 +2655,7 @@ const Pages = {
       var v = ventas[vi];
       var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
-      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin', metodoPago: v.metodoPago || 'efectivo' });
     }
     for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
@@ -3369,7 +3417,7 @@ const Pages = {
       var v = ventas[vi];
       var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
-      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin', metodoPago: v.metodoPago || 'efectivo' });
     }
     for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
