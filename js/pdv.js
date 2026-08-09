@@ -328,11 +328,13 @@ var PDV = {
     if (ventas.length === 0) {
       h += '<div class="card"><div class="card-body text-center text-muted" style="padding:32px">Sin ventas registradas</div></div>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th>Detalle</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Metodo</th><th>Total</th><th>Detalle</th></tr></thead><tbody>';
       for (var i = 0; i < ventas.length; i++) {
         var v = ventas[i];
         var itemsStr = (v.items || []).map(function(it) { return it.productoNombre + ' x' + it.cantidad; }).join(', ');
+        var metodoTag = v.metodoPago === 'qr' ? '<span style="color:var(--blue);font-size:0.75rem;font-weight:600">QR</span>' : '<span style="color:var(--green);font-size:0.75rem;font-weight:600">Efectivo</span>';
         h += '<tr><td>' + (v.fecha || '').slice(0, 10) + '</td><td>' + itemsStr + '</td>' +
+          '<td>' + metodoTag + '</td>' +
           '<td class="fw7">$' + (v.total || 0).toLocaleString() + '</td>' +
           '<td><button class="btn btn-sm btn-outline" onclick="PDV.verVentaDetalle(' + v.id + ')">Ver</button></td></tr>';
       }
@@ -490,24 +492,76 @@ var PDV = {
     if (countEl) countEl.textContent = this._posCart.length;
   },
 
+  /* ==================== PAYMENT MODAL (shared) ==================== */
+  _showPDVPagoModal: function(saleData, onSuccess) {
+    var total = 0;
+    for (var i = 0; i < saleData.items.length; i++) {
+      total += (Number(saleData.items[i].precioUnitario) || 0) * (Number(saleData.items[i].cantidad) || 0);
+    }
+    saleData.total = total;
+    var qrImg = (typeof Pages !== 'undefined' && Pages._qrPagoImage) ? Pages._qrPagoImage : null;
+    var qrContent = qrImg
+      ? '<div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Muestra este QR al cliente:</div>' +
+        '<div style="margin-bottom:16px"><img src="' + qrImg + '" style="max-width:260px;max-height:260px;border-radius:8px;border:1px solid var(--border)"></div>'
+      : '<div style="padding:20px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted)">No hay QR configurado.<br>Configuralo en Ventas > Configuracion de Pago.</div>';
+    var pm = document.createElement('div');
+    pm.className = 'modal-overlay';
+    pm.id = 'pdv-pago-modal';
+    pm.innerHTML =
+      '<div class="modal" style="max-width:420px;text-align:center">' +
+        '<div class="modal-header"><h3>Metodo de Pago</h3></div>' +
+        '<div class="modal-body">' +
+          '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
+          '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago</p>' +
+          '<div style="display:flex;gap:12px;justify-content:center">' +
+            '<button class="btn btn-gold" id="pdv-pago-efectivo-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700">Efectivo</button>' +
+            '<button class="btn btn-outline" id="pdv-pago-qr-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700;border-color:var(--gold);color:var(--gold)">QR</button>' +
+          '</div>' +
+          '<div id="pdv-pago-qr-area" style="display:none;margin-top:20px">' +
+            qrContent +
+            '<button class="btn btn-gold btn-block" id="pdv-pago-recibido-btn" style="padding:14px;font-size:1rem;font-weight:700">RECIBIDO</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(pm);
+    document.getElementById('pdv-pago-efectivo-btn').addEventListener('click', function() {
+      saleData.metodoPago = 'efectivo';
+      pm.remove();
+      onSuccess(saleData);
+    });
+    document.getElementById('pdv-pago-qr-btn').addEventListener('click', function() {
+      document.getElementById('pdv-pago-qr-area').style.display = 'block';
+      document.getElementById('pdv-pago-efectivo-btn').style.display = 'none';
+      document.getElementById('pdv-pago-qr-btn').style.display = 'none';
+    });
+    document.getElementById('pdv-pago-recibido-btn').addEventListener('click', function() {
+      saleData.metodoPago = 'qr';
+      pm.remove();
+      onSuccess(saleData);
+    });
+  },
+
   posConfirmar() {
     if (this._posCart.length === 0) return;
     var pdv = this.currentPDV;
     if (!pdv) return;
-    if (!confirm('Confirmar venta por $' + this._posCart.reduce(function(s, it) { return s + it.subtotal; }, 0).toLocaleString() + '?')) return;
-    try {
-      var venta = ArcanoDB.savePDVVenta({
-        puntoDeVentaId: pdv.id,
-        puntoDeVentaNombre: pdv.nombre,
-        items: this._posCart.map(function(it) {
-          return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario };
-        })
-      });
-      this._posCart = [];
-      toast('Venta registrada! #' + venta.id);
-      this.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
-      this.renderPos(document.getElementById('page-content'));
-    } catch (e) { toast(e.message, 'err'); }
+    var self = this;
+    var saleData = {
+      puntoDeVentaId: pdv.id,
+      puntoDeVentaNombre: pdv.nombre,
+      items: this._posCart.map(function(it) {
+        return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario };
+      })
+    };
+    this._showPDVPagoModal(saleData, function(data) {
+      try {
+        var venta = ArcanoDB.savePDVVenta(data);
+        self._posCart = [];
+        toast('Venta registrada! #' + venta.id);
+        self.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
+        self.renderPos(document.getElementById('page-content'));
+      } catch (e) { toast(e.message, 'err'); }
+    });
   },
 
   /* ==================== ESTADISTICAS ==================== */
@@ -558,11 +612,19 @@ var PDV = {
 
   _renderStatsResumen(stats, ventas, pdv) {
     var h = '';
+    // Calculate Efectivo vs QR
+    var pdvEfectivo = 0, pdvQr = 0;
+    for (var pvi = 0; pvi < ventas.length; pvi++) {
+      if (ventas[pvi].metodoPago === 'qr') pdvQr += (ventas[pvi].total || 0);
+      else pdvEfectivo += (ventas[pvi].total || 0);
+    }
     h += '<div class="est-kpi-grid">' +
       '<div class="est-kpi up"><div class="est-kpi-value">$' + stats.totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--green)">$' + pdvEfectivo.toLocaleString() + '</div><div class="est-kpi-label">Efectivo</div><div class="est-kpi-sub">pagos en efectivo</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--blue)">$' + pdvQr.toLocaleString() + '</div><div class="est-kpi-label">QR</div><div class="est-kpi-sub">pagos con QR</div></div>' +
       '<div class="est-kpi"><div class="est-kpi-value">' + stats.totalVentas + '</div><div class="est-kpi-label">Total Ventas</div><div class="est-kpi-sub">transacciones realizadas</div></div>' +
-      '<div class="est-kpi"><div class="est-kpi-value">$' + Math.round(stats.ticketPromedio).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">ingreso por venta</div></div>' +
-      '<div class="est-kpi ' + (stats.totalItemsEnStock < 10 ? 'down' : 'up') + '"><div class="est-kpi-value">' + stats.totalItemsEnStock + '</div><div class="est-kpi-label">Unidades en Stock</div><div class="est-kpi-sub">' + stats.productosEnStock + ' productos</div></div>' +
+      '<div class="est-kpi ' + (stats.totalItemsEnStock < 10 ? 'down' : 'up') + '"><div class="est-kpi-value">$' + Math.round(stats.ticketPromedio).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">ingreso por venta</div></div>' +
+      '<div class="est-kpi"><div class="est-kpi-value">' + stats.totalItemsEnStock + '</div><div class="est-kpi-label">Unidades en Stock</div><div class="est-kpi-sub">' + stats.productosEnStock + ' productos</div></div>' +
       '</div>';
     h += '<div class="est-charts-grid">' +
       '<div class="est-chart-card"><h4>Ingresos Diarios</h4><div class="est-chart-wrap" style="height:220px"><canvas id="pdv-chart-ingresos"></canvas></div></div>' +
@@ -581,12 +643,13 @@ var PDV = {
     }
     if (ventas.length > 0) {
       h += '<h4 style="margin:20px 0 8px">Ultimas 5 Ventas</h4>';
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Fecha</th><th>Items</th><th>Total</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Fecha</th><th>Items</th><th>Metodo</th><th>Total</th></tr></thead><tbody>';
       var recent = ventas.slice(-5).reverse();
       for (var r = 0; r < recent.length; r++) {
         var rv = recent[r];
         var itemNames = (rv.items || []).map(function(it) { return it.productoNombre; }).join(', ');
-        h += '<tr><td>' + rv.id + '</td><td>' + (rv.fecha || '').slice(0, 16) + '</td><td class="text-sm">' + this.esc(itemNames) + '</td><td class="fw7">$' + (rv.total || 0).toLocaleString() + '</td></tr>';
+        var rvMetodo = rv.metodoPago === 'qr' ? '<span style="color:var(--blue);font-size:0.75rem;font-weight:600">QR</span>' : '<span style="color:var(--green);font-size:0.75rem;font-weight:600">Efectivo</span>';
+        h += '<tr><td>' + rv.id + '</td><td>' + (rv.fecha || '').slice(0, 16) + '</td><td class="text-sm">' + this.esc(itemNames) + '</td><td>' + rvMetodo + '</td><td class="fw7">$' + (rv.total || 0).toLocaleString() + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -1046,23 +1109,25 @@ var PDV = {
     if (this._pdvCamCart.length === 0) { toast('No hay productos en la venta', 'err'); return; }
     var pdv = this.currentPDV;
     if (!pdv) return;
-    var total = this._pdvCamCart.reduce(function(s, it) { return s + it.subtotal; }, 0);
-    if (!confirm('Registrar venta por $' + total.toLocaleString() + ' en ' + pdv.nombre + '?')) return;
-    try {
-      var venta = ArcanoDB.savePDVVenta({
-        puntoDeVentaId: pdv.id,
-        puntoDeVentaNombre: pdv.nombre,
-        items: this._pdvCamCart.map(function(it) {
-          return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario };
-        })
-      });
-      this.closeVentaCam();
-      toast('Venta registrada! #' + venta.id);
-      this.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
-      this.render(document.getElementById('page-content'));
-    } catch (err) {
-      toast('Error: ' + err.message, 'err');
-    }
+    var self = this;
+    var saleData = {
+      puntoDeVentaId: pdv.id,
+      puntoDeVentaNombre: pdv.nombre,
+      items: this._pdvCamCart.map(function(it) {
+        return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario };
+      })
+    };
+    this._showPDVPagoModal(saleData, function(data) {
+      try {
+        var venta = ArcanoDB.savePDVVenta(data);
+        self.closeVentaCam();
+        toast('Venta registrada! #' + venta.id);
+        self.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
+        self.render(document.getElementById('page-content'));
+      } catch (err) {
+        toast('Error: ' + err.message, 'err');
+      }
+    });
   },
 
   closeVentaCam() {
