@@ -1333,7 +1333,10 @@ const Pages = {
           '</div>' +
           '<div id="pago-qr-area" style="display:none;margin-top:20px">' +
             qrContent +
-            '<button class="btn btn-gold btn-block" id="pago-recibido-btn" style="padding:14px;font-size:1rem;font-weight:700">RECIBIDO</button>' +
+            '<div style="display:flex;gap:12px;justify-content:center;margin-top:12px">' +
+              '<button class="btn btn-gold" id="pago-recibido-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Pago Recibido</button>' +
+              '<button class="btn btn-outline" id="pago-qr-cancel-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Cancelar</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1352,6 +1355,11 @@ const Pages = {
       saleData.metodoPago = 'qr';
       try { ArcanoDB.saveVenta(saleData); pm.remove(); if (onClose) onClose(); else App.renderPage('ventas'); }
       catch (err) { alert('Error: ' + err.message); }
+    });
+    document.getElementById('pago-qr-cancel-btn').addEventListener('click', function() {
+      document.getElementById('pago-qr-area').style.display = 'none';
+      document.getElementById('pago-efectivo-btn').style.display = '';
+      document.getElementById('pago-qr-btn').style.display = '';
     });
   },
 
