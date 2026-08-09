@@ -1121,6 +1121,16 @@ const Pages = {
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formVenta()">+ Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="Pages.formVentaQR()" style="margin-left:8px">\u{1F4F7} Vender por QR</button></div>';
 
+    // === QR PAYMENT CONFIG ===
+    h += '<div class="card mt-16"><div class="card-header"><h3>Configuracion de Pago</h3></div><div class="card-body">' +
+      '<p class="text-sm text-muted mb-12">Sube la imagen QR que se mostrara al cobrar con metodo QR.</p>' +
+      '<div id="qr-config-area">' +
+        '<div id="qr-config-preview" style="margin-bottom:12px;text-align:center"></div>' +
+        '<label class="btn btn-outline" style="cursor:pointer;display:inline-block">Subir Imagen QR<input type="file" accept="image/*" id="qr-config-file" style="display:none"></label>' +
+        '<button class="btn btn-sm btn-red" id="qr-config-remove" style="margin-left:8px;display:none" onclick="Pages._removeQRPago()">Eliminar QR</button>' +
+        '<p id="qr-config-status" class="text-sm text-muted mt-8"></p>' +
+      '</div></div></div>';
+
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
@@ -1137,6 +1147,71 @@ const Pages = {
     }
     h += '</div></div>';
     container.innerHTML = h;
+    Pages._loadQRPagoConfig();
+  },
+
+  // --- QR PAGO CONFIG ---
+  _qrPagoImage: null,
+
+  _loadQRPagoConfig: function() {
+    var cached = localStorage.getItem('arcano_qr_pago_image');
+    if (cached) { Pages._qrPagoImage = cached; }
+    try {
+      firebase.database().ref('arcano/config/qrPagoImage').once('value').then(function(snap) {
+        var val = snap.val();
+        if (val) {
+          Pages._qrPagoImage = val;
+          localStorage.setItem('arcano_qr_pago_image', val);
+        } else {
+          Pages._qrPagoImage = null;
+          localStorage.removeItem('arcano_qr_pago_image');
+        }
+        Pages._renderQRPagoPreview();
+      }).catch(function() { Pages._renderQRPagoPreview(); });
+    } catch(e) { Pages._renderQRPagoPreview(); }
+    var fileInput = document.getElementById('qr-config-file');
+    if (fileInput) {
+      fileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 500000) { alert('La imagen es muy grande (max 500KB).'); return; }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          var dataUrl = ev.target.result;
+          Pages._qrPagoImage = dataUrl;
+          localStorage.setItem('arcano_qr_pago_image', dataUrl);
+          try { firebase.database().ref('arcano/config/qrPagoImage').set(dataUrl); } catch(e) {}
+          Pages._renderQRPagoPreview();
+          toast('QR de pago guardado');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  },
+
+  _renderQRPagoPreview: function() {
+    var preview = document.getElementById('qr-config-preview');
+    var removeBtn = document.getElementById('qr-config-remove');
+    var status = document.getElementById('qr-config-status');
+    if (!preview) return;
+    if (Pages._qrPagoImage) {
+      preview.innerHTML = '<img src="' + Pages._qrPagoImage + '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid var(--border)">';
+      if (removeBtn) removeBtn.style.display = 'inline-block';
+      if (status) status.textContent = 'QR configurado correctamente';
+    } else {
+      preview.innerHTML = '<p class="text-muted" style="padding:20px 0">No hay QR configurado. Sube una imagen.</p>';
+      if (removeBtn) removeBtn.style.display = 'none';
+      if (status) status.textContent = '';
+    }
+  },
+
+  _removeQRPago: function() {
+    if (!confirm('Eliminar el QR de pago configurado?')) return;
+    Pages._qrPagoImage = null;
+    localStorage.removeItem('arcano_qr_pago_image');
+    try { firebase.database().ref('arcano/config/qrPagoImage').remove(); } catch(e) {}
+    Pages._renderQRPagoPreview();
+    toast('QR de pago eliminado');
   },
 
   formVenta() {
@@ -1238,11 +1313,16 @@ const Pages = {
       total += (Number(saleData.items[i].precioUnitario) || 0) * (Number(saleData.items[i].cantidad) || 0);
     }
     saleData.total = total;
+    var qrImg = Pages._qrPagoImage;
     var pm = document.createElement('div');
     pm.className = 'modal-overlay';
     pm.id = 'pago-modal';
+    var qrContent = qrImg
+      ? '<div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Muestra este QR al cliente:</div>' +
+        '<div style="margin-bottom:16px"><img src="' + qrImg + '" style="max-width:260px;max-height:260px;border-radius:8px;border:1px solid var(--border)"></div>'
+      : '<div style="padding:20px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted)">No hay QR configurado.<br>Ve a Ventas > Configuracion de Pago para subirlo.</div>';
     pm.innerHTML =
-      '<div class="modal" style="max-width:400px;text-align:center">' +
+      '<div class="modal" style="max-width:420px;text-align:center">' +
         '<div class="modal-header"><h3>Metodo de Pago</h3></div>' +
         '<div class="modal-body">' +
           '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
@@ -1252,9 +1332,7 @@ const Pages = {
             '<button class="btn btn-outline" id="pago-qr-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700;border-color:var(--gold);color:var(--gold)">QR</button>' +
           '</div>' +
           '<div id="pago-qr-area" style="display:none;margin-top:20px">' +
-            '<div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px">Muestra el QR al cliente o sube una captura</div>' +
-            '<div id="pago-qr-preview" style="margin-bottom:12px"></div>' +
-            '<label class="btn btn-outline btn-block" style="cursor:pointer;display:block;margin-bottom:12px">Subir QR del Cliente<input type="file" accept="image/*" id="pago-qr-file" style="display:none"></label>' +
+            qrContent +
             '<button class="btn btn-gold btn-block" id="pago-recibido-btn" style="padding:14px;font-size:1rem;font-weight:700">RECIBIDO</button>' +
           '</div>' +
         '</div>' +
@@ -1269,15 +1347,6 @@ const Pages = {
       document.getElementById('pago-qr-area').style.display = 'block';
       document.getElementById('pago-efectivo-btn').style.display = 'none';
       document.getElementById('pago-qr-btn').style.display = 'none';
-    });
-    document.getElementById('pago-qr-file').addEventListener('change', function(e) {
-      var file = e.target.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        document.getElementById('pago-qr-preview').innerHTML = '<img src="' + ev.target.result + '" style="max-width:100%;max-height:250px;border-radius:8px;border:1px solid var(--border)">';
-      };
-      reader.readAsDataURL(file);
     });
     document.getElementById('pago-recibido-btn').addEventListener('click', function() {
       saleData.metodoPago = 'qr';
