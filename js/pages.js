@@ -3220,15 +3220,17 @@ const Pages = {
       var ctxI = document.getElementById('chart-pdv-ingresos');
       if (ctxI) {
         Pages._estCharts.push(new Chart(ctxI, {
-          type: 'bar', data: { labels: pdvLabels, datasets: [{ label: 'Ingresos ($)', data: pdvIngresoData, backgroundColor: 'rgba(142,68,173,0.7)', borderColor: '#8e44ad', borderWidth: 1, borderRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+          type: 'bar',
+          data: { labels: pdvLabels, datasets: [{ label: 'Ingresos ($)', data: pdvIngresoData, backgroundColor: 'rgba(142,68,173,0.7)', borderColor: '#8e44ad', borderWidth: 1, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
         }));
       }
       var ctxO = document.getElementById('chart-pdv-ops');
       if (ctxO) {
         Pages._estCharts.push(new Chart(ctxO, {
-          type: 'bar', data: { labels: pdvLabels, datasets: [{ label: 'Ventas', data: pdvOpsData, backgroundColor: 'rgba(93,173,226,0.7)', borderColor: '#5dade2', borderWidth: 1, borderRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } }
+          type: 'bar',
+          data: { labels: pdvLabels, datasets: [{ label: 'Ventas', data: pdvOpsData, backgroundColor: 'rgba(93,173,226,0.7)', borderColor: '#5dade2', borderWidth: 1, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
         }));
       }
       var cvPdv = el.querySelectorAll('.est-chart-wrap');
