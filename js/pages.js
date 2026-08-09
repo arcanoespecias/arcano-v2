@@ -60,7 +60,26 @@ const Pages = {
         prodVentaMap[pkey] += (it.subtotal || 0);
       }}
     }
-    for (var pi = 0; pi < pedidos.length; pi++) {
+    // Include PDV ventas in payment totals
+    var pdvs = ArcanoDB.getPDVs ? ArcanoDB.getPDVs() : [];
+    var efectivoOps = 0, qrOps = 0;
+    for (var pdvi = 0; pdvi < ventas.length; pdvi++) {
+      if (ventas[pdvi].metodoPago === 'qr') qrOps++; else efectivoOps++;
+    }
+    for (var pdvi2 = 0; pdvi2 < pdvs.length; pdvi2++) {
+      var pdvVtas = ArcanoDB.getPDVVentas(pdvs[pdvi2].id);
+      for (var pdvVi = 0; pdvVi < pdvVtas.length; pdvVi++) {
+        var pv = pdvVtas[pdvVi];
+        totalIngresos += (pv.total || 0);
+        totalOps++;
+        adminIngreso += (pv.total || 0);
+        if (pv.metodoPago === 'qr') { qrIngreso += (pv.total || 0); qrOps++; }
+        else { efectivoIngreso += (pv.total || 0); efectivoOps++; }
+        if (pv.fecha === today) ingresosHoy += (pv.total || 0);
+        if (pv.fecha && pv.fecha.startsWith(mes)) { ingresosMes += (pv.total || 0); opsMes++; }
+      }
+    }
+        for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
       if (p.estado === 'nuevo') pedidosNuevos.push(p);
       if (p.estado === 'cancelado') continue;
@@ -145,6 +164,36 @@ const Pages = {
     h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalProductos + '</div><div class="dash-mini-lbl">Productos Activos</div><div class="dash-mini-sub">' + stats.totalEspecias + ' esp + ' + stats.totalBlends + ' bl</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
     h += '</div>';
+
+    // PANEL METODOS DE PAGO
+    var _pmTotal = efectivoIngreso + qrIngreso;
+    var _pmEfectivoPct = _pmTotal > 0 ? Math.round(efectivoIngreso / _pmTotal * 100) : 0;
+    var _pmQrPct = _pmTotal > 0 ? Math.round(qrIngreso / _pmTotal * 100) : 0;
+    h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--green)"></span>Metodos de Pago</div>';
+    h += '<div class="card" style="overflow:hidden">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">';
+    h += '<div style="padding:24px;text-align:center;border-right:1px solid var(--border)">';
+    h += '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px">Efectivo</div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:var(--green)">$' + efectivoIngreso.toLocaleString() + '</div>';
+    h += '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">' + _pmEfectivoPct + '% del total</div>';
+    h += '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">' + efectivoOps + ' operaciones</div>';
+    h += '</div>';
+    h += '<div style="padding:24px;text-align:center">';
+    h += '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px">QR</div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:#8e44ad">$' + qrIngreso.toLocaleString() + '</div>';
+    h += '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">' + _pmQrPct + '% del total</div>';
+    h += '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">' + qrOps + ' operaciones</div>';
+    h += '</div></div>';
+    h += '<div style="padding:0 24px 20px">';
+    h += '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg3)">';
+    h += '<div style="width:' + _pmEfectivoPct + '%;background:var(--green);transition:width 0.5s"></div>';
+    h += '<div style="width:' + _pmQrPct + '%;background:#8e44ad;transition:width 0.5s"></div>';
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.7rem;color:var(--muted)">';
+    h += '<span>Efectivo ' + _pmEfectivoPct + '%</span>';
+    h += '<span>Total: $' + _pmTotal.toLocaleString() + '</span>';
+    h += '<span>QR ' + _pmQrPct + '%</span>';
+    h += '</div></div></div>';
 
     // Canal de venta + Composicion
     h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--blue)"></span>Analisis de Ventas</div>';
