@@ -625,12 +625,14 @@ const Pages = {
     var etiqList = ArcanoDB.getProductosConStickers();
     var entradas = ArcanoDB.getEntradas();
 
+    var cintas = db.stockCintas || 0;
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button></div>';
-    h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">' +
+    h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.chico||0) + '</div><div class="stat-label">Bolsas Chicas</div></div>' +
-      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.grande||0) + '</div><div class="stat-label">Bolsas Grandes</div></div></div>';
+      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.grande||0) + '</div><div class="stat-label">Bolsas Grandes</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value" style="color:var(--gold)">' + cintas + '</div><div class="stat-label">Cintas</div></div></div>';
 
     h += '<div class="g2 mt-16" style="gap:16px">';
     // Especias en pala
@@ -673,6 +675,7 @@ const Pages = {
           if (it.tipo==='envase') return 'Frascos ' + (it.talla||'chico') + ' x' + it.cantidad;
           if (it.tipo==='bolsa') return 'Bolsas ' + (it.talla||'chico') + ' x' + it.cantidad;
           if (it.tipo==='sticker') return 'Stk ' + (it.stickerNombre||'?') + ' ' + (it.talla||'chico') + ' x' + it.cantidad;
+          if (it.tipo==='cinta') return 'Cintas x' + it.cantidad;
           return '?';
         }).join(' | ');
         h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + '</td>' +
@@ -737,7 +740,7 @@ const Pages = {
       div.style.background = 'var(--bg)';
       div.innerHTML = '<div class="card-body" style="padding:12px">' +
         '<div class="g4 mb-8">' +
-          '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Frascos</option><option value="bolsa">Bolsas</option><option value="sticker">Stickers</option></select></div>' +
+          '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Frascos</option><option value="bolsa">Bolsas</option><option value="cinta">Cintas</option><option value="sticker">Stickers</option></select></div>' +
           '<div class="form-group" style="margin:0" id="ent-detail-placeholder"></div>' +
           '<div class="form-group" style="margin:0"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
           '<div class="form-group" style="margin:0"><label>Costo Unit.</label><input type="number" class="input ent-cost" placeholder="0" min="0"></div>' +
@@ -777,6 +780,8 @@ const Pages = {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
         } else if (t === 'bolsa') {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Chica</option><option value="grande">Grande</option></select>';
+        } else if (t === 'cinta') {
+          detailDiv.innerHTML = '';
         } else {
           detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
           var stkSel = detailDiv.querySelector('.ent-stk-nombre');
@@ -935,7 +940,7 @@ const Pages = {
           '<td class="fw7">' + (p.productoNombre||'') + '</td>' +
           '<td><span class="badge ' + ((p.talla||'chico')==='grande'?'badge-gold':'badge-blue') + '">' + (p.talla||'chico') + '</span></td>' +
           '<td class="fw7 text-green">' + (p.cantidad||0) + ' fr</td>' +
-          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + '</td></tr>';
+          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + ' Bol:' + (p.bolsasConsumidas||0) + ' Cin:' + (p.cintasConsumidas||0) + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -1050,6 +1055,12 @@ const Pages = {
       var bolsaOk = bolsaAvail >= cant;
       if (!bolsaOk) allOk = false;
       h += '<div class="list-row"><span>Bolsas ' + talla + '</span><span class="' + (bolsaOk?'text-green':'text-red fw7') + '">' + bolsaAvail + ' → necesita ' + cant + ' ' + (bolsaOk?'OK':'FALTA') + '</span></div>';
+
+      // Cintas
+      var cintaAvail = db.stockCintas || 0;
+      var cintaOk = cintaAvail >= cant;
+      if (!cintaOk) allOk = false;
+      h += '<div class="list-row"><span>Cintas</span><span class="' + (cintaOk?'text-green':'text-red fw7') + '">' + cintaAvail + ' → necesita ' + cant + ' ' + (cintaOk?'OK':'FALTA') + '</span></div>';
 
       h += '</div></div>';
       previewDiv.innerHTML = h;
@@ -2906,7 +2917,7 @@ const Pages = {
 
     // 1. Total cost of purchases (entradas)
     var totalCostoCompras = 0;
-    var costoByTipo = { especia_grs: 0, envase: 0, bolsa: 0, sticker: 0 };
+    var costoByTipo = { especia_grs: 0, envase: 0, bolsa: 0, sticker: 0, cinta: 0 };
     var proveedorMap = {};
     var compraMonthMap = {};
     for (var ei = 0; ei < entradas.length; ei++) {
@@ -3022,11 +3033,12 @@ const Pages = {
 
     // Cost breakdown by type
     h += '<div class="card mt-16"><div class="card-header"><h3>Desglose de Costos por Tipo</h3></div><div class="card-body">';
-    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">';
     h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.especia_grs || 0).toLocaleString() + '</div><div class="stat-label">Materia Prima</div></div>';
     h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + (costoByTipo.envase || 0).toLocaleString() + '</div><div class="stat-label">Frascos (Envases)</div></div>';
     h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + (costoByTipo.bolsa || 0).toLocaleString() + '</div><div class="stat-label">Bolsas</div></div>';
     h += '<div class="stat-card" style="border-left-color:var(--yellow)"><div class="stat-value">$' + (costoByTipo.sticker || 0).toLocaleString() + '</div><div class="stat-label">Stickers/Etiquetas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.cinta || 0).toLocaleString() + '</div><div class="stat-label">Cintas</div></div>';
     h += '</div></div></div>';
 
     // Proveedor table
@@ -3132,7 +3144,7 @@ const Pages = {
   _renderProduccion: function(data, el, producciones) {
     if (!el) return;
     var totalFrascos = 0, totalGramos = 0;
-    var tipoProdMap = {}, tallaProdMap = {}, prodProdMap = {}, prodMonthMap = {}, envasesConsumidos = 0, bolsasConsumidas = 0, stickersConsumidos = 0;
+    var tipoProdMap = {}, tallaProdMap = {}, prodProdMap = {}, prodMonthMap = {}, envasesConsumidos = 0, bolsasConsumidas = 0, stickersConsumidos = 0, cintasConsumidas = 0;
     for (var i = 0; i < producciones.length; i++) {
       var pr = producciones[i];
       totalFrascos += (pr.cantidad || 0);
@@ -3140,6 +3152,7 @@ const Pages = {
       envasesConsumidos += (pr.envasesConsumidos || 0);
       bolsasConsumidas += (pr.bolsasConsumidas || 0);
       stickersConsumidos += (pr.stickersConsumidos || 0);
+      cintasConsumidas += (pr.cintasConsumidas || 0);
       tipoProdMap[pr.tipo] = (tipoProdMap[pr.tipo] || 0) + (pr.cantidad || 0);
       tallaProdMap[pr.talla || 'chico'] = (tallaProdMap[pr.talla || 'chico'] || 0) + (pr.cantidad || 0);
       var pk = (pr.productoNombre || '?') + '|' + (pr.tipo || 'especia') + '|' + (pr.talla || 'chico');
@@ -3164,6 +3177,7 @@ const Pages = {
     h += '<div class="est-kpi"><div class="est-kpi-value">' + envasesConsumidos + '</div><div class="est-kpi-label">Envases Consumidos</div><div class="est-kpi-sub">frascos usados</div></div>';
     h += '<div class="est-kpi"><div class="est-kpi-value">' + stickersConsumidos + '</div><div class="est-kpi-label">Stickers Usados</div><div class="est-kpi-sub">etiquetas aplicadas</div></div>';
     h += '<div class="est-kpi"><div class="est-kpi-value">' + bolsasConsumidas + '</div><div class="est-kpi-label">Bolsas Usadas</div><div class="est-kpi-sub">empaques</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cintasConsumidas + '</div><div class="est-kpi-label">Cintas Usadas</div><div class="est-kpi-sub">decorativas</div></div>';
     h += '</div>';
 
     // Charts
