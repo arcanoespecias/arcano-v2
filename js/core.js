@@ -26,7 +26,7 @@ const ARCANO_LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUD
 
 const App = {
   currentPage: 'dashboard',
-  sidebarOpen: true,
+  sidebarOpen: window.innerWidth > 768,
 
   async init() {
     this.showSplash();
@@ -210,6 +210,7 @@ const App = {
           '</div>' +
         '</main>' +
       '</div>' +
+      '<div id="sidebar-mobile-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:499" onclick="App.toggleSidebar()"></div>' +
       '<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="modal-header"><h3 id="modal-title"></h3><button class="btn btn-ghost" onclick="closeModal()" style="font-size:18px">X</button></div><div class="modal-body" id="modal-body"></div></div></div>' +
       '<div id="toast" class="toast"></div>';
   },
@@ -219,6 +220,7 @@ const App = {
     document.querySelectorAll('.nav-item').forEach(function(el) {
       el.classList.toggle('active', el.dataset.page === page);
     });
+    this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
       produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
@@ -229,7 +231,25 @@ const App = {
 
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
-    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    var layout = document.querySelector('.app-layout');
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-mobile-overlay');
+    if (window.innerWidth <= 768) {
+      sidebar.classList.toggle('mobile-open', this.sidebarOpen);
+      if (overlay) overlay.style.display = this.sidebarOpen ? 'block' : 'none';
+    } else {
+      layout.classList.toggle('sidebar-closed', !this.sidebarOpen);
+    }
+  },
+
+  closeMobileSidebar() {
+    if (window.innerWidth <= 768 && this.sidebarOpen) {
+      this.sidebarOpen = false;
+      var sidebar = document.getElementById('sidebar');
+      var overlay = document.getElementById('sidebar-mobile-overlay');
+      sidebar.classList.remove('mobile-open');
+      if (overlay) overlay.style.display = 'none';
+    }
   },
 
   logout() {
