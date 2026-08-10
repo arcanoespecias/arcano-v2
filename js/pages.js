@@ -3484,4 +3484,14 @@ const Pages = {
     // Redirect to ventas tab for backward compat
     Pages._estTab = 'ventas';
     Pages._renderVentas(data, el);
-  }};
+  },
+
+  /* ================================================================
+     TESTING (sandbox)
+     ================================================================ */
+  renderTesting: function(container) {
+    container.innerHTML = '<div class="card"><div class="card-body text-center text-muted" style="padding:40px">' +
+      '<p style="font-size:48px;margin-bottom:12px">Experimental</p>' +
+      '<p>Area de pruebas y experimentacion</p></div></div>';
+  }
+};
