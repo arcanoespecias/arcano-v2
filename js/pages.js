@@ -7,7 +7,6 @@ const Pages = {
   _dashCharts: [],
 
   renderDashboard(container) {
-    Pages._syncGlobalConfig();
     if (Pages._dashCharts) { for (var _ci = 0; _ci < Pages._dashCharts.length; _ci++) { try { Pages._dashCharts[_ci].destroy(); } catch(e) {} } }
     Pages._dashCharts = [];
 
@@ -27,7 +26,6 @@ const Pages = {
     var ventasHoy = [], ventasMes = [], pedidosNuevos = [];
     var totalIngresos = 0, totalUnidades = 0, totalOps = 0;
     var adminIngreso = 0, tiendaIngreso = 0;
-    var efectivoIngreso = 0, qrIngreso = 0;
     var prodVentaMap = {}, tipoCount = {especia: 0, blend: 0}, tallaCount = {chico: 0, grande: 0};
     var diaMap = {}, monthMap = {};
 
@@ -37,8 +35,6 @@ const Pages = {
       totalIngresos += (v.total || 0);
       totalOps++;
       adminIngreso += (v.total || 0);
-      if (v.metodoPago === 'qr') qrIngreso += (v.total || 0);
-      else efectivoIngreso += (v.total || 0);
       if (vf === today) ventasHoy.push(v);
       if (vf && vf.startsWith(mes)) ventasMes.push(v);
       if (vf) {
@@ -61,26 +57,7 @@ const Pages = {
         prodVentaMap[pkey] += (it.subtotal || 0);
       }}
     }
-    // Include PDV ventas in payment totals
-    var pdvs = ArcanoDB.getPDVs ? ArcanoDB.getPDVs() : [];
-    var efectivoOps = 0, qrOps = 0;
-    for (var pdvi = 0; pdvi < ventas.length; pdvi++) {
-      if (ventas[pdvi].metodoPago === 'qr') qrOps++; else efectivoOps++;
-    }
-    for (var pdvi2 = 0; pdvi2 < pdvs.length; pdvi2++) {
-      var pdvVtas = ArcanoDB.getPDVVentas(pdvs[pdvi2].id);
-      for (var pdvVi = 0; pdvVi < pdvVtas.length; pdvVi++) {
-        var pv = pdvVtas[pdvVi];
-        totalIngresos += (pv.total || 0);
-        totalOps++;
-        adminIngreso += (pv.total || 0);
-        if (pv.metodoPago === 'qr') { qrIngreso += (pv.total || 0); qrOps++; }
-        else { efectivoIngreso += (pv.total || 0); efectivoOps++; }
-        if (pv.fecha === today) ingresosHoy += (pv.total || 0);
-        if (pv.fecha && pv.fecha.startsWith(mes)) { ingresosMes += (pv.total || 0); opsMes++; }
-      }
-    }
-        for (var pi = 0; pi < pedidos.length; pi++) {
+    for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
       if (p.estado === 'nuevo') pedidosNuevos.push(p);
       if (p.estado === 'cancelado') continue;
@@ -166,36 +143,6 @@ const Pages = {
     h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
     h += '</div>';
 
-    // PANEL METODOS DE PAGO
-    var _pmTotal = efectivoIngreso + qrIngreso;
-    var _pmEfectivoPct = _pmTotal > 0 ? Math.round(efectivoIngreso / _pmTotal * 100) : 0;
-    var _pmQrPct = _pmTotal > 0 ? Math.round(qrIngreso / _pmTotal * 100) : 0;
-    h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--green)"></span>Metodos de Pago</div>';
-    h += '<div class="card" style="overflow:hidden">';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">';
-    h += '<div style="padding:24px;text-align:center;border-right:1px solid var(--border)">';
-    h += '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px">Efectivo</div>';
-    h += '<div style="font-size:1.8rem;font-weight:800;color:var(--green)">$' + efectivoIngreso.toLocaleString() + '</div>';
-    h += '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">' + _pmEfectivoPct + '% del total</div>';
-    h += '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">' + efectivoOps + ' operaciones</div>';
-    h += '</div>';
-    h += '<div style="padding:24px;text-align:center">';
-    h += '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px">QR</div>';
-    h += '<div style="font-size:1.8rem;font-weight:800;color:#8e44ad">$' + qrIngreso.toLocaleString() + '</div>';
-    h += '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">' + _pmQrPct + '% del total</div>';
-    h += '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">' + qrOps + ' operaciones</div>';
-    h += '</div></div>';
-    h += '<div style="padding:0 24px 20px">';
-    h += '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg3)">';
-    h += '<div style="width:' + _pmEfectivoPct + '%;background:var(--green);transition:width 0.5s"></div>';
-    h += '<div style="width:' + _pmQrPct + '%;background:#8e44ad;transition:width 0.5s"></div>';
-    h += '</div>';
-    h += '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.7rem;color:var(--muted)">';
-    h += '<span>Efectivo ' + _pmEfectivoPct + '%</span>';
-    h += '<span>Total: $' + _pmTotal.toLocaleString() + '</span>';
-    h += '<span>QR ' + _pmQrPct + '%</span>';
-    h += '</div></div></div>';
-
     // Canal de venta + Composicion
     h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--blue)"></span>Analisis de Ventas</div>';
     h += '<div class="dash-grid-2">';
@@ -214,10 +161,10 @@ const Pages = {
     var tallaTotal = (tallaCount.chico || 0) + (tallaCount.grande || 0);
     var chPct = tallaTotal > 0 ? Math.round((tallaCount.chico || 0) / tallaTotal * 100) : 50;
     var grPct = 100 - chPct;
-    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gold)" stroke-dasharray="' + espPct + ' ' + (100 - espPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + espPct + '%</div></div><div class="dash-comp-label">Especias <b>' + (tipoCount.especia || 0) + '</b></div></div>';
-    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--blue)" stroke-dasharray="' + blPct + ' ' + (100 - blPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + blPct + '%</div></div><div class="dash-comp-label">Blends <b>' + (tipoCount.blend || 0) + '</b></div></div>';
-    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gold2)" stroke-dasharray="' + chPct + ' ' + (100 - chPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + chPct + '%</div></div><div class="dash-comp-label">Pequeno <b>' + (tallaCount.chico || 0) + '</b></div></div>';
-    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--green)" stroke-dasharray="' + grPct + ' ' + (100 - grPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + grPct + '%</div></div><div class="dash-comp-label">Grande <b>' + (tallaCount.grande || 0) + '</b></div></div>';
+    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gold)" stroke-width="3" stroke-dasharray="' + espPct + ' ' + (100 - espPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + espPct + '%</div></div><div class="dash-comp-label">Especias <b>' + (tipoCount.especia || 0) + '</b></div></div>';
+    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="' + blPct + ' ' + (100 - blPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + blPct + '%</div></div><div class="dash-comp-label">Blends <b>' + (tipoCount.blend || 0) + '</b></div></div>';
+    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gold2)" stroke-width="3" stroke-dasharray="' + chPct + ' ' + (100 - chPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + chPct + '%</div></div><div class="dash-comp-label">Pequeno <b>' + (tallaCount.chico || 0) + '</b></div></div>';
+    h += '<div class="dash-comp-item"><div class="dash-comp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--green)" stroke-width="3" stroke-dasharray="' + grPct + ' ' + (100 - grPct) + '" stroke-dashoffset="25" stroke-linecap="round"></circle></svg><div class="dash-comp-center">' + grPct + '%</div></div><div class="dash-comp-label">Grande <b>' + (tallaCount.grande || 0) + '</b></div></div>';
     h += '</div></div></div>';
 
     // Charts
@@ -343,19 +290,16 @@ const Pages = {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
     var tab = window._prodTab || 'especias';
-    var packs = ArcanoDB.getPacks();
 
     var h = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
       '<div class="tabs" style="margin-bottom:0;border-bottom:none">' +
-        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage(\'productos\')">Especias<span class="tab-count">${especias.length}</span></button>` +
-        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage(\'productos\')">Blends<span class="tab-count">${blends.length}</span></button>` +
-        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage(\'productos\')">Etiquetas de uso</button>` +
-        `<button class="tab${tab==='packs' ? ' active' : ''}" onclick="window._prodTab='packs';App.renderPage(\'productos\')">Packs<span class="tab-count">${packs.length}</span></button>` +
+        `<button class="tab${tab==='especias' ? ' active' : ''}" onclick="window._prodTab='especias';App.renderPage('productos')">Especias<span class="tab-count">${especias.length}</span></button>` +
+        `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
+        `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';App.renderPage('productos')">Etiquetas de uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
         (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
-        (tab==='packs' ? '<button class="btn btn-gold" onclick="Pages.formPack()">+ Pack</button>' : '') +
       '</div></div>';
 
     h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
@@ -437,30 +381,6 @@ const Pages = {
         h += '</div></div>';
       }
       h += '</div></div>';
-    }
-
-    // --- TAB: PACKS ---
-    if (tab === 'packs') {
-      if (packs.length === 0) {
-        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin packs. Crea un pack de productos.</p></div></div>';
-      } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Componentes</th><th>Frascos</th><th>Costo</th><th>P. Venta</th><th>Margen</th><th>Acciones</th></tr></thead><tbody>';
-        for (var pi = 0; pi < packs.length; pi++) {
-          var pk = packs[pi];
-          h += '<tr><td>' + (pk.imagen ? '<img src="' + pk.imagen + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:6px"> ' : '') + '<span class="fw7">' + pk.nombre + '</span></td>' +
-            '<td>' + (pk.componentes || []).length + ' items</td>' +
-            '<td>' + (pk.totalFrascos || 0) + '</td>' +
-            '<td>$' + (pk.costoTotal || 0).toLocaleString() + '</td>' +
-            '<td class="fw7">$' + (pk.precioVenta || 0).toLocaleString() + '</td>' +
-            '<td class="' + ((pk.margen || 0) >= 0 ? 'text-green' : 'text-red') + '">$' + (pk.margen || 0).toLocaleString() + '</td>' +
-            '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" style="margin-bottom:4px" onclick="ArcanoDB.toggleTienda(\'pack\',' + pk.id + ');App.renderPage(\'productos\')">' + (pk.enTienda ? 'En Tienda' : 'Publicar') + '</button></td>' +
-            '<td>' +
-              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
-              '<button class="btn btn-sm btn-red" onclick="Pages.doDeletePack(' + pk.id + ')">X</button>' +
-            '</td></tr>';
-        }
-        h += '</tbody></table></div>';
-      }
     }
 
     container.innerHTML = h;
@@ -733,7 +653,7 @@ const Pages = {
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas</h3></div><div class="card-body">';
     if (entradas.length === 0) { h += '<p class="text-muted text-center">Sin entradas.</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Metodo</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < Math.min(entradas.length, 30); i++) {
         var en = entradas[i];
         var desc = (en.items||[]).map(function(it) {
@@ -1164,113 +1084,21 @@ const Pages = {
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formVenta()">+ Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="Pages.formVentaQR()" style="margin-left:8px">\u{1F4F7} Vender por QR</button></div>';
 
-    // === QR PAYMENT CONFIG ===
-    h += '<div class="card mt-16"><div class="card-header"><h3>Configuracion de Pago</h3></div><div class="card-body">' +
-      '<p class="text-sm text-muted mb-12">Sube la imagen QR que se mostrara al cobrar con metodo QR.</p>' +
-      '<div id="qr-config-area">' +
-        '<div id="qr-config-preview" style="margin-bottom:12px;text-align:center"></div>' +
-        '<label class="btn btn-outline" style="cursor:pointer;display:inline-block">Subir Imagen QR<input type="file" accept="image/*" id="qr-config-file" style="display:none"></label>' +
-        '<button class="btn btn-sm btn-red" id="qr-config-remove" style="margin-left:8px;display:none" onclick="Pages._removeQRPago()">Eliminar QR</button>' +
-        '<p id="qr-config-status" class="text-sm text-muted mt-8"></p>' +
-      '</div></div></div>';
-
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Metodo</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < Math.min(ventas.length, 30); i++) {
         var v = ventas[i];
         var desc = (v.items||[]).map(function(it){ return (it.productoNombre||'?')+' '+(it.talla||'chico')+' x'+(it.cantidad||0)+' ($'+(it.subtotal||0).toLocaleString()+')'; }).join(' | ');
-        var metodoTag = v.metodoPago === 'qr' ? '<span style="color:var(--blue);font-size:0.75rem;font-weight:600">QR</span>' : '<span style="color:var(--green);font-size:0.75rem;font-weight:600">Efectivo</span>';
-        h += '<tr><td>' + (v.fecha||'') + '</td><td>' + metodoTag + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
+        h += '<tr><td>' + (v.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
           '<td><button class="btn btn-sm btn-red" onclick="Pages.delVenta(' + v.id + ')">X</button></td></tr>';
       }
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
     container.innerHTML = h;
-    Pages._loadQRPagoConfig();
-  },
-
-  // --- QR PAGO CONFIG ---
-  _qrPagoImage: null,
-  _configLoaded: false,
-
-  _syncGlobalConfig: function() {
-    if (Pages._configLoaded) return;
-    Pages._configLoaded = true;
-    try {
-      firebase.database().ref('arcano/config').once('value').then(function(snap) {
-        var cfg = snap.val() || {};
-        if (cfg.groqKey) { localStorage.setItem('arcano_groq_key', cfg.groqKey); }
-        if (cfg.qrPagoImage) {
-          Pages._qrPagoImage = cfg.qrPagoImage;
-          localStorage.setItem('arcano_qr_pago_image', cfg.qrPagoImage);
-        }
-      }).catch(function() {});
-    } catch(e) {}
-  },
-
-  _loadQRPagoConfig: function() {
-    var cached = localStorage.getItem('arcano_qr_pago_image');
-    if (cached) { Pages._qrPagoImage = cached; }
-    try {
-      firebase.database().ref('arcano/config/qrPagoImage').once('value').then(function(snap) {
-        var val = snap.val();
-        if (val) {
-          Pages._qrPagoImage = val;
-          localStorage.setItem('arcano_qr_pago_image', val);
-        } else {
-          Pages._qrPagoImage = null;
-          localStorage.removeItem('arcano_qr_pago_image');
-        }
-        Pages._renderQRPagoPreview();
-      }).catch(function() { Pages._renderQRPagoPreview(); });
-    } catch(e) { Pages._renderQRPagoPreview(); }
-    var fileInput = document.getElementById('qr-config-file');
-    if (fileInput) {
-      fileInput.addEventListener('change', function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 500000) { alert('La imagen es muy grande (max 500KB).'); return; }
-        var reader = new FileReader();
-        reader.onload = function(ev) {
-          var dataUrl = ev.target.result;
-          Pages._qrPagoImage = dataUrl;
-          localStorage.setItem('arcano_qr_pago_image', dataUrl);
-          try { firebase.database().ref('arcano/config/qrPagoImage').set(dataUrl); } catch(e) {}
-          Pages._renderQRPagoPreview();
-          toast('QR de pago guardado');
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  },
-
-  _renderQRPagoPreview: function() {
-    var preview = document.getElementById('qr-config-preview');
-    var removeBtn = document.getElementById('qr-config-remove');
-    var status = document.getElementById('qr-config-status');
-    if (!preview) return;
-    if (Pages._qrPagoImage) {
-      preview.innerHTML = '<img src="' + Pages._qrPagoImage + '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid var(--border)">';
-      if (removeBtn) removeBtn.style.display = 'inline-block';
-      if (status) status.textContent = 'QR configurado correctamente';
-    } else {
-      preview.innerHTML = '<p class="text-muted" style="padding:20px 0">No hay QR configurado. Sube una imagen.</p>';
-      if (removeBtn) removeBtn.style.display = 'none';
-      if (status) status.textContent = '';
-    }
-  },
-
-  _removeQRPago: function() {
-    if (!confirm('Eliminar el QR de pago configurado?')) return;
-    Pages._qrPagoImage = null;
-    localStorage.removeItem('arcano_qr_pago_image');
-    try { firebase.database().ref('arcano/config/qrPagoImage').remove(); } catch(e) {}
-    Pages._renderQRPagoPreview();
-    toast('QR de pago eliminado');
   },
 
   formVenta() {
@@ -1286,7 +1114,7 @@ const Pages = {
         '<div class="venta-total-box mt-12">Total: $<span id="v-total">0</span></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
-        '<button class="btn btn-gold" id="btn-save-v">Cobrar</button>' +
+        '<button class="btn btn-gold" id="btn-save-v">Vender</button>' +
       '</div></div>';
     document.body.appendChild(modal);
 
@@ -1355,8 +1183,11 @@ const Pages = {
         items.push({ tipo: parts[0], productoId: Number(parts[1]), talla: parts[2], cantidad: cant, precioUnitario: precio });
       }
       if (items.length === 0) { alert('Agrega al menos un item'); return; }
-      var saleData = { fecha: document.getElementById('f-v-fecha').value, items: items };
-      Pages._showPagoModal(saleData, function() { modal.remove(); });
+      try {
+        ArcanoDB.saveVenta({ fecha: document.getElementById('f-v-fecha').value, items: items });
+        modal.remove();
+        App.renderPage('ventas');
+      } catch (err) { alert('Error: ' + err.message); }
     });
   },
 
@@ -1366,65 +1197,7 @@ const Pages = {
     App.renderPage('ventas');
   },
 
-  _showPagoModal: function(saleData, onClose) {
-    var total = 0;
-    for (var i = 0; i < saleData.items.length; i++) {
-      total += (Number(saleData.items[i].precioUnitario) || 0) * (Number(saleData.items[i].cantidad) || 0);
-    }
-    saleData.total = total;
-    var qrImg = Pages._qrPagoImage;
-    var pm = document.createElement('div');
-    pm.className = 'modal-overlay';
-    pm.id = 'pago-modal';
-    var qrContent = qrImg
-      ? '<div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Muestra este QR al cliente:</div>' +
-        '<div style="margin-bottom:16px"><img src="' + qrImg + '" style="max-width:260px;max-height:260px;border-radius:8px;border:1px solid var(--border)"></div>'
-      : '<div style="padding:20px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted)">No hay QR configurado.<br>Ve a Ventas > Configuracion de Pago para subirlo.</div>';
-    pm.innerHTML =
-      '<div class="modal" style="max-width:420px;text-align:center">' +
-        '<div class="modal-header"><button class="btn btn-ghost" id="pago-volver-btn" style="margin-right:auto;padding:4px 12px;font-size:0.85rem">< Volver</button><h3>Metodo de Pago</h3></div>' +
-        '<div class="modal-body">' +
-          '<div style="font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + total.toLocaleString() + '</div>' +
-          '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago</p>' +
-          '<div style="display:flex;gap:12px;justify-content:center">' +
-            '<button class="btn btn-gold" id="pago-efectivo-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700">Efectivo</button>' +
-            '<button class="btn btn-outline" id="pago-qr-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700;border-color:var(--gold);color:var(--gold)">QR</button>' +
-          '</div>' +
-          '<div id="pago-qr-area" style="display:none;margin-top:20px">' +
-            qrContent +
-            '<div style="display:flex;gap:12px;justify-content:center;margin-top:12px">' +
-              '<button class="btn btn-gold" id="pago-recibido-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Pago Recibido</button>' +
-              '<button class="btn btn-outline" id="pago-qr-cancel-btn" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Cancelar</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(pm);
-    document.getElementById('pago-efectivo-btn').addEventListener('click', function() {
-      saleData.metodoPago = 'efectivo';
-      try { ArcanoDB.saveVenta(saleData); pm.remove(); if (onClose) onClose(); else App.renderPage('ventas'); }
-      catch (err) { alert('Error: ' + err.message); }
-    });
-    document.getElementById('pago-qr-btn').addEventListener('click', function() {
-      document.getElementById('pago-qr-area').style.display = 'block';
-      document.getElementById('pago-efectivo-btn').style.display = 'none';
-      document.getElementById('pago-qr-btn').style.display = 'none';
-    });
-    document.getElementById('pago-recibido-btn').addEventListener('click', function() {
-      saleData.metodoPago = 'qr';
-      try { ArcanoDB.saveVenta(saleData); pm.remove(); if (onClose) onClose(); else App.renderPage('ventas'); }
-      catch (err) { alert('Error: ' + err.message); }
-    });
-    document.getElementById('pago-qr-cancel-btn').addEventListener('click', function() {
-      document.getElementById('pago-qr-area').style.display = 'none';
-      document.getElementById('pago-efectivo-btn').style.display = '';
-      document.getElementById('pago-qr-btn').style.display = '';
-    });
-    document.getElementById('pago-volver-btn').addEventListener('click', function() {
-      pm.remove();
-    });
-  },
-
+  /* ================================================================
   /* ================================================================
      VENTA POR CAMARA (OCR - lectura de etiquetas)
      ================================================================ */
@@ -1699,11 +1472,17 @@ const Pages = {
 
   confirmarVentaCam() {
     if (Pages._camCart.length === 0) { alert('No hay productos en la venta'); return; }
-    var saleData = {
-      fecha: new Date().toISOString().slice(0, 10),
-      items: JSON.parse(JSON.stringify(Pages._camCart))
-    };
-    Pages._showPagoModal(saleData, function() { Pages.closeVentaCam(); });
+    if (!confirm('Registrar venta de ' + Pages._camCart.length + ' producto(s)?')) return;
+    try {
+      ArcanoDB.saveVenta({
+        fecha: new Date().toISOString().slice(0, 10),
+        items: JSON.parse(JSON.stringify(Pages._camCart))
+      });
+      Pages.closeVentaCam();
+      App.renderPage('ventas');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
   },
 
   closeVentaCam() {
@@ -2072,38 +1851,13 @@ const Pages = {
     h += '</tbody></table></div>';
     h += '<div style="text-align:right;margin-top:12px;font-size:1.2rem" class="fw7">Total: $' + (p.total || 0).toLocaleString() + '</div>';
 
-    // Metodo de pago
-    var pagoMetodo = p.metodoPago || '';
-    var pagoConfirmado = pagoMetodo === 'efectivo' || pagoMetodo === 'qr';
-    h += '<div class="mt-16 card" style="padding:14px;background:var(--bg-card)"><h4 style="margin-bottom:10px">Metodo de Pago</h4>';
-    if (pagoConfirmado) {
-      var pagoLabel = pagoMetodo === 'qr' ? 'QR' : 'Efectivo';
-      var pagoColor = pagoMetodo === 'qr' ? 'var(--purple)' : 'var(--green)';
-      var pagoIcon = pagoMetodo === 'qr' ? '&#9641;' : '&#9733;';
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;border-radius:8px;background:' + pagoColor + ';color:#fff;font-weight:700">';
-      h += '<span style="font-size:1.3em">' + pagoIcon + '</span> ' + pagoLabel + ' <span style="font-weight:400;opacity:0.8">(confirmado)</span></div>';
-      h += '<button class="btn btn-outline btn-sm mt-8" style="color:var(--red);border-color:var(--red)" onclick="Pages._pedidoResetPago(\'' + pedidoKey + '\')">Cambiar Metodo</button>';
-    } else {
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-      h += '<button class="btn btn-sm" style="padding:16px;font-size:1rem;font-weight:700;background:var(--green);color:#fff;border:none;border-radius:8px" onclick="Pages._pedidoConfirmarPago(\'' + pedidoKey + '\',\'efectivo\')">&#9733; Efectivo</button>';
-      h += '<button class="btn btn-sm" style="padding:16px;font-size:1rem;font-weight:700;background:var(--purple);color:#fff;border:none;border-radius:8px" onclick="Pages._pedidoConfirmarPago(\'' + pedidoKey + '\',\'qr\')">&#9641; QR</button>';
-      h += '</div>';
-      h += '<p class="text-sm text-muted mt-8" style="text-align:center">Debes confirmar el metodo de pago antes de marcar como Entregado</p>';
-    }
-    h += '</div>';
-
     // Estado buttons
     h += '<div class="mt-16"><h4>Cambiar Estado</h4><div class="mt-8" style="display:flex;gap:8px;flex-wrap:wrap">';
     for (var ei = 0; ei < estados.length; ei++) {
       var est = estados[ei];
       var isActive = p.estado === est;
-      var isEntregado = est === 'entregado';
-      if (isEntregado && !pagoConfirmado) {
-        h += '<button class="btn btn-sm btn-outline" style="opacity:0.4;cursor:not-allowed" disabled title="Confirma el metodo de pago primero">' + estadoLabels[est] + '</button>';
-      } else {
-        var btnClass = isActive ? 'btn btn-gold' : 'btn btn-outline';
-        h += '<button class="' + btnClass + ' btn-sm" onclick="Pages.cambiarEstadoPedido(\'' + pedidoKey + '\',\'' + est + '\')">' + estadoLabels[est] + '</button>';
-      }
+      var btnClass = isActive ? 'btn btn-gold' : 'btn btn-outline';
+      h += '<button class="' + btnClass + ' btn-sm" onclick="Pages.cambiarEstadoPedido(\'' + pedidoKey + '\',\'' + est + '\')">' + estadoLabels[est] + '</button>';
     }
     h += '</div></div>';
 
@@ -2118,21 +1872,6 @@ const Pages = {
     modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
     modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' + h + '</div>';
     document.body.appendChild(modal);
-  },
-
-  _pedidoConfirmarPago(pedidoKey, metodo) {
-    ArcanoDB.updatePedidoMetodoPago(pedidoKey, metodo);
-    var modal = document.getElementById('pedido-modal');
-    if (modal) modal.remove();
-    Pages.verPedido(pedidoKey);
-    toast(metodo === 'qr' ? 'Pago QR confirmado' : 'Pago Efectivo confirmado');
-  },
-
-  _pedidoResetPago(pedidoKey) {
-    ArcanoDB.updatePedidoMetodoPago(pedidoKey, '');
-    var modal = document.getElementById('pedido-modal');
-    if (modal) modal.remove();
-    Pages.verPedido(pedidoKey);
   },
 
   cambiarEstadoPedido(pedidoKey, nuevoEstado) {
@@ -2733,90 +2472,143 @@ const Pages = {
     localStorage.setItem('arcano_groq_key', apiKey);
     try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
 
-    // Build product context
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Cargando productos y recetas existentes...';
+
+    // Build rich product context and load existing recipes, then generate
     var productos = ArcanoDB.getTiendaProductos();
-    var nombres = [];
-    for (var i = 0; i < productos.length; i++) nombres.push(productos[i].nombre);
-    var productContext = nombres.length > 0 ? nombres.join(', ') : 'especias y blends variados';
+    var productLines = [];
+    for (var i = 0; i < productos.length; i++) {
+      var p = productos[i];
+      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categoria: ' + p.categoria + ']';
+      if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
+      productLines.push(line);
+    }
+    var productContext = productLines.length > 0 ? productLines.join('\n') : '  - No hay productos en tienda aun';
 
     var langInstr = idioma === 'en'
       ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
       : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
 
     var temaInstr = tema
-      ? 'El tema especifico es: ' + tema + '.'
-      : 'Inventa un tema creativo y apetitoso.';
+      ? 'El tema especifico es: ' + tema + '. La receta debe girar alrededor de este tema.'
+      : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
 
-    var systemPrompt =
-      'Eres un chef experto en especias y blends artesanales de la marca Arcano Especias. ' +
-      'Tu especialidad es crear recetas deliciosas que resalten los sabores de las especias. ' +
-      'Los productos disponibles son: ' + productContext + '. ' +
-      'Si es posible, usa al menos uno de estos productos en la receta. ' +
-      langInstr;
-
-    var userPrompt =
-      'Genera una receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
-      'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
-      '{"titulo": "...", "descripcion": "... (2-3 oraciones)", "categoria": "' + categoria + '", ' +
-      '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
-      '"ingredientes": ["1 cucharadita de comino", "200g de pollo", ...], ' +
-      '"pasos": ["Paso 1: ...", "Paso 2: ...", ...]}\n\n' +
-      'La receta debe ser practica, deliciosa y usar especias de forma creativa. ' +
-      'Entre 4 y 8 ingredientes, entre 4 y 6 pasos.';
-
-    btn.disabled = true;
-    btn.textContent = 'Generando...';
-    status.textContent = 'Consultando Llama 3.3 70B via Groq...';
-
-    fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.8,
-        max_tokens: 1024,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ]
-      })
-    })
-    .then(function(res) {
-      if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
-      return res.json();
-    })
-    .then(function(data) {
-      var content = data.choices[0].message.content.trim();
-      // Strip markdown code blocks if present
-      content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-      var receta = JSON.parse(content);
-
-      // Validate structure
-      if (!receta.titulo) throw new Error('La receta no tiene titulo');
-      if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
-      if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
-
-      // Save to Firebase
-      receta.fecha = new Date().toISOString().slice(0, 10);
-      if (!receta.categoria) receta.categoria = categoria;
-      firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
-        if (err) {
-          status.textContent = 'Error al guardar: ' + (err.message || err);
-        } else {
-          status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
-          Pages._loadRecetasAdmin();
+    // Load existing recipes to avoid repetition
+    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+      var data = snap.val();
+      var existingTitles = [];
+      var existingByCategory = { Comida: [], Infusiones: [], Cocteleria: [] };
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          if (r.titulo) existingTitles.push(r.titulo);
+          var cat = r.categoria || 'Comida';
+          if (!existingByCategory[cat]) existingByCategory[cat] = [];
+          existingByCategory[cat].push(r.titulo);
         }
+      }
+
+      var existingBlock = '';
+      if (existingTitles.length > 0) {
+        existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir temas, platos ni titulos similares):\n';
+        existingBlock += existingTitles.join('\n');
+        existingBlock += '\n\nTotal recetas existentes por categoria:\n';
+        var catKeys2 = Object.keys(existingByCategory);
+        for (var c = 0; c < catKeys2.length; c++) {
+          var catName = catKeys2[c];
+          var catCount = existingByCategory[catName].length;
+          if (catCount > 0) existingBlock += '- ' + catName + ': ' + catCount + ' recetas\n';
+        }
+        existingBlock += '\nREGLA IMPORTANTE: No repitas ninguno de estos titulos ni crees recetas con tematicas similares. Cada receta debe ser unica.';
+      }
+
+      var systemPrompt =
+        'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
+        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
+        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
+        'REGLAS OBLIGATORIAS:\n' +
+        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
+        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
+        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
+        '4. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
+        '5. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres).\n' +
+        '6. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras.\n' +
+        '7. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino), estilos (sour, fizz, mocktail, punch, old fashioned, spritz) y tecnicas (muddling, infusion, flame, dry shake).\n' +
+        '8. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas.\n' +
+        '9. Los pasos deben ser claros, concisos y en orden logico.\n' +
+        '10. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n\n' +
+        langInstr;
+
+      var userPrompt =
+        'Genera UNA receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+        existingBlock + '\n\n' +
+        'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
+        '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
+        '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+        '"ingredientes": ["1 cucharadita de [producto Arcano]", "200g de proteina principal", ...], ' +
+        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...]}\n\n' +
+        'RECUERDA: De 5 a 10 ingredientes, de 4 a 7 pasos. La receta DEBE ser diferente a todas las existentes. ' +
+        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes.';
+
+      status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.9,
+          max_tokens: 1200,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+        return res.json();
+      })
+      .then(function(data) {
+        var content = data.choices[0].message.content.trim();
+        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+        var receta = JSON.parse(content);
+
+        if (!receta.titulo) throw new Error('La receta no tiene titulo');
+        if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+        if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+
+        // Check for duplicate title
+        var dupTitle = false;
+        for (var d = 0; d < existingTitles.length; d++) {
+          if (existingTitles[d].toLowerCase() === receta.titulo.toLowerCase()) { dupTitle = true; break; }
+        }
+        if (dupTitle) throw new Error('La receta generada tiene un titulo identico a una existente. Intenta de nuevo con otro tema.');
+
+        receta.fecha = new Date().toISOString().slice(0, 10);
+        if (!receta.categoria) receta.categoria = categoria;
+        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+          if (err) {
+            status.textContent = 'Error al guardar: ' + (err.message || err);
+          } else {
+            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+            Pages._loadRecetasAdmin();
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generar Receta con IA';
+        });
+      })
+      .catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
         btn.disabled = false;
         btn.textContent = 'Generar Receta con IA';
       });
-    })
-    .catch(function(err) {
-      status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
-      btn.disabled = false;
-      btn.textContent = 'Generar Receta con IA';
     });
   },
 
@@ -2835,39 +2627,21 @@ const Pages = {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
 
-    // === COMBINE ALL SALES (admin + tienda + PDV) ===
+    // === COMBINE ALL SALES ===
     var allSales = [];
-    // Admin ventas
     for (var vi = 0; vi < ventas.length; vi++) {
       var v = ventas[vi];
       var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
-      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin', metodoPago: v.metodoPago || 'efectivo' });
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
     }
-    // Tienda pedidos
     for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
       if (p.estado === 'cancelado') continue;
       var pItems = [];
       if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
       var pFecha = p.creado ? p.creado.slice(0, 10) : '';
-      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', metodoPago: p.metodoPago || '', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
-    }
-    // PDV ventas
-    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
-    var pdvVentasAll = [];
-    for (var pvi = 0; pvi < pdvs.length; pvi++) {
-      var pdvV = ArcanoDB.getPDVVentas(pdvs[pvi].id);
-      for (var pvj = 0; pvj < pdvV.length; pvj++) {
-        var pv = pdvV[pvj];
-        var pvItems = [];
-        if (pv.items) { for (var pvk = 0; pvk < pv.items.length; pvk++) {
-          var pvIt = pv.items[pvk];
-          pvItems.push({ nombre: pvIt.productoNombre || '?', tipo: pvIt.tipo || 'especia', talla: pvIt.talla || 'chico', cantidad: pvIt.cantidad || 0, precio: pvIt.precioUnitario || 0, subtotal: pvIt.subtotal || 0 });
-        }}
-        allSales.push({ fecha: pv.fecha || '', creado: pv.creado || '', total: pv.total || 0, items: pvItems, source: 'pdv', metodoPago: pv.metodoPago || 'efectivo', pdvNombre: pdvs[pvi].nombre || 'PDV' });
-      }
-      pdvVentasAll = pdvVentasAll.concat(pdvV);
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
     }
     allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 
@@ -2875,7 +2649,6 @@ const Pages = {
 
     var h = '<div class="est-tabs">';
     h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas</button>';
-    h += '<button class="est-tab' + (Pages._estTab === 'pdv' ? ' active' : '') + '" onclick="Pages._estTab=\'pdv\';App.renderPage(\'estadisticas\')">P. de Venta</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'costos' ? ' active' : '') + '" onclick="Pages._estTab=\'costos\';App.renderPage(\'estadisticas\')">Costos y Margen</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
@@ -2884,11 +2657,17 @@ const Pages = {
     h += '<div id="est-content"></div>';
     container.innerHTML = h;
 
-    if (Pages._estTab === 'ventas') Pages._renderVentas(allSales, container.querySelector('#est-content'));
-    else if (Pages._estTab === 'pdv') Pages._renderPDVEstadisticas(container.querySelector('#est-content'), pdvs);
-    else if (Pages._estTab === 'costos') Pages._renderCostos(allSales, container.querySelector('#est-content'), entradas, especias, blends, producciones);
-    else if (Pages._estTab === 'produccion') Pages._renderProduccion(allSales, container.querySelector('#est-content'), producciones);
-    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(allSales, container.querySelector('#est-content'));
+    var data;
+    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
+      data = allSales;
+    } else {
+      data = allSales.filter(function(s) { return s.source === 'tienda'; });
+    }
+
+    if (Pages._estTab === 'ventas') Pages._renderVentas(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'costos') Pages._renderCostos(data, container.querySelector('#est-content'), entradas, especias, blends, producciones);
+    else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
+    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
     else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
   },
 
@@ -2969,32 +2748,17 @@ const Pages = {
     h += '<div class="est-kpi ' + (tendenciaMensual >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendMSign + tendenciaMensual + '%</div><div class="est-kpi-label">Variacion Mensual</div><div class="est-kpi-sub">' + (ingresosMesActual >= ingresosMesAnterior ? 'crecimiento' : 'caida') + '</div></div>';
     h += '</div></div></div>';
 
-    // Source breakdown (admin vs tienda vs pdv)
+    // Source breakdown (admin vs tienda)
     h += '<div class="card mt-16"><div class="card-header"><h3>Canal de Venta</h3></div><div class="card-body">';
-    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr">';
-    var adminIngreso = 0, tiendaIngreso = 0, pdvIngreso = 0, adminOps = 0, tiendaOps = 0, pdvOps = 0;
-    for (var d = 0; d < data.length; d++) {
-      if (data[d].source === 'admin') { adminIngreso += data[d].total || 0; adminOps++; }
-      else if (data[d].source === 'pdv') { pdvIngreso += data[d].total || 0; pdvOps++; }
-      else { tiendaIngreso += data[d].total || 0; tiendaOps++; }
-    }
-    var totalCh = adminIngreso + tiendaIngreso + pdvIngreso;
-    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + adminOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
-    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + tiendaOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
-    h += '<div class="stat-card" style="border-left-color:var(--purple)"><div class="stat-value">$' + pdvIngreso.toLocaleString() + '</div><div class="stat-label">Puntos de Venta</div><div class="stat-sub">' + pdvOps + ' ops' + (totalCh > 0 ? ' (' + Math.round(pdvIngreso/totalCh*100) + '%)' : '') + '</div></div>';
-    h += '</div></div></div>';
-    // Metodo de pago (admin + pdv ventas)
-    var efectivoIng = 0, qrIng = 0, efectivoOps = 0, qrOps = 0;
-    for (var d = 0; d < data.length; d++) {
-      if (data[d].source === 'tienda') continue;
-      if (data[d].metodoPago === 'qr') { qrIng += data[d].total || 0; qrOps++; }
-      else { efectivoIng += data[d].total || 0; efectivoOps++; }
-    }
-    var _mpT = efectivoIng + qrIng;
-    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago (Admin + PDV)</h3></div><div class="card-body">';
     h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
-    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + efectivoIng.toLocaleString() + '</div><div class="stat-label">Efectivo</div><div class="stat-sub">' + efectivoOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(efectivoIng/_mpT*100) + '%)' : '') + '</div></div>';
-    h += '<div class="stat-card" style="border-left-color:#8e44ad"><div class="stat-value">$' + qrIng.toLocaleString() + '</div><div class="stat-label">QR</div><div class="stat-sub">' + qrOps + ' ops' + (_mpT > 0 ? ' (' + Math.round(qrIng/_mpT*100) + '%)' : '') + '</div></div>';
+    var adminIngreso = 0, tiendaIngreso = 0;
+    for (var d = 0; d < data.length; d++) {
+      if (data[d].source === 'admin') adminIngreso += data[d].total || 0;
+      else tiendaIngreso += data[d].total || 0;
+    }
+    var totalCh = adminIngreso + tiendaIngreso;
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
     h += '</div></div></div>';
 
     // Charts
@@ -3120,139 +2884,6 @@ const Pages = {
 
     var canvases = el.querySelectorAll('.est-chart-wrap');
     for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = canvases[ch].classList.contains('est-chart-full') ? '300px' : '260px'; }
-  },
-
-  /* ================================================================
-     PUNTOS DE VENTA TAB
-     ================================================================ */
-  _renderPDVEstadisticas: function(el, pdvs) {
-    if (!el) return;
-    var totalPDVIngreso = 0, totalPDVOps = 0, totalPDVUnidades = 0;
-    var totalPDVEfectivo = 0, totalPDVQR = 0;
-    var totalStockPDV = 0, totalProductosEnPDV = 0;
-    var pdvDataArr = [];
-
-    for (var pvi = 0; pvi < pdvs.length; pvi++) {
-      var pdv = pdvs[pvi];
-      var stats = ArcanoDB.getPDVStats(pdv.id);
-      var stock = (pdv.stock) ? pdv.stock : {};
-      var stockKeys = Object.keys(stock).filter(function(k) { return stock[k] > 0; });
-      var stockTotal = 0;
-      for (var sk = 0; sk < stockKeys.length; sk++) stockTotal += stock[stockKeys[sk]];
-
-      pdvDataArr.push({
-        id: pdv.id, nombre: pdv.nombre || 'PDV', ubicacion: pdv.ubicacion || '', activo: pdv.activo !== false,
-        totalVentas: stats.totalVentas, totalIngresos: stats.totalIngresos,
-        totalItems: stats.totalItems, efectivoIngresos: stats.efectivoIngresos, qrIngresos: stats.qrIngresos,
-        ticketPromedio: stats.ticketPromedio, productosEnStock: stockKeys.length, stockTotal: stockTotal,
-        topProductos: stats.topProductos || [], diario: stats.diario || {}
-      });
-      totalPDVIngreso += stats.totalIngresos;
-      totalPDVOps += stats.totalVentas;
-      totalPDVUnidades += stats.totalItems;
-      totalPDVEfectivo += stats.efectivoIngresos;
-      totalPDVQR += stats.qrIngresos;
-      totalStockPDV += stockTotal;
-      totalProductosEnPDV += stockKeys.length;
-    }
-
-    var h = '';
-    // KPIs generales
-    h += '<div class="est-kpi-grid">';
-    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalPDVIngreso.toLocaleString() + '</div><div class="est-kpi-label">Ingresos PDV</div><div class="est-kpi-sub">' + pdvs.length + ' punto(s) de venta</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPDVOps + '</div><div class="est-kpi-label">Ventas PDV</div><div class="est-kpi-sub">' + totalPDVUnidades + ' unidades vendidas</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalPDVOps > 0 ? Math.round(totalPDVIngreso / totalPDVOps) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio PDV</div><div class="est-kpi-sub">por venta</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalStockPDV + '</div><div class="est-kpi-label">Stock en PDVs</div><div class="est-kpi-sub">' + totalProductosEnPDV + ' productos distintos</div></div>';
-    h += '</div>';
-
-    // Metodo de pago PDV
-    var pdvPagoTotal = totalPDVEfectivo + totalPDVQR;
-    h += '<div class="card mt-16"><div class="card-header"><h3>Metodo de Pago en PDVs</h3></div><div class="card-body">';
-    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
-    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + totalPDVEfectivo.toLocaleString() + '</div><div class="stat-label">Efectivo</div><div class="stat-sub">' + (pdvPagoTotal > 0 ? Math.round(totalPDVEfectivo/pdvPagoTotal*100) + '%' : '0%') + '</div></div>';
-    h += '<div class="stat-card" style="border-left-color:#8e44ad"><div class="stat-value">$' + totalPDVQR.toLocaleString() + '</div><div class="stat-label">QR</div><div class="stat-sub">' + (pdvPagoTotal > 0 ? Math.round(totalPDVQR/pdvPagoTotal*100) + '%' : '0%') + '</div></div>';
-    h += '</div></div></div>';
-
-    // Per-PDV cards
-    for (var i = 0; i < pdvDataArr.length; i++) {
-      var pd = pdvDataArr[i];
-      var pdColor = pd.activo ? 'var(--green)' : 'var(--red)';
-      h += '<div class="card mt-16"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><h3>' + pd.nombre + '</h3><span style="width:10px;height:10px;border-radius:50%;background:' + pdColor + '" title="' + (pd.activo ? 'Activo' : 'Inactivo') + '"></span></div><div class="card-body">';
-      if (pd.ubicacion) h += '<p class="text-sm text-muted" style="margin-bottom:10px">' + pd.ubicacion + '</p>';
-      h += '<div class="est-kpi-grid" style="grid-template-columns:repeat(3,1fr)">';
-      h += '<div class="est-kpi"><div class="est-kpi-value">$' + pd.totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos</div><div class="est-kpi-sub">' + pd.totalVentas + ' ventas</div></div>';
-      h += '<div class="est-kpi"><div class="est-kpi-value">$' + Math.round(pd.ticketPromedio).toLocaleString() + '</div><div class="est-kpi-label">Ticket Prom.</div><div class="est-kpi-sub">' + pd.totalItems + ' unidades</div></div>';
-      h += '<div class="est-kpi"><div class="est-kpi-value">' + pd.stockTotal + '</div><div class="est-kpi-label">Stock Actual</div><div class="est-kpi-sub">' + pd.productosEnStock + ' productos</div></div>';
-      h += '</div>';
-
-      // Efectivo vs QR bar
-      var pdPagoT = pd.efectivoIngresos + pd.qrIngresos;
-      if (pdPagoT > 0) {
-        var efPct = Math.round(pd.efectivoIngresos / pdPagoT * 100);
-        var qrPct = 100 - efPct;
-        h += '<div class="mt-12" style="background:var(--bg);border-radius:8px;overflow:hidden;height:24px;display:flex">';
-        h += '<div style="width:' + efPct + '%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.75rem;font-weight:700">Ef ' + efPct + '%</div>';
-        h += '<div style="width:' + qrPct + '%;background:#8e44ad;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.75rem;font-weight:700">QR ' + qrPct + '%</div>';
-        h += '</div>';
-      }
-
-      // Top productos
-      if (pd.topProductos.length > 0) {
-        h += '<h4 class="mt-12" style="font-size:0.9rem">Top Productos</h4>';
-        h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Unidades</th><th>Ingreso</th></tr></thead><tbody>';
-        for (var tp = 0; tp < Math.min(pd.topProductos.length, 5); tp++) {
-          var tpp = pd.topProductos[tp];
-          h += '<tr><td class="fw7">' + tpp.nombre + '</td><td>' + tpp.cantidad + '</td><td style="color:var(--gold)">$' + tpp.monto.toLocaleString() + '</td></tr>';
-        }
-        h += '</tbody></table></div>';
-      }
-      h += '</div></div>';
-    }
-
-    if (pdvs.length === 0) {
-      h += '<div class="card mt-16"><div class="card-body" style="text-align:center;padding:40px"><p class="text-muted">No hay puntos de venta registrados</p></div></div>';
-    }
-
-    el.innerHTML = h;
-
-    // Charts for PDVs
-    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
-    Pages._estCharts = [];
-    Chart.defaults.color = '#9a8a78';
-    Chart.defaults.borderColor = '#3a2218';
-
-    if (pdvDataArr.length >= 2) {
-      var pdvLabels = [], pdvIngresoData = [], pdvOpsData = [];
-      for (var ci = 0; ci < pdvDataArr.length; ci++) {
-        pdvLabels.push(pdvDataArr[ci].nombre);
-        pdvIngresoData.push(pdvDataArr[ci].totalIngresos);
-        pdvOpsData.push(pdvDataArr[ci].totalVentas);
-      }
-      var h2 = '<div class="card mt-16"><div class="card-header"><h3>Comparativa entre PDVs</h3></div><div class="card-body">';
-      h2 += '<div class="est-charts-grid"><div class="est-chart-card"><h4>Ingresos por PDV</h4><div class="est-chart-wrap"><canvas id="chart-pdv-ingresos"></canvas></div></div>';
-      h2 += '<div class="est-chart-card"><h4>Ventas por PDV</h4><div class="est-chart-wrap"><canvas id="chart-pdv-ops"></canvas></div></div></div>';
-      h2 += '</div></div>';
-      el.insertAdjacentHTML('beforeend', h2);
-
-      var ctxI = document.getElementById('chart-pdv-ingresos');
-      if (ctxI) {
-        Pages._estCharts.push(new Chart(ctxI, {
-          type: 'bar',
-          data: { labels: pdvLabels, datasets: [{ label: 'Ingresos ($)', data: pdvIngresoData, backgroundColor: 'rgba(142,68,173,0.7)', borderColor: '#8e44ad', borderWidth: 1, borderRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
-        }));
-      }
-      var ctxO = document.getElementById('chart-pdv-ops');
-      if (ctxO) {
-        Pages._estCharts.push(new Chart(ctxO, {
-          type: 'bar',
-          data: { labels: pdvLabels, datasets: [{ label: 'Ventas', data: pdvOpsData, backgroundColor: 'rgba(93,173,226,0.7)', borderColor: '#5dade2', borderWidth: 1, borderRadius: 6 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
-        }));
-      }
-      var cvPdv = el.querySelectorAll('.est-chart-wrap');
-      for (var ch = 0; ch < cvPdv.length; ch++) cvPdv[ch].style.height = '260px';
-    }
   },
 
   /* ================================================================
@@ -3764,7 +3395,7 @@ const Pages = {
       var v = ventas[vi];
       var vItems = [];
       if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
-      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin', metodoPago: v.metodoPago || 'efectivo' });
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
     }
     for (var pi = 0; pi < pedidos.length; pi++) {
       var p = pedidos[pi];
@@ -3776,486 +3407,6 @@ const Pages = {
     }
     allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
     return allSales;
-  },
-
-
-
-  /* ==================== PACKS ==================== */
-  formPack(editId) {
-    var pack = (editId != null) ? ArcanoDB.getPack(editId) : null;
-    var isEdit = (pack != null);
-    var comps = (pack ? pack.componentes : []) || [];
-
-    var html = '<div class="modal-overlay" id="packModal">' +
-      '<div class="modal modal-lg">' +
-      '<div class="modal-header"><h3>' + (isEdit ? 'Editar Pack: ' + (pack.nombre || '') : 'Nuevo Pack de Productos') + '</h3>' +
-        '<button class="btn btn-sm btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
-      '<div class="modal-body" style="max-height:70vh;overflow-y:auto">' +
-
-      '<div class="form-group"><label>Nombre del Pack</label>' +
-      '<input type="text" class="input" id="packNombre" value="' + (isEdit ? (pack.nombre || '').replace(/"/g, '&quot;') : '') + '" placeholder="Ej: Pack Cocteleria Premium"></div>' +
-
-      '<div class="form-group"><label>Descripcion (opcional)</label>' +
-      '<input type="text" class="input" id="packDesc" value="' + (isEdit ? (pack.descripcion || '').replace(/"/g, '&quot;') : '') + '" placeholder="Descripcion breve del pack"></div>' +
-
-      '<div class="form-group"><label>Precio de Venta ($)</label>' +
-      '<input type="number" class="input" id="packPrecio" value="' + (isEdit ? (pack.precioVenta || 0) : '') + '" min="0" step="100" oninput="Pages.calcPackCost()"></div>' +
-      '<div class="form-group"><label>Imagen del Pack</label>' +
-      '<div id="img-area-pk" class="img-upload-area">' +
-        (isEdit && pack.imagen ? '<img src="' + pack.imagen + '" class="img-preview" id="img-preview-pk"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-pk\',\'f-pk-img\')">Quitar imagen</button>' : '') +
-        '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-pk-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
-      '<input type="file" id="f-pk-img" accept="image/*" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-pk\')">' +
-
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">' +
-        '<label class="fw7">Componentes del Pack</label>' +
-        '<button class="btn btn-sm btn-outline" onclick="Pages.addPackComponent()">+ Agregar componente</button>' +
-      '</div>' +
-
-      '<div id="packComps">' + Pages._packCompHTML(comps) + '</div>' +
-
-      '<div id="packCostInfo" class="card" style="margin-top:16px;background:var(--bg-card);border:1px solid var(--border)"></div>' +
-
-      '</div>' +
-      '<div class="modal-footer">' +
-        '<button class="btn btn-gold" onclick="Pages.doSavePack(' + (isEdit ? editId : 'null') + ')">Guardar Pack</button>' +
-        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
-      '</div></div></div>';
-
-    document.body.insertAdjacentHTML('beforeend', html);
-    // Calculate initial cost
-    setTimeout(function() { Pages.calcPackCost(); }, 50);
-  },
-
-  _packCompHTML(comps) {
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var h = '';
-    for (var i = 0; i < comps.length; i++) {
-      var c = comps[i];
-      var prodOptions = '<option value="">-- Seleccionar --</option>';
-      // Especias
-      for (var ei = 0; ei < especias.length; ei++) {
-        var sel = (c.tipo === 'especia' && c.productoId == especias[ei].id) ? ' selected' : '';
-        prodOptions += '<option value="especia:' + especias[ei].id + '"' + sel + '>' + especias[ei].nombre + '</option>';
-      }
-      // Blends
-      for (var bi = 0; bi < blends.length; bi++) {
-        var sel2 = (c.tipo === 'blend' && c.productoId == blends[bi].id) ? ' selected' : '';
-        prodOptions += '<option value="blend:' + blends[bi].id + '"' + sel2 + '>' + blends[bi].nombre + ' (Blend)</option>';
-      }
-      h += '<div class="card" style="margin-bottom:8px;padding:12px" data-comp-idx="' + i + '">' +
-        '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
-          '<div style="flex:2;min-width:180px"><label class="text-sm text-muted">Producto</label>' +
-            '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()">' + prodOptions + '</select></div>' +
-          '<div style="flex:1;min-width:100px"><label class="text-sm text-muted">Talla</label>' +
-            '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()"><option value="chico"' + (c.talla === 'grande' ? '' : ' selected') + '>Pequeno</option><option value="grande"' + (c.talla === 'grande' ? ' selected' : '') + '>Grande</option></select></div>' +
-          '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
-            '<input type="number" class="input" value="' + (c.cantidad || 1) + '" min="1" onchange="Pages.calcPackCost()"></div>' +
-          '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
-            '<input type="number" class="input" value="' + (c.costoUnitario || c._precio || 0) + '" min="0" step="100" readonly data-costo="1" style="background:var(--bg-body);opacity:0.7"></div>' +
-          '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
-        '</div></div>';
-    }
-    return h;
-  },
-
-  addPackComponent() {
-    var container = document.getElementById('packComps');
-    if (!container) return;
-    var idx = container.children.length;
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var prodOptions = '<option value="">-- Seleccionar --</option>';
-    for (var ei = 0; ei < especias.length; ei++) {
-      prodOptions += '<option value="especia:' + especias[ei].id + '">' + especias[ei].nombre + '</option>';
-    }
-    for (var bi = 0; bi < blends.length; bi++) {
-      prodOptions += '<option value="blend:' + blends[bi].id + '">' + blends[bi].nombre + ' (Blend)</option>';
-    }
-    var compHTML = '<div class="card" style="margin-bottom:8px;padding:12px" data-comp-idx="' + idx + '">' +
-      '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
-        '<div style="flex:2;min-width:180px"><label class="text-sm text-muted">Producto</label>' +
-          '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()">' + prodOptions + '</select></div>' +
-        '<div style="flex:1;min-width:100px"><label class="text-sm text-muted">Talla</label>' +
-          '<select class="input" onchange="Pages._updateCompCost(this);Pages.calcPackCost()"><option value="chico" selected>Pequeno</option><option value="grande">Grande</option></select></div>' +
-        '<div style="flex:0.5;min-width:70px"><label class="text-sm text-muted">Cant.</label>' +
-          '<input type="number" class="input" value="1" min="1" onchange="Pages.calcPackCost()"></div>' +
-        '<div style="flex:0.7;min-width:90px"><label class="text-sm text-muted">Costo Unit.</label>' +
-          '<input type="number" class="input" value="0" min="0" step="100" readonly data-costo="1" style="background:var(--bg-body);opacity:0.7"></div>' +
-        '<button class="btn btn-sm btn-red" style="margin-bottom:1px" onclick="this.parentElement.parentElement.remove();Pages.calcPackCost()">X</button>' +
-      '</div></div>';
-    container.insertAdjacentHTML('beforeend', compHTML);
-  },
-
-  _updateCompCost(selectEl) {
-    var card = selectEl.closest('[data-comp-idx]');
-    if (!card) return;
-    var selects = card.querySelectorAll('select');
-    var prodVal = selects[0].value;
-    var talla = selects[1].value;
-    var costoInput = card.querySelector('[data-costo]');
-    if (!prodVal || !costoInput) { if (costoInput) costoInput.value = 0; return; }
-    var parts = prodVal.split(':');
-    var tipo = parts[0];
-    var prodId = Number(parts[1]);
-    var producto = null;
-    if (tipo === 'especia') producto = ArcanoDB.getEspecia(prodId);
-    else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
-    if (!producto) { costoInput.value = 0; return; }
-    var costoInfo = ArcanoDB.getCostoProducto(producto, tipo);
-    costoInput.value = Number(talla === 'grande' ? costoInfo.grande : costoInfo.chico) || 0;
-  },
-
-  calcPackCost() {
-    var infoEl = document.getElementById('packCostInfo');
-    if (!infoEl) return;
-    var compCards = document.querySelectorAll('#packComps [data-comp-idx]');
-    var costoTotal = 0;
-    var totalFrascos = 0;
-    var detalles = [];
-
-    for (var i = 0; i < compCards.length; i++) {
-      var card = compCards[i];
-      var selects = card.querySelectorAll('select');
-      var inputs = card.querySelectorAll('input[type="number"]');
-      var prodVal = selects[0].value;
-      var talla = selects[1].value;
-      var cant = Number(inputs[0].value) || 1;
-
-      if (!prodVal) continue;
-      var parts = prodVal.split(':');
-      var tipo = parts[0];
-      var prodId = Number(parts[1]);
-      var producto = null;
-      if (tipo === 'especia') producto = ArcanoDB.getEspecia(prodId);
-      else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
-      if (!producto) continue;
-
-      // Always calculate real cost from purchase data (admin cannot override)
-      var costoInputs = card.querySelectorAll('[data-costo]');
-      var costoUnit = 0;
-      if (producto) {
-        var costoInfo = ArcanoDB.getCostoProducto(producto, tipo);
-        costoUnit = Number(talla === 'grande' ? costoInfo.grande : costoInfo.chico) || 0;
-        if (costoInputs.length > 0) costoInputs[0].value = costoUnit;
-      }
-      var sub = costoUnit * cant;
-      costoTotal += sub;
-      totalFrascos += cant;
-      detalles.push(producto.nombre + ' (' + (talla === 'grande' ? 'Grande' : 'Pequeno') + ') x' + cant + ' = $' + sub.toLocaleString());
-    }
-
-    var precioVenta = Number(document.getElementById('packPrecio').value) || 0;
-    var margen = precioVenta - costoTotal;
-    var margenClass = margen >= 0 ? 'text-green' : 'text-red';
-
-    var infoHTML = '<div style="padding:12px">' +
-      '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
-        '<span class="fw7">Costo total de componentes:</span>' +
-        '<span class="fw7">$' + costoTotal.toLocaleString() + '</span>' +
-      '</div>';
-    if (detalles.length > 0) {
-      infoHTML += '<div class="text-sm text-muted" style="margin-bottom:8px">' + detalles.join('<br>') + '</div>';
-    }
-    infoHTML += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
-        '<span class="fw7">Total frascos:</span>' +
-        '<span>' + totalFrascos + '</span>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">' +
-        '<span class="fw7">Precio de Venta:</span>' +
-        '<span class="fw7">$' + precioVenta.toLocaleString() + '</span>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
-        '<span class="fw7">Margen:</span>' +
-        '<span class="fw7 ' + margenClass + '">$' + margen.toLocaleString() + '</span>' +
-      '</div>' +
-      '</div>';
-    infoEl.innerHTML = infoHTML;
-  },
-
-  doSavePack(editId) {
-    var nombre = (document.getElementById('packNombre').value || '').trim();
-    if (!nombre) { toast('Ingresa un nombre para el pack', 'err'); return; }
-
-    var compCards = document.querySelectorAll('#packComps [data-comp-idx]');
-    var componentes = [];
-    for (var i = 0; i < compCards.length; i++) {
-      var card = compCards[i];
-      var selects = card.querySelectorAll('select');
-      var inputs = card.querySelectorAll('input[type="number"]');
-      var prodVal = selects[0].value;
-      var talla = selects[1].value;
-      var cant = Number(inputs[0].value) || 1;
-      if (!prodVal) continue;
-      var parts = prodVal.split(':');
-      var tipo = parts[0];
-      var prodId = Number(parts[1]);
-      var producto = null;
-      var nombreProd = '';
-      if (tipo === 'especia') { producto = ArcanoDB.getEspecia(prodId); nombreProd = producto ? producto.nombre : ''; }
-      else if (tipo === 'blend') { producto = ArcanoDB.getBlend(prodId); nombreProd = producto ? producto.nombre : ''; }
-      componentes.push({ tipo: tipo, productoId: prodId, nombre: nombreProd, talla: talla, cantidad: cant });
-    }
-
-    if (componentes.length === 0) { toast('Agrega al menos un componente al pack', 'err'); return; }
-
-    var data = {
-      nombre: nombre,
-      descripcion: (document.getElementById('packDesc').value || '').trim(),
-      precioVenta: Number(document.getElementById('packPrecio').value) || 0,
-      componentes: componentes,
-      imagen: (document.getElementById('img-preview-pk') || {}).src || '',
-      componentes: componentes
-    };
-    if (editId != null) data.id = editId;
-
-    try {
-      var saved = ArcanoDB.savePack(data);
-      toast('Pack guardado: ' + saved.nombre, 'ok');
-      var modal = document.getElementById('packModal');
-      if (modal) modal.remove();
-      App.renderPage('productos');
-    } catch (e) {
-      toast('Error: ' + e.message, 'err');
-    }
-  },
-
-  doDeletePack(id) {
-    if (!confirm('Eliminar este pack?')) return;
-    ArcanoDB.deletePack(id);
-    toast('Pack eliminado', 'ok');
-    App.renderPage('productos');
-  },
-
-
-  /* ================================================================
-     TESTING / SANDBOX
-     ================================================================ */
-  renderTesting(container) {
-    var db = ArcanoDB.getDB();
-    var especias = ArcanoDB.getEspecias();
-    var blends = ArcanoDB.getBlends();
-    var ventas = ArcanoDB.getVentas();
-    var pedidos = ArcanoDB.getPedidos();
-    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
-
-    var h = '<div style="margin-bottom:16px">' +
-      '<h3 style="margin:0 0 4px">Testing y Sandbox</h3>' +
-      '<p class="text-muted text-sm">Genera datos de prueba, reinicia stocks y prueba todas las funciones del sistema.</p>' +
-      '</div>';
-
-    // Current state
-    h += '<div class="card"><div class="card-header"><h3>Estado Actual</h3></div><div class="card-body">';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
-    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--gold)">' + especias.length + '</div><div class="text-muted text-sm">Especias</div></div>';
-    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--blue)">' + blends.length + '</div><div class="text-muted text-sm">Blends</div></div>';
-    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">' + ventas.length + '</div><div class="text-muted text-sm">Ventas Admin</div></div>';
-    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pedidos.length + '</div><div class="text-muted text-sm">Pedidos Tienda</div></div>';
-    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pdvs.length + '</div><div class="text-muted text-sm">P. de Venta</div></div>';
-    h += '</div></div></div>';
-
-    // Generate test data
-    h += '<div class="card mt-16"><div class="card-header"><h3>Generar Datos de Prueba</h3></div><div class="card-body">';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Especias</label><input type="number" class="input" id="test-esp" value="8" min="0" max="50"></div>';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Blends</label><input type="number" class="input" id="test-blend" value="5" min="0" max="50"></div>';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas Admin</label><input type="number" class="input" id="test-ventas" value="20" min="0" max="200"></div>';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Pedidos Tienda</label><input type="number" class="input" id="test-pedidos" value="10" min="0" max="100"></div>';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">PDVs</label><input type="number" class="input" id="test-pdvs" value="2" min="0" max="10"></div>';
-    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas por PDV</label><input type="number" class="input" id="test-pdv-ventas" value="15" min="0" max="100"></div>';
-    h += '</div>';
-    h += '<div style="margin-top:12px"><label class="text-sm fw7" style="display:block;margin-bottom:4px">Antiguedad (dias)</label>';
-    h += '<input type="range" id="test-dias" min="1" max="90" value="30" style="width:100%" oninput="document.getElementById(\'test-dias-val\').textContent=this.value+\' dias\'"><span id="test-dias-val" class="text-sm text-muted">30 dias</span></div>';
-    h += '<button class="btn btn-gold btn-block mt-12" onclick="Pages._testGenerarTodo()" style="padding:14px;font-size:1rem;font-weight:700">Generar Todo</button>';
-    h += '</div></div>';
-
-    // Individual actions
-    h += '<div class="card mt-16"><div class="card-header"><h3>Acciones Individuales</h3></div><div class="card-body">';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<button class="btn btn-outline" onclick="Pages._testCrearProductos()">Crear 10 Productos</button>';
-    h += '<button class="btn btn-outline" onclick="Pages._testGenerarVentas()">Crear 20 Ventas</button>';
-    h += '<button class="btn btn-outline" onclick="Pages._testGenerarPedidos()">Crear 10 Pedidos</button>';
-    h += '<button class="btn btn-outline" onclick="Pages._testCrearPDVs()">Crear 2 PDVs</button>';
-    h += '<button class="btn btn-outline" onclick="Pages._testAgregarStock()">Agregar Stock PDVs</button>';
-    h += '<button class="btn btn-outline" onclick="Pages._testCrearProducciones()">Crear 5 Producciones</button>';
-    h += '</div></div></div>';
-
-    // Danger zone
-    h += '<div class="card mt-16"><div class="card-header"><h3 style="color:var(--red)">Zona de Peligro</h3></div><div class="card-body">';
-    h += '<p class="text-sm text-muted mb-12">Estas acciones eliminan datos de forma permanente.</p>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testResetStocks()">Reiniciar Stocks a 0</button>';
-    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearVentas()">Borrar Todas las Ventas</button>';
-    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearPedidos()">Borrar Todos los Pedidos</button>';
-    h += '<button class="btn btn-red" onclick="Pages._testNuclearReset()">RESET NUCLEAR - Borrar Todo</button>';
-    h += '</div></div></div>';
-
-    container.innerHTML = h;
-  },
-
-  _testRandomDate(d) { var dt = new Date(); dt.setDate(dt.getDate() - Math.floor(Math.random() * d)); return dt.toISOString().slice(0, 10); },
-
-  _testGenerarTodo() {
-    var esp = Number(document.getElementById('test-esp').value) || 0;
-    var blend = Number(document.getElementById('test-blend').value) || 0;
-    var vtas = Number(document.getElementById('test-ventas').value) || 0;
-    var peds = Number(document.getElementById('test-pedidos').value) || 0;
-    var npdv = Number(document.getElementById('test-pdvs').value) || 0;
-    var pv = Number(document.getElementById('test-pdv-ventas').value) || 0;
-    var dias = Number(document.getElementById('test-dias').value) || 30;
-    Pages._testCrearProductosN(esp, blend);
-    Pages._testGenerarVentasN(vtas, dias);
-    Pages._testGenerarPedidosN(peds, dias);
-    Pages._testCrearPDVsN(npdv, pv, dias);
-    Pages._testCrearProduccionesN(5, dias);
-    toast('Datos de prueba generados! Revisa Dashboard, Ventas, P.Venta y Stats.');
-  },
-
-  _testCrearProductos() { Pages._testCrearProductosN(6, 4); toast('Productos creados'); },
-
-  _testCrearProductosN(nEsp, nBlend) {
-    var nms = ['Canela','Curcuma','Pimienta Negra','Comino','Oregano','Clavo','Nuez Moscada','Jengibre','Cacao','Vanilla','Cardamomo','Cilantro','Paprika','Azafran','Laurel','Tomillo','Romero','Salvia','Hinojo','Anis'];
-    var cats = ['Especias','Dulces','Saladas','Exoticas'];
-    for (var i = 0; i < nEsp; i++) {
-      var nm = nms[i % nms.length] + (i >= nms.length ? ' ' + Math.ceil((i+1)/nms.length) : '');
-      var pc = Math.floor(Math.random() * 8000 + 3000);
-      ArcanoDB.saveEspecia({ nombre: nm, categoria: cats[i % cats.length], precioChico: pc, precioGrande: Math.floor(pc * 1.7), stockBolsa: Math.floor(Math.random() * 500 + 100), stockChico: Math.floor(Math.random() * 15 + 2), stockGrande: Math.floor(Math.random() * 10 + 1), enTienda: Math.random() > 0.3 });
-    }
-    var nmsB = ['Arcano Mix','Fuego Interior','Dulce Despertar','Noche Estelar','Camino Sagrado','Raiz Ancestral','Brisa Otono','Sol Naciente','Luna Llena','Tierra Fertil'];
-    for (var j = 0; j < nBlend; j++) {
-      var nb = nmsB[j % nmsB.length] + (j >= nmsB.length ? ' ' + Math.ceil((j+1)/nmsB.length) : '');
-      var pb = Math.floor(Math.random() * 12000 + 5000);
-      ArcanoDB.saveBlend({ nombre: nb, categoria: 'Blends', precioChico: pb, precioGrande: Math.floor(pb * 1.6), stockChico: Math.floor(Math.random() * 12 + 2), stockGrande: Math.floor(Math.random() * 8 + 1), enTienda: Math.random() > 0.3 });
-    }
-  },
-
-  _testGenerarVentas() { Pages._testGenerarVentasN(20, 30); toast('Ventas creadas'); },
-
-  _testGenerarVentasN(count, dias) {
-    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
-    if (!all.length) { toast('Crea productos primero','err'); return; }
-    for (var v = 0; v < count; v++) {
-      var nI = Math.floor(Math.random() * 3) + 1, items = [];
-      for (var it = 0; it < nI; it++) {
-        var pr = all[Math.floor(Math.random() * all.length)];
-        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 3) + 1;
-        var pu = tl === 'grande' ? pr.pg : pr.pc;
-        items.push({ tipo: pr.tipo, productoId: pr.id, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
-      }
-      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
-      ArcanoDB.saveVenta({ fecha: Pages._testRandomDate(dias), items: items, total: tot, metodoPago: Math.random() > 0.5 ? 'efectivo' : 'qr' });
-    }
-  },
-
-  _testGenerarPedidos() { Pages._testGenerarPedidosN(10, 30); toast('Pedidos creados'); },
-
-  _testGenerarPedidosN(count, dias) {
-    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-    var all = [].concat(esp, bl);
-    if (!all.length) { toast('Crea productos primero','err'); return; }
-    var ests = ['nuevo','confirmado','preparando','enviado','entregado'];
-    for (var i = 0; i < count; i++) {
-      var nI = Math.floor(Math.random() * 3) + 1, items = [];
-      for (var it = 0; it < nI; it++) {
-        var pr = all[Math.floor(Math.random() * all.length)];
-        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 2) + 1;
-        var pu = tl === 'grande' ? (pr.precioGrande||0) : (pr.precioChico||0);
-        items.push({ tipo: pr.tipo||'especia', productoId: pr.id, productoNombre: pr.nombre, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
-      }
-      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
-      ArcanoDB.savePedido({ nombre: 'Cliente Test ' + (i+1), telefono: '300' + Math.floor(Math.random()*9000000+1000000), direccion: 'Calle Test #' + (i+1), items: items, total: tot, estado: ests[Math.min(Math.floor(Math.random()*ests.length), ests.length-1)], creado: new Date(Date.now() - Math.floor(Math.random()*dias*86400000)).toISOString() });
-    }
-  },
-
-  _testCrearPDVs() { Pages._testCrearPDVsN(2, 15, 30); toast('PDVs creados'); },
-
-  _testCrearPDVsN(count, vp, dias) {
-    var locs = ['Feria Central','Plaza Principal','Mercado Municipal','Centro Comercial','Parque Norte'];
-    var existentes = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
-    for (var p = 0; p < count; p++) {
-      var pdv = ArcanoDB.savePuntoDeVenta({ nombre: 'PDV Test ' + (existentes.length + p + 1), ubicacion: locs[p % locs.length], activo: true });
-      var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-      var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
-      var si = [];
-      for (var s = 0; s < Math.min(8, all.length); s++) {
-        var pr = all[Math.floor(Math.random() * all.length)];
-        si.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+2 });
-      }
-      try { ArcanoDB.moverStockAPDV(pdv.id, si); } catch(e) {}
-      for (var v = 0; v < vp; v++) {
-        var nI = Math.floor(Math.random()*2)+1, items = [];
-        for (var it = 0; it < nI; it++) {
-          var pr2 = all[Math.floor(Math.random()*all.length)];
-          var cn2 = Math.floor(Math.random()*2)+1;
-          items.push({ tipo: pr2.tipo, productoId: pr2.id, talla: 'chico', cantidad: cn2, precioUnitario: pr2.pc, subtotal: pr2.pc*cn2 });
-        }
-        ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, fecha: Pages._testRandomDate(dias), items: items, metodoPago: Math.random()>0.5?'efectivo':'qr' });
-      }
-    }
-  },
-
-  _testAgregarStock() {
-    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
-    if (!pdvs.length) { toast('Crea PDVs primero','err'); return; }
-    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id};}), bl.map(function(b){return{tipo:'blend',id:b.id};}));
-    for (var p = 0; p < pdvs.length; p++) {
-      var items = [];
-      for (var s = 0; s < Math.min(6,all.length); s++) {
-        var pr = all[Math.floor(Math.random()*all.length)];
-        items.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+3 });
-      }
-      try { ArcanoDB.moverStockAPDV(pdvs[p].id, items); } catch(e) {}
-    }
-    toast('Stock agregado a ' + pdvs.length + ' PDVs');
-  },
-
-  _testCrearProducciones() { Pages._testCrearProduccionesN(5, 30); toast('Producciones creadas'); },
-
-  _testCrearProduccionesN(count, dias) {
-    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-    var all = [].concat(esp, bl);
-    if (!all.length) { toast('Crea productos primero','err'); return; }
-    for (var i = 0; i < count; i++) {
-      var pr = all[Math.floor(Math.random()*all.length)];
-      ArcanoDB.saveProduccion({ tipo: pr.tipo||'especia', productoId: pr.id, fecha: Pages._testRandomDate(dias), cantidad: Math.floor(Math.random()*20)+5, frascosChico: Math.floor(Math.random()*10)+2, frascosGrande: Math.floor(Math.random()*5)+1 });
-    }
-  },
-
-  _testResetStocks() {
-    if (!confirm('Reiniciar todos los stocks a 0?')) return;
-    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
-    for (var i = 0; i < esp.length; i++) ArcanoDB.saveEspecia({ id: esp[i].id, stockBolsa: 0, stockChico: 0, stockGrande: 0 });
-    for (var j = 0; j < bl.length; j++) ArcanoDB.saveBlend({ id: bl[j].id, stockChico: 0, stockGrande: 0 });
-    toast('Stocks reiniciados a 0'); App.renderPage('testing');
-  },
-
-  _testClearVentas() {
-    if (!confirm('Borrar TODAS las ventas (admin y PDV)?')) return;
-    var v = ArcanoDB.getVentas();
-    for (var i = 0; i < v.length; i++) ArcanoDB.deleteVenta(v[i].id);
-    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
-    for (var p = 0; p < pdvs.length; p++) pdvs[p].ventas = {};
-    try { firebase.database().ref('arcano').remove(); } catch(e) {}
-    localStorage.clear();
-    toast('Ventas eliminadas'); App.renderPage('testing');
-  },
-
-  _testClearPedidos() {
-    if (!confirm('Borrar TODOS los pedidos?')) return;
-    var p = ArcanoDB.getPedidos();
-    for (var i = 0; i < p.length; i++) ArcanoDB.deletePedido(p[i].id);
-    toast('Pedidos eliminados'); App.renderPage('testing');
-  },
-
-  _testNuclearReset() {
-    if (!confirm('RESET NUCLEAR: Se borrarán TODOS los datos. Continuar?')) return;
-    if (!confirm('Estas SEGURO? Se perderán productos, ventas, pedidos, PDVs, todo.')) return;
-    try { firebase.database().ref('arcano').remove(); } catch(e) {}
-    localStorage.clear();
-    toast('Reset completo. Recargando...');
-    setTimeout(function() { location.reload(); }, 1500);
   },
 
   _renderEstContent: function(data, el) {
