@@ -1,5 +1,17 @@
 /* ===================== ARCANO V3 — PAGES (FIXED) ===================== */
 const Pages = {
+  _getCheckedCats: function(prefix) {
+    var cats = [];
+    var el;
+    el = document.getElementById('f-' + prefix + '-cat-comidas');
+    if (el && el.checked) cats.push('Comidas');
+    el = document.getElementById('f-' + prefix + '-cat-infusiones');
+    if (el && el.checked) cats.push('Infusiones');
+    el = document.getElementById('f-' + prefix + '-cat-cocteleria');
+    if (el && el.checked) cats.push('Cocteleria');
+    return cats;
+  },
+
 
   /* ================================================================
      DASHBOARD — MAPA VISUAL COMPLETO DEL NEGOCIO
@@ -314,7 +326,7 @@ const Pages = {
           var e = especias[i];
           h += '<tr>' +
             '<td class="fw7">' + e.nombre + '</td>' +
-            '<td><span class="badge badge-gold">' + (e.categoria||'—') + '</span></td>' +
+            '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
             '<td>' + (e.stockBolsa||0) + 'g</td>' +
             '<td>' + (e.gramosChico||0) + 'g</td>' +
             '<td>' + (e.gramosGrande||0) + 'g</td>' +
@@ -344,7 +356,7 @@ const Pages = {
           var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
           h += '<tr>' +
             '<td class="fw7">' + b.nombre + '</td>' +
-            '<td><span class="badge badge-blue">' + (b.categoria||'—') + '</span></td>' +
+            '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : (b.categoria||'—')) + '</span></td>' +
             '<td class="text-sm text-muted">' + (b.region||'—') + '</td>' +
             '<td class="text-sm text-muted">' + (ingN||'—') + '</td>' +
             '<td>$' + (b.precioChico||0).toLocaleString() + '</td>' +
@@ -400,11 +412,11 @@ const Pages = {
       '<button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
         '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-esp-nombre" value="' + (isEdit ? esp.nombre : '') + '" placeholder="Ej: Curcuma" ' + '></div>' +
-        '<div class="form-group"><label>Categoria</label><select class="input" id="f-esp-cat" onchange="Pages.refreshTagSelector(\'esp\')">' +
-          '<option value="Comidas"' + (isEdit && esp.categoria==='Comidas' ? ' selected' : '') + '>Comidas</option>' +
-          '<option value="Infusiones"' + (isEdit && esp.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
-          '<option value="Cocteleria"' + (isEdit && esp.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
-        '</select></div>' +
+        '<div class="form-group"><label>Categorias</label><div class="cat-checks">' +
+        '<label class="cat-check"><input type="checkbox" value="Comidas" id="f-esp-cat-comidas"' + (isEdit && (esp.categorias || []).indexOf('Comidas') >= 0 ? ' checked' : (!isEdit ? ' checked' : '')) + '><span>Comidas</span></label>' +
+        '<label class="cat-check"><input type="checkbox" value="Infusiones" id="f-esp-cat-infusiones"' + (isEdit && (esp.categorias || []).indexOf('Infusiones') >= 0 ? ' checked' : '') + '><span>Infusiones</span></label>' +
+        '<label class="cat-check"><input type="checkbox" value="Cocteleria" id="f-esp-cat-cocteleria"' + (isEdit && (esp.categorias || []).indexOf('Cocteleria') >= 0 ? ' checked' : '') + '><span>Cocteleria</span></label>' +
+        '</div></div>' +
         '<div class="card" style="border-color:var(--gold)"><div class="card-header"><h3>Precios de Venta</h3></div><div class="card-body">' +
         '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-esp-pc" value="' + (isEdit ? esp.precioChico : '') + '" placeholder="Ej: 8000" min="0"></div>' +
         '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-esp-pg" value="' + (isEdit ? esp.precioGrande : '') + '" placeholder="Ej: 18000" min="0"></div></div>' +
@@ -420,7 +432,7 @@ const Pages = {
         (isEdit && esp.imagen ? '<img src="' + esp.imagen + '" class="img-preview" id="img-preview-esp"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-esp\',\'f-esp-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-esp-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit ? (esp.categoria||'Comidas') : 'Comidas', isEdit ? (esp.tags || []) : []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit && (esp.categorias || []).length ? esp.categorias[0] : 'Comidas', isEdit ? (esp.tags || []) : []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g pala, ' + (esp.stockChico||0) + ' fr pequeño, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
@@ -438,7 +450,7 @@ const Pages = {
       var previewEl = document.getElementById('img-preview-esp');
       var data = {
         nombre: nombre,
-        categoria: document.getElementById('f-esp-cat').value,
+        categorias: Pages._getCheckedCats('esp'),
         precioChico: Number(document.getElementById('f-esp-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-esp-pg').value) || 0,
         gramosChico: Number(document.getElementById('f-esp-gc').value) || 0,
@@ -494,11 +506,11 @@ const Pages = {
       '<div class="modal-body">' +
         '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-bl-nombre" value="' + (isEdit ? bl.nombre : '') + '" placeholder="Ej: Curry Casero" ' + '></div>' +
         '<div class="g2">' +
-          '<div class="form-group"><label>Categoria</label><select class="input" id="f-bl-cat" onchange="Pages.refreshTagSelector(\'bl\')">' +
-          '<option value="Comidas"' + (isEdit && bl.categoria==='Comidas' ? ' selected' : '') + '>Comidas</option>' +
-          '<option value="Infusiones"' + (isEdit && bl.categoria==='Infusiones' ? ' selected' : '') + '>Infusiones</option>' +
-          '<option value="Cocteleria"' + (isEdit && bl.categoria==='Cocteleria' ? ' selected' : '') + '>Cocteleria</option>' +
-        '</select></div>' +
+          '<div class="form-group"><label>Categorias</label><div class="cat-checks">' +
+          '<label class="cat-check"><input type="checkbox" value="Comidas" id="f-bl-cat-comidas"' + (isEdit && (bl.categorias || []).indexOf('Comidas') >= 0 ? ' checked' : (!isEdit ? ' checked' : '')) + '><span>Comidas</span></label>' +
+          '<label class="cat-check"><input type="checkbox" value="Infusiones" id="f-bl-cat-infusiones"' + (isEdit && (bl.categorias || []).indexOf('Infusiones') >= 0 ? ' checked' : '') + '><span>Infusiones</span></label>' +
+          '<label class="cat-check"><input type="checkbox" value="Cocteleria" id="f-bl-cat-cocteleria"' + (isEdit && (bl.categorias || []).indexOf('Cocteleria') >= 0 ? ' checked' : '') + '><span>Cocteleria</span></label>' +
+        '</div></div>' +
           '<div class="form-group"><label>Region (opcional)</label><input type="text" class="input" id="f-bl-region" value="' + (isEdit ? (bl.region||'') : '') + '" placeholder="Ej: India"></div>' +
         '</div>' +
         '<div class="form-group"><label>Uso (opcional)</label><input type="text" class="input" id="f-bl-uso" value="' + (isEdit ? (bl.uso||'') : '') + '" placeholder="Ej: Carnes, Currys"></div>' +
@@ -517,7 +529,7 @@ const Pages = {
         (isEdit && bl.imagen ? '<img src="' + bl.imagen + '" class="img-preview" id="img-preview-bl"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-bl\',\'f-bl-img\')">Quitar imagen</button>' : '') +
         '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-bl-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '</div></div>' +
-        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit ? (bl.categoria||'Comidas') : 'Comidas', isEdit ? (bl.tags || []) : []) + '</div></div>' +
+        '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-bl">' + Pages.buildTagSelectorHtml(isEdit && (bl.categorias || []).length ? bl.categorias[0] : 'Comidas', isEdit ? (bl.tags || []) : []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-bl-desc" rows="2" placeholder="Breve descripcion del blend para la tienda...">' + (isEdit ? (bl.descripcion||'') : '') + '</textarea></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (bl.stockChico||0) + ' fr pequeño, ' + (bl.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
@@ -568,7 +580,7 @@ const Pages = {
       }
       var data = {
         nombre: nombre,
-        categoria: document.getElementById('f-bl-cat').value,
+        categorias: Pages._getCheckedCats('bl'),
         region: (document.getElementById('f-bl-region') || {}).value ? document.getElementById('f-bl-region').value.trim() : '',
         uso: (document.getElementById('f-bl-uso') || {}).value ? document.getElementById('f-bl-uso').value.trim() : '',
         precioChico: Number(document.getElementById('f-bl-pc').value) || 0,
@@ -629,7 +641,7 @@ const Pages = {
       for (var i = 0; i < especias.length; i++) {
         var e = especias[i];
         var cls = (e.stockBolsa||0) <= 50 ? 'text-red fw7' : (e.stockBolsa||0) <= 200 ? 'text-yellow fw7' : 'text-green';
-        h += '<tr><td class="fw7">' + e.nombre + '</td><td class="text-sm">' + (e.categoria||'') + '</td><td class="' + cls + '">' + (e.stockBolsa||0) + ' grs</td></tr>';
+        h += '<tr><td class="fw7">' + e.nombre + '</td><td class="text-sm">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'')) + '</td><td class="' + cls + '">' + (e.stockBolsa||0) + ' grs</td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -1518,7 +1530,7 @@ const Pages = {
       for (var i = 0; i < especias.length; i++) {
         var e = especias[i];
         h += '<tr><td class="fw7">' + e.nombre + '</td>' +
-          '<td><span class="badge badge-gold">' + (e.categoria||'—') + '</span></td>' +
+          '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
           '<td class="' + ((e.stockBolsa||0)<=50?'text-red fw7':'') + '">' + (e.stockBolsa||0) + '</td>' +
           '<td class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</td>' +
           '<td class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</td></tr>';
@@ -1535,7 +1547,7 @@ const Pages = {
       for (var i = 0; i < blends.length; i++) {
         var b = blends[i];
         h += '<tr><td class="fw7">' + b.nombre + '</td>' +
-          '<td><span class="badge badge-blue">' + (b.categoria||'—') + '</span></td>' +
+          '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : (b.categoria||'—')) + '</span></td>' +
           '<td class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</td>' +
           '<td class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</td></tr>';
       }
@@ -1916,7 +1928,7 @@ const Pages = {
         h += '<tr>' +
           '<td class="fw7">' + p.nombre + '</td>' +
           '<td><span class="badge ' + (p.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (p.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
-          '<td>' + (p.categoria||'') + '</td>' +
+          '<td>' + ((p.categorias||[]).length ? (p.categorias||[]).join(', ') : (p.categoria||'')) + '</td>' +
           '<td class="text-gold">$' + (p.precioChico||0).toLocaleString() + '</td>' +
           '<td class="text-gold">$' + (p.precioGrande||0).toLocaleString() + '</td>' +
           '<td class="text-green">' + p.stockChico + '</td>' +
@@ -2481,7 +2493,7 @@ const Pages = {
     var productLines = [];
     for (var i = 0; i < productos.length; i++) {
       var p = productos[i];
-      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categoria: ' + p.categoria + ']';
+      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categorias: ' + (p.categorias || [p.categoria]).join('/') + ']';
       if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
       productLines.push(line);
     }
@@ -3303,25 +3315,31 @@ const Pages = {
       var vGrande = (e.stockGrande || 0) * (e.precioGrande || 0);
       valorFrascos += vChico + vGrande;
       var palaGrs = e.stockBolsa || 0;
-      var cat = e.categoria || 'Sin categoria';
-      if (!catMap[cat]) catMap[cat] = { productos: 0, frascos: 0, pala: 0 };
-      catMap[cat].productos++;
-      catMap[cat].frascos += (e.stockChico || 0) + (e.stockGrande || 0);
-      catMap[cat].pala += palaGrs;
+      var eCats = (e.categorias || []).length > 0 ? e.categorias : [e.categoria || 'Sin categoria'];
+      var eCatLabel = eCats.join(' / ');
+      for (var ci = 0; ci < eCats.length; ci++) {
+        if (!catMap[eCats[ci]]) catMap[eCats[ci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[eCats[ci]].productos++;
+        catMap[eCats[ci]].frascos += (e.stockChico || 0) + (e.stockGrande || 0);
+        catMap[eCats[ci]].pala += palaGrs;
+      }
       var totalStock = (e.stockChico || 0) + (e.stockGrande || 0);
-      if (totalStock === 0 && palaGrs === 0) sinStock.push({ nombre: e.nombre, tipo: 'especia', cat: cat });
-      else if (totalStock <= 3 || palaGrs <= 50) stockBajo.push({ nombre: e.nombre, tipo: 'especia', cat: cat, frascos: totalStock, pala: palaGrs });
+      if (totalStock === 0 && palaGrs === 0) sinStock.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel });
+      else if (totalStock <= 3 || palaGrs <= 50) stockBajo.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel, frascos: totalStock, pala: palaGrs });
     }
     for (var bi = 0; bi < blends.length; bi++) {
       var b = blends[bi];
       valorFrascos += (b.stockChico || 0) * (b.precioChico || 0) + (b.stockGrande || 0) * (b.precioGrande || 0);
-      var cat2 = b.categoria || 'Sin categoria';
-      if (!catMap[cat2]) catMap[cat2] = { productos: 0, frascos: 0, pala: 0 };
-      catMap[cat2].productos++;
-      catMap[cat2].frascos += (b.stockChico || 0) + (b.stockGrande || 0);
+      var bCats = (b.categorias || []).length > 0 ? b.categorias : [b.categoria || 'Sin categoria'];
+      var bCatLabel = bCats.join(' / ');
+      for (var bci = 0; bci < bCats.length; bci++) {
+        if (!catMap[bCats[bci]]) catMap[bCats[bci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[bCats[bci]].productos++;
+        catMap[bCats[bci]].frascos += (b.stockChico || 0) + (b.stockGrande || 0);
+      }
       var ts = (b.stockChico || 0) + (b.stockGrande || 0);
-      if (ts === 0) sinStock.push({ nombre: b.nombre, tipo: 'blend', cat: cat2 });
-      else if (ts <= 3) stockBajo.push({ nombre: b.nombre, tipo: 'blend', cat: cat2, frascos: ts, pala: 0 });
+      if (ts === 0) sinStock.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel });
+      else if (ts <= 3) stockBajo.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel, frascos: ts, pala: 0 });
     }
     var totalProductos = especias.length + blends.length;
     var totalFrascosStock = especias.reduce(function(s, e) { return s + (e.stockChico||0) + (e.stockGrande||0); }, 0) +
