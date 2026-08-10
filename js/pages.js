@@ -2357,6 +2357,7 @@ const Pages = {
   /* ================================================================
      RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
      ================================================================ */
+  _groqKeyLoaded: false,
   renderRecetasAdmin(container) {
     var savedKey = localStorage.getItem('arcano_groq_key') || '';
     var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
@@ -2371,8 +2372,9 @@ const Pages = {
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
         '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
-        '<div class="form-group"><label>Groq API Key</label>' +
-        '<input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
         '</div>' +
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
@@ -2406,26 +2408,50 @@ const Pages = {
     // Load existing recipes from Firebase
     Pages._loadRecetasAdmin();
 
-    // Try to load Groq key from Firebase (persistent storage)
+    // Load Groq key from Firebase (persistent across devices/deploys)
+    Pages._groqKeyLoaded = false;
     try {
       firebase.database().ref('arcano/config/groqKey').once('value').then(function(snap) {
         var fbKey = snap.val();
+        var statusEl = document.getElementById('ra-key-status');
         if (fbKey) {
           var inp = document.getElementById('ra-groq-key');
           if (inp) inp.value = fbKey;
           localStorage.setItem('arcano_groq_key', fbKey);
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
+          Pages._groqKeyLoaded = true;
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube</span>';
         }
-      }).catch(function() {});
+      }).catch(function() {
+        var statusEl = document.getElementById('ra-key-status');
+        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error de conexion</span>';
+      });
     } catch(e) {}
   },
 
-  _saveGroqKey: function() {
+  _saveGroqKey: function(showFeedback) {
     var inp = document.getElementById('ra-groq-key');
     if (!inp) return;
     var key = inp.value.trim();
-    if (key) {
-      localStorage.setItem('arcano_groq_key', key);
-      try { firebase.database().ref('arcano/config/groqKey').set(key); } catch(e) {}
+    var statusEl = document.getElementById('ra-key-status');
+    if (!key) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>';
+      return;
+    }
+    localStorage.setItem('arcano_groq_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">guardando...</span>';
+    try {
+      firebase.database().ref('arcano/config/groqKey').set(key, function(err) {
+        if (err) {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error al guardar</span>';
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+          Pages._groqKeyLoaded = true;
+        }
+      });
+    } catch(e) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">local OK</span>';
     }
   },
 
@@ -2456,15 +2482,22 @@ const Pages = {
       listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
       return;
     }
-    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Categoria</th><th>Tiempo</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
     for (var i = 0; i < recetas.length; i++) {
       var r = recetas[i];
+      var prodsUsados = '';
+      if (r.productos_usados && r.productos_usados.length) {
+        prodsUsados = r.productos_usados.join(', ');
+      }
+      var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
       h += '<tr>' +
         '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
         '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
         '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm">' + (prodsUsados || '-') + '</td>' +
         '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
-        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">Eliminar</button></td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">X</button></td>' +
         '</tr>';
     }
     h += '</tbody></table></div>';
@@ -2550,19 +2583,40 @@ const Pages = {
 
       var systemPrompt =
         'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
-        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
-        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
-        'REGLAS OBLIGATORIAS:\n' +
-        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
-        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
-        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
-        '4. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
-        '5. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres).\n' +
-        '6. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras.\n' +
-        '7. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino), estilos (sour, fizz, mocktail, punch, old fashioned, spritz) y tecnicas (muddling, infusion, flame, dry shake).\n' +
-        '8. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas.\n' +
-        '9. Los pasos deben ser claros, concisos y en orden logico.\n' +
-        '10. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n\n' +
+        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.
+
+' +
+        'CATALOGO DE PRODUCTOS DISPONIBLES:
+' + productContext + '
+
+' +
+        'REGLAS OBLIGATORIAS:
+' +
+        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.
+' +
+        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.
+' +
+        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.
+' +
+        '4. IMPORTANTE: Menciona el nombre EXACTO del producto Arcano tal como aparece en el catalogo dentro de los ingredientes y pasos. Esto permite que se enlace automaticamente en la tienda.
+' +
+        '5. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.
+' +
+        '6. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, colombiana, marroqui, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar, ahumar, confitar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres, ceviches, empanadas, arepas).
+' +
+        '7. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras, toddies calientes, cold brew de especias.
+' +
+        '8. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino, cava, sake), estilos (sour, fizz, mocktail, punch, old fashioned, spritz, julep, colada) y tecnicas (muddling, infusion, flame, dry shake, fat wash, clarification).
+' +
+        '9. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas en cada ingrediente.
+' +
+        '10. Los pasos deben ser claros, concisos y en orden logico. Cada paso debe describir una accion concreta.
+' +
+        '11. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.
+' +
+        '12. El campo "productos_usados" debe listar SOLO los nombres exactos de productos Arcano usados en la receta (tal como aparecen en el catalogo).
+
+' +
         langInstr;
 
       var userPrompt =
@@ -2570,11 +2624,15 @@ const Pages = {
         existingBlock + '\n\n' +
         'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
         '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
+        '"dificultad": "Facil" o "Media" o "Dificil", ' +
         '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
-        '"ingredientes": ["1 cucharadita de [producto Arcano]", "200g de proteina principal", ...], ' +
-        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...]}\n\n' +
-        'RECUERDA: De 5 a 10 ingredientes, de 4 a 7 pasos. La receta DEBE ser diferente a todas las existentes. ' +
-        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes.';
+        '"productos_usados": ["Nombre Exacto del Producto 1"], ' +
+        '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto Arcano", "200g de proteina principal", ...], ' +
+        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
+        '"imagen_prompt": "descripcion visual del plato terminado para generar una imagen (en ingles, 1 oracion)"}\n\n' +
+        'RECUERDA: De 5 a 12 ingredientes, de 5 a 8 pasos. La receta DEBE ser diferente a todas las existentes. ' +
+        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
+        'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
 
       status.textContent = 'Consultando Llama 3.3 70B via Groq...';
 
@@ -2587,7 +2645,7 @@ const Pages = {
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           temperature: 0.9,
-          max_tokens: 1200,
+          max_tokens: 2000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
