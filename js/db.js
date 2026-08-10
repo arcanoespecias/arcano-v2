@@ -354,7 +354,11 @@ function saveEspecia(data) {
     }
   }
   data.nombre = (data.nombre || '').trim();
-  data.categoria = data.categoria || 'Comidas';
+  if (Array.isArray(data.categorias) && data.categorias.length > 0) {
+    data.categoria = data.categorias[0];
+  } else {
+    data.categorias = [data.categoria || 'Comidas'];
+  }
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   data.gramosChico = Number(data.gramosChico) || 0;
@@ -393,7 +397,11 @@ function saveBlend(data) {
     }
   }
   data.nombre = (data.nombre || '').trim();
-  data.categoria = data.categoria || 'Comidas';
+  if (Array.isArray(data.categorias) && data.categorias.length > 0) {
+    data.categoria = data.categorias[0];
+  } else {
+    data.categorias = [data.categoria || 'Comidas'];
+  }
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   data.ingredientes = data.ingredientes || [];
@@ -442,7 +450,7 @@ function getProductosConStickers() {
     if (!e || typeof e !== 'object') continue;
     var stk = _findStickerByNombre(e.nombre);
     items.push({
-      id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '',
+      id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '', categorias: e.categorias || [e.categoria || 'Comidas'],
       stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
       stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
@@ -453,7 +461,7 @@ function getProductosConStickers() {
     if (!b || typeof b !== 'object') continue;
     var stk = _findStickerByNombre(b.nombre);
     items.push({
-      id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '',
+      id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '', categorias: b.categorias || [b.categoria || 'Comidas'],
       stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
       stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
@@ -908,7 +916,7 @@ function getTiendaProductos() {
     if (!e || !e.enTienda) continue;
     if ((e.stockChico || 0) <= 0 && (e.stockGrande || 0) <= 0) continue;
     products.push({
-      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas',
+      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', categorias: e.categorias || [e.categoria || 'Comidas'],
       precioChico: Number(e.precioTiendaChico) || Number(e.precioChico) || 0,
       precioGrande: Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0,
       stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0,
@@ -921,7 +929,7 @@ function getTiendaProductos() {
     if (!b || !b.enTienda) continue;
     if ((b.stockChico || 0) <= 0 && (b.stockGrande || 0) <= 0) continue;
     products.push({
-      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas',
+      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', categorias: b.categorias || [b.categoria || 'Comidas'],
       precioChico: Number(b.precioTiendaChico) || Number(b.precioChico) || 0,
       precioGrande: Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0,
       stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0,
