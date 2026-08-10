@@ -236,6 +236,7 @@ const App = {
     var overlay = document.getElementById('sidebar-mobile-overlay');
     if (window.innerWidth <= 768) {
       sidebar.classList.toggle('mobile-open', this.sidebarOpen);
+      layout.classList.toggle('sidebar-closed', !this.sidebarOpen);
       if (overlay) overlay.style.display = this.sidebarOpen ? 'block' : 'none';
     } else {
       layout.classList.toggle('sidebar-closed', !this.sidebarOpen);
@@ -245,9 +246,11 @@ const App = {
   closeMobileSidebar() {
     if (window.innerWidth <= 768 && this.sidebarOpen) {
       this.sidebarOpen = false;
+      var layout = document.querySelector('.app-layout');
       var sidebar = document.getElementById('sidebar');
       var overlay = document.getElementById('sidebar-mobile-overlay');
       sidebar.classList.remove('mobile-open');
+      layout.classList.add('sidebar-closed');
       if (overlay) overlay.style.display = 'none';
     }
   },
