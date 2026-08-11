@@ -131,6 +131,7 @@ var _pedidosListeners = [];  // callbacks when new pedido arrives
 var _costosRef = null;
 var _costosInsumos = null;
 var _costosReady = false;
+var _costosListeners = [];
 
 function _initFirebase() {
   if (_firebaseDb) return;
@@ -1453,8 +1454,14 @@ function saveCostosInsumos(data) {
   _costosInsumos = data;
   if (_costosRef) {
     _costosRef.set(data, function(error) {
-      if (error) console.error('[DB] Costos save error:', error);
+      if (error) {
+        console.error('[DB] Costos save error:', error);
+        alert('Error al guardar costos: ' + error.message);
+      }
     });
+  }
+  for (var i = 0; i < _costosListeners.length; i++) {
+    try { _costosListeners[i](_costosInsumos); } catch (e) {}
   }
   _notify('update', 'costosInsumos', 'global');
   return data;
