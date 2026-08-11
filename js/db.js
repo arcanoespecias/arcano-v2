@@ -500,7 +500,30 @@ function saveEntrada(data) {
       if (tipo === 'especia_grs') {
         // Add grams to especia stockBolsa
         if (item.especiaId && _db.especias[item.especiaId]) {
-          _db.especias[item.especiaId].stockBolsa = (_db.especias[item.especiaId].stockBolsa || 0) + (Number(item.cantidad) || 0);
+          var espObj = _db.especias[item.especiaId];
+          var grsNuevos = Number(item.cantidad) || 0;
+          var costoNuevo = Number(item.costoUnitario) || 0;
+          // Promedio ponderado del costo por gramo
+          if (grsNuevos > 0 && costoNuevo > 0) {
+            var stockPrevio = espObj.stockBolsa || 0;
+            var costoPrevio = (_costosInsumos && _costosInsumos.especias && _costosInsumos.especias[item.especiaId]) || 0;
+            var nuevoTotalGrs = stockPrevio + grsNuevos;
+            var nuevoCostoProm = 0;
+            if (nuevoTotalGrs > 0) {
+              nuevoCostoProm = (stockPrevio * costoPrevio + grsNuevos * costoNuevo) / nuevoTotalGrs;
+            }
+            // Actualizar costosInsumos con el nuevo promedio
+            if (!_costosInsumos) _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
+            if (!_costosInsumos.especias) _costosInsumos.especias = {};
+            _costosInsumos.especias[item.especiaId] = Math.round(nuevoCostoProm * 1000) / 1000;
+            // Guardar el nuevo costo promediado a Firebase
+            if (_costosRef) {
+              _costosRef.set(_costosInsumos, function(error) {
+                if (error) console.error('[DB] Costos promedio save error:', error);
+              });
+            }
+          }
+          espObj.stockBolsa = (espObj.stockBolsa || 0) + grsNuevos;
         }
       } else if (tipo === 'envase') {
         var talla = item.talla || 'chico';
