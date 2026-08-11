@@ -1425,6 +1425,47 @@ function saveCostosInsumos(data) {
   return data;
 }
 
+
+/* ==================== ADMIN TOOLS (TESTING) ==================== */
+
+function saveGlobalStocks(data) {
+  _ensureStructure();
+  if (data.stockEnvases) _db.stockEnvases = data.stockEnvases;
+  if (data.stockBolsas) _db.stockBolsas = data.stockBolsas;
+  if (typeof data.stockCintas === 'number') _db.stockCintas = data.stockCintas;
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'globalStocks', 'global');
+  return _db;
+}
+
+function clearCollection(collection) {
+  _ensureStructure();
+  if (_db[collection] && typeof _db[collection] === 'object') {
+    _db[collection] = Array.isArray(_db[collection]) ? [] : {};
+  }
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', collection, 'all');
+  return true;
+}
+
+function resetAllData() {
+  var keep = { usuarios: _db.usuarios, productTags: _db.productTags, costosInsumos: _db.costosInsumos };
+  var fresh = {
+    meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {},
+    puntosDeVenta: {}, pdvVentas: {}, pedidos: [],
+    stockEnvases: { chico: 0, grande: 0 },
+    stockBolsas: { chico: 0, grande: 0 },
+    stockCintas: 0,
+    costosInsumos: keep.costosInsumos || { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} },
+    productTags: keep.productTags || {},
+    usuarios: keep.usuarios || { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
+  };
+  _db = fresh;
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -1454,5 +1495,6 @@ window.ArcanoDB = {
   savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
-  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos
+  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos,
+  saveGlobalStocks: saveGlobalStocks, clearCollection: clearCollection, resetAllData: resetAllData
 };
