@@ -80,7 +80,7 @@ function _ensureStructure() {
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
   if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
   if (!_db.stockCintas) _db.stockCintas = 0;
-  if (!_db.costosInsumos) _db.costosInsumos = { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} };
+
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
@@ -100,7 +100,7 @@ function _emptyDB() {
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     stockCintas: 0,
-    costosInsumos: { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} },
+
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
@@ -127,6 +127,11 @@ var _pedidos = [];           // in-memory list of orders from tienda
 var _pedidosRef = null;      // Firebase ref for arcano/db/pedidos
 var _pedidosListeners = [];  // callbacks when new pedido arrives
 
+/* === Costos de insumos (separate from _db to avoid sync overwrites) === */
+var _costosRef = null;
+var _costosInsumos = null;
+var _costosReady = false;
+
 function _initFirebase() {
   if (_firebaseDb) return;
   try {
@@ -134,6 +139,7 @@ function _initFirebase() {
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
+    _costosRef = _firebaseDb.ref('arcano/config/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
   }
@@ -1459,7 +1465,7 @@ function clearCollection(collection) {
 }
 
 function resetAllData() {
-  var keep = { usuarios: _db.usuarios, productTags: _db.productTags, costosInsumos: _db.costosInsumos };
+  var keep = { usuarios: _db.usuarios, productTags: _db.productTags };
   var fresh = {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
     especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {},
@@ -1467,7 +1473,7 @@ function resetAllData() {
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     stockCintas: 0,
-    costosInsumos: keep.costosInsumos || { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} },
+
     productTags: keep.productTags || {},
     usuarios: keep.usuarios || { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
   };
@@ -1506,5 +1512,6 @@ window.ArcanoDB = {
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos,
-  saveGlobalStocks: saveGlobalStocks, clearCollection: clearCollection, resetAllData: resetAllData
+  saveGlobalStocks: saveGlobalStocks, clearCollection: clearCollection, resetAllData: resetAllData,
+  onCostosChange: onCostosChange
 };
