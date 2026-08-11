@@ -3128,6 +3128,16 @@ const Pages = {
         costoGrPorEsp[espNames[gn]] = costoPorGramo[espNames[gn]] / gramosComprados[espNames[gn]];
       }
     }
+    // Prefer manual costs from costosInsumos when available
+    var costosCfg = ArcanoDB.getCostosInsumos();
+    if (costosCfg && costosCfg.especias) {
+      for (var mci = 0; mci < especias.length; mci++) {
+        var manualCost = costosCfg.especias[especias[mci].id];
+        if (manualCost && manualCost > 0) {
+          costoGrPorEsp[especias[mci].nombre] = manualCost;
+        }
+      }
+    }
 
     // Build blend cost from ingredients
     var costoBlendMap = {};
@@ -3148,6 +3158,18 @@ const Pages = {
       var esp = especias[ei3];
       var cpg2 = costoGrPorEsp[esp.nombre] || 0;
       costoBlendMap['especia|' + esp.nombre] = { chico: (Number(esp.gramosChico) || 0) * cpg2, grande: (Number(esp.gramosGrande) || 0) * cpg2 };
+    }
+    // Add packaging costs (Frasco + Sticker + Cinta + Bolsa) to every product
+    var pkgChico = (costosCfg.envaseChico || 0) + (costosCfg.bolsaChica || 0) + (costosCfg.cinta || 0);
+    var pkgGrande = (costosCfg.envaseGrande || 0) + (costosCfg.bolsaGrande || 0) + (costosCfg.cinta || 0);
+    var blendKeys = Object.keys(costoBlendMap);
+    for (var pk = 0; pk < blendKeys.length; pk++) {
+      var bk = blendKeys[pk];
+      var bParts = bk.split('|');
+      var prodName = bParts.slice(1).join('|');
+      var stkC = (costosCfg.stickers && costosCfg.stickers[prodName]) || {};
+      costoBlendMap[bk].chico += pkgChico + (stkC.chico || 0);
+      costoBlendMap[bk].grande += pkgGrande + (stkC.grande || 0);
     }
 
     // 5. Production volume stats
@@ -3204,7 +3226,7 @@ const Pages = {
     h += '</div>';
 
     // Per-product margin table
-    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo de materia prima estimado segun precio de compra por gramo. No incluye envases/bolsas/stickers.</p>';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo total estimado: Ingredientes + Frasco + Sticker + Cinta + Bolsa. Usa costos manuales si estan configurados.</p>';
     var allProducts = [];
     for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
       var pk2 = Object.keys(prodVentaMap)[vk];
@@ -3217,7 +3239,7 @@ const Pages = {
     }
     allProducts.sort(function(a, b) { return b.ingreso - a.ingreso; });
     if (allProducts.length > 0) {
-      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo M.P.</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo Total</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
       for (var api = 0; api < Math.min(allProducts.length, 20); api++) {
         var ap = allProducts[api];
         var apMargen = ap.ingreso - ap.costoEst;
@@ -3272,7 +3294,7 @@ const Pages = {
     var ctxCD = document.getElementById('chart-cost-dist');
     if (ctxCD) {
       Pages._estCharts.push(new Chart(ctxCD, {
-        type: 'doughnut', data: { labels: ['Materia Prima', 'Envases', 'Bolsas', 'Stickers'], datasets: [{ data: [costoByTipo.especia_grs || 0, costoByTipo.envase || 0, costoByTipo.bolsa || 0, costoByTipo.sticker || 0], backgroundColor: ['#e8b84b', '#5dade2', '#27ae60', '#f0c040'], borderColor: '#241209', borderWidth: 3 }] },
+        type: 'doughnut', data: { labels: ['Materia Prima', 'Envases', 'Bolsas', 'Stickers', 'Cintas'], datasets: [{ data: [costoByTipo.especia_grs || 0, costoByTipo.envase || 0, costoByTipo.bolsa || 0, costoByTipo.sticker || 0, costoByTipo.cinta || 0], backgroundColor: ['#e8b84b', '#5dade2', '#27ae60', '#f0c040', '#e67e22'], borderColor: '#241209', borderWidth: 3 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
       }));
     }
