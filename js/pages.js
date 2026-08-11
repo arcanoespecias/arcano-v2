@@ -352,20 +352,31 @@ const Pages = {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>$/gr</th><th>Costo Ch.</th><th>$Venta Ch.</th><th>Margen Ch.</th><th>Costo Gr.</th><th>$Venta Gr.</th><th>Margen Gr.</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredEspecias.length; i++) {
           var e = filteredEspecias[i];
+          var eCpg = (costos.especias && costos.especias[e.id]) || 0;
+          var eCostC = (e.gramosChico||0) * eCpg + pkgC;
+          var eCostG = (e.gramosGrande||0) * eCpg + pkgG;
+          var ePrecioC = e.precioChico || 0;
+          var ePrecioG = e.precioGrande || 0;
+          var eMargenC = ePrecioC - eCostC;
+          var eMargenG = ePrecioG - eCostG;
+          var ePctC = ePrecioC > 0 ? (eMargenC / ePrecioC * 100) : 0;
+          var ePctG = ePrecioG > 0 ? (eMargenG / ePrecioG * 100) : 0;
           h += '<tr>' +
             '<td class="fw7">' + e.nombre + '</td>' +
             '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
             '<td>' + (e.stockBolsa||0) + 'g</td>' +
-            '<td>' + (e.gramosChico||0) + 'g</td>' +
-            '<td>' + (e.gramosGrande||0) + 'g</td>' +
-            '<td>$' + (e.precioChico||0).toLocaleString() + '</td>' +
-            '<td>$' + (e.precioGrande||0).toLocaleString() + '</td>' +
+            '<td class="text-sm" style="color:var(--gold)">$' + eCpg.toFixed(3) + '</td>' +
+            '<td style="color:var(--red)" class="text-sm">$' + eCostC.toFixed(1) + '</td>' +
+            '<td class="text-sm">$' + ePrecioC.toLocaleString() + '</td>' +
+            '<td class="text-sm" style="color:' + (eMargenC>=0?'var(--green)':'var(--red)') + '">' + eMargenC.toFixed(0) + ' (' + ePctC.toFixed(0) + '%)</td>' +
+            '<td style="color:var(--red)" class="text-sm">$' + eCostG.toFixed(1) + '</td>' +
+            '<td class="text-sm">$' + ePrecioG.toLocaleString() + '</td>' +
+            '<td class="text-sm" style="color:' + (eMargenG>=0?'var(--green)':'var(--red)') + '">' + eMargenG.toFixed(0) + ' (' + ePctG.toFixed(0) + '%)</td>' +
             '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm ' + (e.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'especia\',' + e.id + ');App.renderPage(\'productos\')" title="Tienda">' + (e.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Producir</button>' +
-              '<button class="btn btn-sm btn-outline mr-8" onclick="Pages.formEspecia(' + e.id + ')">Editar</button>' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'especia\',' + e.id + ')">Prod</button>' +
+              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formEspecia(' + e.id + ')">Edit</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')">X</button>' +
             '</td></tr>';
         }
@@ -383,20 +394,36 @@ const Pages = {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Costo Ch.</th><th>$Venta Ch.</th><th>Margen Ch.</th><th>Costo Gr.</th><th>$Venta Gr.</th><th>Margen Gr.</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredBlends.length; i++) {
           var b = filteredBlends[i];
-          var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
+          var bIngs = b.ingredientes || [];
+          var bCostC = 0, bCostG = 0;
+          for (var bi2 = 0; bi2 < bIngs.length; bi2++) {
+            var bIng = bIngs[bi2];
+            var bCpg = (costos.especias && costos.especias[bIng.especiaId]) || 0;
+            bCostC += (bIng.gramosChico||0) * bCpg;
+            bCostG += (bIng.gramosGrande||0) * bCpg;
+          }
+          bCostC += pkgC; bCostG += pkgG;
+          var bPrecioC = b.precioChico || 0;
+          var bPrecioG = b.precioGrande || 0;
+          var bMargenC = bPrecioC - bCostC;
+          var bMargenG = bPrecioG - bCostG;
+          var bPctC = bPrecioC > 0 ? (bMargenC / bPrecioC * 100) : 0;
+          var bPctG = bPrecioG > 0 ? (bMargenG / bPrecioG * 100) : 0;
+          var ingN = bIngs.map(function(x){return x.especiaNombre||'?'}).join(', ');
           h += '<tr>' +
-            '<td class="fw7">' + b.nombre + '</td>' +
+            '<td class="fw7" title="Ingredientes: ' + (ingN||'—') + '">' + b.nombre + '</td>' +
             '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : (b.categoria||'—')) + '</span></td>' +
-            '<td class="text-sm text-muted">' + (b.region||'—') + '</td>' +
-            '<td class="text-sm text-muted">' + (ingN||'—') + '</td>' +
-            '<td>$' + (b.precioChico||0).toLocaleString() + '</td>' +
-            '<td>$' + (b.precioGrande||0).toLocaleString() + '</td>' +
+            '<td style="color:var(--red)" class="text-sm">$' + bCostC.toFixed(1) + '</td>' +
+            '<td class="text-sm">$' + bPrecioC.toLocaleString() + '</td>' +
+            '<td class="text-sm" style="color:' + (bMargenC>=0?'var(--green)':'var(--red)') + '">' + bMargenC.toFixed(0) + ' (' + bPctC.toFixed(0) + '%)</td>' +
+            '<td style="color:var(--red)" class="text-sm">$' + bCostG.toFixed(1) + '</td>' +
+            '<td class="text-sm">$' + bPrecioG.toLocaleString() + '</td>' +
+            '<td class="text-sm" style="color:' + (bMargenG>=0?'var(--green)':'var(--red)') + '">' + bMargenG.toFixed(0) + ' (' + bPctG.toFixed(0) + '%)</td>' +
             '<td><span class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</span></td>' +
             '<td><span class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</span></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formBlend(' + b.id + ')" title="Editar">Editar</button>' +
-              '<button class="btn btn-sm ' + (b.enTienda ? 'btn-green' : 'btn-outline') + ' mr-4" onclick="ArcanoDB.toggleTienda(\'blend\',' + b.id + ');App.renderPage(\'productos\')" title="Tienda">' + (b.enTienda ? 'Tienda ON' : 'Tienda') + '</button>' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Producir</button>' +
+              '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formBlend(' + b.id + ')">Edit</button>' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'blend\',' + b.id + ')">Prod</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')">X</button>' +
             '</td></tr>';
         }
@@ -743,19 +770,22 @@ const Pages = {
     }
     h += '</div></div></div>'; // fin g2 pala + stickers
 
-    // ===== COSTOS POR PRODUCTO =====
+    // ===== DETALLE COSTOS POR PRODUCTO =====
     h += '<div class="card mt-16"><div class="card-header"><h3>Costos y Margen por Producto</h3>' +
-      '<span class="text-sm text-muted">Costo = Ingredientes + Frasco + Sticker + Cinta + Bolsa</span></div><div class="card-body">';
+      '<span class="text-sm text-muted">Desglose: Especias(grs x $/gr) + Frasco + Bolsa + Cinta + Sticker</span></div><div class="card-body">';
+    h += '<div class="text-sm text-muted mb-8" style="padding:6px 10px;background:var(--bg);border-radius:6px">Packaging Chico: Frasco $' + (costos.envaseChico||0) + ' + Bolsa $' + (costos.bolsaChica||0) + ' + Cinta $' + (costos.cinta||0) + ' + Sticker $' + (costos.stickerChico||0) + ' = <b>$' + pkgC.toFixed(2) + '</b> | Packaging Grande: Frasco $' + (costos.envaseGrande||0) + ' + Bolsa $' + (costos.bolsaGrande||0) + ' + Cinta $' + (costos.cinta||0) + ' + Sticker $' + (costos.stickerGrande||0) + ' = <b>$' + pkgG.toFixed(2) + '</b></div>';
     var blends2 = ArcanoDB.getBlends();
     if (especias.length === 0 && blends2.length === 0) {
       h += '<p class="text-muted text-center">Sin productos</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Costo Chico</th><th>Precio Chico</th><th>Margen Ch.</th><th>Costo Grande</th><th>Precio Grande</th><th>Margen Gr.</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Costo Ch.</th><th>Precio Ch.</th><th>Margen Ch.</th><th>Costo Gr.</th><th>Precio Gr.</th><th>Margen Gr.</th></tr></thead><tbody>';
       for (var ci = 0; ci < especias.length; ci++) {
         var esp = especias[ci];
         var eCpg = (costos.especias && costos.especias[esp.id]) || 0;
-        var eCostC = (Number(esp.gramosChico) || 0) * eCpg + pkgC;
-        var eCostG = (Number(esp.gramosGrande) || 0) * eCpg + pkgG;
+        var eIngCostC = (Number(esp.gramosChico) || 0) * eCpg;
+        var eIngCostG = (Number(esp.gramosGrande) || 0) * eCpg;
+        var eCostC = eIngCostC + pkgC;
+        var eCostG = eIngCostG + pkgG;
         var ePrecioC = esp.precioChico || 0;
         var ePrecioG = esp.precioGrande || 0;
         var eMargenC = ePrecioC - eCostC;
@@ -764,7 +794,7 @@ const Pages = {
         var ePctG = ePrecioG > 0 ? (eMargenG / ePrecioG * 100) : 0;
         var eMColorC = eMargenC >= 0 ? 'var(--green)' : 'var(--red)';
         var eMColorG = eMargenG >= 0 ? 'var(--green)' : 'var(--red)';
-        h += '<tr><td class="fw7">' + esp.nombre + '</td><td><span class="badge badge-gold">Especia</span></td>' +
+        h += '<tr title="Especia: ' + (esp.gramosChico||0) + 'g x $' + eCpg.toFixed(3) + '/g = $' + eIngCostC.toFixed(2) + ' + pkg $' + pkgC.toFixed(2) + '"><td class="fw7">' + esp.nombre + '</td><td><span class="badge badge-gold">Especia</span></td>' +
           '<td style="color:var(--red)">$' + eCostC.toFixed(1) + '</td>' +
           '<td>$' + ePrecioC.toLocaleString() + '</td>' +
           '<td style="color:' + eMColorC + '">' + eMargenC.toFixed(1) + ' (' + ePctC.toFixed(0) + '%)</td>' +
@@ -776,11 +806,16 @@ const Pages = {
         var bl2 = blends2[bi2];
         var bIngs = bl2.ingredientes || [];
         var bCostC = 0, bCostG = 0;
+        var bDetCh = [], bDetGr = [];
         for (var big = 0; big < bIngs.length; big++) {
           var bIng = bIngs[big];
           var bCpg = (costos.especias && costos.especias[bIng.especiaId]) || 0;
-          bCostC += (Number(bIng.gramosChico) || 0) * bCpg;
-          bCostG += (Number(bIng.gramosGrande) || 0) * bCpg;
+          var bIngCCh = (Number(bIng.gramosChico) || 0) * bCpg;
+          var bIngCGr = (Number(bIng.gramosGrande) || 0) * bCpg;
+          bCostC += bIngCCh;
+          bCostG += bIngCGr;
+          bDetCh.push((bIng.especiaNombre||'?') + ':' + (bIng.gramosChico||0) + 'g x $' + bCpg.toFixed(3) + '=$' + bIngCCh.toFixed(2));
+          bDetGr.push((bIng.especiaNombre||'?') + ':' + (bIng.gramosGrande||0) + 'g x $' + bCpg.toFixed(3) + '=$' + bIngCGr.toFixed(2));
         }
         bCostC += pkgC;
         bCostG += pkgG;
@@ -792,7 +827,8 @@ const Pages = {
         var bPctG = bPrecioG > 0 ? (bMargenG / bPrecioG * 100) : 0;
         var bMColorC = bMargenC >= 0 ? 'var(--green)' : 'var(--red)';
         var bMColorG = bMargenG >= 0 ? 'var(--green)' : 'var(--red)';
-        h += '<tr><td class="fw7">' + bl2.nombre + '</td><td><span class="badge badge-blue">Blend</span></td>' +
+        var bTitle = 'Chico: ' + bDetCh.join(' | ') + ' + pkg $' + pkgC.toFixed(2) + '\nGrande: ' + bDetGr.join(' | ') + ' + pkg $' + pkgG.toFixed(2);
+        h += '<tr title="' + bTitle + '"><td class="fw7">' + bl2.nombre + '</td><td><span class="badge badge-blue">Blend</span></td>' +
           '<td style="color:var(--red)">$' + bCostC.toFixed(1) + '</td>' +
           '<td>$' + bPrecioC.toLocaleString() + '</td>' +
           '<td style="color:' + bMColorC + '">' + bMargenC.toFixed(1) + ' (' + bPctC.toFixed(0) + '%)</td>' +
@@ -803,6 +839,49 @@ const Pages = {
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
+
+    // ===== DETALLE DE INGREDIENTES POR BLEND =====
+    if (blends2.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Desglose de Ingredientes por Blend</h3>' +
+        '<span class="text-sm text-muted">Pasa el mouse sobre cada blend para ver el costo detallado de cada ingrediente</span></div><div class="card-body">';
+      for (var dbi = 0; dbi < blends2.length; dbi++) {
+        var dbl = blends2[dbi];
+        var dbIngs = dbl.ingredientes || [];
+        h += '<div style="margin-bottom:12px;padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--blue)">' +
+          '<div class="fw7" style="margin-bottom:6px">' + dbl.nombre + ' <span class="badge badge-blue" style="margin-left:6px">Blend</span></div>';
+        if (dbIngs.length === 0) {
+          h += '<span class="text-sm text-muted">Sin ingredientes definidos</span>';
+        } else {
+          h += '<div class="table-wrap"><table class="table" style="font-size:.82rem"><thead><tr><th>Especia</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$/gr</th><th>Costo Ch.</th><th>Costo Gr.</th></tr></thead><tbody>';
+          for (var dii = 0; dii < dbIngs.length; dii++) {
+            var dIng = dbIngs[dii];
+            var dCpg = (costos.especias && costos.especias[dIng.especiaId]) || 0;
+            var dCostCh = (dIng.gramosChico||0) * dCpg;
+            var dCostGr = (dIng.gramosGrande||0) * dCpg;
+            h += '<tr><td>' + (dIng.especiaNombre||'?') + '</td><td>' + (dIng.gramosChico||0) + 'g</td><td>' + (dIng.gramosGrande||0) + 'g</td><td style="color:var(--gold)">$' + dCpg.toFixed(3) + '</td><td style="color:var(--red)">$' + dCostCh.toFixed(2) + '</td><td style="color:var(--red)">$' + dCostGr.toFixed(2) + '</td></tr>';
+          }
+          var dbTotCostC = 0, dbTotCostG = 0;
+          for (var dii2 = 0; dii2 < dbIngs.length; dii2++) {
+            var dIng2 = dbIngs[dii2];
+            var dCpg2 = (costos.especias && costos.especias[dIng2.especiaId]) || 0;
+            dbTotCostC += (dIng2.gramosChico||0) * dCpg2;
+            dbTotCostG += (dIng2.gramosGrande||0) * dCpg2;
+          }
+          h += '<tr style="border-top:2px solid var(--border)"><td class="fw7">Subtotal especias</td><td colspan="3"></td><td class="fw7" style="color:var(--red)">$' + dbTotCostC.toFixed(2) + '</td><td class="fw7" style="color:var(--red)">$' + dbTotCostG.toFixed(2) + '</td></tr>';
+          h += '<tr><td class="fw7">+ Packaging</td><td colspan="3" class="text-sm text-muted">Frasco+Bolsa+Cinta+Sticker</td><td style="color:var(--red)">$' + pkgC.toFixed(2) + '</td><td style="color:var(--red)">$' + pkgG.toFixed(2) + '</td></tr>';
+          h += '<tr style="background:rgba(232,184,75,0.08)"><td class="fw7">COSTO TOTAL</td><td colspan="3"></td><td class="fw7" style="color:var(--red)">$' + (dbTotCostC + pkgC).toFixed(2) + '</td><td class="fw7" style="color:var(--red)">$' + (dbTotCostG + pkgG).toFixed(2) + '</td></tr>';
+          var dbPrecioC = dbl.precioChico || 0;
+          var dbPrecioG = dbl.precioGrande || 0;
+          var dbMargenC = dbPrecioC - (dbTotCostC + pkgC);
+          var dbMargenG = dbPrecioG - (dbTotCostG + pkgG);
+          h += '<tr style="background:rgba(232,184,75,0.08)"><td class="fw7">PRECIO VENTA</td><td colspan="3"></td><td class="fw7" style="color:var(--gold)">$' + dbPrecioC.toLocaleString() + '</td><td class="fw7" style="color:var(--gold)">$' + dbPrecioG.toLocaleString() + '</td></tr>';
+          h += '<tr style="background:rgba(232,184,75,0.08)"><td class="fw7">MARGEN</td><td colspan="3"></td><td class="fw7" style="color:' + (dbMargenC>=0?'var(--green)':'var(--red)') + '">$' + dbMargenC.toFixed(1) + ' (' + (dbPrecioC > 0 ? (dbMargenC/dbPrecioC*100).toFixed(0) : '0') + '%)</td><td class="fw7" style="color:' + (dbMargenG>=0?'var(--green)':'var(--red)') + '">$' + dbMargenG.toFixed(1) + ' (' + (dbPrecioG > 0 ? (dbMargenG/dbPrecioG*100).toFixed(0) : '0') + '%)</td></tr>';
+          h += '</tbody></table></div>';
+        }
+        h += '</div>';
+      }
+      h += '</div></div>';
+    }
 
     // Historial
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas</h3></div><div class="card-body">';
@@ -1124,7 +1203,7 @@ const Pages = {
         ArcanoDB.saveCostosInsumos(data);
         document.querySelector('.modal-overlay').remove();
         App.renderPage('insumos');
-      } catch (err) { alert('Error: ' + err.message); }
+      } catch (err) { alert('Error al guardar: ' + err.message); }
     });
   },
 
@@ -3364,8 +3443,9 @@ const Pages = {
     h += '<div class="est-chart-card"><h4>Distribucion de Costos</h4><div class="est-chart-wrap"><canvas id="chart-cost-dist"></canvas></div></div>';
     h += '</div>';
 
-    // Per-product margin table
-    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo total estimado: Ingredientes + Frasco + Sticker + Cinta + Bolsa. Usa costos manuales si estan configurados.</p>';
+    // Per-product margin table - ALL products, not just sold ones
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen por Producto (Todos)</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo = Ingredientes + Frasco + Bolsa + Cinta + Sticker. Pasa el mouse para ver desglose.</p>';
+    // First, show products that had sales
     var allProducts = [];
     for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
       var pk2 = Object.keys(prodVentaMap)[vk];
@@ -3374,17 +3454,39 @@ const Pages = {
       var pTipo = parts[0];
       var pIngreso = prodVentaMap[pk2];
       var costoEst = costoBlendMap[pk2] || { chico: 0, grande: 0 };
-      allProducts.push({ nombre: pNombre, tipo: pTipo, ingreso: pIngreso, costoEst: costoEst.chico + costoEst.grande });
+      allProducts.push({ nombre: pNombre, tipo: pTipo, ingreso: pIngreso, costoCh: costoEst.chico, costoGr: costoEst.grande, vendido: true });
+    }
+    // Add ALL especias/blends that were not yet sold
+    for (var ae2 = 0; ae2 < especias.length; ae2++) {
+      var aEsp = especias[ae2];
+      var aKey = 'especia|' + aEsp.nombre;
+      if (!prodVentaMap[aKey]) {
+        var aCosto = costoBlendMap[aKey] || { chico: 0, grande: 0 };
+        allProducts.push({ nombre: aEsp.nombre, tipo: 'especia', ingreso: 0, costoCh: aCosto.chico, costoGr: aCosto.grande, precioCh: aEsp.precioChico, precioGr: aEsp.precioGrande, vendido: false });
+      }
+    }
+    for (var ab2 = 0; ab2 < blends.length; ab2++) {
+      var aBl = blends[ab2];
+      var aKey2 = 'blend|' + aBl.nombre;
+      if (!prodVentaMap[aKey2]) {
+        var aCosto2 = costoBlendMap[aKey2] || { chico: 0, grande: 0 };
+        allProducts.push({ nombre: aBl.nombre, tipo: 'blend', ingreso: 0, costoCh: aCosto2.chico, costoGr: aCosto2.grande, precioCh: aBl.precioChico, precioGr: aBl.precioGrande, vendido: false });
+      }
     }
     allProducts.sort(function(a, b) { return b.ingreso - a.ingreso; });
     if (allProducts.length > 0) {
-      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo Total</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
-      for (var api = 0; api < Math.min(allProducts.length, 20); api++) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo Ch.</th><th>Costo Gr.</th><th>Margen Est.</th></tr></thead><tbody>';
+      for (var api = 0; api < allProducts.length; api++) {
         var ap = allProducts[api];
-        var apMargen = ap.ingreso - ap.costoEst;
+        var apCostoTotal = ap.costoCh + ap.costoGr;
+        var apMargen = ap.ingreso - apCostoTotal;
         var apPct = ap.ingreso > 0 ? (apMargen / ap.ingreso * 100).toFixed(1) : '0';
         var apColor = apMargen >= 0 ? 'var(--green)' : 'var(--red)';
-        h += '<tr><td class="fw7">' + ap.nombre + '</td><td><span class="badge ' + (ap.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (ap.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td style="color:var(--gold)">$' + ap.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ap.costoEst.toLocaleString() + '</td><td style="color:' + apColor + '">$' + apMargen.toLocaleString() + '</td><td style="color:' + apColor + '">' + apPct + '%</td></tr>';
+        h += '<tr><td class="fw7">' + ap.nombre + '</td><td><span class="badge ' + (ap.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (ap.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>' +
+          '<td style="color:var(--gold)">$' + ap.ingreso.toLocaleString() + '</td>' +
+          '<td style="color:var(--red)">$' + ap.costoCh.toFixed(1) + '</td>' +
+          '<td style="color:var(--red)">$' + ap.costoGr.toFixed(1) + '</td>' +
+          '<td style="color:' + apColor + '">$' + apMargen.toLocaleString() + ' (' + apPct + '%)</td></tr>';
       }
       h += '</tbody></table></div>';
     } else { h += '<p class="text-muted text-center">Sin datos suficientes</p>'; }
