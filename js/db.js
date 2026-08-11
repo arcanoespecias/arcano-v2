@@ -80,6 +80,7 @@ function _ensureStructure() {
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
   if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
   if (!_db.stockCintas) _db.stockCintas = 0;
+  if (!_db.costosInsumos) _db.costosInsumos = { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} };
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
@@ -99,6 +100,7 @@ function _emptyDB() {
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     stockCintas: 0,
+    costosInsumos: { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} },
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
@@ -1406,6 +1408,23 @@ function savePDVVenta(data) {
   return data;
 }
 
+
+/* ==================== COSTOS DE INSUMOS (MANUAL) ==================== */
+
+function getCostosInsumos() {
+  _ensureStructure();
+  return _db.costosInsumos || { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} };
+}
+
+function saveCostosInsumos(data) {
+  _ensureStructure();
+  _db.costosInsumos = data;
+  _saveToFirebase();
+  _cacheLocal();
+  _notify('update', 'costosInsumos', 'global');
+  return data;
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -1434,5 +1453,6 @@ window.ArcanoDB = {
   getPuntosDeVenta: getPuntosDeVenta, getPuntoDeVenta: getPuntoDeVenta,
   savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
-  getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta
+  getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
+  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos
 };
