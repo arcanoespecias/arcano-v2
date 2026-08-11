@@ -3590,12 +3590,136 @@ const Pages = {
     Pages._renderVentas(data, el);
   },
 
-  /* ================================================================
-     TESTING (sandbox)
-     ================================================================ */
   renderTesting: function(container) {
-    container.innerHTML = '<div class="card"><div class="card-body text-center text-muted" style="padding:40px">' +
-      '<p style="font-size:48px;margin-bottom:12px">Experimental</p>' +
-      '<p>Area de pruebas y experimentacion</p></div></div>';
-  }
+    var db = ArcanoDB.getDB();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var pdvs = ArcanoDB.getPuntosDeVenta();
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var producciones = ArcanoDB.getProducciones();
+    var entradas = ArcanoDB.getEntradas();
+    var ajustes = ArcanoDB.getAjustes();
+
+    var h = '';
+
+    // === SECTION 1: Global Stocks ===
+    h += '<div class="card"><div class="card-header"><h3>Stocks Globales (Packaging)</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">';
+    h += '<div class="form-group"><label>Frascos Chicos</label><input type="number" class="input" id="tst-env-chico" value="' + ((db.stockEnvases||{}).chico||0) + '" min="0"></div>';
+    h += '<div class="form-group"><label>Frascos Grandes</label><input type="number" class="input" id="tst-env-grande" value="' + ((db.stockEnvases||{}).grande||0) + '" min="0"></div>';
+    h += '<div class="form-group"><label>Bolsas Chicas</label><input type="number" class="input" id="tst-bol-chica" value="' + ((db.stockBolsas||{}).chico||0) + '" min="0"></div>';
+    h += '<div class="form-group"><label>Bolsas Grandes</label><input type="number" class="input" id="tst-bol-grande" value="' + ((db.stockBolsas||{}).grande||0) + '" min="0"></div>';
+    h += '<div class="form-group"><label>Cintas</label><input type="number" class="input" id="tst-cintas" value="' + (db.stockCintas||0) + '" min="0"></div>';
+    h += '</div>';
+    h += '<button class="btn btn-gold mt-8" onclick="Pages._tstSaveGlobal()">Guardar Stocks Globales</button>';
+    h += '</div></div>';
+
+    // === SECTION 2: Especias Stocks ===
+    h += '<div class="card mt-16"><div class="card-header"><h3>Stocks de Especias</h3><span class="text-sm text-muted">Editar directamente los valores de stock</span></div><div class="card-body">';
+    if (especias.length === 0) {
+      h += '<p class="text-muted text-center">Sin especias</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Pala (g)</th><th>Frasco Chico</th><th>Frasco Grande</th></tr></thead><tbody>';
+      for (var i = 0; i < especias.length; i++) {
+        var e = especias[i];
+        h += '<tr>' +
+          '<td class="fw7">' + e.nombre + '</td>' +
+          '<td><input type="number" class="input tst-esp-pala" data-id="' + e.id + '" value="' + (e.stockBolsa||0) + '" min="0" style="min-width:100px"></td>' +
+          '<td><input type="number" class="input tst-esp-ch" data-id="' + e.id + '" value="' + (e.stockChico||0) + '" min="0" style="min-width:100px"></td>' +
+          '<td><input type="number" class="input tst-esp-gr" data-id="' + e.id + '" value="' + (e.stockGrande||0) + '" min="0" style="min-width:100px"></td>' +
+          '</tr>';
+      }
+      h += '</tbody></table></div>';
+      h += '<button class="btn btn-gold mt-8" onclick="Pages._tstSaveEspecias()">Guardar Stocks de Especias</button>';
+    }
+    h += '</div></div>';
+
+    // === SECTION 3: Blends Stocks ===
+    h += '<div class="card mt-16"><div class="card-header"><h3>Stocks de Blends</h3><span class="text-sm text-muted">Editar directamente los valores de stock</span></div><div class="card-body">';
+    if (blends.length === 0) {
+      h += '<p class="text-muted text-center">Sin blends</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Blend</th><th>Frasco Chico</th><th>Frasco Grande</th></tr></thead><tbody>';
+      for (var j = 0; j < blends.length; j++) {
+        var b = blends[j];
+        h += '<tr>' +
+          '<td class="fw7">' + b.nombre + '</td>' +
+          '<td><input type="number" class="input tst-bl-ch" data-id="' + b.id + '" value="' + (b.stockChico||0) + '" min="0" style="min-width:100px"></td>' +
+          '<td><input type="number" class="input tst-bl-gr" data-id="' + b.id + '" value="' + (b.stockGrande||0) + '" min="0" style="min-width:100px"></td>' +
+          '</tr>';
+      }
+      h += '</tbody></table></div>';
+      h += '<button class="btn btn-gold mt-8" onclick="Pages._tstSaveBlends()">Guardar Stocks de Blends</button>';
+    }
+    h += '</div></div>';
+
+    // === SECTION 4: Data Formatting (Danger Zone) ===
+    h += '<div class="card mt-16" style="border-color:var(--red)"><div class="card-header" style="border-bottom-color:var(--red)"><h3 style="color:var(--red)">Zona de Formateo</h3><span class="text-sm text-muted">Elimina datos. No se puede deshacer.</span></div><div class="card-body">';
+    h += '<div class="g2" style="gap:8px;flex-wrap:wrap">';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'puntosDeVenta\', \'Puntos de Venta\')">Limpiar PDVs (' + pdvs.length + ')</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'pdvVentas\', \'Ventas PDV\')">Limpiar Ventas PDV</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'ventas\', \'Ventas Admin\')">Limpiar Ventas (' + ventas.length + ')</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'pedidos\', \'Pedidos Tienda\')">Limpiar Pedidos (' + pedidos.length + ')</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'producciones\', \'Producciones\')">Limpiar Producciones (' + producciones.length + ')</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'entradas\', \'Entradas\')">Limpiar Entradas (' + entradas.length + ')</button>';
+    h += '<button class="btn btn-red" onclick="Pages._tstClearColl(\'ajustes\', \'Ajustes\')">Limpiar Ajustes (' + ajustes.length + ')</button>';
+    h += '</div>';
+    h += '<div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--red)">';
+    h += '<button class="btn" style="background:var(--red);color:#fff;font-size:1rem;padding:10px 20px" onclick="Pages._tstResetAll()">RESET COMPLETO - Borrar todo</button>';
+    h += '<p class="text-sm text-muted mt-8">Elimina TODOS los datos excepto usuarios y config. La app vuelve a estado inicial.</p>';
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  _tstSaveGlobal: function() {
+    var data = {
+      stockEnvases: { chico: Number(document.getElementById('tst-env-chico').value) || 0, grande: Number(document.getElementById('tst-env-grande').value) || 0 },
+      stockBolsas: { chico: Number(document.getElementById('tst-bol-chica').value) || 0, grande: Number(document.getElementById('tst-bol-grande').value) || 0 },
+      stockCintas: Number(document.getElementById('tst-cintas').value) || 0
+    };
+    ArcanoDB.saveGlobalStocks(data);
+    App.renderPage('testing');
+  },
+
+  _tstSaveEspecias: function() {
+    var rows = document.querySelectorAll('.tst-esp-pala');
+    for (var i = 0; i < rows.length; i++) {
+      var id = Number(rows[i].getAttribute('data-id'));
+      var esp = ArcanoDB.getEspecia(id);
+      if (!esp) continue;
+      esp.stockBolsa = Number(rows[i].value) || 0;
+      esp.stockChico = Number(document.querySelector('.tst-esp-ch[data-id="' + id + '"]').value) || 0;
+      esp.stockGrande = Number(document.querySelector('.tst-esp-gr[data-id="' + id + '"]').value) || 0;
+      ArcanoDB.saveEspecia(esp);
+    }
+    App.renderPage('testing');
+  },
+
+  _tstSaveBlends: function() {
+    var rows = document.querySelectorAll('.tst-bl-ch');
+    for (var i = 0; i < rows.length; i++) {
+      var id = Number(rows[i].getAttribute('data-id'));
+      var bl = ArcanoDB.getBlend(id);
+      if (!bl) continue;
+      bl.stockChico = Number(rows[i].value) || 0;
+      bl.stockGrande = Number(document.querySelector('.tst-bl-gr[data-id="' + id + '"]').value) || 0;
+      ArcanoDB.saveBlend(bl);
+    }
+    App.renderPage('testing');
+  },
+
+  _tstClearColl: function(coll, label) {
+    if (!confirm('Seguro que quieres limpiar ' + label + '? Esta accion no se puede deshacer.')) return;
+    ArcanoDB.clearCollection(coll);
+    App.renderPage('testing');
+  },
+
+  _tstResetAll: function() {
+    if (!confirm('RESET COMPLETO: Se borraran TODOS los datos (excepto usuarios). Continuar?')) return;
+    if (!confirm('Ultima confirmacion: Estas seguro?')) return;
+    ArcanoDB.resetAllData();
+    App.renderPage('testing');
+  },
 };
