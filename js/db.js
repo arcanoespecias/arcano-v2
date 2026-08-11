@@ -1415,22 +1415,45 @@ function savePDVVenta(data) {
 }
 
 
-/* ==================== COSTOS DE INSUMOS (MANUAL) ==================== */
+/* ==================== COSTOS DE INSUMOS (FIREBASE SEPARATE) ==================== */
+/* Costos en arcano/config/costosInsumos - separados de _db para evitar sobrescritura */
+
+var _COSTOS_DEFAULTS = { envaseChico: 0, envaseGrande: 0, cinta: 0, stickerChico: 0, stickerGrande: 0, especias: {} };
 
 function getCostosInsumos() {
-  _ensureStructure();
-  return _db.costosInsumos || { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, especias: {}, stickers: {} };
+  return _costosInsumos || Object.assign({}, _COSTOS_DEFAULTS);
 }
 
 function saveCostosInsumos(data) {
-  _ensureStructure();
-  _db.costosInsumos = data;
-  _saveToFirebase();
-  _cacheLocal();
+  _costosInsumos = data;
+  if (_costosRef) {
+    _costosRef.set(data, function(error) {
+      if (error) console.error('[DB] Costos save error:', error);
+    });
+  }
   _notify('update', 'costosInsumos', 'global');
   return data;
 }
 
+function onCostosChange(callback) {
+  _costosListeners.push(callback);
+}
+
+function _startCostosListener() {
+  if (!_costosRef) return;
+  _costosRef.on('value', function(snap) {
+    var data = snap.val();
+    if (data && typeof data === 'object') {
+      _costosInsumos = data;
+    } else {
+      _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
+    }
+    _costosReady = true;
+    for (var i = 0; i < _costosListeners.length; i++) {
+      try { _costosListeners[i](_costosInsumos); } catch (e) {}
+    }
+  });
+}
 
 /* ==================== ADMIN TOOLS (TESTING) ==================== */
 
