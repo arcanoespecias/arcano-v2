@@ -140,7 +140,7 @@ function _initFirebase() {
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
-    _costosRef = _firebaseDb.ref('arcano/config/costosInsumos');
+    _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
   }
@@ -198,6 +198,7 @@ function initDB() {
         var fbData = snap.val();
         if (fbData && fbData.meta && fbData.meta.version === DB_VERSION && _ensureStructureOn(fbData)) {
           delete fbData.pedidos;  // pedidos managed separately, not part of admin _db
+          delete fbData.costosInsumos;  // costos managed separately, not part of admin _db
           _db = fbData;
           _ensureStructure();  // ensure new fields exist on Firebase data
         } else {
@@ -247,6 +248,7 @@ function _startFirebaseListener() {
     // CRITICAL: skip if local save is pending to prevent overwriting unsaved changes
     if (_localDirty) return;
     delete data.pedidos;  // pedidos managed separately, not part of admin _db
+    delete data.costosInsumos;  // costos managed separately, not part of admin _db
     var prevJson = JSON.stringify(_db);
     _db = data;
     _ensureStructure();
@@ -1452,6 +1454,7 @@ function getCostosInsumos() {
 
 function saveCostosInsumos(data) {
   _costosInsumos = data;
+  try { localStorage.setItem('arcano_costos', JSON.stringify(data)); } catch (e) {}
   if (_costosRef) {
     _costosRef.set(data, function(error) {
       if (error) {
@@ -1472,12 +1475,21 @@ function onCostosChange(callback) {
 }
 
 function _startCostosListener() {
+  // Try localStorage cache first for instant UI
+  try {
+    var cached = JSON.parse(localStorage.getItem('arcano_costos'));
+    if (cached && typeof cached === 'object' && cached.especias) {
+      _costosInsumos = cached;
+      _costosReady = true;
+    }
+  } catch (e) {}
   if (!_costosRef) return;
   _costosRef.on('value', function(snap) {
     var data = snap.val();
     if (data && typeof data === 'object') {
       _costosInsumos = data;
-    } else {
+      try { localStorage.setItem('arcano_costos', JSON.stringify(data)); } catch (e) {}
+    } else if (!_costosInsumos) {
       _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
     }
     _costosReady = true;
