@@ -186,6 +186,7 @@ function initDB() {
       _ready = true;
       _startFirebaseListener();
       _startPedidosListener();
+      _startCostosListener();
       resolve();
       return;
     }
