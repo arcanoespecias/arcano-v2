@@ -626,7 +626,7 @@ const Pages = {
     var entradas = ArcanoDB.getEntradas();
 
     var cintas = db.stockCintas || 0;
-    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button></div>';
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button><button class="btn btn-outline" style="margin-left:8px" onclick="Pages.formCostosInsumos()">✏ Editar Costos</button></div>';
     h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
@@ -908,6 +908,104 @@ const Pages = {
       try {
         ArcanoDB.saveEntrada({ fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
         modal.remove();
+        App.renderPage('insumos');
+      } catch (err) { alert('Error: ' + err.message); }
+    });
+  },
+
+  /* ---------- Costos de Insumos Form ---------- */
+  formCostosInsumos() {
+    var db = ArcanoDB.getDB();
+    var costos = ArcanoDB.getCostosInsumos();
+    var especias = ArcanoDB.getEspecias();
+    var stickers = ArcanoDB.getProductosConStickers();
+
+    var h = '<div class="modal-overlay">' +
+      '<div class="modal modal-lg" style="max-width:640px">' +
+      '<div class="modal-header"><h3>Costos Unitarios de Insumos</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+      '<p class="text-sm text-muted mb-12">Estos costos se usan para calcular m\u00e1rgenes y rentabilidad. Se guardan independientemente de las entradas.</p>' +
+      '<h4 class="mb-8">Packaging</h4>' +
+      '<div class="stats-grid mb-16" style="grid-template-columns:repeat(5,1fr)">' +
+        '<div class="form-group" style="margin:0"><label>Frasco Chico</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-env-chico" value="' + (costos.envaseChico || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Frasco Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-env-grande" value="' + (costos.envaseGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Bolsa Chica</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-bol-chica" value="' + (costos.bolsaChica || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Bolsa Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-bol-grande" value="' + (costos.bolsaGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Cinta (unit.)</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-cinta" value="' + (costos.cinta || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+      '</div>' +
+      '<h4 class="mb-8 mt-16">Especias (costo por gramo)</h4>' +
+      '<div class="card mb-16"><div class="card-body" style="padding:8px"><div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Stock (g)</th><th>$/gramo</th></tr></thead><tbody>';
+
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var cpg = (costos.especias && costos.especias[e.id]) || 0;
+      h += '<tr>' +
+        '<td class="fw7">' + e.nombre + '</td>' +
+        '<td>' + (e.stockBolsa || 0) + 'g</td>' +
+        '<td><div style="position:relative;max-width:120px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-esp-cost" data-esp-id="' + e.id + '" value="' + cpg + '" min="0" step="0.001" style="padding-left:22px;min-width:100px"></div></td>' +
+        '</tr>';
+    }
+    if (especias.length === 0) {
+      h += '<tr><td colspan="3" class="text-muted text-center text-sm">Sin especias registradas</td></tr>';
+    }
+
+    h += '</tbody></table></div></div></div>' +
+      '<h4 class="mb-8">Stickers (costo por unidad)</h4>' +
+      '<div class="card mb-16"><div class="card-body" style="padding:8px"><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Chico $</th><th>Grande $</th></tr></thead><tbody>';
+
+    for (var j = 0; j < stickers.length; j++) {
+      var st = stickers[j];
+      var stkCostos = (costos.stickers && costos.stickers[st.nombre]) || {};
+      var badgeCls = st.tipo === 'blend' ? 'badge-blue' : 'badge-gold';
+      var tipoLabel = st.tipo === 'blend' ? 'Blend' : 'Especia';
+      h += '<tr>' +
+        '<td class="fw7">' + st.nombre + '</td>' +
+        '<td><span class="' + badgeCls + '">' + tipoLabel + '</span></td>' +
+        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-chico" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.chico || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
+        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-grande" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.grande || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
+        '</tr>';
+    }
+    if (stickers.length === 0) {
+      h += '<tr><td colspan="4" class="text-muted text-center text-sm">Sin stickers registrados</td></tr>';
+    }
+
+    h += '</tbody></table></div></div></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-costos">Guardar Costos</button>' +
+      '</div></div></div>';
+
+    var modal = document.createElement('div');
+    modal.innerHTML = h;
+    document.body.appendChild(modal.firstChild);
+
+    document.getElementById('btn-save-costos').addEventListener('click', function() {
+      var data = {
+        envaseChico: Number(document.getElementById('ci-env-chico').value) || 0,
+        envaseGrande: Number(document.getElementById('ci-env-grande').value) || 0,
+        bolsaChica: Number(document.getElementById('ci-bol-chica').value) || 0,
+        bolsaGrande: Number(document.getElementById('ci-bol-grande').value) || 0,
+        cinta: Number(document.getElementById('ci-cinta').value) || 0,
+        especias: {},
+        stickers: {}
+      };
+      var espInputs = document.querySelectorAll('.ci-esp-cost');
+      for (var k = 0; k < espInputs.length; k++) {
+        var eid = espInputs[k].getAttribute('data-esp-id');
+        data.especias[eid] = Number(espInputs[k].value) || 0;
+      }
+      var stkChicoInputs = document.querySelectorAll('.ci-stk-chico');
+      var stkGrandeInputs = document.querySelectorAll('.ci-stk-grande');
+      for (var m = 0; m < stkChicoInputs.length; m++) {
+        var sn = stkChicoInputs[m].getAttribute('data-stk-nombre');
+        data.stickers[sn] = {
+          chico: Number(stkChicoInputs[m].value) || 0,
+          grande: Number(stkGrandeInputs[m].value) || 0
+        };
+      }
+      try {
+        ArcanoDB.saveCostosInsumos(data);
+        document.querySelector('.modal-overlay').remove();
         App.renderPage('insumos');
       } catch (err) { alert('Error: ' + err.message); }
     });
@@ -1639,6 +1737,7 @@ const Pages = {
           '<option value="envase">Frascos</option>' +
           '<option value="bolsa">Bolsas</option>' +
           '<option value="sticker">Stickers</option>' +
+          '<option value="cinta">Cintas</option>' +
         '</select></div>' +
         '<div class="form-group" id="f-aj-prod-wrap"><label>Producto</label><select class="input" id="f-aj-prod"></select></div>' +
         '<div class="form-group"><label>Sub-tipo</label><select class="input" id="f-aj-sub"></select></div>' +
@@ -1680,7 +1779,7 @@ const Pages = {
       var prodId = prodSel.value;
 
       // Show/hide product selector
-      if (cat === 'envase' || cat === 'bolsa') {
+      if (cat === 'envase' || cat === 'bolsa' || cat === 'cinta') {
         prodWrap.style.display = 'none';
       } else {
         prodWrap.style.display = '';
@@ -1700,6 +1799,8 @@ const Pages = {
         subSel.innerHTML = '<option value="chico">Chica (unidades)</option><option value="grande">Grande (unidades)</option>';
       } else if (cat === 'sticker') {
         subSel.innerHTML = '<option value="chico">Chico (unidades)</option><option value="grande">Grande (unidades)</option>';
+      } else if (cat === 'cinta') {
+        subSel.innerHTML = '<option value="unidad">Unidades</option>';
       }
 
       updatePreview();
@@ -1734,6 +1835,9 @@ const Pages = {
       } else if (cat === 'bolsa') {
         nombre = 'Bolsas ' + sub;
         actual = (db.stockBolsas || {})[sub] || 0;
+      } else if (cat === 'cinta') {
+        nombre = 'Cintas';
+        actual = db.stockCintas || 0;
       } else if (cat === 'sticker' && prodSel.value) {
         nombre = prodSel.value;
         var stks = ArcanoDB.getStickers();
