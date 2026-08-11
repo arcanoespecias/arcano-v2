@@ -1440,6 +1440,16 @@ function saveGlobalStocks(data) {
 
 function clearCollection(collection) {
   _ensureStructure();
+  if (collection === 'pedidos') {
+    // Pedidos are stored separately, not in _db
+    if (_pedidosRef) {
+      _pedidosRef.set(null);
+    }
+    _pedidos = [];
+    _notify('delete', 'pedidos', 'all');
+    _notifyPedidos(false, true);
+    return true;
+  }
   if (_db[collection] && typeof _db[collection] === 'object') {
     _db[collection] = Array.isArray(_db[collection]) ? [] : {};
   }
