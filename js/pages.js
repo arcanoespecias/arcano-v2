@@ -653,7 +653,55 @@ const Pages = {
     var entradas = ArcanoDB.getEntradas();
 
     var cintas = db.stockCintas || 0;
+    var costos = ArcanoDB.getCostosInsumos();
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formEntrada()">+ Registrar Entrada</button><button class="btn btn-outline" style="margin-left:8px" onclick="Pages.formCostosInsumos()">✏ Editar Costos</button></div>';
+
+    // Calcular valor total en pala
+    var valorPala = 0;
+    for (var vp = 0; vp < especias.length; vp++) {
+      var ep = especias[vp];
+      var cpg = (costos.especias && costos.especias[ep.id]) || 0;
+      valorPala += (ep.stockBolsa || 0) * cpg;
+    }
+
+    // Calcular costo total de lo producido
+    var producciones = ArcanoDB.getProducciones();
+    var costoTotalProd = 0;
+    var pkgC = (costos.envaseChico || 0) + (costos.bolsaChica || 0) + (costos.cinta || 0) + (costos.stickerChico || 0);
+    var pkgG = (costos.envaseGrande || 0) + (costos.bolsaGrande || 0) + (costos.cinta || 0) + (costos.stickerGrande || 0);
+    for (var pr2 = 0; pr2 < producciones.length; pr2++) {
+      var prd2 = producciones[pr2];
+      var ingCost = 0;
+      if (prd2.ingredientes) {
+        for (var ig2 = 0; ig2 < prd2.ingredientes.length; ig2++) {
+          var ing2 = prd2.ingredientes[ig2];
+          var icpg = (costos.especias && costos.especias[ing2.especiaId]) || 0;
+          ingCost += (ing2.gramosTotal || 0) * icpg;
+        }
+      } else if (prd2.gramosTotal && prd2.especiaId) {
+        var icpg2 = (costos.especias && costos.especias[prd2.especiaId]) || 0;
+        ingCost = prd2.gramosTotal * icpg2;
+      }
+      var pkgCost2 = (prd2.talla || 'chico') === 'grande' ? pkgG : pkgC;
+      costoTotalProd += ingCost + (pkgCost2 * (prd2.cantidad || 0));
+    }
+
+    // Ingresos totales por ventas
+    var ventas2 = ArcanoDB.getVentas();
+    var pedidos2 = ArcanoDB.getPedidos();
+    var ingresosTotal = 0;
+    for (var vi6 = 0; vi6 < ventas2.length; vi6++) ingresosTotal += (ventas2[vi6].total || 0);
+    for (var pi4 = 0; pi4 < pedidos2.length; pi4++) {
+      if (pedidos2[pi4].estado !== 'cancelado') ingresosTotal += (pedidos2[pi4].total || 0);
+    }
+
+    h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">' +
+      '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value" style="color:var(--gold)">$' + valorPala.toLocaleString() + '</div><div class="stat-label">Valor en Pala</div><div class="text-sm text-muted">materia prima</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + costoTotalProd.toLocaleString() + '</div><div class="stat-label">Costo Total Producido</div><div class="text-sm text-muted">insumos consumidos</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">$' + ingresosTotal.toLocaleString() + '</div><div class="stat-label">Total Vendido</div><div class="text-sm text-muted">ingresos</div></div>' +
+      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">$' + (ingresosTotal - costoTotalProd).toLocaleString() + '</div><div class="stat-label">Margen Estimado</div><div class="text-sm text-muted">ventas - produccion</div></div>' +
+    '</div>';
+
     h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(5, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
       '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
@@ -666,11 +714,13 @@ const Pages = {
     h += '<div class="card"><div class="card-header"><h3>Pala (materia prima)</h3></div><div class="card-body">';
     if (especias.length === 0) { h += '<p class="text-muted text-center text-sm">Sin especias</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Cat.</th><th>Gramos</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Cat.</th><th>Gramos</th><th>$/gr</th><th>Valor</th></tr></thead><tbody>';
       for (var i = 0; i < especias.length; i++) {
         var e = especias[i];
         var cls = (e.stockBolsa||0) <= 50 ? 'text-red fw7' : (e.stockBolsa||0) <= 200 ? 'text-yellow fw7' : 'text-green';
-        h += '<tr><td class="fw7">' + e.nombre + '</td><td class="text-sm">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'')) + '</td><td class="' + cls + '">' + (e.stockBolsa||0) + ' grs</td></tr>';
+        var ecpg = (costos.especias && costos.especias[e.id]) || 0;
+        var eval2 = (e.stockBolsa || 0) * ecpg;
+        h += '<tr><td class="fw7">' + e.nombre + '</td><td class="text-sm">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'')) + '</td><td class="' + cls + '">' + (e.stockBolsa||0) + ' grs</td><td class="text-sm">$' + ecpg.toFixed(3) + '</td><td class="text-sm fw7" style="color:var(--gold)">$' + eval2.toLocaleString() + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -942,10 +992,8 @@ const Pages = {
 
   /* ---------- Costos de Insumos Form ---------- */
   formCostosInsumos() {
-    var db = ArcanoDB.getDB();
     var costos = ArcanoDB.getCostosInsumos();
     var especias = ArcanoDB.getEspecias();
-    var stickers = ArcanoDB.getProductosConStickers();
 
     var h = '<div class="modal-overlay">' +
       '<div class="modal modal-lg" style="max-width:640px">' +
@@ -978,25 +1026,11 @@ const Pages = {
 
     h += '</tbody></table></div></div></div>' +
       '<h4 class="mb-8">Stickers (costo por unidad)</h4>' +
-      '<div class="card mb-16"><div class="card-body" style="padding:8px"><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Chico $</th><th>Grande $</th></tr></thead><tbody>';
-
-    for (var j = 0; j < stickers.length; j++) {
-      var st = stickers[j];
-      var stkCostos = (costos.stickers && costos.stickers[st.nombre]) || {};
-      var badgeCls = st.tipo === 'blend' ? 'badge-blue' : 'badge-gold';
-      var tipoLabel = st.tipo === 'blend' ? 'Blend' : 'Especia';
-      h += '<tr>' +
-        '<td class="fw7">' + st.nombre + '</td>' +
-        '<td><span class="' + badgeCls + '">' + tipoLabel + '</span></td>' +
-        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-chico" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.chico || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
-        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-grande" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.grande || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
-        '</tr>';
-    }
-    if (stickers.length === 0) {
-      h += '<tr><td colspan="4" class="text-muted text-center text-sm">Sin stickers registrados</td></tr>';
-    }
-
-    h += '</tbody></table></div></div></div>' +
+      '<div class="card mb-16"><div class="card-body" style="padding:8px">' +
+      '<div class="stats-grid" style="grid-template-columns:1fr 1fr">' +
+        '<div class="form-group" style="margin:0"><label>Sticker Pequeno</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-stk-chico" value="' + (costos.stickerChico || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Sticker Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-stk-grande" value="' + (costos.stickerGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+      '</div></div></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
         '<button class="btn btn-gold" id="btn-save-costos">Guardar Costos</button>' +
@@ -1013,22 +1047,14 @@ const Pages = {
         bolsaChica: Number(document.getElementById('ci-bol-chica').value) || 0,
         bolsaGrande: Number(document.getElementById('ci-bol-grande').value) || 0,
         cinta: Number(document.getElementById('ci-cinta').value) || 0,
-        especias: {},
-        stickers: {}
+        stickerChico: Number(document.getElementById('ci-stk-chico').value) || 0,
+        stickerGrande: Number(document.getElementById('ci-stk-grande').value) || 0,
+        especias: {}
       };
       var espInputs = document.querySelectorAll('.ci-esp-cost');
       for (var k = 0; k < espInputs.length; k++) {
         var eid = espInputs[k].getAttribute('data-esp-id');
         data.especias[eid] = Number(espInputs[k].value) || 0;
-      }
-      var stkChicoInputs = document.querySelectorAll('.ci-stk-chico');
-      var stkGrandeInputs = document.querySelectorAll('.ci-stk-grande');
-      for (var m = 0; m < stkChicoInputs.length; m++) {
-        var sn = stkChicoInputs[m].getAttribute('data-stk-nombre');
-        data.stickers[sn] = {
-          chico: Number(stkChicoInputs[m].value) || 0,
-          grande: Number(stkGrandeInputs[m].value) || 0
-        };
       }
       try {
         ArcanoDB.saveCostosInsumos(data);
@@ -3190,21 +3216,34 @@ const Pages = {
     var pkgChico = (costosCfg.envaseChico || 0) + (costosCfg.bolsaChica || 0) + (costosCfg.cinta || 0);
     var pkgGrande = (costosCfg.envaseGrande || 0) + (costosCfg.bolsaGrande || 0) + (costosCfg.cinta || 0);
     var blendKeys = Object.keys(costoBlendMap);
+    var globalStkChico = costosCfg.stickerChico || 0;
+    var globalStkGrande = costosCfg.stickerGrande || 0;
     for (var pk = 0; pk < blendKeys.length; pk++) {
       var bk = blendKeys[pk];
-      var bParts = bk.split('|');
-      var prodName = bParts.slice(1).join('|');
-      var stkC = (costosCfg.stickers && costosCfg.stickers[prodName]) || {};
-      costoBlendMap[bk].chico += pkgChico + (stkC.chico || 0);
-      costoBlendMap[bk].grande += pkgGrande + (stkC.grande || 0);
+      costoBlendMap[bk].chico += pkgChico + globalStkChico;
+      costoBlendMap[bk].grande += pkgGrande + globalStkGrande;
     }
 
     // 5. Production volume stats
-    var totalFrascosProd = 0, totalGrsProd = 0, prodByMonth = {};
+    var totalFrascosProd = 0, totalGrsProd = 0, prodByMonth = {}, costoTotalProdEst = 0;
     for (var pri = 0; pri < producciones.length; pri++) {
       var pr = producciones[pri];
       totalFrascosProd += (pr.cantidad || 0);
       totalGrsProd += (pr.gramosTotal || 0);
+      // Calcular costo estimado de esta produccion
+      var prdCost = 0;
+      var prdPkg = (pr.talla || 'chico') === 'grande' ? pkgGrande : pkgChico;
+      if (pr.ingredientes) {
+        for (var pii = 0; pii < pr.ingredientes.length; pii++) {
+          var prIng = pr.ingredientes[pii];
+          var prCpg = costoGrPorEsp[prIng.especiaNombre] || 0;
+          prdCost += (prIng.gramosTotal || 0) * prCpg;
+        }
+      } else if (pr.especiaNombre) {
+        prdCost = (pr.gramosTotal || 0) * (costoGrPorEsp[pr.especiaNombre] || 0);
+      }
+      prdCost += prdPkg * (pr.cantidad || 0);
+      costoTotalProdEst += prdCost;
       if (pr.fecha) {
         var pmn = pr.fecha.substring(0, 7);
         if (!prodByMonth[pmn]) prodByMonth[pmn] = { frascos: 0, gramos: 0, ops: 0 };
@@ -3214,13 +3253,22 @@ const Pages = {
       }
     }
 
+    // Valor en pala
+    var valorPalaEst = 0;
+    for (var vpi = 0; vpi < especias.length; vpi++) {
+      var vEsp = especias[vpi];
+      var vCpg = costoGrPorEsp[vEsp.nombre] || 0;
+      valorPalaEst += (vEsp.stockBolsa || 0) * vCpg;
+    }
+
     var h = '';
     // KPIs
     h += '<div class="est-kpi-grid">';
     h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>';
     h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--red)">$' + totalCostoCompras.toLocaleString() + '</div><div class="est-kpi-label">Costo Compras</div><div class="est-kpi-sub">materia prima + packaging</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--gold)">$' + costoTotalProdEst.toLocaleString() + '</div><div class="est-kpi-label">Costo Produccion</div><div class="est-kpi-sub">insumos consumidos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--blue)">$' + valorPalaEst.toLocaleString() + '</div><div class="est-kpi-label">Valor en Pala</div><div class="est-kpi-sub">stock materia prima</div></div>';
     h += '<div class="est-kpi ' + (margenBruto >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">$' + margenBruto.toLocaleString() + '</div><div class="est-kpi-label">Margen Bruto</div><div class="est-kpi-sub">' + margenPct + '%</div></div>';
-    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosProd + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + totalGrsProd.toLocaleString() + ' grs en total</div></div>';
     h += '</div>';
 
     // Cost breakdown by type
