@@ -738,7 +738,68 @@ const Pages = {
       }
       h += '</tbody></table></div>';
     }
-    h += '</div></div></div>';
+    h += '</div></div></div>'; // fin g2 pala + stickers
+
+    // ===== COSTOS POR PRODUCTO =====
+    h += '<div class="card mt-16"><div class="card-header"><h3>Costos y Margen por Producto</h3>' +
+      '<span class="text-sm text-muted">Costo = Ingredientes + Frasco + Sticker + Cinta + Bolsa</span></div><div class="card-body">';
+    var blends2 = ArcanoDB.getBlends();
+    if (especias.length === 0 && blends2.length === 0) {
+      h += '<p class="text-muted text-center">Sin productos</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Costo Chico</th><th>Precio Chico</th><th>Margen Ch.</th><th>Costo Grande</th><th>Precio Grande</th><th>Margen Gr.</th></tr></thead><tbody>';
+      for (var ci = 0; ci < especias.length; ci++) {
+        var esp = especias[ci];
+        var eCpg = (costos.especias && costos.especias[esp.id]) || 0;
+        var eCostC = (Number(esp.gramosChico) || 0) * eCpg + pkgC;
+        var eCostG = (Number(esp.gramosGrande) || 0) * eCpg + pkgG;
+        var ePrecioC = esp.precioChico || 0;
+        var ePrecioG = esp.precioGrande || 0;
+        var eMargenC = ePrecioC - eCostC;
+        var eMargenG = ePrecioG - eCostG;
+        var ePctC = ePrecioC > 0 ? (eMargenC / ePrecioC * 100) : 0;
+        var ePctG = ePrecioG > 0 ? (eMargenG / ePrecioG * 100) : 0;
+        var eMColorC = eMargenC >= 0 ? 'var(--green)' : 'var(--red)';
+        var eMColorG = eMargenG >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr><td class="fw7">' + esp.nombre + '</td><td><span class="badge badge-gold">Especia</span></td>' +
+          '<td style="color:var(--red)">$' + eCostC.toFixed(1) + '</td>' +
+          '<td>$' + ePrecioC.toLocaleString() + '</td>' +
+          '<td style="color:' + eMColorC + '">' + eMargenC.toFixed(1) + ' (' + ePctC.toFixed(0) + '%)</td>' +
+          '<td style="color:var(--red)">$' + eCostG.toFixed(1) + '</td>' +
+          '<td>$' + ePrecioG.toLocaleString() + '</td>' +
+          '<td style="color:' + eMColorG + '">' + eMargenG.toFixed(1) + ' (' + ePctG.toFixed(0) + '%)</td></tr>';
+      }
+      for (var bi2 = 0; bi2 < blends2.length; bi2++) {
+        var bl2 = blends2[bi2];
+        var bIngs = bl2.ingredientes || [];
+        var bCostC = 0, bCostG = 0;
+        for (var big = 0; big < bIngs.length; big++) {
+          var bIng = bIngs[big];
+          var bCpg = (costos.especias && costos.especias[bIng.especiaId]) || 0;
+          bCostC += (Number(bIng.gramosChico) || 0) * bCpg;
+          bCostG += (Number(bIng.gramosGrande) || 0) * bCpg;
+        }
+        bCostC += pkgC;
+        bCostG += pkgG;
+        var bPrecioC = bl2.precioChico || 0;
+        var bPrecioG = bl2.precioGrande || 0;
+        var bMargenC = bPrecioC - bCostC;
+        var bMargenG = bPrecioG - bCostG;
+        var bPctC = bPrecioC > 0 ? (bMargenC / bPrecioC * 100) : 0;
+        var bPctG = bPrecioG > 0 ? (bMargenG / bPrecioG * 100) : 0;
+        var bMColorC = bMargenC >= 0 ? 'var(--green)' : 'var(--red)';
+        var bMColorG = bMargenG >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr><td class="fw7">' + bl2.nombre + '</td><td><span class="badge badge-blue">Blend</span></td>' +
+          '<td style="color:var(--red)">$' + bCostC.toFixed(1) + '</td>' +
+          '<td>$' + bPrecioC.toLocaleString() + '</td>' +
+          '<td style="color:' + bMColorC + '">' + bMargenC.toFixed(1) + ' (' + bPctC.toFixed(0) + '%)</td>' +
+          '<td style="color:var(--red)">$' + bCostG.toFixed(1) + '</td>' +
+          '<td>$' + bPrecioG.toLocaleString() + '</td>' +
+          '<td style="color:' + bMColorG + '">' + bMargenG.toFixed(1) + ' (' + bPctG.toFixed(0) + '%)</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
 
     // Historial
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas</h3></div><div class="card-body">';
