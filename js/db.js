@@ -208,6 +208,7 @@ function initDB() {
         _cacheLocal();
         _startFirebaseListener();
         _startPedidosListener();
+        _startCostosListener();
         resolve();
       }).catch(function() {
         _db = _emptyDB();
