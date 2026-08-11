@@ -913,27 +913,28 @@ const Pages = {
     });
   },
 
-  /* ---------- Costos de Insumos Form ---------- */
   formCostosInsumos() {
-    var db = ArcanoDB.getDB();
     var costos = ArcanoDB.getCostosInsumos();
     var especias = ArcanoDB.getEspecias();
-    var stickers = ArcanoDB.getProductosConStickers();
 
     var h = '<div class="modal-overlay">' +
-      '<div class="modal modal-lg" style="max-width:640px">' +
+      '<div class="modal modal-lg" style="max-width:600px">' +
       '<div class="modal-header"><h3>Costos Unitarios de Insumos</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
-      '<p class="text-sm text-muted mb-12">Estos costos se usan para calcular m\u00e1rgenes y rentabilidad. Se guardan independientemente de las entradas.</p>' +
+      '<p class="text-sm text-muted mb-12">Costos por unidad. Se usan para calcular m\u00e1rgenes: Ingredientes + Frasco + Sticker + Cinta.</p>' +
+
       '<h4 class="mb-8">Packaging</h4>' +
-      '<div class="stats-grid mb-16" style="grid-template-columns:repeat(5,1fr)">' +
+      '<div class="stats-grid mb-16" style="grid-template-columns:repeat(4,1fr)">' +
         '<div class="form-group" style="margin:0"><label>Frasco Chico</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-env-chico" value="' + (costos.envaseChico || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
         '<div class="form-group" style="margin:0"><label>Frasco Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-env-grande" value="' + (costos.envaseGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
-        '<div class="form-group" style="margin:0"><label>Bolsa Chica</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-bol-chica" value="' + (costos.bolsaChica || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
-        '<div class="form-group" style="margin:0"><label>Bolsa Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-bol-grande" value="' + (costos.bolsaGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
-        '<div class="form-group" style="margin:0"><label>Cinta (unit.)</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-cinta" value="' + (costos.cinta || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Sticker Chico</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-stk-chico" value="' + (costos.stickerChico || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+        '<div class="form-group" style="margin:0"><label>Sticker Grande</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-stk-grande" value="' + (costos.stickerGrande || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
       '</div>' +
-      '<h4 class="mb-8 mt-16">Especias (costo por gramo)</h4>' +
+      '<div class="stats-grid" style="grid-template-columns:repeat(1,1fr);max-width:200px">' +
+        '<div class="form-group" style="margin:0"><label>Cinta (cada frasco lleva 1)</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="ci-cinta" value="' + (costos.cinta || 0) + '" min="0" step="0.01" style="padding-left:24px"></div></div>' +
+      '</div>' +
+
+      '<h4 class="mb-8 mt-16">Especias ($/gramo)</h4>' +
       '<div class="card mb-16"><div class="card-body" style="padding:8px"><div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Stock (g)</th><th>$/gramo</th></tr></thead><tbody>';
 
     for (var i = 0; i < especias.length; i++) {
@@ -950,26 +951,6 @@ const Pages = {
     }
 
     h += '</tbody></table></div></div></div>' +
-      '<h4 class="mb-8">Stickers (costo por unidad)</h4>' +
-      '<div class="card mb-16"><div class="card-body" style="padding:8px"><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Chico $</th><th>Grande $</th></tr></thead><tbody>';
-
-    for (var j = 0; j < stickers.length; j++) {
-      var st = stickers[j];
-      var stkCostos = (costos.stickers && costos.stickers[st.nombre]) || {};
-      var badgeCls = st.tipo === 'blend' ? 'badge-blue' : 'badge-gold';
-      var tipoLabel = st.tipo === 'blend' ? 'Blend' : 'Especia';
-      h += '<tr>' +
-        '<td class="fw7">' + st.nombre + '</td>' +
-        '<td><span class="' + badgeCls + '">' + tipoLabel + '</span></td>' +
-        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-chico" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.chico || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
-        '<td><div style="position:relative;max-width:100px"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input ci-stk-grande" data-stk-nombre="' + st.nombre + '" value="' + (stkCostos.grande || 0) + '" min="0" step="0.01" style="padding-left:22px;min-width:80px"></div></td>' +
-        '</tr>';
-    }
-    if (stickers.length === 0) {
-      h += '<tr><td colspan="4" class="text-muted text-center text-sm">Sin stickers registrados</td></tr>';
-    }
-
-    h += '</tbody></table></div></div></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
         '<button class="btn btn-gold" id="btn-save-costos">Guardar Costos</button>' +
@@ -983,31 +964,19 @@ const Pages = {
       var data = {
         envaseChico: Number(document.getElementById('ci-env-chico').value) || 0,
         envaseGrande: Number(document.getElementById('ci-env-grande').value) || 0,
-        bolsaChica: Number(document.getElementById('ci-bol-chica').value) || 0,
-        bolsaGrande: Number(document.getElementById('ci-bol-grande').value) || 0,
+        stickerChico: Number(document.getElementById('ci-stk-chico').value) || 0,
+        stickerGrande: Number(document.getElementById('ci-stk-grande').value) || 0,
         cinta: Number(document.getElementById('ci-cinta').value) || 0,
-        especias: {},
-        stickers: {}
+        especias: {}
       };
       var espInputs = document.querySelectorAll('.ci-esp-cost');
       for (var k = 0; k < espInputs.length; k++) {
         var eid = espInputs[k].getAttribute('data-esp-id');
         data.especias[eid] = Number(espInputs[k].value) || 0;
       }
-      var stkChicoInputs = document.querySelectorAll('.ci-stk-chico');
-      var stkGrandeInputs = document.querySelectorAll('.ci-stk-grande');
-      for (var m = 0; m < stkChicoInputs.length; m++) {
-        var sn = stkChicoInputs[m].getAttribute('data-stk-nombre');
-        data.stickers[sn] = {
-          chico: Number(stkChicoInputs[m].value) || 0,
-          grande: Number(stkGrandeInputs[m].value) || 0
-        };
-      }
-      try {
-        ArcanoDB.saveCostosInsumos(data);
-        document.querySelector('.modal-overlay').remove();
-        App.renderPage('insumos');
-      } catch (err) { alert('Error: ' + err.message); }
+      ArcanoDB.saveCostosInsumos(data);
+      document.querySelector('.modal-overlay').remove();
+      App.renderPage('insumos');
     });
   },
 
@@ -3159,17 +3128,14 @@ const Pages = {
       var cpg2 = costoGrPorEsp[esp.nombre] || 0;
       costoBlendMap['especia|' + esp.nombre] = { chico: (Number(esp.gramosChico) || 0) * cpg2, grande: (Number(esp.gramosGrande) || 0) * cpg2 };
     }
-    // Add packaging costs (Frasco + Sticker + Cinta + Bolsa) to every product
-    var pkgChico = (costosCfg.envaseChico || 0) + (costosCfg.bolsaChica || 0) + (costosCfg.cinta || 0);
-    var pkgGrande = (costosCfg.envaseGrande || 0) + (costosCfg.bolsaGrande || 0) + (costosCfg.cinta || 0);
+    // Add packaging costs (Frasco + Sticker + Cinta) to every product
+    // Formula: Ingredientes + Frasco + Sticker + Cinta (sin bolsa)
+    var pkgChico = (costosCfg.envaseChico || 0) + (costosCfg.stickerChico || 0) + (costosCfg.cinta || 0);
+    var pkgGrande = (costosCfg.envaseGrande || 0) + (costosCfg.stickerGrande || 0) + (costosCfg.cinta || 0);
     var blendKeys = Object.keys(costoBlendMap);
     for (var pk = 0; pk < blendKeys.length; pk++) {
-      var bk = blendKeys[pk];
-      var bParts = bk.split('|');
-      var prodName = bParts.slice(1).join('|');
-      var stkC = (costosCfg.stickers && costosCfg.stickers[prodName]) || {};
-      costoBlendMap[bk].chico += pkgChico + (stkC.chico || 0);
-      costoBlendMap[bk].grande += pkgGrande + (stkC.grande || 0);
+      costoBlendMap[blendKeys[pk]].chico += pkgChico;
+      costoBlendMap[blendKeys[pk]].grande += pkgGrande;
     }
 
     // 5. Production volume stats
@@ -3226,7 +3192,7 @@ const Pages = {
     h += '</div>';
 
     // Per-product margin table
-    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo total estimado: Ingredientes + Frasco + Sticker + Cinta + Bolsa. Usa costos manuales si estan configurados.</p>';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo por producto: Ingredientes + Frasco + Sticker + Cinta.</p>';
     var allProducts = [];
     for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
       var pk2 = Object.keys(prodVentaMap)[vk];
