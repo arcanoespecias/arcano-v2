@@ -303,6 +303,9 @@ const Pages = {
     var blends = ArcanoDB.getBlends();
     var tab = window._prodTab || 'especias';
     var search = (window._prodSearch || '').toLowerCase().trim();
+    var costos = ArcanoDB.getCostosInsumos();
+    var pkgC = (costos.envaseChico||0) + (costos.bolsaChica||0) + (costos.cinta||0) + (costos.stickerChico||0);
+    var pkgG = (costos.envaseGrande||0) + (costos.bolsaGrande||0) + (costos.cinta||0) + (costos.stickerGrande||0);
 
     // Filtrar por búsqueda
     var filteredEspecias = search ? especias.filter(function(e) {
@@ -346,7 +349,7 @@ const Pages = {
       } else if (filteredEspecias.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron especias para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>$/gr</th><th>Costo Ch.</th><th>$Venta Ch.</th><th>Margen Ch.</th><th>Costo Gr.</th><th>$Venta Gr.</th><th>Margen Gr.</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredEspecias.length; i++) {
           var e = filteredEspecias[i];
           h += '<tr>' +
@@ -377,7 +380,7 @@ const Pages = {
       } else if (filteredBlends.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron blends para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Costo Ch.</th><th>$Venta Ch.</th><th>Margen Ch.</th><th>Costo Gr.</th><th>$Venta Gr.</th><th>Margen Gr.</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredBlends.length; i++) {
           var b = filteredBlends[i];
           var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
