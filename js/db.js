@@ -1420,7 +1420,7 @@ function savePDVVenta(data) {
 /* ==================== COSTOS DE INSUMOS (FIREBASE SEPARATE) ==================== */
 /* Costos en arcano/config/costosInsumos - separados de _db para evitar sobrescritura */
 
-var _COSTOS_DEFAULTS = { envaseChico: 0, envaseGrande: 0, cinta: 0, stickerChico: 0, stickerGrande: 0, especias: {} };
+var _COSTOS_DEFAULTS = { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, stickerChico: 0, stickerGrande: 0, especias: {} };
 
 function getCostosInsumos() {
   return _costosInsumos || Object.assign({}, _COSTOS_DEFAULTS);
