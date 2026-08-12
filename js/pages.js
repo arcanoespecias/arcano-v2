@@ -715,7 +715,9 @@ const Pages = {
         '<div class="form-group"><label>Nombre del Pack</label><input type="text" class="input" id="f-pk-nombre" value="' + (isEdit ? (existing.nombre||'').replace(/"/g, '&quot;') : '') + '" placeholder="Ej: Pack Desayuno"></div>' +
         '<div class="form-group"><label>Descripcion</label><textarea class="input" id="f-pk-desc" rows="2" placeholder="Descripcion del pack...">' + (isEdit ? (existing.descripcion||'') : '') + '</textarea></div>' +
         '<div class="form-group"><label>Precio de Venta</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gold)">$</span><input type="number" class="input" id="f-pk-precio" value="' + (isEdit ? (existing.precio||0) : '') + '" min="0" step="0.01" style="padding-left:24px;max-width:200px"></div></div>' +
-        '<div class="form-group"><label>URL Imagen (opcional)</label><input type="text" class="input" id="f-pk-imagen" value="' + (isEdit ? (existing.imagen||'') : '') + '" placeholder="https://..."></div>' +
+        '<div class="form-group"><label>Imagen</label><div class="img-upload-area" id="img-area-pk"><input type="file" accept="image/*" id="f-pk-img" style="display:none" onchange="Pages.handleImageUpload(this,\'img-area-pk\')">' +
+        (isEdit && existing.imagen ? '<img src="' + existing.imagen + '" class="img-preview" id="img-preview-pk"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages.removeImage(\'img-area-pk\',\'f-pk-img\')">Quitar imagen</button>' : '') +
+        '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-pk-img\').click()"><span>+ Click para subir imagen</span></div></div></div>' +
         '<h4 class="mt-12 mb-8">Blends que componen el Pack</h4><div id="f-pk-items">';
 
     var items = isEdit ? (existing.blendItems || []) : [];
@@ -760,7 +762,7 @@ const Pages = {
         nombre: nombre,
         descripcion: document.getElementById('f-pk-desc').value.trim(),
         precio: Number(document.getElementById('f-pk-precio').value) || 0,
-        imagen: document.getElementById('f-pk-imagen').value.trim(),
+        imagen: (document.getElementById('img-preview-pk') || {}).src || '',
         blendItems: blendItems,
         enTienda: isEdit ? (existing.enTienda || false) : false
       };
