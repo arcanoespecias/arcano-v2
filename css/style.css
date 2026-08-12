@@ -552,14 +552,8 @@ select.input { cursor: pointer; }
 .dash-op-date { font-size: 0.75rem; color: var(--text3); }
 .dash-op-detail { font-size: 0.82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-op-val { font-size: 0.85rem; font-weight: 700; color: var(--gold); white-space: nowrap; margin-left: 12px; }
-
-/* ==================== TOAST ==================== */
-.toast {
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  padding: 10px 24px; border-radius: var(--radius-sm);
-  font-size: 0.85rem; font-weight: 600; z-index: 2000;
-  opacity: 0; transition: opacity 0.3s; pointer-events: none;
-}
-.toast.show { opacity: 1; }
-.toast.ok { background: var(--green); color: #fff; }
-.toast.err { background: var(--red); color: #fff; }
+/* === MULTI-CATEGORY CHECKBOXES === */
+.cat-checks { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 0; }
+.cat-check { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; color: var(--text); }
+.cat-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
+.cat-check span { user-select: none; }
