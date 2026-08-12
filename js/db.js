@@ -30,7 +30,7 @@ var _saveTimer = null;
 var _listeners = [];
 var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosDeVenta: 1, pdvVentas: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosDeVenta: 1, pdvVentas: 1, packs: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -72,6 +72,7 @@ function _ensureStructure() {
   if (!_db.entradas) _db.entradas = {};
   if (!_db.stickers) _db.stickers = {};
   if (!_db.ajustes) _db.ajustes = {};
+  if (!_db.packs) _db.packs = {};
   // Migration: copy old etiquetas data to stickers
   if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
     _db.stickers = _db.etiquetas;
@@ -80,7 +81,6 @@ function _ensureStructure() {
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
   if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
   if (!_db.stockCintas) _db.stockCintas = 0;
-
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
@@ -96,11 +96,10 @@ function _ensureStructure() {
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosDeVenta: {}, pdvVentas: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosDeVenta: {}, pdvVentas: {}, packs: {},
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     stockCintas: 0,
-
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
@@ -197,8 +196,8 @@ function initDB() {
       _firebaseRef.once('value').then(function(snap) {
         var fbData = snap.val();
         if (fbData && fbData.meta && fbData.meta.version === DB_VERSION && _ensureStructureOn(fbData)) {
-          delete fbData.pedidos;  // pedidos managed separately, not part of admin _db
-          delete fbData.costosInsumos;  // costos managed separately, not part of admin _db
+          delete fbData.pedidos;
+          delete fbData.costosInsumos;
           _db = fbData;
           _ensureStructure();  // ensure new fields exist on Firebase data
         } else {
@@ -247,8 +246,8 @@ function _startFirebaseListener() {
     if (!data || !data.meta || data.meta.version !== DB_VERSION) return;
     // CRITICAL: skip if local save is pending to prevent overwriting unsaved changes
     if (_localDirty) return;
-    delete data.pedidos;  // pedidos managed separately, not part of admin _db
-    delete data.costosInsumos;  // costos managed separately, not part of admin _db
+    delete data.pedidos;
+    delete data.costosInsumos;
     var prevJson = JSON.stringify(_db);
     _db = data;
     _ensureStructure();
@@ -506,7 +505,7 @@ function saveEntrada(data) {
           var espObj = _db.especias[item.especiaId];
           var grsNuevos = Number(item.cantidad) || 0;
           var costoNuevo = Number(item.costoUnitario) || 0;
-          // Promedio ponderado del costo por gramo
+          // Weighted average cost per gram
           if (grsNuevos > 0 && costoNuevo > 0) {
             var stockPrevio = espObj.stockBolsa || 0;
             var costoPrevio = (_costosInsumos && _costosInsumos.especias && _costosInsumos.especias[item.especiaId]) || 0;
@@ -515,16 +514,15 @@ function saveEntrada(data) {
             if (nuevoTotalGrs > 0) {
               nuevoCostoProm = (stockPrevio * costoPrevio + grsNuevos * costoNuevo) / nuevoTotalGrs;
             }
-            // Actualizar costosInsumos con el nuevo promedio
             if (!_costosInsumos) _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
             if (!_costosInsumos.especias) _costosInsumos.especias = {};
             _costosInsumos.especias[item.especiaId] = Math.round(nuevoCostoProm * 1000) / 1000;
-            // Guardar el nuevo costo promediado a Firebase
             if (_costosRef) {
               _costosRef.set(_costosInsumos, function(error) {
                 if (error) console.error('[DB] Costos promedio save error:', error);
               });
             }
+            try { localStorage.setItem('arcano_costos', JSON.stringify(_costosInsumos)); } catch (e) {}
           }
           espObj.stockBolsa = (espObj.stockBolsa || 0) + grsNuevos;
         }
@@ -997,6 +995,28 @@ function getTiendaProductos() {
       region: b.region || '', uso: b.uso || ''
     });
   }
+  // Packs
+  var pkKeys = Object.keys(_db.packs || {});
+  for (var i = 0; i < pkKeys.length; i++) {
+    var pk = _db.packs[pkKeys[i]];
+    if (!pk || !pk.enTienda) continue;
+    var blendItems = pk.blendItems || [];
+    var minStock = 999999;
+    for (var j = 0; j < blendItems.length; j++) {
+      var bi2 = blendItems[j];
+      var bl2 = _db.blends[bi2.blendId];
+      if (!bl2) { minStock = 0; break; }
+      var st = bi2.talla === 'grande' ? (bl2.stockGrande || 0) : (bl2.stockChico || 0);
+      if (st < minStock) minStock = st;
+    }
+    if (minStock <= 0) continue;
+    products.push({
+      id: pk.id, nombre: pk.nombre, tipo: 'pack', categoria: 'Packs', categorias: ['Packs'],
+      precioChico: 0, precioGrande: 0, precio: Number(pk.precio) || 0,
+      stockChico: 0, stockGrande: 0, stock: minStock,
+      region: '', uso: pk.descripcion || '', imagen: pk.imagen || ''
+    });
+  }
   return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 }
 
@@ -1006,9 +1026,12 @@ function toggleTienda(tipo, id) {
     _db.especias[id].enTienda = !_db.especias[id].enTienda;
   } else if (tipo === 'blend' && _db.blends[id]) {
     _db.blends[id].enTienda = !_db.blends[id].enTienda;
+  } else if (tipo === 'pack' && _db.packs[id]) {
+    _db.packs[id].enTienda = !_db.packs[id].enTienda;
   } else return;
   _saveToFirebase(); _cacheLocal();
-  _notify('update', tipo === 'especia' ? 'especias' : 'blends', id);
+  var colMap = { especia: 'especias', blend: 'blends', pack: 'packs' };
+  _notify('update', colMap[tipo] || tipo, id);
 }
 
 /* ==================== EXCEL IMPORT ==================== */
@@ -1442,10 +1465,7 @@ function savePDVVenta(data) {
   return data;
 }
 
-
 /* ==================== COSTOS DE INSUMOS (FIREBASE SEPARATE) ==================== */
-/* Costos en arcano/config/costosInsumos - separados de _db para evitar sobrescritura */
-
 var _COSTOS_DEFAULTS = { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, stickerChico: 0, stickerGrande: 0, especias: {} };
 
 function getCostosInsumos() {
@@ -1475,7 +1495,6 @@ function onCostosChange(callback) {
 }
 
 function _startCostosListener() {
-  // Try localStorage cache first for instant UI
   try {
     var cached = JSON.parse(localStorage.getItem('arcano_costos'));
     if (cached && typeof cached === 'object' && cached.especias) {
@@ -1499,53 +1518,33 @@ function _startCostosListener() {
   });
 }
 
-/* ==================== ADMIN TOOLS (TESTING) ==================== */
+/* ==================== PACKS DE BLENDS ==================== */
 
-function saveGlobalStocks(data) {
-  _ensureStructure();
-  if (data.stockEnvases) _db.stockEnvases = data.stockEnvases;
-  if (data.stockBolsas) _db.stockBolsas = data.stockBolsas;
-  if (typeof data.stockCintas === 'number') _db.stockCintas = data.stockCintas;
-  _saveToFirebase(); _cacheLocal();
-  _notify('update', 'globalStocks', 'global');
-  return _db;
+function getPacks() {
+  return _filterValid(Object.values(_db.packs || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 }
 
-function clearCollection(collection) {
-  _ensureStructure();
-  if (collection === 'pedidos') {
-    // Pedidos are stored separately, not in _db
-    if (_pedidosRef) {
-      _pedidosRef.set(null);
-    }
-    _pedidos = [];
-    _notify('delete', 'pedidos', 'all');
-    _notifyPedidos(false, true);
-    return true;
-  }
-  if (_db[collection] && typeof _db[collection] === 'object') {
-    _db[collection] = Array.isArray(_db[collection]) ? [] : {};
-  }
-  _saveToFirebase(); _cacheLocal();
-  _notify('delete', collection, 'all');
-  return true;
+function getPack(id) {
+  return (_db.packs || {})[id];
 }
 
-function resetAllData() {
-  var keep = { usuarios: _db.usuarios, productTags: _db.productTags };
-  var fresh = {
-    meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {},
-    puntosDeVenta: {}, pdvVentas: {}, pedidos: [],
-    stockEnvases: { chico: 0, grande: 0 },
-    stockBolsas: { chico: 0, grande: 0 },
-    stockCintas: 0,
-
-    productTags: keep.productTags || {},
-    usuarios: keep.usuarios || { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
-  };
-  _db = fresh;
+function savePack(data) {
+  var isNew = !data.id || !_db.packs[data.id];
+  if (isNew) {
+    data.id = nextId('packs');
+    data.creado = new Date().toISOString();
+  }
+  _db.packs[data.id] = data;
   _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'packs', data.id);
+  return data;
+}
+
+function deletePack(id) {
+  if (!_db.packs[id]) return false;
+  delete _db.packs[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'packs', id);
   return true;
 }
 
@@ -1578,7 +1577,6 @@ window.ArcanoDB = {
   savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
-  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos,
-  saveGlobalStocks: saveGlobalStocks, clearCollection: clearCollection, resetAllData: resetAllData,
-  onCostosChange: onCostosChange
+  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack,
+  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange
 };
