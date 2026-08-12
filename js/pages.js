@@ -1145,6 +1145,61 @@ const Pages = {
     App.renderPage('insumos');
   },
 
+  formCostosInsumos() {
+    var costos = ArcanoDB.getCostosInsumos();
+    var especias = ArcanoDB.getEspecias();
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    var espCostosRows = '';
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var val = (costos.especias && costos.especias[e.id]) || 0;
+      espCostosRows += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<label style="flex:1;font-size:0.85rem">' + e.nombre + ' ($/g)</label>' +
+        '<input type="number" class="input" style="width:120px" id="f-cos-esp-' + e.id + '" value="' + val + '" min="0" step="0.1">' +
+        '</div>';
+    }
+    modal.innerHTML = '<div class="modal">' +
+      '<div class="modal-header"><h3>Editar Costos de Insumos</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<h4 style="margin-bottom:8px">Packaging</h4>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">' +
+          '<div class="form-group"><label>Envase Chico</label><input type="number" class="input" id="f-cos-env-c" value="' + (costos.envaseChico||0) + '" min="0"></div>' +
+          '<div class="form-group"><label>Envase Grande</label><input type="number" class="input" id="f-cos-env-g" value="' + (costos.envaseGrande||0) + '" min="0"></div>' +
+          '<div class="form-group"><label>Bolsa Chica</label><input type="number" class="input" id="f-cos-bol-c" value="' + (costos.bolsaChica||0) + '" min="0"></div>' +
+          '<div class="form-group"><label>Bolsa Grande</label><input type="number" class="input" id="f-cos-bol-g" value="' + (costos.bolsaGrande||0) + '" min="0"></div>' +
+          '<div class="form-group"><label>Cinta</label><input type="number" class="input" id="f-cos-cinta" value="' + (costos.cinta||0) + '" min="0"></div>' +
+          '<div class="form-group"><label>Sticker Chico</label><input type="number" class="input" id="f-cos-stk-c" value="' + (costos.stickerChico||0) + '" min="0"></div>' +
+        '</div>' +
+        '<div class="form-group" style="margin-bottom:4px"><label>Sticker Grande</label><input type="number" class="input" id="f-cos-stk-g" value="' + (costos.stickerGrande||0) + '" min="0"></div>' +
+        '<h4 style="margin:16px 0 8px">Costo de Especias ($/g)</h4>' +
+        (espCostosRows || '<p class="text-muted text-sm">No hay especias registradas.</p>') +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-costos">Guardar</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+    document.getElementById('btn-save-costos').addEventListener('click', function() {
+      var data = {
+        envaseChico: Number(document.getElementById('f-cos-env-c').value) || 0,
+        envaseGrande: Number(document.getElementById('f-cos-env-g').value) || 0,
+        bolsaChica: Number(document.getElementById('f-cos-bol-c').value) || 0,
+        bolsaGrande: Number(document.getElementById('f-cos-bol-g').value) || 0,
+        cinta: Number(document.getElementById('f-cos-cinta').value) || 0,
+        stickerChico: Number(document.getElementById('f-cos-stk-c').value) || 0,
+        stickerGrande: Number(document.getElementById('f-cos-stk-g').value) || 0,
+        especias: {}
+      };
+      for (var i = 0; i < especias.length; i++) {
+        var v = Number(document.getElementById('f-cos-esp-' + especias[i].id).value) || 0;
+        if (v > 0) data.especias[especias[i].id] = v;
+      }
+      ArcanoDB.saveCostosInsumos(data);
+      modal.remove();
+      App.renderPage('insumos');
+    });
+  },
+
   /* ================================================================
      PRODUCCION
      ================================================================ */
