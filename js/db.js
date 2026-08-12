@@ -381,6 +381,7 @@ function saveEspecia(data) {
   data.stockChico = Number(data.stockChico) || 0;
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.especias[data.id] = data;
+  _getOrCreateSticker(data.nombre);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'especias', data.id);
   return data;
@@ -422,6 +423,7 @@ function saveBlend(data) {
   data.stockChico = Number(data.stockChico) || 0;
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.blends[data.id] = data;
+  _getOrCreateSticker(data.nombre);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'blends', data.id);
   return data;
@@ -619,8 +621,7 @@ function saveAjuste(data) {
     _db.stockBolsas[t] = nv;
     data.productoNombre = 'Bolsas ' + t;
   } else if (cat === 'sticker') {
-    var stk = _findStickerByNombre(data.productoNombre);
-    if (!stk) throw new Error('Sticker "' + (data.productoNombre||'') + '" no encontrado');
+    var stk = _getOrCreateSticker(data.productoNombre);
     var field = (sub === 'grande') ? 'stockGrande' : 'stockChico';
     var nv = (Number(stk[field]) || 0) + cantidad;
     if (nv < 0) throw new Error('Stock resultante negativo (' + nv + ') para sticker ' + stk.nombre);
