@@ -3716,8 +3716,30 @@ const Pages = {
      TESTING (sandbox)
      ================================================================ */
   renderTesting: function(container) {
-    container.innerHTML = '<div class="card"><div class="card-body text-center text-muted" style="padding:40px">' +
-      '<p style="font-size:48px;margin-bottom:12px">Experimental</p>' +
-      '<p>Area de pruebas y experimentacion</p></div></div>';
+    var h = '<h2 style="margin-bottom:16px">Testing</h2>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">' +
+      '<div class="card"><div class="card-body"><div style="font-size:2rem;margin-bottom:8px">📷</div>' +
+      '<h3 style="margin-bottom:4px">Venta por Camara (OCR)</h3>' +
+      '<p class="text-sm text-muted mb-12">Usa la camara para leer etiquetas de productos y registrar ventas rapidamente.</p>' +
+      '<button class="btn btn-gold" onclick="Pages.formVentaQR()">Abrir Camara</button>' +
+      '</div></div>' +
+      '<div class="card"><div class="card-body"><div style="font-size:2rem;margin-bottom:8px">🤖</div>' +
+      '<h3 style="margin-bottom:4px">Recetas con IA</h3>' +
+      '<p class="text-sm text-muted mb-12">Genera recetas automaticamente usando Groq (Llama 3.3 70B).</p>' +
+      '<button class="btn btn-gold" onclick="App.navigate(\'recetas\')">Ir a Recetas</button>' +
+      '</div></div>' +
+      '<div class="card"><div class="card-body"><div style="font-size:2rem;margin-bottom:8px">📊</div>' +
+      '<h3 style="margin-bottom:4px">Info del Sistema</h3>' +
+      '<div class="text-sm" style="line-height:1.8">' +
+      '<div><b>Cache SW:</b> arcano-v4-13</div>' +
+      '<div><b>DB Key:</b> arcano_db_v1</div>' +
+      '<div><b>Costos:</b> ' + (ArcanoDB.getCostosInsumos() ? 'Cargados' : 'Sin datos') + '</div>' +
+      '<div><b>Productos:</b> ' + (ArcanoDB.getEspecias().length + ArcanoDB.getBlends().length) + ' (' + ArcanoDB.getEspecias().length + ' especias, ' + ArcanoDB.getBlends().length + ' blends)</div>' +
+      '<div><b>Packs:</b> ' + ArcanoDB.getPacks().length + '</div>' +
+      '<div><b>PDVs:</b> ' + ArcanoDB.getPuntosDeVenta().length + '</div>' +
+      '<div><b>Usuario:</b> ' + (ArcanoDB.getCurrentUser() ? ArcanoDB.getCurrentUser().nombre : 'No autenticado') + '</div>' +
+      '</div></div></div>' +
+      '</div>';
+    container.innerHTML = h;
   }
 };
