@@ -2622,14 +2622,18 @@ const Pages = {
             var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
             for (var i = 1; i < espData.length; i++) {
               var row = espData[i];
-              if (!row || !row[0]) continue;
+              if (!row) continue;
+              var nombre = String(row[1] || '').trim();
+              if (!nombre) continue;
+              var rawId = row[0] ? String(row[0]).trim() : '';
               espUpdates.push({
-                id: String(row[0]),
-                nombre: String(row[1] || '').trim(),
-                categoria: String(row[2] || '').trim(),
+                id: rawId,
+                nombre: nombre,
+                categoria: String(row[2] || '').trim() || 'Especias',
                 precioChico: Number(row[3]) || 0,
                 precioGrande: Number(row[4]) || 0,
-                enTienda: String(row[8] || '').toLowerCase() === 'si'
+                enTienda: String(row[8] || '').toLowerCase() === 'si',
+                isNew: !rawId || !ArcanoDB.getEspecia(rawId)
               });
             }
           }
@@ -2701,7 +2705,15 @@ const Pages = {
             }
           }
 
+          var espNewCount = 0;
+          for (var ci = 0; ci < espUpdates.length; ci++) { if (espUpdates[ci].isNew) espNewCount++; }
+          var blNewCount = 0;
           var blKeys = Object.keys(blUpdates);
+          for (var bi = 0; bi < blKeys.length; bi++) {
+            var bId = blUpdates[blKeys[bi]].id;
+            if (!bId || !ArcanoDB.getBlend(bId)) blNewCount++;
+          }
+
           if (espUpdates.length === 0 && blKeys.length === 0 && Object.keys(costoUpdates).length === 0) {
             statusDiv.innerHTML = '<p class="text-red">No se encontraron datos para actualizar.</p>';
             parseBtn.disabled = false;
@@ -2711,8 +2723,8 @@ const Pages = {
           // Preview
           var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
           phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
-            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias a actualizar</div></div>' +
-            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends a actualizar</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias</div><div class="text-xs text-muted">' + espNewCount + ' nuevas, ' + (espUpdates.length - espNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends</div><div class="text-xs text-muted">' + blNewCount + ' nuevos, ' + (blKeys.length - blNewCount) + ' act.</div></div>' +
             '<div class="stat-card"><div class="stat-value" style="color:var(--gold)">' + Object.keys(costoUpdates).length + '</div><div class="stat-label">Costos packaging</div></div>' +
             '<div class="stat-card"><div class="stat-value">' + Object.keys(costoEspUpdates).length + '</div><div class="stat-label">Costos especias</div></div>' +
           '</div>';
@@ -2743,10 +2755,10 @@ const Pages = {
             try {
               var espOk = 0, blOk = 0;
 
-              // Update especias
+              // Update/create especias
               for (var i = 0; i < espUpdates.length; i++) {
                 var u = espUpdates[i];
-                var existing = ArcanoDB.getEspecia(u.id);
+                var existing = u.id ? ArcanoDB.getEspecia(u.id) : null;
                 if (existing) {
                   ArcanoDB.saveEspecia({
                     id: u.id,
@@ -2757,35 +2769,58 @@ const Pages = {
                     enTienda: u.enTienda
                   });
                   espOk++;
+                } else {
+                  // New especia - check by name first
+                  var byName = ArcanoDB.findEspeciaByName(u.nombre);
+                  if (byName) {
+                    ArcanoDB.saveEspecia({
+                      id: byName.id,
+                      nombre: u.nombre,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  } else {
+                    ArcanoDB.saveEspecia({
+                      nombre: u.nombre,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  }
+                  espOk++;
                 }
               }
 
-              // Update blends
+              // Update/create blends
               var blKeys2 = Object.keys(blUpdates);
               for (var j = 0; j < blKeys2.length; j++) {
                 var bU = blUpdates[blKeys2[j]];
-                var existingBl = ArcanoDB.getBlend(bU.id);
+                // Resolve ingredient names to IDs
+                var resolvedIngs = [];
+                for (var ii = 0; ii < bU.ingredientes.length; ii++) {
+                  var ing = bU.ingredientes[ii];
+                  var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
+                  if (espObj) {
+                    resolvedIngs.push({
+                      especiaId: espObj.id,
+                      especiaNombre: espObj.nombre,
+                      gramos: ing.gramos
+                    });
+                  }
+                }
+                // Calculate gramosTotal
+                var grsTotal = 0;
+                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
+                  resolvedIngs[gi2].gramosTotal = grsTotal;
+                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100) : 0;
+                }
+
+                var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
                 if (existingBl) {
-                  // Resolve ingredient names to IDs
-                  var resolvedIngs = [];
-                  for (var ii = 0; ii < bU.ingredientes.length; ii++) {
-                    var ing = bU.ingredientes[ii];
-                    var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
-                    if (espObj) {
-                      resolvedIngs.push({
-                        especiaId: espObj.id,
-                        especiaNombre: espObj.nombre,
-                        gramos: ing.gramos
-                      });
-                    }
-                  }
-                  // Calculate gramosTotal for first ingredient (used for production)
-                  var grsTotal = 0;
-                  for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
-                  for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
-                    resolvedIngs[gi2].gramosTotal = grsTotal;
-                    resolvedIngs[gi2].pct = Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100);
-                  }
                   ArcanoDB.saveBlend({
                     id: bU.id,
                     nombre: bU.nombre || existingBl.nombre,
@@ -2795,6 +2830,34 @@ const Pages = {
                     enTienda: bU.enTienda,
                     ingredientes: resolvedIngs
                   });
+                  blOk++;
+                } else {
+                  // New blend - check by name first
+                  var allBlends = ArcanoDB.getBlends();
+                  var matchBl = null;
+                  for (var mb = 0; mb < allBlends.length; mb++) {
+                    if (allBlends[mb].nombre.toLowerCase() === bU.nombre.toLowerCase()) { matchBl = allBlends[mb]; break; }
+                  }
+                  if (matchBl) {
+                    ArcanoDB.saveBlend({
+                      id: matchBl.id,
+                      nombre: bU.nombre,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  } else {
+                    ArcanoDB.saveBlend({
+                      nombre: bU.nombre,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  }
                   blOk++;
                 }
               }
@@ -2808,12 +2871,12 @@ const Pages = {
               }
 
               previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
-                '<p class="text-green fw7 mb-8">Actualizacion completada</p>' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
                 '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Actualizadas</div></div>' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Actualizados</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
                 '</div>' +
-                '<p class="text-sm text-muted mt-12">Los stocks no fueron modificados. Recarga la pagina para ver los cambios.</p>' +
+                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
               '</div></div>';
 
               footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
