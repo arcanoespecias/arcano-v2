@@ -333,7 +333,7 @@ const Pages = {
         `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';window._prodSearch='';App.renderPage('productos')">Etiquetas de uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Excel</button>' : '') +
+        (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Recetas</button><button class="btn btn-outline" style="border-color:var(--blue);color:var(--blue)" onclick="Pages.exportarProductosExcel()">Exportar Excel</button><button class="btn btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="Pages.importarProductosExcel()">Importar Datos</button>' : '') +
         (tab==='blends' ? '<button class="btn btn-gold" onclick="Pages.formBlend()">+ Blend</button>' : '') +
         (tab==='packs' ? '<button class="btn btn-gold" onclick="Pages.formPack()">+ Pack</button>' : '') +
       '</div></div>';
@@ -2458,6 +2458,365 @@ const Pages = {
                 modal.remove();
                 App.renderPage('productos');
               }, 2000);
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     EXPORTAR / IMPORTAR PRODUCTOS EXCEL
+     ================================================================ */
+  exportarProductosExcel() {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var costos = ArcanoDB.getCostosInsumos();
+
+    // === Sheet ESPECIAS ===
+    var espRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      espRows.push([e.id, e.nombre, e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+    }
+    var espSheet = XLSX.utils.aoa_to_sheet(espRows);
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+
+    // === Sheet BLENDS ===
+    var blRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Gramos', 'Costo Ingr. ($/g)', 'Subcosto']];
+    for (var j = 0; j < blends.length; j++) {
+      var b = blends[j];
+      var ings = b.ingredientes || [];
+      if (ings.length === 0) {
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '']);
+      } else {
+        for (var k = 0; k < ings.length; k++) {
+          var ing = ings[k];
+          var costoGr = (costos.especias && costos.especias[ing.especiaId]) || 0;
+          var subcosto = costoGr * (ing.gramos || 0);
+          blRows.push([
+            k === 0 ? b.id : '',
+            k === 0 ? b.nombre : '',
+            k === 0 ? (b.categoria || '') : '',
+            k === 0 ? (b.precioChico || 0) : '',
+            k === 0 ? (b.precioGrande || 0) : '',
+            k === 0 ? (b.stockChico || 0) : '',
+            k === 0 ? (b.stockGrande || 0) : '',
+            k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
+            ing.especiaNombre || '',
+            ing.gramos || 0,
+            costoGr,
+            Math.round(subcosto)
+          ]);
+        }
+      }
+    }
+    var blSheet = XLSX.utils.aoa_to_sheet(blRows);
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 12 }];
+
+    // === Sheet COSTOS ===
+    var costRows = [['Campo', 'Valor']];
+    costRows.push(['Envase Chico', costos.envaseChico || 0]);
+    costRows.push(['Envase Grande', costos.envaseGrande || 0]);
+    costRows.push(['Bolsa Chica', costos.bolsaChica || 0]);
+    costRows.push(['Bolsa Grande', costos.bolsaGrande || 0]);
+    costRows.push(['Cinta', costos.cinta || 0]);
+    costRows.push(['Sticker Chico', costos.stickerChico || 0]);
+    costRows.push(['Sticker Grande', costos.stickerGrande || 0]);
+    costRows.push(['']);
+    costRows.push(['Costo Especias ($/g)', '']);
+    for (var ei = 0; ei < especias.length; ei++) {
+      var esp = especias[ei];
+      var cVal = (costos.especias && costos.especias[esp.id]) || 0;
+      costRows.push([esp.nombre, cVal]);
+    }
+    var costSheet = XLSX.utils.aoa_to_sheet(costRows);
+    costSheet['!cols'] = [{ wch: 25 }, { wch: 14 }];
+
+    // === RESUMEN COSTOS BLENDS ===
+    var resRows = [['Blend', 'Costo Total Ingredientes ($)', 'Gramos Totales (frasco chico)', 'Costo por Frasco Chico', 'Costo por Frasco Grande']];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var blIngs = bl.ingredientes || [];
+      var costoTotal = 0;
+      for (var ii = 0; ii < blIngs.length; ii++) {
+        var bing = blIngs[ii];
+        var cGr = (costos.especias && costos.especias[bing.especiaId]) || 0;
+        costoTotal += cGr * (bing.gramos || 0);
+      }
+      resRows.push([bl.nombre, Math.round(costoTotal), blIngs.length > 0 ? blIngs[0].gramosTotal : 0, Math.round(costoTotal) || '', '']);
+    }
+    var resSheet = XLSX.utils.aoa_to_sheet(resRows);
+    resSheet['!cols'] = [{ wch: 25 }, { wch: 24 }, { wch: 26 }, { wch: 22 }, { wch: 22 }];
+
+    // Create workbook
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, espSheet, 'Especias');
+    XLSX.utils.book_append_sheet(wb, blSheet, 'Blends');
+    XLSX.utils.book_append_sheet(wb, costSheet, 'Costos');
+    XLSX.utils.book_append_sheet(wb, resSheet, 'Resumen Costos');
+
+    // Download
+    var fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, 'Arcano_Productos_' + fecha + '.xlsx');
+    toast('Excel exportado correctamente');
+  },
+
+  importarProductosExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:700px">' +
+      '<div class="modal-header"><h3>Importar Datos desde Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi el archivo Excel exportado previamente. Se actualizaran precios, ingredientes y costos de los productos existentes. Los stocks no se modifican.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-imp-prod-file" accept=".xlsx,.xls"></div>' +
+        '<div id="f-imp-prod-status" class="mt-12"></div>' +
+        '<div id="f-imp-prod-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-imp-prod-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-prod-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-imp-prod-file');
+    var parseBtn = document.getElementById('btn-parse-prod-excel');
+    var statusDiv = document.getElementById('f-imp-prod-status');
+    var previewDiv = document.getElementById('f-imp-prod-preview');
+    var footerDiv = document.getElementById('f-imp-prod-footer');
+
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS
+          var espUpdates = [];
+          var espSheet = wb.Sheets['Especias'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              if (!row || !row[0]) continue;
+              espUpdates.push({
+                id: String(row[0]),
+                nombre: String(row[1] || '').trim(),
+                categoria: String(row[2] || '').trim(),
+                precioChico: Number(row[3]) || 0,
+                precioGrande: Number(row[4]) || 0,
+                enTienda: String(row[8] || '').toLowerCase() === 'si'
+              });
+            }
+          }
+
+          // Parse BLENDS
+          var blUpdates = {};
+          var blSheet = wb.Sheets['Blends'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlId = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              if (row[0]) {
+                currentBlId = String(row[0]);
+                blUpdates[currentBlId] = {
+                  id: currentBlId,
+                  nombre: String(row[1] || '').trim(),
+                  categoria: String(row[2] || '').trim(),
+                  precioChico: Number(row[3]) || 0,
+                  precioGrande: Number(row[4]) || 0,
+                  enTienda: String(row[7] || '').toLowerCase() === 'si',
+                  ingredientes: []
+                };
+              }
+              if (currentBlId && row[8]) {
+                blUpdates[currentBlId].ingredientes.push({
+                  especiaNombre: String(row[8] || '').trim(),
+                  gramos: Number(row[9]) || 0
+                });
+              }
+            }
+          }
+
+          // Parse COSTOS
+          var costoUpdates = {};
+          var costoEspUpdates = {};
+          var costSheet = wb.Sheets['Costos'];
+          if (costSheet) {
+            var costData = XLSX.utils.sheet_to_json(costSheet, { header: 1 });
+            for (var k = 0; k < costData.length; k++) {
+              var row = costData[k];
+              if (!row || !row[0]) continue;
+              var campo = String(row[0]).trim();
+              var valor = Number(row[1]) || 0;
+              if (campo === 'Envase Chico') costoUpdates.envaseChico = valor;
+              else if (campo === 'Envase Grande') costoUpdates.envaseGrande = valor;
+              else if (campo === 'Bolsa Chica') costoUpdates.bolsaChica = valor;
+              else if (campo === 'Bolsa Grande') costoUpdates.bolsaGrande = valor;
+              else if (campo === 'Cinta') costoUpdates.cinta = valor;
+              else if (campo === 'Sticker Chico') costoUpdates.stickerChico = valor;
+              else if (campo === 'Sticker Grande') costoUpdates.stickerGrande = valor;
+            }
+            // Get existing costos for especias mapping
+            var existingCostos = ArcanoDB.getCostosInsumos();
+            costoEspUpdates = existingCostos.especias ? JSON.parse(JSON.stringify(existingCostos.especias)) : {};
+            for (var ci = 0; ci < costData.length; ci++) {
+              var cr = costData[ci];
+              if (!cr || !cr[0] || cr[0] === 'Campo' || cr[0] === 'Costo Especias ($/g)' || cr[0] === '') continue;
+              // Match by especia name
+              var allEsp = ArcanoDB.getEspecias();
+              var matchedId = null;
+              for (var ei = 0; ei < allEsp.length; ei++) {
+                if (allEsp[ei].nombre === String(cr[0]).trim()) { matchedId = allEsp[ei].id; break; }
+              }
+              if (matchedId && Number(cr[1]) > 0) {
+                costoEspUpdates[matchedId] = Number(cr[1]);
+              }
+            }
+          }
+
+          var blKeys = Object.keys(blUpdates);
+          if (espUpdates.length === 0 && blKeys.length === 0 && Object.keys(costoUpdates).length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos para actualizar.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Preview
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias a actualizar</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends a actualizar</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--gold)">' + Object.keys(costoUpdates).length + '</div><div class="stat-label">Costos packaging</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + Object.keys(costoEspUpdates).length + '</div><div class="stat-label">Costos especias</div></div>' +
+          '</div>';
+
+          // Show blend details
+          if (blKeys.length > 0) {
+            phtml += '<p class="text-sm fw7 mb-8">Blends:</p>';
+            for (var bk = 0; bk < Math.min(blKeys.length, 10); bk++) {
+              var bU = blUpdates[blKeys[bk]];
+              phtml += '<p class="text-sm text-muted">- ' + bU.nombre + ': ' + bU.ingredientes.length + ' ingredientes, $' + bU.precioChico + '/$' + bU.precioGrande + '</p>';
+            }
+            if (blKeys.length > 10) phtml += '<p class="text-sm text-muted">... y ' + (blKeys.length - 10) + ' mas</p>';
+          }
+          phtml += '</div></div>';
+
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-prod-import">Confirmar Actualizacion</button>';
+
+          document.getElementById('btn-do-prod-import').addEventListener('click', function() {
+            var btn = document.getElementById('btn-do-prod-import');
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            try {
+              var espOk = 0, blOk = 0;
+
+              // Update especias
+              for (var i = 0; i < espUpdates.length; i++) {
+                var u = espUpdates[i];
+                var existing = ArcanoDB.getEspecia(u.id);
+                if (existing) {
+                  ArcanoDB.saveEspecia({
+                    id: u.id,
+                    nombre: u.nombre || existing.nombre,
+                    categoria: u.categoria || existing.categoria,
+                    precioChico: u.precioChico,
+                    precioGrande: u.precioGrande,
+                    enTienda: u.enTienda
+                  });
+                  espOk++;
+                }
+              }
+
+              // Update blends
+              var blKeys2 = Object.keys(blUpdates);
+              for (var j = 0; j < blKeys2.length; j++) {
+                var bU = blUpdates[blKeys2[j]];
+                var existingBl = ArcanoDB.getBlend(bU.id);
+                if (existingBl) {
+                  // Resolve ingredient names to IDs
+                  var resolvedIngs = [];
+                  for (var ii = 0; ii < bU.ingredientes.length; ii++) {
+                    var ing = bU.ingredientes[ii];
+                    var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
+                    if (espObj) {
+                      resolvedIngs.push({
+                        especiaId: espObj.id,
+                        especiaNombre: espObj.nombre,
+                        gramos: ing.gramos
+                      });
+                    }
+                  }
+                  // Calculate gramosTotal for first ingredient (used for production)
+                  var grsTotal = 0;
+                  for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                  for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
+                    resolvedIngs[gi2].gramosTotal = grsTotal;
+                    resolvedIngs[gi2].pct = Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100);
+                  }
+                  ArcanoDB.saveBlend({
+                    id: bU.id,
+                    nombre: bU.nombre || existingBl.nombre,
+                    categoria: bU.categoria || existingBl.categoria,
+                    precioChico: bU.precioChico,
+                    precioGrande: bU.precioGrande,
+                    enTienda: bU.enTienda,
+                    ingredientes: resolvedIngs
+                  });
+                  blOk++;
+                }
+              }
+
+              // Update costos
+              if (Object.keys(costoUpdates).length > 0 || Object.keys(costoEspUpdates).length > 0) {
+                var newCostos = ArcanoDB.getCostosInsumos();
+                for (var ck in costoUpdates) newCostos[ck] = costoUpdates[ck];
+                newCostos.especias = costoEspUpdates;
+                ArcanoDB.saveCostosInsumos(newCostos);
+              }
+
+              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Actualizacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Actualizadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Actualizados</div></div>' +
+                '</div>' +
+                '<p class="text-sm text-muted mt-12">Los stocks no fueron modificados. Recarga la pagina para ver los cambios.</p>' +
+              '</div></div>';
+
+              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
             } catch (err) {
               previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
               btn.disabled = false;
