@@ -1907,7 +1907,6 @@ const Pages = {
   formAjusteStock() {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
-    var stickerList = ArcanoDB.getStickers();
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -1951,8 +1950,9 @@ const Pages = {
       return o;
     }
     function buildStickerOpts() {
+      var allProds = ArcanoDB.getProductosConStickers();
       var o = '';
-      for (var i = 0; i < stickerList.length; i++) o += '<option value="' + stickerList[i].nombre + '">' + stickerList[i].nombre + '</option>';
+      for (var i = 0; i < allProds.length; i++) o += '<option value="' + allProds[i].nombre + '">' + allProds[i].nombre + ' (' + (allProds[i].tipo==='blend'?'Blend':'Especia') + ')</option>';
       return o;
     }
 
@@ -2017,10 +2017,10 @@ const Pages = {
         actual = (db.stockBolsas || {})[sub] || 0;
       } else if (cat === 'sticker' && prodSel.value) {
         nombre = prodSel.value;
-        var stks = ArcanoDB.getStickers();
-        for (var i = 0; i < stks.length; i++) {
-          if (stks[i].nombre === nombre) {
-            actual = (sub === 'grande') ? (stks[i].stockGrande || 0) : (stks[i].stockChico || 0);
+        var allStks = ArcanoDB.getProductosConStickers();
+        for (var i = 0; i < allStks.length; i++) {
+          if (allStks[i].nombre === nombre) {
+            actual = (sub === 'grande') ? (allStks[i].stockGrande || 0) : (allStks[i].stockChico || 0);
             break;
           }
         }
