@@ -3422,6 +3422,7 @@ const Pages = {
     h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'inventario' ? ' active' : '') + '" onclick="Pages._estTab=\'inventario\';App.renderPage(\'estadisticas\')">Inventario</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'canales' ? ' active' : '') + '" onclick="Pages._estTab=\'canales\';App.renderPage(\'estadisticas\')">Costos por Canal</button>';
     h += '</div>';
     h += '<div id="est-content"></div>';
     container.innerHTML = h;
@@ -3438,6 +3439,7 @@ const Pages = {
     else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
     else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
     else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
+    else if (Pages._estTab === 'canales') Pages._renderCostosPorCanal(container.querySelector('#est-content'));
   },
 
   /* ================================================================
@@ -4421,5 +4423,143 @@ const Pages = {
     localStorage.clear();
     toast('Reset completo. Recargando...');
     setTimeout(function() { location.reload(); }, 1500);
+  },
+
+  /* ================================================================
+     COSTOS POR CANAL DE VENTA
+     ================================================================ */
+  _renderCostosPorCanal: function(el) {
+    if (!el) return;
+    var channels = ArcanoDB.getCostosPorCanal();
+    var canalKeys = ['admin', 'tienda', 'pdv'];
+    var canalNombres = { admin: 'Ventas Admin', tienda: 'Tienda Online', pdv: 'Puntos de Venta' };
+    var canalColores = { admin: 'var(--gold)', tienda: 'var(--green)', pdv: 'var(--blue)' };
+
+    var h = '';
+
+    // === RESUMEN GENERAL ===
+    var totalIngreso = 0, totalCosto = 0, totalStockCosto = 0;
+    for (var ci = 0; ci < canalKeys.length; ci++) {
+      var ch = channels[canalKeys[ci]];
+      totalIngreso += ch.ingreso;
+      totalCosto += ch.costo;
+      totalStockCosto += (ch.stockCosto || 0);
+    }
+    var totalMargen = totalIngreso - totalCosto;
+    var totalMargenPct = totalIngreso > 0 ? (totalMargen / totalIngreso * 100) : 0;
+
+    h += '<div class="card"><div class="card-header"><h3>Resumen General</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card"><div class="stat-value">$' + totalIngreso.toLocaleString() + '</div><div class="stat-label">Ingreso Total</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + totalCosto.toLocaleString() + '</div><div class="stat-label">Costo Produccion</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">$' + totalMargen.toLocaleString() + '</div><div class="stat-label">Margen ($' + totalMargenPct.toFixed(1) + '%)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">$' + totalStockCosto.toLocaleString() + '</div><div class="stat-label">Costo Stock Actual</div></div>';
+    h += '</div></div></div>';
+
+    // === POR CADA CANAL ===
+    for (var ci2 = 0; ci2 < canalKeys.length; ci2++) {
+      var key = canalKeys[ci2];
+      var c = channels[key];
+      var clr = canalColores[key];
+      var margen = c.ingreso - c.costo;
+      var margenPct = c.ingreso > 0 ? (margen / c.ingreso * 100) : 0;
+
+      h += '<div class="card mt-16"><div class="card-header"><h3 style="color:' + clr + '">' + canalNombres[key] + '</h3></div><div class="card-body">';
+
+      // KPIs del canal
+      h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+      h += '<div class="stat-card"><div class="stat-value">' + c.ventas + '</div><div class="stat-label">Ventas</div></div>';
+      h += '<div class="stat-card"><div class="stat-value">$' + c.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + c.costo.toLocaleString() + '</div><div class="stat-label">Costo Prod.</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toLocaleString() + '</div><div class="stat-label">Margen (' + margenPct.toFixed(1) + '%)</div></div>';
+      h += '</div>';
+
+      // Tabla de productos vendidos
+      var prodKeys = Object.keys(c.productos || {});
+      if (prodKeys.length > 0) {
+        h += '<h4 style="margin:16px 0 8px;font-size:.95rem">Costos de Productos Vendidos</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo Prod.</th><th>Margen</th></tr></thead><tbody>';
+        for (var pi = 0; pi < prodKeys.length; pi++) {
+          var pr = c.productos[prodKeys[pi]];
+          var prMargen = pr.ingreso - pr.costo;
+          h += '<tr><td class="fw7">' + pr.nombre + '</td>';
+          h += '<td><span class="badge ' + (pr.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pr.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+          h += '<td>' + pr.talla + '</td>';
+          h += '<td class="fw7">' + pr.cantidad + '</td>';
+          h += '<td>$' + pr.ingreso.toLocaleString() + '</td>';
+          h += '<td style="color:var(--red)">$' + pr.costo.toLocaleString() + '</td>';
+          h += '<td style="color:' + (prMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + prMargen.toLocaleString() + '</td></tr>';
+        }
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin ventas registradas en este canal.</p>';
+      }
+
+      // PDV desglose por punto de venta
+      if (key === 'pdv' && c.pdvs) {
+        var pdvKeys = Object.keys(c.pdvs);
+        if (pdvKeys.length > 0) {
+          h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Desglose por Punto de Venta</h4>';
+          for (var pk = 0; pk < pdvKeys.length; pk++) {
+            var pv = c.pdvs[pdvKeys[pk]];
+            var pvMargen = pv.ingreso - pv.costo;
+            h += '<div class="card" style="background:var(--bg);margin-bottom:8px"><div class="card-body">';
+            h += '<div class="fw7" style="margin-bottom:8px;color:var(--blue)">' + pdvKeys[pk] + '</div>';
+            h += '<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">';
+            h += '<div class="stat-card"><div class="stat-value">' + pv.ventas + '</div><div class="stat-label">Ventas</div></div>';
+            h += '<div class="stat-card"><div class="stat-value">$' + pv.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+            h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (pvMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pvMargen.toLocaleString() + '</div><div class="stat-label">Margen</div></div>';
+            h += '</div>';
+            // Productos del PDV
+            var pvProdKeys = Object.keys(pv.productos || {});
+            if (pvProdKeys.length > 0) {
+              h += '<div class="table-wrap" style="margin-top:8px"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo</th><th>Margen</th></tr></thead><tbody>';
+              for (var ppk = 0; ppk < pvProdKeys.length; ppk++) {
+                var ppr = pv.productos[pvProdKeys[ppk]];
+                var pprM = ppr.ingreso - ppr.costo;
+                h += '<tr><td>' + ppr.nombre + '</td><td>' + ppr.talla + '</td><td>' + ppr.cantidad + '</td><td>$' + ppr.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ppr.costo.toLocaleString() + '</td><td style="color:' + (pprM >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pprM.toLocaleString() + '</td></tr>';
+              }
+              h += '</tbody></table></div>';
+            }
+            h += '</div></div>';
+          }
+        }
+      }
+
+      // Stock del canal
+      var stockItems = c.stockDetalle || [];
+      if (stockItems.length > 0) {
+        h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Costo de Stock Actual</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr>';
+        if (key === 'pdv') {
+          h += '<th>Punto de Venta</th><th>Costo Total en Stock</th>';
+        } else {
+          h += '<th>Producto</th><th>Tipo</th><th>Fr.Ch (cant)</th><th>Fr.Gr (cant)</th><th>Costo/Fr.Ch</th><th>Costo/Fr.Gr</th><th>Costo Total</th>';
+        }
+        h += '</tr></thead><tbody>';
+        var stockTotal = 0;
+        for (var si = 0; si < stockItems.length; si++) {
+          var s = stockItems[si];
+          stockTotal += s.costoTotal;
+          if (key === 'pdv') {
+            h += '<tr><td class="fw7">' + s.nombre + '</td><td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          } else {
+            h += '<tr><td class="fw7">' + s.nombre + '</td>';
+            h += '<td><span class="badge ' + (s.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (s.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+            h += '<td>' + s.chico + '</td><td>' + s.grande + '</td>';
+            h += '<td>$' + s.costoChico.toFixed(0) + '</td><td>$' + s.costoGrande.toFixed(0) + '</td>';
+            h += '<td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          }
+        }
+        h += '<tr style="border-top:2px solid var(--border)"><td colspan="6" class="fw7" style="text-align:right">Total Stock</td><td style="color:var(--red);font-weight:700">$' + stockTotal.toLocaleString() + '</td></tr>';
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin stock en este canal.</p>';
+      }
+
+      h += '</div></div>';
+    }
+
+    el.innerHTML = h;
   }
 };
