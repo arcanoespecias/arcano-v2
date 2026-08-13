@@ -89,6 +89,7 @@ function _ensureStructure() {
     'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
     'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
   };
+  if (!_db.tiendaConfig) _db.tiendaConfig = { logoNequi: '', logoBancolombia: '' };
   _cleanNulls();
   return true;
 }
@@ -1720,6 +1721,20 @@ function deletePack(id) {
   return true;
 }
 
+/* ==================== TIENDA CONFIG ==================== */
+
+function getTiendaConfig() {
+  return _db.tiendaConfig || { logoNequi: '', logoBancolombia: '' };
+}
+
+function saveTiendaConfig(data) {
+  if (!_db.tiendaConfig) _db.tiendaConfig = {};
+  if (typeof data.logoNequi === 'string') _db.tiendaConfig.logoNequi = data.logoNequi;
+  if (typeof data.logoBancolombia === 'string') _db.tiendaConfig.logoBancolombia = data.logoBancolombia;
+  _saveToFirebase(); _cacheLocal();
+  return _db.tiendaConfig;
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -1751,5 +1766,6 @@ window.ArcanoDB = {
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
-  getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal
+  getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
+  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig
 };
