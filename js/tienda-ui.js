@@ -396,7 +396,7 @@ function renderSocialLinks() {
 function renderSidebarLogo() {
   var el = document.getElementById('sidebar-brand');
   if (!el) return;
-  var cfg = (_sDb && _sDb.tiendaConfig) || {};
+  var cfg = getTiendaConfig();
   var nequi = cfg.logoNequi || '';
   var bancolombia = cfg.logoBancolombia || '';
   if (nequi || bancolombia) {
