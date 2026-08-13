@@ -32,6 +32,11 @@ function initTienda() {
   });
 }
 
+function getTiendaConfig() {
+  if (!_sDb) return {};
+  return _sDb.tiendaConfig || {};
+}
+
 function onTiendaChange(fn) { _sListeners.push(fn); }
 
 /* === PEDIDOS (write) === */
@@ -57,7 +62,7 @@ function getStoreProducts() {
     var e = _sDb.especias[ek[i]];
     if (!e || !e.enTienda) continue;
     products.push({
-      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas',
+      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', categorias: e.categorias || [e.categoria || 'Comidas'],
       precioChico: Number(e.precioTiendaChico) || Number(e.precioChico) || 0,
       precioGrande: Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0,
       stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0,
@@ -69,11 +74,12 @@ function getStoreProducts() {
     var b = _sDb.blends[bk[i]];
     if (!b || !b.enTienda) continue;
     products.push({
-      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas',
+      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', categorias: b.categorias || [b.categoria || 'Comidas'],
       precioChico: Number(b.precioTiendaChico) || Number(b.precioChico) || 0,
       precioGrande: Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0,
       stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0,
-      region: b.region || '', uso: b.uso || '', descripcion: b.descripcion || '', imagen: b.imagen || '', tags: b.tags || []
+      region: b.region || '', uso: b.uso || '', descripcion: b.descripcion || '', imagen: b.imagen || '', tags: b.tags || [],
+      ingredientes: b.ingredientes || []
     });
   }
   return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
