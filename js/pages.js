@@ -1863,76 +1863,97 @@ const Pages = {
     var etiqList = ArcanoDB.getProductosConStickers();
     var ajustes = ArcanoDB.getAjustes();
 
-    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formAjusteStock()">Ajustar Stock</button></div>';
+    var h = '<div class="page-actions">' +
+      '<button class="btn btn-gold" id="btn-batch-aj" style="opacity:0.4;pointer-events:none">Guardar Ajustes (0)</button>' +
+      '<button class="btn btn-outline" style="margin-left:8px" onclick="Pages.formAjusteStock()">Ajuste Individual</button>' +
+      '<button class="btn btn-outline" style="margin-left:8px" id="btn-clear-aj" onclick="Pages._clearStockInputs()">Limpiar</button>' +
+      '<span class="text-xs text-muted" style="margin-left:12px">Escribe +/− en los campos y guarda todo de una vez</span>' +
+      '</div>';
 
-    // === SECTION 1: PRODUCTOS ===
-    h += '<h3 style="color:var(--gold);margin-bottom:12px;font-size:1.1rem">Stock de Productos</h3>';
-
-    // Especias
-    h += '<div class="card mt-8"><div class="card-header"><h3>Especias</h3></div><div class="card-body">';
-    if (especias.length === 0) { h += '<p class="text-muted text-center">Sin especias</p>'; }
-    else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (grs)</th><th>Fr.Pequeño</th><th>Fr.Grande</th></tr></thead><tbody>';
-      for (var i = 0; i < especias.length; i++) {
-        var e = especias[i];
-        h += '<tr><td class="fw7">' + e.nombre + '</td>' +
-          '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
-          '<td class="' + ((e.stockBolsa||0)<=50?'text-red fw7':'') + '">' + (e.stockBolsa||0) + '</td>' +
-          '<td class="' + ((e.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockChico||0) + '</td>' +
-          '<td class="' + ((e.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (e.stockGrande||0) + '</td></tr>';
-      }
-      h += '</tbody></table></div>';
+    // helper: inline adj input
+    function adjInput(cat, sub, prodId, prodNombre, placeholder) {
+      var pid = prodId != null ? String(prodId) : '';
+      return '<input type="number" class="input stock-adj-input" ' +
+        'data-cat="' + cat + '" data-sub="' + sub + '" data-pid="' + pid + '" data-pname="' + (prodNombre||'').replace(/"/g, '&quot;') + '" ' +
+        'style="width:70px;padding:4px 6px;font-size:0.85rem;text-align:center" placeholder="' + placeholder + '" title="Stock actual: ' + placeholder + '">';
     }
-    h += '</div></div>';
 
-    // Blends
-    h += '<div class="card mt-16"><div class="card-header"><h3>Blends</h3></div><div class="card-body">';
-    if (blends.length === 0) { h += '<p class="text-muted text-center">Sin blends</p>'; }
-    else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Pequeño</th><th>Fr.Grande</th></tr></thead><tbody>';
-      for (var i = 0; i < blends.length; i++) {
-        var b = blends[i];
-        h += '<tr><td class="fw7">' + b.nombre + '</td>' +
-          '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : (b.categoria||'—')) + '</span></td>' +
-          '<td class="' + ((b.stockChico||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockChico||0) + '</td>' +
-          '<td class="' + ((b.stockGrande||0)<=3?'text-red fw7':'text-green') + '">' + (b.stockGrande||0) + '</td></tr>';
-      }
-      h += '</tbody></table></div>';
+    // === SECTION 1: ESPECIAS ===
+    h += '<h3 style="color:var(--gold);margin:16px 0 12px;font-size:1.1rem">Especias</h3>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (g)</th><th>Ajuste</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th></tr></thead><tbody>';
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var palaCls = (e.stockBolsa||0)<=50?'text-red fw7':'';
+      var chCls = (e.stockChico||0)<=3?'text-red fw7':'text-green';
+      var grCls = (e.stockGrande||0)<=3?'text-red fw7':'text-green';
+      h += '<tr>' +
+        '<td class="fw7">' + e.nombre + '</td>' +
+        '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
+        '<td class="' + palaCls + '">' + (e.stockBolsa||0) + '</td>' +
+        '<td>' + adjInput('especia', 'pala', e.id, e.nombre, e.stockBolsa||0) + '</td>' +
+        '<td class="' + chCls + '">' + (e.stockChico||0) + '</td>' +
+        '<td>' + adjInput('especia', 'chico', e.id, e.nombre, e.stockChico||0) + '</td>' +
+        '<td class="' + grCls + '">' + (e.stockGrande||0) + '</td>' +
+        '<td>' + adjInput('especia', 'grande', e.id, e.nombre, e.stockGrande||0) + '</td>' +
+        '</tr>';
     }
-    h += '</div></div>';
+    h += '</tbody></table></div></div></div>';
 
-    // === SECTION 2: PACKAGING ===
+    // === SECTION 2: BLENDS ===
+    h += '<h3 style="color:var(--gold);margin:24px 0 12px;font-size:1.1rem">Blends</h3>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th></tr></thead><tbody>';
+    for (var i = 0; i < blends.length; i++) {
+      var b = blends[i];
+      var chCls = (b.stockChico||0)<=3?'text-red fw7':'text-green';
+      var grCls = (b.stockGrande||0)<=3?'text-red fw7':'text-green';
+      h += '<tr>' +
+        '<td class="fw7">' + b.nombre + '</td>' +
+        '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : '—') + '</span></td>' +
+        '<td class="' + chCls + '">' + (b.stockChico||0) + '</td>' +
+        '<td>' + adjInput('blend', 'chico', b.id, b.nombre, b.stockChico||0) + '</td>' +
+        '<td class="' + grCls + '">' + (b.stockGrande||0) + '</td>' +
+        '<td>' + adjInput('blend', 'grande', b.id, b.nombre, b.stockGrande||0) + '</td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // === SECTION 3: PACKAGING ===
     h += '<h3 style="color:var(--gold);margin:24px 0 12px;font-size:1.1rem">Packaging</h3>';
-    h += '<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr)">' +
-      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.chico||0) + '</div><div class="stat-label">Frascos Pequeños</div></div>' +
-      '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">' + (envases.grande||0) + '</div><div class="stat-label">Frascos Grandes</div></div>' +
-      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.chico||0) + '</div><div class="stat-label">Bolsas Chicas</div></div>' +
-      '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">' + (bolsas.grande||0) + '</div><div class="stat-label">Bolsas Grandes</div></div></div>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Stock</th><th>Ajuste</th></tr></thead><tbody>';
+    h += '<tr><td class="fw7">Frascos Pequeños</td><td>' + (envases.chico||0) + '</td><td>' + adjInput('envase', 'chico', null, 'Frascos chico', envases.chico||0) + '</td></tr>';
+    h += '<tr><td class="fw7">Frascos Grandes</td><td>' + (envases.grande||0) + '</td><td>' + adjInput('envase', 'grande', null, 'Frascos grande', envases.grande||0) + '</td></tr>';
+    h += '<tr><td class="fw7">Bolsas Chicas</td><td>' + (bolsas.chico||0) + '</td><td>' + adjInput('bolsa', 'chico', null, 'Bolsas chica', bolsas.chico||0) + '</td></tr>';
+    h += '<tr><td class="fw7">Bolsas Grandes</td><td>' + (bolsas.grande||0) + '</td><td>' + adjInput('bolsa', 'grande', null, 'Bolsas grande', bolsas.grande||0) + '</td></tr>';
+    h += '<tr><td class="fw7">Cintas</td><td>' + (db.stockCintas||0) + '</td><td>' + adjInput('cinta', 'cinta', null, 'Cintas', db.stockCintas||0) + '</td></tr>';
+    h += '</tbody></table></div></div></div>';
 
-    // Stickers table
-    h += '<div class="card mt-16"><div class="card-header"><h3>Stickers</h3></div><div class="card-body">';
-    if (etiqList.length === 0) { h += '<p class="text-muted text-center">Sin stickers</p>'; }
-    else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Stk.Pequeño</th><th>Stk.Grande</th></tr></thead><tbody>';
-      for (var i = 0; i < etiqList.length; i++) {
-        var et = etiqList[i];
-        h += '<tr><td class="fw7">' + et.nombre + '</td><td><span class="badge ' + (et.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (et.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
-          '<td class="' + (et.stockChico<=5?'text-red fw7':'') + '">' + et.stockChico + '</td>' +
-          '<td class="' + (et.stockGrande<=5?'text-red fw7':'') + '">' + et.stockGrande + '</td></tr>';
-      }
-      h += '</tbody></table></div>';
+    // === SECTION 4: STICKERS ===
+    h += '<h3 style="color:var(--gold);margin:24px 0 12px;font-size:1.1rem">Stickers</h3>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Pequeño</th><th>Ajuste</th><th>Grande</th><th>Ajuste</th></tr></thead><tbody>';
+    for (var i = 0; i < etiqList.length; i++) {
+      var et = etiqList[i];
+      var chCls = et.stockChico<=5?'text-red fw7':'';
+      var grCls = et.stockGrande<=5?'text-red fw7':'';
+      h += '<tr>' +
+        '<td class="fw7">' + et.nombre + '</td>' +
+        '<td><span class="badge ' + (et.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (et.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
+        '<td class="' + chCls + '">' + et.stockChico + '</td>' +
+        '<td>' + adjInput('sticker', 'chico', null, et.nombre, et.stockChico) + '</td>' +
+        '<td class="' + grCls + '">' + et.stockGrande + '</td>' +
+        '<td>' + adjInput('sticker', 'grande', null, et.nombre, et.stockGrande) + '</td>' +
+        '</tr>';
     }
-    h += '</div></div>';
+    h += '</tbody></table></div></div></div>';
 
-    // === SECTION 3: HISTORIAL DE AJUSTES ===
-    h += '<div class="card mt-24"><div class="card-header"><h3>Historial de Ajustes Manuales</h3></div><div class="card-body">';
+    // === SECTION 5: HISTORIAL ===
+    h += '<div class="card mt-24"><div class="card-header"><h3>Historial de Ajustes</h3></div><div class="card-body">';
     if (ajustes.length === 0) {
-      h += '<p class="text-muted text-center">Sin ajustes manuales.</p>';
+      h += '<p class="text-muted text-center">Sin ajustes.</p>';
     } else {
       h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Sub</th><th>Cant.</th><th>Motivo</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < Math.min(ajustes.length, 50); i++) {
         var aj = ajustes[i];
-        var catLabel = aj.categoria === 'especia' ? 'Especia' : aj.categoria === 'blend' ? 'Blend' : aj.categoria === 'envase' ? 'Frascos' : aj.categoria === 'bolsa' ? 'Bolsas' : 'Sticker';
+        var catLabel = aj.categoria === 'especia' ? 'Especia' : aj.categoria === 'blend' ? 'Blend' : aj.categoria === 'envase' ? 'Frascos' : aj.categoria === 'bolsa' ? 'Bolsas' : aj.categoria === 'cinta' ? 'Cintas' : 'Sticker';
         var subLabel = aj.subtipo === 'pala' ? 'Pala' : aj.subtipo === 'chico' ? 'Pequeño' : 'Grande';
         var cantColor = (aj.cantidad > 0) ? 'text-green' : 'text-red';
         var cantSign = (aj.cantidad > 0) ? '+' : '';
@@ -1949,6 +1970,71 @@ const Pages = {
     }
     h += '</div></div>';
     container.innerHTML = h;
+
+    // Wire up batch logic
+    var allInputs = container.querySelectorAll('.stock-adj-input');
+    var batchBtn = document.getElementById('btn-batch-aj');
+    function countPending() {
+      var c = 0;
+      for (var i = 0; i < allInputs.length; i++) { if (allInputs[i].value !== '' && Number(allInputs[i].value) !== 0) c++; }
+      return c;
+    }
+    function refreshBtn() {
+      var n = countPending();
+      if (n > 0) {
+        batchBtn.textContent = 'Guardar Ajustes (' + n + ')';
+        batchBtn.style.opacity = '1';
+        batchBtn.style.pointerEvents = 'auto';
+      } else {
+        batchBtn.textContent = 'Guardar Ajustes (0)';
+        batchBtn.style.opacity = '0.4';
+        batchBtn.style.pointerEvents = 'none';
+      }
+    }
+    for (var i = 0; i < allInputs.length; i++) {
+      allInputs[i].addEventListener('input', refreshBtn);
+    }
+    batchBtn.addEventListener('click', function() {
+      var pending = [];
+      for (var i = 0; i < allInputs.length; i++) {
+        var inp = allInputs[i];
+        var v = Number(inp.value);
+        if (inp.value === '' || v === 0) continue;
+        pending.push({
+          categoria: inp.getAttribute('data-cat'),
+          subtipo: inp.getAttribute('data-sub'),
+          productoId: inp.getAttribute('data-pid') ? Number(inp.getAttribute('data-pid')) : null,
+          productoNombre: inp.getAttribute('data-pname'),
+          cantidad: v
+        });
+      }
+      if (pending.length === 0) return;
+      var summary = pending.map(function(p) { return p.productoNombre + ' ' + p.subtipo + ': ' + (p.cantidad > 0 ? '+' : '') + p.cantidad; }).join('\n');
+      if (!confirm('Aplicar ' + pending.length + ' ajustes?\n\n' + summary)) return;
+      var errors = [];
+      for (var i = 0; i < pending.length; i++) {
+        try {
+          ArcanoDB.saveAjuste({
+            categoria: pending[i].categoria,
+            subtipo: pending[i].subtipo,
+            productoId: pending[i].productoId,
+            productoNombre: pending[i].productoNombre,
+            cantidad: pending[i].cantidad,
+            motivo: 'Ajuste rapido multiple',
+            fecha: new Date().toISOString().slice(0, 10)
+          });
+        } catch(err) { errors.push(pending[i].productoNombre + ': ' + err.message); }
+      }
+      if (errors.length) { alert('Errores:\n' + errors.join('\n')); }
+      App.renderPage('stock');
+    });
+  },
+
+  _clearStockInputs: function() {
+    var inputs = document.querySelectorAll('.stock-adj-input');
+    for (var i = 0; i < inputs.length; i++) inputs[i].value = '';
+    var btn = document.getElementById('btn-batch-aj');
+    if (btn) { btn.textContent = 'Guardar Ajustes (0)'; btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
   },
 
   /* ---------- Ajuste Manual de Stock ---------- */
