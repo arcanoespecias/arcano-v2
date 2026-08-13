@@ -2391,7 +2391,8 @@ const Pages = {
   _handlePagoLogo: function(input, tipo) {
     if (!input.files || !input.files[0]) return;
     var file = input.files[0];
-    ArcanoDB.compressImage(file, 200, function(dataUrl) {
+    ArcanoDB.compressImage(file, 200, 0.8, function(err, dataUrl) {
+      if (err) { alert('Error: ' + err); return; }
       var data = {};
       data[tipo === 'nequi' ? 'logoNequi' : 'logoBancolombia'] = dataUrl;
       ArcanoDB.saveTiendaConfig(data);
