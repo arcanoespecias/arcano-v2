@@ -1519,6 +1519,177 @@ function _startCostosListener() {
   });
 }
 
+/* ==================== COSTOS DE PRODUCCION POR PRODUCTO ==================== */
+
+/** Returns the production cost of a single unit (frasco) of a product */
+function getCostoProducto(tipo, productoId, talla) {
+  var costos = _costosInsumos || _COSTOS_DEFAULTS;
+  var pkgC = (Number(costos.envaseChico) || 0) + (Number(costos.bolsaChica) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerChico) || 0);
+  var pkgG = (Number(costos.envaseGrande) || 0) + (Number(costos.bolsaGrande) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerGrande) || 0);
+  var pkg = talla === 'grande' ? pkgG : pkgC;
+  if (tipo === 'especia') {
+    var esp = _db.especias[productoId];
+    if (!esp) return 0;
+    var gramos = talla === 'grande' ? (Number(esp.gramosGrande) || 0) : (Number(esp.gramosChico) || 0);
+    var costoGrs = (costos.especias && costos.especias[productoId]) || 0;
+    return gramos * costoGrs + pkg;
+  } else if (tipo === 'blend') {
+    var blend = _db.blends[productoId];
+    if (!blend) return 0;
+    var ings = blend.ingredientes || [];
+    var total = 0;
+    for (var i = 0; i < ings.length; i++) {
+      var g = talla === 'grande' ? (Number(ings[i].gramosGrande) || 0) : (Number(ings[i].gramosChico) || 0);
+      var cpg = (costos.especias && costos.especias[ings[i].especiaId]) || 0;
+      total += g * cpg;
+    }
+    return total + pkg;
+  }
+  return pkg;
+}
+
+/** Get all sales grouped by channel with production costs */
+function getCostosPorCanal() {
+  var costos = _costosInsumos || _COSTOS_DEFAULTS;
+  var pkgC = (Number(costos.envaseChico) || 0) + (Number(costos.bolsaChica) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerChico) || 0);
+  var pkgG = (Number(costos.envaseGrande) || 0) + (Number(costos.bolsaGrande) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerGrande) || 0);
+
+  var channels = {
+    admin: { nombre: 'Ventas Admin', ventas: 0, ingreso: 0, costo: 0, productos: {} },
+    tienda: { nombre: 'Tienda Online', ventas: 0, ingreso: 0, costo: 0, productos: {} },
+    pdv: { nombre: 'Puntos de Venta', ventas: 0, ingreso: 0, costo: 0, productos: {}, pdvs: {} }
+  };
+
+  // 1. Admin ventas (sin pdvId)
+  var ventas = getVentas();
+  for (var i = 0; i < ventas.length; i++) {
+    var v = ventas[i];
+    var canal = v.pdvId ? 'pdv' : 'admin';
+    var ch = channels[canal];
+    ch.ventas++;
+    ch.ingreso += (v.total || 0);
+    var items = v.items || [];
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var tipo = it.tipo || 'especia';
+      var pid = it.productoId;
+      var talla = it.talla || 'chico';
+      var cant = it.cantidad || 0;
+      var costoUnit = getCostoProducto(tipo, pid, talla);
+      var costoTotal = costoUnit * cant;
+      ch.costo += costoTotal;
+      var key = (it.productoNombre || '?') + '|' + talla;
+      if (!ch.productos[key]) ch.productos[key] = { nombre: it.productoNombre || '?', tipo: tipo, talla: talla, cantidad: 0, ingreso: 0, costo: 0 };
+      ch.productos[key].cantidad += cant;
+      ch.productos[key].ingreso += (it.subtotal || 0);
+      ch.productos[key].costo += costoTotal;
+      if (canal === 'pdv' && v.pdvNombre) {
+        if (!ch.pdvs[v.pdvNombre]) ch.pdvs[v.pdvNombre] = { ventas: 0, ingreso: 0, costo: 0, productos: {} };
+        var pv = ch.pdvs[v.pdvNombre];
+        pv.ventas++;
+        pv.ingreso += (it.subtotal || 0);
+        pv.costo += costoTotal;
+        var pk2 = (it.productoNombre || '?') + '|' + talla;
+        if (!pv.productos[pk2]) pv.productos[pk2] = { nombre: it.productoNombre || '?', tipo: tipo, talla: talla, cantidad: 0, ingreso: 0, costo: 0 };
+        pv.productos[pk2].cantidad += cant;
+        pv.productos[pk2].ingreso += (it.subtotal || 0);
+        pv.productos[pk2].costo += costoTotal;
+      }
+    }
+  }
+
+  // 2. Tienda pedidos (entregados)
+  var pedidos = getPedidos();
+  for (var pi = 0; pi < pedidos.length; pi++) {
+    var p = pedidos[pi];
+    if (p.estado === 'cancelado') continue;
+    var ch2 = channels.tienda;
+    ch2.ventas++;
+    ch2.ingreso += (p.total || 0);
+    var pItems = p.items || [];
+    for (var pj = 0; pj < pItems.length; pj++) {
+      var pit = pItems[pj];
+      var ptipo = pit.tipo || 'especia';
+      var ppid = pit.productoId;
+      var ptalla = pit.talla || 'chico';
+      var pcant = pit.qty || pit.cantidad || 0;
+      var pcostoUnit = getCostoProducto(ptipo, ppid, ptalla);
+      var pcostoTotal = pcostoUnit * pcant;
+      ch2.costo += pcostoTotal;
+      var pkey = (pit.nombre || '?') + '|' + ptalla;
+      if (!ch2.productos[pkey]) ch2.productos[pkey] = { nombre: pit.nombre || '?', tipo: ptipo, talla: ptalla, cantidad: 0, ingreso: 0, costo: 0 };
+      ch2.productos[pkey].cantidad += pcant;
+      ch2.productos[pkey].ingreso += (pit.subtotal || pit.precio * pcant || 0);
+      ch2.productos[pkey].costo += pcostoTotal;
+    }
+  }
+
+  // 3. Stock costs per channel
+  channels.admin.stockCosto = 0;
+  channels.admin.stockDetalle = [];
+  var espKeys = Object.keys(_db.especias || {});
+  for (var ei = 0; ei < espKeys.length; ei++) {
+    var e = _db.especias[espKeys[ei]];
+    if (!e || typeof e !== 'object') continue;
+    var ecCh = getCostoProducto('especia', e.id, 'chico') * (e.stockChico || 0);
+    var ecGr = getCostoProducto('especia', e.id, 'grande') * (e.stockGrande || 0);
+    channels.admin.stockCosto += ecCh + ecGr;
+    if (ecCh + ecGr > 0) channels.admin.stockDetalle.push({ nombre: e.nombre, tipo: 'especia', chico: e.stockChico || 0, grande: e.stockGrande || 0, costoChico: getCostoProducto('especia', e.id, 'chico'), costoGrande: getCostoProducto('especia', e.id, 'grande'), costoTotal: ecCh + ecGr });
+  }
+  var blKeys = Object.keys(_db.blends || {});
+  for (var bi = 0; bi < blKeys.length; bi++) {
+    var b = _db.blends[blKeys[bi]];
+    if (!b || typeof b !== 'object') continue;
+    var bcCh = getCostoProducto('blend', b.id, 'chico') * (b.stockChico || 0);
+    var bcGr = getCostoProducto('blend', b.id, 'grande') * (b.stockGrande || 0);
+    channels.admin.stockCosto += bcCh + bcGr;
+    if (bcCh + bcGr > 0) channels.admin.stockDetalle.push({ nombre: b.nombre, tipo: 'blend', chico: b.stockChico || 0, grande: b.stockGrande || 0, costoChico: getCostoProducto('blend', b.id, 'chico'), costoGrande: getCostoProducto('blend', b.id, 'grande'), costoTotal: bcCh + bcGr });
+  }
+
+  // Tienda stock = same as admin stock but only enTienda products
+  channels.tienda.stockCosto = 0;
+  channels.tienda.stockDetalle = [];
+  for (var ti = 0; ti < espKeys.length; ti++) {
+    var te = _db.especias[espKeys[ti]];
+    if (!te || !te.enTienda) continue;
+    var tecCh = getCostoProducto('especia', te.id, 'chico') * (te.stockChico || 0);
+    var tecGr = getCostoProducto('especia', te.id, 'grande') * (te.stockGrande || 0);
+    channels.tienda.stockCosto += tecCh + tecGr;
+    if (tecCh + tecGr > 0) channels.tienda.stockDetalle.push({ nombre: te.nombre, tipo: 'especia', chico: te.stockChico || 0, grande: te.stockGrande || 0, costoChico: getCostoProducto('especia', te.id, 'chico'), costoGrande: getCostoProducto('especia', te.id, 'grande'), costoTotal: tecCh + tecGr });
+  }
+  for (var tbi = 0; tbi < blKeys.length; tbi++) {
+    var tb = _db.blends[blKeys[tbi]];
+    if (!tb || !tb.enTienda) continue;
+    var tbcCh = getCostoProducto('blend', tb.id, 'chico') * (tb.stockChico || 0);
+    var tbcGr = getCostoProducto('blend', tb.id, 'grande') * (tb.stockGrande || 0);
+    channels.tienda.stockCosto += tbcCh + tbcGr;
+    if (tbcCh + tbcGr > 0) channels.tienda.stockDetalle.push({ nombre: tb.nombre, tipo: 'blend', chico: tb.stockChico || 0, grande: tb.stockGrande || 0, costoChico: getCostoProducto('blend', tb.id, 'chico'), costoGrande: getCostoProducto('blend', tb.id, 'grande'), costoTotal: tbcCh + tbcGr });
+  }
+
+  // PDV stock
+  channels.pdv.stockCosto = 0;
+  channels.pdv.stockDetalle = [];
+  var pdvs = _filterValid(Object.values(_db.puntosDeVenta || {}));
+  for (var pi2 = 0; pi2 < pdvs.length; pi2++) {
+    var pdv = pdvs[pi2];
+    var pdvStock = pdv.stock || {};
+    var pdvCosto = 0;
+    var sks = Object.keys(pdvStock);
+    for (var si = 0; si < sks.length; si++) {
+      var cant = Number(pdvStock[sks[si]]) || 0;
+      if (cant <= 0) continue;
+      var parts = sks[si].split('_');
+      var stipo = parts[0], sprodId = Number(parts[1]), stalla = parts[2];
+      var cu = getCostoProducto(stipo, sprodId, stalla);
+      pdvCosto += cu * cant;
+    }
+    channels.pdv.stockCosto += pdvCosto;
+    if (pdvCosto > 0) channels.pdv.stockDetalle.push({ nombre: pdv.nombre || 'PDV', tipo: 'pdv', chico: 0, grande: 0, costoChico: 0, costoGrande: 0, costoTotal: pdvCosto, pdvId: pdv.id });
+  }
+
+  return channels;
+}
+
 /* ==================== PACKS DE BLENDS ==================== */
 
 function getPacks() {
@@ -1579,5 +1750,6 @@ window.ArcanoDB = {
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack,
-  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange
+  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
+  getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal
 };
