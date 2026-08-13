@@ -57,7 +57,7 @@ function renderProducts(filter) {
     grid.innerHTML = '<div class="empty-state"><p style="font-size:2rem;margin-bottom:8px">\ud83c\udf36</p><p>No hay productos disponibles por el momento.</p></div>';
     return;
   }
-  var filtered = filter && filter !== 'Todos' ? products.filter(function(p) { return p.categoria === filter; }) : products;
+  var filtered = filter && filter !== 'Todos' ? products.filter(function(p) { return (p.categorias || []).indexOf(filter) >= 0; }) : products;
   if (filtered.length === 0) {
     grid.innerHTML = '<div class="empty-state"><p>No hay productos en esta categoria.</p></div>';
     return;
@@ -68,18 +68,8 @@ function renderProducts(filter) {
     var hasChico = p.stockChico > 0 && p.precioChico > 0;
     var hasGrande = p.stockGrande > 0 && p.precioGrande > 0;
     var anyStock = hasChico || hasGrande;
-    var stockClass = (hasChico && p.stockChico <= 3) || (hasGrande && p.stockGrande <= 3) ? 'stock-low' : 'stock-ok';
-    var stockText = '';
-    if (hasChico && hasGrande) stockText = 'Ch: ' + p.stockChico + ' | Gr: ' + p.stockGrande;
-    else if (hasChico) stockText = 'Chico: ' + p.stockChico + ' disp.';
-    else if (hasGrande) stockText = 'Grande: ' + p.stockGrande + ' disp.';
-
-    var usoTags = [];
-    if (p.tags && p.tags.length) {
-      usoTags = p.tags;
-    } else if (p.uso) {
-      usoTags = p.uso.split(/[,;]/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
-    }
+    var meta = (p.tipo === 'blend' ? 'Blend' : 'Especia');
+    if (p.categorias && p.categorias.length > 1) { meta += ' \u00b7 ' + p.categorias.join(' / '); } else if (p.categoria) { meta += ' \u00b7 ' + p.categoria; }
 
     h += '<div class="product-card">' +
       '<div class="card-img" style="position:relative" onclick="openDetail(' + p.id + ')">' +
@@ -87,32 +77,32 @@ function renderProducts(filter) {
       '</div>' +
       '<div class="card-body">' +
         '<div class="card-name">' + p.nombre + '</div>' +
-        (usoTags.length ? '<div class="card-tags">' + usoTags.map(function(t){return '<span class="card-tag">' + t + '</span>';}).join('') + '</div>' : '') +
-        (anyStock ? '<span class="stock-badge ' + stockClass + '">' + stockText + '</span>' : '') +
+        '<div class="card-meta">' + meta + '</div>' +
         '<div class="card-prices">' +
-          (hasChico ? '<div class="price-box"><div class="price-label">Chico</div><div class="price-value">$' + p.precioChico.toLocaleString() + '</div></div>' : '') +
-          (hasGrande ? '<div class="price-box"><div class="price-label">Grande</div><div class="price-value">$' + p.precioGrande.toLocaleString() + '</div></div>' : '') +
+          (hasChico ? '<button class="price-box price-box-btn" onclick="event.stopPropagation();addToCartByIdAndSize(' + p.id + ', &#39;chico&#39;)"><div class="price-label">Pequeño</div><div class="price-value">$' + p.precioChico.toLocaleString() + '</div></button>' : '') +
+          (hasGrande ? '<button class="price-box price-box-btn" onclick="event.stopPropagation();addToCartByIdAndSize(' + p.id + ', &#39;grande&#39;)"><div class="price-label">Grande</div><div class="price-value">$' + p.precioGrande.toLocaleString() + '</div></button>' : '') +
           (!hasChico && !hasGrande ? '<div class="price-na">Sin precio</div>' : '') +
         '</div>' +
-        (hasChico && hasGrande ?
-          '<div class="card-size-btns">' +
-            '<button class="add-btn size-btn" onclick="doAddToCart(' + p.id + ',\'chico\')">Chico $' + p.precioChico.toLocaleString() + '</button>' +
-            '<button class="add-btn size-btn" onclick="doAddToCart(' + p.id + ',\'grande\')">Grande $' + p.precioGrande.toLocaleString() + '</button>' +
-          '</div>' :
-          (hasChico ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ',\'chico\')">Agregar $' + p.precioChico.toLocaleString() + '</button>' :
-          (hasGrande ? '<button class="add-btn" onclick="doAddToCart(' + p.id + ',\'grande\')">Agregar $' + p.precioGrande.toLocaleString() + '</button>' :
-          '<button class="add-btn" disabled>Sin stock</button>'))) +
+        (!anyStock ? '<button class="add-btn" disabled>Sin stock</button>' : '') +
       '</div></div>';
   }
   grid.innerHTML = h;
 }
 
-function doAddToCart(pid, talla) {
+function addToCartByIdAndSize(pid, talla) {
   var products = getStoreProducts();
   var product = null;
   for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { product = products[i]; break; } }
   if (!product) return;
-  if (!talla) talla = (product.stockChico > 0 && product.precioChico > 0) ? 'chico' : 'grande';
+  addToCart(product, talla);
+}
+
+function doAddToCart(pid) {
+  var products = getStoreProducts();
+  var product = null;
+  for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { product = products[i]; break; } }
+  if (!product) return;
+  var talla = (product.stockChico > 0 && product.precioChico > 0) ? 'chico' : 'grande';
   addToCart(product, talla);
 }
 
@@ -130,7 +120,7 @@ function openDetail(pid) {
   var typeLabel = p.tipo === 'blend' ? 'Blend' : 'Especia';
 
   var tagsHtml = '';
-  if (p.categoria) tagsHtml += '<span class="detail-info-tag">' + p.categoria + '</span>';
+  if (p.categorias && p.categorias.length > 0) { for (var ci = 0; ci < p.categorias.length; ci++) { tagsHtml += '<span class="detail-info-tag">' + p.categorias[ci] + '</span>'; } } else if (p.categoria) { tagsHtml += '<span class="detail-info-tag">' + p.categoria + '</span>'; }
   if (p.uso) tagsHtml += '<span class="detail-info-tag">' + p.uso + '</span>';
   if (p.region) tagsHtml += '<span class="detail-info-tag">' + p.region + '</span>';
   if (p.tags && p.tags.length) {
@@ -140,15 +130,21 @@ function openDetail(pid) {
   }
 
   var pricesHtml = '';
-  if (hasChico) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Chico</div><div class="detail-price-val">$' + p.precioChico.toLocaleString() + '</div></div>';
-  if (hasGrande) pricesHtml += '<div class="detail-price-card"><div class="detail-price-label">Grande</div><div class="detail-price-val">$' + p.precioGrande.toLocaleString() + '</div></div>';
-
-  var stockHtml = '';
-  if (hasChico && hasGrande) stockHtml = 'Chico: ' + p.stockChico + ' disponibles \u00b7 Grande: ' + p.stockGrande + ' disponibles';
-  else if (hasChico) stockHtml = p.stockChico + ' frascos disponibles';
-  else if (hasGrande) stockHtml = p.stockGrande + ' frascos disponibles';
+  if (hasChico) pricesHtml += '<button class="detail-price-card detail-price-btn" onclick="addToCartByIdAndSize(' + p.id + ', ' + String.fromCharCode(39) + 'chico' + String.fromCharCode(39) + ');document.getElementById(' + String.fromCharCode(39) + 'detail-overlay' + String.fromCharCode(39) + ').remove()"><div class="detail-price-label">Pequeño</div><div class="detail-price-val">$' + p.precioChico.toLocaleString() + '</div></button>';
+  if (hasGrande) pricesHtml += '<button class="detail-price-card detail-price-btn" onclick="addToCartByIdAndSize(' + p.id + ', ' + String.fromCharCode(39) + 'grande' + String.fromCharCode(39) + ');document.getElementById(' + String.fromCharCode(39) + 'detail-overlay' + String.fromCharCode(39) + ').remove()"><div class="detail-price-label">Grande</div><div class="detail-price-val">$' + p.precioGrande.toLocaleString() + '</div></button>';
 
   var descHtml = p.descripcion ? '<p class="detail-desc">' + p.descripcion + '</p>' : '';
+
+  // Mostrar ingredientes para blends
+  var ingsHtml = '';
+  if (p.tipo === 'blend' && p.ingredientes && p.ingredientes.length > 0) {
+    ingsHtml = '<div style="margin-top:12px"><div style="font-size:.8rem;font-weight:600;color:var(--gold);margin-bottom:6px">Ingredientes</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+    for (var ii = 0; ii < p.ingredientes.length; ii++) {
+      var ing = p.ingredientes[ii];
+      ingsHtml += '<span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:.75rem;background:rgba(232,184,75,0.12);color:var(--gold);border:1px solid rgba(232,184,75,0.25)">' + (ing.especiaNombre || 'Especia') + '</span>';
+    }
+    ingsHtml += '</div></div>';
+  }
 
   var overlay = document.createElement('div');
   overlay.className = 'detail-overlay';
@@ -165,16 +161,8 @@ function openDetail(pid) {
       '<h2>' + p.nombre + '</h2>' +
       (tagsHtml ? '<div class="detail-info-row">' + tagsHtml + '</div>' : '') +
       descHtml +
+      ingsHtml +
       (pricesHtml ? '<div class="detail-prices-row">' + pricesHtml + '</div>' : '') +
-      (stockHtml ? '<p class="detail-stock">' + stockHtml + '</p>' : '') +
-      (anyStock ?
-        (hasChico && hasGrande ?
-          '<div class="detail-size-btns">' +
-            '<button class="detail-add-btn detail-size-btn" onclick="doAddToCart(' + p.id + ',\'chico\');document.getElementById(\'detail-overlay\').remove()">Chico $' + p.precioChico.toLocaleString() + '</button>' +
-            '<button class="detail-add-btn detail-size-btn" onclick="doAddToCart(' + p.id + ',\'grande\');document.getElementById(\'detail-overlay\').remove()">Grande $' + p.precioGrande.toLocaleString() + '</button>' +
-          '</div>' :
-          '<button class="detail-add-btn" onclick="doAddToCart(' + p.id + ',\'' + (hasChico ? 'chico' : 'grande') + '\');document.getElementById(\'detail-overlay\').remove()">Agregar al pedido</button>')
-        : '<button class="detail-add-btn" disabled>Sin stock</button>') +
     '</div></div>';
 
   overlay.innerHTML = html;
@@ -208,7 +196,7 @@ function renderCartModal() {
       var c = cart[i];
       h += '<div class="cart-item">' +
         '<div class="cart-item-info"><div class="cart-item-name">' + c.nombre + '</div>' +
-        '<div class="cart-item-detail">' + (c.talla === 'grande' ? 'Grande' : 'Chico') + ' \u00b7 $' + c.precio.toLocaleString() + ' c/u</div></div>' +
+        '<div class="cart-item-detail">' + (c.talla === 'grande' ? 'Grande' : 'Pequeño') + ' \u00b7 $' + c.precio.toLocaleString() + ' c/u</div></div>' +
         '<div class="cart-item-qty"><button onclick="changeQty(' + i + ',-1)">-</button><span>' + c.qty + '</span><button onclick="changeQty(' + i + ',1)">+</button></div>' +
         '<div class="cart-item-price">$' + (c.precio * c.qty).toLocaleString() + '</div>' +
         '<button class="cart-item-rm" onclick="removeFromCart(' + i + ')">&times;</button></div>';
@@ -321,6 +309,44 @@ function selectRecetaCat(cat) {
   for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].dataset.cat === cat);
   renderRecetas();
 }
+/* === ARCANO PRODUCT LINKER (recipes) === */
+var _arcanoLinkData = null;
+
+function _getArcanoLinkData() {
+  if (_arcanoLinkData) return _arcanoLinkData;
+  var products = getStoreProducts();
+  var map = {};
+  for (var i = 0; i < products.length; i++) {
+    var p = products[i];
+    if (p.nombre && (p.precioChico > 0 || p.precioGrande > 0)) map[p.nombre] = p.id;
+  }
+  var names = Object.keys(map);
+  if (names.length === 0) { _arcanoLinkData = { regex: null, map: map }; return _arcanoLinkData; }
+  names.sort(function(a, b) { return b.length - a.length; });
+  var escaped = [];
+  for (var i = 0; i < names.length; i++) {
+    escaped.push(names[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  }
+  _arcanoLinkData = {
+    regex: new RegExp('(^|[\\s,.:;!?])(' + escaped.join('|') + ')(?=[\\s,.:;!?]|$)', 'gi'),
+    map: map
+  };
+  return _arcanoLinkData;
+}
+
+function _linkArcanoProducts(text) {
+  var data = _getArcanoLinkData();
+  if (!data.regex) return text;
+  return text.replace(data.regex, function(full, before, name) {
+    var pid = null;
+    for (var k in data.map) {
+      if (k.toLowerCase() === name.toLowerCase()) { pid = data.map[k]; break; }
+    }
+    if (!pid) return full;
+    return before + '<span class=\'arcano-link\' onclick=\'event.stopPropagation();openDetail(' + pid + ')\'>' + name + '</span>';
+  });
+}
+
 function renderRecetas() {
   var recetas = getRecetas();
   var filtered = [];
@@ -333,13 +359,13 @@ function renderRecetas() {
     var ingredientes = '';
     if (r.ingredientes && r.ingredientes.length) {
       ingredientes = '<div class="recipe-sb-label">Ingredientes</div><ul class="recipe-sb-list">';
-      for (var j = 0; j < r.ingredientes.length; j++) ingredientes += '<li>' + r.ingredientes[j] + '</li>';
+      for (var j = 0; j < r.ingredientes.length; j++) ingredientes += '<li>' + _linkArcanoProducts(r.ingredientes[j]) + '</li>';
       ingredientes += '</ul>';
     }
     var pasos = '';
     if (r.pasos && r.pasos.length) {
       pasos = '<div class="recipe-sb-label">Preparaci\u00f3n</div><ol class="recipe-sb-steps">';
-      for (var k = 0; k < r.pasos.length; k++) pasos += '<li>' + r.pasos[k] + '</li>';
+      for (var k = 0; k < r.pasos.length; k++) pasos += '<li>' + _linkArcanoProducts(r.pasos[k]) + '</li>';
       pasos += '</ol>';
     }
     h += '<div class="recipe-card-sb" id="recipe-' + r._key + '">' +
@@ -348,7 +374,7 @@ function renderRecetas() {
       '<div class="recipe-card-sb-meta">' + (r.tiempo || '') + (r.porciones ? ' \u00b7 ' + r.porciones + ' porciones' : '') + '</div></div>' +
       '<div class="recipe-card-sb-arrow">\u25BC</div></div>' +
       '<div class="recipe-card-sb-body"><div class="recipe-card-sb-inner">' +
-      (r.descripcion ? '<p class="recipe-sb-desc">' + r.descripcion + '</p>' : '') +
+      (r.descripcion ? '<p class="recipe-sb-desc">' + _linkArcanoProducts(r.descripcion) + '</p>' : '') +
       ingredientes + pasos +
       '<button class="recipe-share-btn" onclick="event.stopPropagation();compartirReceta(\'' + r._key + '\')">Compartir receta</button>' +
       '</div></div></div>';
@@ -370,10 +396,20 @@ function renderSocialLinks() {
 function renderSidebarLogo() {
   var el = document.getElementById('sidebar-brand');
   if (!el) return;
-  // Use the same logo from the header
-  var headerImg = document.querySelector('.store-logo img');
-  if (headerImg) {
-    el.innerHTML = '<img src="' + headerImg.src + '" alt="Arcano">';
+  var cfg = (_sDb && _sDb.tiendaConfig) || {};
+  var nequi = cfg.logoNequi || '';
+  var bancolombia = cfg.logoBancolombia || '';
+  if (nequi || bancolombia) {
+    var h = '<div class="pago-logos">';
+    if (nequi) h += '<img src="' + nequi + '" alt="Nequi" class="pago-logo-img">';
+    if (bancolombia) h += '<img src="' + bancolombia + '" alt="Bancolombia" class="pago-logo-img">';
+    h += '</div>';
+    el.innerHTML = h;
+  } else {
+    var headerImg = document.querySelector('.store-logo img');
+    if (headerImg) {
+      el.innerHTML = '<img src="' + headerImg.src + '" alt="Arcano">';
+    }
   }
 }
 function compartirReceta(key) {
@@ -414,12 +450,17 @@ function compartirReceta(key) {
 /* === INIT === */
 var currentFilter = 'Todos';
 document.addEventListener('DOMContentLoaded', function() {
+  // Lock portrait orientation on mobile
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('portrait').catch(function() {});
+  }
   initTienda().then(function() {
     renderProducts('Todos');
     updateCartFab();
     onRecetasReady(function() { renderRecetas(); });
     initRecetas();
     renderSidebarLogo();
+    onTiendaChange(renderSidebarLogo);
     renderSocialLinks();
   });
 
