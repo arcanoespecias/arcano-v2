@@ -2369,7 +2369,41 @@ const Pages = {
       h += '</tbody></table></div>';
     }
     h += '</div></div>';
+
+    // Logos de pago
+    var cfg = ArcanoDB.getTiendaConfig();
+    h += '<div class="card mt-16"><div class="card-header"><h3>Logos de Metodos de Pago (Nequi / Bancolombia)</h3></div><div class="card-body">' +
+      '<p class="text-xs text-muted mb-12">Estos logos se muestran en el sidebar de la tienda online.</p>' +
+      '<div class="g2">' +
+        '<div class="form-group"><label>Logo Nequi</label>' +
+          '<div class="img-upload-area" id="img-area-nequi"><input type="file" accept="image/*" id="f-logo-nequi" style="display:none" onchange="Pages._handlePagoLogo(this,\'nequi\')">' +
+          (cfg.logoNequi ? '<img src="' + cfg.logoNequi + '" class="img-preview" id="img-preview-nequi"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo(\'nequi\')">Quitar</button>' : '') +
+          '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-nequi\').click()"><span>+ Nequi</span></div></div></div>' +
+        '<div class="form-group"><label>Logo Bancolombia</label>' +
+          '<div class="img-upload-area" id="img-area-bancolombia"><input type="file" accept="image/*" id="f-logo-bancolombia" style="display:none" onchange="Pages._handlePagoLogo(this,\'bancolombia\')">' +
+          (cfg.logoBancolombia ? '<img src="' + cfg.logoBancolombia + '" class="img-preview" id="img-preview-bancolombia"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo(\'bancolombia\')">Quitar</button>' : '') +
+          '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-bancolombia\').click()"><span>+ Bancolombia</span></div></div></div>' +
+      '</div></div></div>';
+
     container.innerHTML = h;
+  },
+
+  _handlePagoLogo: function(input, tipo) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    ArcanoDB.compressImage(file, 200, function(dataUrl) {
+      var data = {};
+      data[tipo === 'nequi' ? 'logoNequi' : 'logoBancolombia'] = dataUrl;
+      ArcanoDB.saveTiendaConfig(data);
+      App.renderPage('tienda-admin');
+    });
+  },
+
+  _removePagoLogo: function(tipo) {
+    var data = {};
+    data[tipo === 'nequi' ? 'logoNequi' : 'logoBancolombia'] = '';
+    ArcanoDB.saveTiendaConfig(data);
+    App.renderPage('tienda-admin');
   },
 
   /* ================================================================
