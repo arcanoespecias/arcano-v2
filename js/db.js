@@ -89,7 +89,7 @@ function _ensureStructure() {
     'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
     'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
   };
-  if (!_db.tiendaConfig) _db.tiendaConfig = { logoNequi: '', logoBancolombia: '' };
+  if (!_db.tiendaConfig) _db.tiendaConfig = { logoPago: '' };
   _cleanNulls();
   return true;
 }
@@ -1724,13 +1724,12 @@ function deletePack(id) {
 /* ==================== TIENDA CONFIG ==================== */
 
 function getTiendaConfig() {
-  return _db.tiendaConfig || { logoNequi: '', logoBancolombia: '' };
+  return _db.tiendaConfig || { logoPago: '' };
 }
 
 function saveTiendaConfig(data) {
   if (!_db.tiendaConfig) _db.tiendaConfig = {};
-  if (typeof data.logoNequi === 'string') _db.tiendaConfig.logoNequi = data.logoNequi;
-  if (typeof data.logoBancolombia === 'string') _db.tiendaConfig.logoBancolombia = data.logoBancolombia;
+  if (typeof data.logoPago === 'string') _db.tiendaConfig.logoPago = data.logoPago;
   _saveToFirebase(); _cacheLocal();
   return _db.tiendaConfig;
 }
