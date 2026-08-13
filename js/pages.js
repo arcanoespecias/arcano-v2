@@ -608,6 +608,7 @@ const Pages = {
         '<p class="text-xs text-muted">Estos son los precios que se mostraran en la tienda.</p></div></div>' +
         '<div class="form-group"><label>Ingredientes</label><div id="blend-ings"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ing">+ Ingrediente</button></div>' +
+        '<div id="f-bl-cost-preview"></div>' +
         '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Tienda Online</h3></div><div class="card-body">' +
         '<div class="form-group"><label>Visible en Tienda</label><select class="input" id="f-bl-tienda"><option value="0"' + (isEdit && !bl.enTienda ? ' selected' : '') + '>No</option><option value="1"' + (isEdit && bl.enTienda ? ' selected' : (!isEdit ? ' selected' : '')) + '>Si</option></select></div>' +
         '<p class="text-xs text-muted mb-8">Precio especial para la tienda online (opcional). Si lo dejas vacio se usara el precio de venta.</p>' +
@@ -644,12 +645,18 @@ const Pages = {
         '<div class="form-group" style="margin:0"><label>Grs/Grande</label><input type="number" class="input ing-gg" value="' + gg + '" placeholder="0" min="0"></div>' +
         '<div><button class="btn btn-sm btn-red btn-rm-ing">X</button></div>';
       if (selVal) div.querySelector('.ing-esp').value = selVal;
-      div.querySelector('.btn-rm-ing').addEventListener('click', function() { div.remove(); });
+      div.querySelector('.btn-rm-ing').addEventListener('click', function() { div.remove(); Pages._updateBlendCost(); });
+      div.querySelector('.ing-esp').addEventListener('change', function() { Pages._updateBlendCost(); });
+      div.querySelector('.ing-gc').addEventListener('input', function() { Pages._updateBlendCost(); });
+      div.querySelector('.ing-gg').addEventListener('input', function() { Pages._updateBlendCost(); });
       ingContainer.appendChild(div);
     }
 
     for (var i = 0; i < ings.length; i++) addIngRow(ings[i]);
-    document.getElementById('btn-add-ing').addEventListener('click', function() { addIngRow(null); });
+    document.getElementById('btn-add-ing').addEventListener('click', function() { addIngRow(null); Pages._updateBlendCost(); });
+    document.getElementById('f-bl-pc').addEventListener('input', function() { Pages._updateBlendCost(); });
+    document.getElementById('f-bl-pg').addEventListener('input', function() { Pages._updateBlendCost(); });
+    Pages._updateBlendCost();
 
     // Save
     document.getElementById('btn-save-bl').addEventListener('click', function() {
@@ -692,6 +699,49 @@ const Pages = {
     });
 
     if (!isEdit) document.getElementById('f-bl-nombre').focus();
+  },
+
+  _updateBlendCost: function() {
+    var costos = ArcanoDB.getCostosInsumos();
+    var pkgC = (costos.envaseChico||0) + (costos.bolsaChica||0) + (costos.cinta||0) + (costos.stickerChico||0);
+    var pkgG = (costos.envaseGrande||0) + (costos.bolsaGrande||0) + (costos.cinta||0) + (costos.stickerGrande||0);
+    var rows = document.querySelectorAll('#blend-ings .g4');
+    var costEspC = 0, costEspG = 0;
+    var lines = [];
+    var especias = ArcanoDB.getEspecias();
+    for (var i = 0; i < rows.length; i++) {
+      var espId = Number(rows[i].querySelector('.ing-esp').value);
+      var gc = Number(rows[i].querySelector('.ing-gc').value) || 0;
+      var gg = Number(rows[i].querySelector('.ing-gg').value) || 0;
+      if (!espId) continue;
+      var cp = (costos.especias && costos.especias[espId]) || 0;
+      var cC = gc * cp;
+      var cG = gg * cp;
+      costEspC += cC;
+      costEspG += cG;
+      var espName = '';
+      for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espName = especias[s].nombre; break; } }
+      if (gc > 0 || gg > 0) lines.push(espName + ': ' + gc + 'g=$' + cC.toFixed(0) + ' / ' + gg + 'g=$' + cG.toFixed(0));
+    }
+    var totalC = costEspC + pkgC;
+    var totalG = costEspG + pkgG;
+    var precioC = Number((document.getElementById('f-bl-pc') || {}).value) || 0;
+    var precioG = Number((document.getElementById('f-bl-pg') || {}).value) || 0;
+    var margenC = precioC - totalC;
+    var margenG = precioG - totalG;
+    var pctC = precioC > 0 ? (margenC / precioC * 100).toFixed(1) : '0';
+    var pctG = precioG > 0 ? (margenG / precioG * 100).toFixed(1) : '0';
+    var el = document.getElementById('f-bl-cost-preview');
+    if (!el) return;
+    el.innerHTML = '<div class="card mt-12" style="background:var(--bg);border-color:var(--gold)"><div class="card-header"><h3>Costo de Produccion</h3></div><div class="card-body">' +
+      '<div class="text-xs text-muted mb-8">Envase+Bolsa+Cinta+Sticker: Pequeno=$' + pkgC.toFixed(0) + ' / Grande=$' + pkgG.toFixed(0) + '</div>' +
+      (lines.length ? '<div class="text-xs mb-8" style="line-height:1.8">' + lines.join('<br>') + '</div>' : '<div class="text-xs text-muted mb-8">Agrega ingredientes para ver el costo</div>') +
+      '<div style="border-top:1px solid var(--border);padding-top:8px" class="g2">' +
+        '<div><div class="fw7">Pequeno</div><div class="text-sm">Especias: $' + costEspC.toFixed(0) + ' + Empaque: $' + pkgC.toFixed(0) + ' = <b style="color:var(--red)">$' + totalC.toFixed(0) + '</b></div>' +
+          (precioC > 0 ? '<div class="text-xs mt-4">Venta: $' + precioC + ' | Margen: <span style="color:' + (margenC >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margenC.toFixed(0) + ' (' + pctC + '%)</span></div>' : '') + '</div>' +
+        '<div><div class="fw7">Grande</div><div class="text-sm">Especias: $' + costEspG.toFixed(0) + ' + Empaque: $' + pkgG.toFixed(0) + ' = <b style="color:var(--red)">$' + totalG.toFixed(0) + '</b></div>' +
+          (precioG > 0 ? '<div class="text-xs mt-4">Venta: $' + precioG + ' | Margen: <span style="color:' + (margenG >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margenG.toFixed(0) + ' (' + pctG + '%)</span></div>' : '') + '</div>' +
+      '</div></div></div>';
   },
 
   delBlend(id) {
