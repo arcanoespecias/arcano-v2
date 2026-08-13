@@ -355,10 +355,12 @@ const Pages = {
     if (tab === 'especias') {
       if (especias.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin especias. Crea una o importa desde Excel.</p></div></div>';
+      } else if (filteredEspecias.length === 0) {
+        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron especias para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala</th><th>Grs/Ch</th><th>Grs/Gr</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < especias.length; i++) {
-          var e = especias[i];
+        for (var i = 0; i < filteredEspecias.length; i++) {
+          var e = filteredEspecias[i];
           h += '<tr>' +
             '<td class="fw7">' + e.nombre + '</td>' +
             '<td><span class="badge badge-gold">' + ((e.categorias||[]).length ? (e.categorias||[]).join(', ') : (e.categoria||'—')) + '</span></td>' +
@@ -384,10 +386,12 @@ const Pages = {
     if (tab === 'blends') {
       if (blends.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">Sin blends. Crea uno nuevo.</p></div></div>';
+      } else if (filteredBlends.length === 0) {
+        h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron blends para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
-        for (var i = 0; i < blends.length; i++) {
-          var b = blends[i];
+        for (var i = 0; i < filteredBlends.length; i++) {
+          var b = filteredBlends[i];
           var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
           h += '<tr>' +
             '<td class="fw7">' + b.nombre + '</td>' +
