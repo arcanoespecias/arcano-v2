@@ -362,9 +362,11 @@ function saveEspecia(data) {
   } else {
     var existing = _db.especias[data.id];
     if (existing) {
-      data.stockBolsa = Number(existing.stockBolsa) || 0;
-      data.stockChico = Number(existing.stockChico) || 0;
-      data.stockGrande = Number(existing.stockGrande) || 0;
+      for (var _k in existing) {
+        if (existing.hasOwnProperty(_k) && !data.hasOwnProperty(_k)) {
+          data[_k] = existing[_k];
+        }
+      }
       data.creado = existing.creado;
     }
   }
@@ -407,8 +409,11 @@ function saveBlend(data) {
   } else {
     var existing = _db.blends[data.id];
     if (existing) {
-      data.stockChico = Number(existing.stockChico) || 0;
-      data.stockGrande = Number(existing.stockGrande) || 0;
+      for (var _k in existing) {
+        if (existing.hasOwnProperty(_k) && !data.hasOwnProperty(_k)) {
+          data[_k] = existing[_k];
+        }
+      }
       data.creado = existing.creado;
     }
   }
