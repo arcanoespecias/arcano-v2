@@ -2655,16 +2655,16 @@ const Pages = {
     var costos = ArcanoDB.getCostosInsumos();
 
     // === Sheet ESPECIAS ===
-    var espRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
     for (var i = 0; i < especias.length; i++) {
       var e = especias[i];
-      espRows.push([e.id, e.nombre, e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
     }
     var espSheet = XLSX.utils.aoa_to_sheet(espRows);
-    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
 
     // === Sheet BLENDS ===
-    var blRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
     var _expEspMap = {};
     for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
     for (var j = 0; j < blends.length; j++) {
@@ -2681,6 +2681,7 @@ const Pages = {
           blRows.push([
             k === 0 ? b.id : '',
             k === 0 ? b.nombre : '',
+            k === 0 ? (b.descripcion || '') : '',
             k === 0 ? (b.categoria || '') : '',
             k === 0 ? (b.precioChico || 0) : '',
             k === 0 ? (b.precioGrande || 0) : '',
@@ -2698,7 +2699,7 @@ const Pages = {
       }
     }
     var blSheet = XLSX.utils.aoa_to_sheet(blRows);
-    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
 
     // === Sheet COSTOS ===
     var costRows = [['Campo', 'Valor']];
@@ -2802,10 +2803,11 @@ const Pages = {
               espUpdates.push({
                 id: rawId,
                 nombre: nombre,
-                categoria: String(row[2] || '').trim() || 'Especias',
-                precioChico: Number(row[3]) || 0,
-                precioGrande: Number(row[4]) || 0,
-                enTienda: String(row[8] || '').toLowerCase() === 'si',
+                descripcion: String(row[2] || '').trim(),
+                categoria: String(row[3] || '').trim() || 'Especias',
+                precioChico: Number(row[4]) || 0,
+                precioGrande: Number(row[5]) || 0,
+                enTienda: String(row[9] || '').toLowerCase() === 'si',
                 isNew: !rawId || !ArcanoDB.getEspecia(rawId)
               });
             }
@@ -2825,17 +2827,19 @@ const Pages = {
                 blUpdates[currentBlId] = {
                   id: currentBlId,
                   nombre: String(row[1] || '').trim(),
-                  categoria: String(row[2] || '').trim(),
-                  precioChico: Number(row[3]) || 0,
-                  precioGrande: Number(row[4]) || 0,
-                  enTienda: String(row[7] || '').toLowerCase() === 'si',
+                  descripcion: String(row[2] || '').trim(),
+                  categoria: String(row[3] || '').trim(),
+                  precioChico: Number(row[4]) || 0,
+                  precioGrande: Number(row[5]) || 0,
+                  enTienda: String(row[8] || '').toLowerCase() === 'si',
                   ingredientes: []
                 };
               }
-              if (currentBlId && row[8]) {
+              if (currentBlId && row[9]) {
                 blUpdates[currentBlId].ingredientes.push({
-                  especiaNombre: String(row[8] || '').trim(),
-                  gramos: Number(row[9]) || 0
+                  especiaNombre: String(row[9] || '').trim(),
+                  gramosChico: Number(row[10]) || 0,
+                  gramosGrande: Number(row[11]) || 0
                 });
               }
             }
@@ -2936,6 +2940,7 @@ const Pages = {
                   ArcanoDB.saveEspecia({
                     id: u.id,
                     nombre: u.nombre || existing.nombre,
+                    descripcion: u.descripcion || existing.descripcion || '',
                     categoria: u.categoria || existing.categoria,
                     precioChico: u.precioChico,
                     precioGrande: u.precioGrande,
@@ -2949,6 +2954,7 @@ const Pages = {
                     ArcanoDB.saveEspecia({
                       id: byName.id,
                       nombre: u.nombre,
+                      descripcion: u.descripcion,
                       categoria: u.categoria,
                       precioChico: u.precioChico,
                       precioGrande: u.precioGrande,
@@ -2957,6 +2963,7 @@ const Pages = {
                   } else {
                     ArcanoDB.saveEspecia({
                       nombre: u.nombre,
+                      descripcion: u.descripcion,
                       categoria: u.categoria,
                       precioChico: u.precioChico,
                       precioGrande: u.precioGrande,
@@ -2997,6 +3004,7 @@ const Pages = {
                   ArcanoDB.saveBlend({
                     id: bU.id,
                     nombre: bU.nombre || existingBl.nombre,
+                    descripcion: bU.descripcion || existingBl.descripcion || '',
                     categoria: bU.categoria || existingBl.categoria,
                     precioChico: bU.precioChico,
                     precioGrande: bU.precioGrande,
@@ -3015,6 +3023,7 @@ const Pages = {
                     ArcanoDB.saveBlend({
                       id: matchBl.id,
                       nombre: bU.nombre,
+                      descripcion: bU.descripcion,
                       categoria: bU.categoria,
                       precioChico: bU.precioChico,
                       precioGrande: bU.precioGrande,
@@ -3024,6 +3033,7 @@ const Pages = {
                   } else {
                     ArcanoDB.saveBlend({
                       nombre: bU.nombre,
+                      descripcion: bU.descripcion,
                       categoria: bU.categoria,
                       precioChico: bU.precioChico,
                       precioGrande: bU.precioGrande,
