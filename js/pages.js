@@ -305,6 +305,8 @@ const Pages = {
     var tab = window._prodTab || 'especias';
     var search = (window._prodSearch || '').toLowerCase().trim();
     var costos = ArcanoDB.getCostosInsumos();
+    var _espMap = {};
+    for (var _ei = 0; _ei < especias.length; _ei++) _espMap[especias[_ei].id] = especias[_ei].nombre;
     var pkgC = (costos.envaseChico||0) + (costos.bolsaChica||0) + (costos.cinta||0) + (costos.stickerChico||0);
     var pkgG = (costos.envaseGrande||0) + (costos.bolsaGrande||0) + (costos.cinta||0) + (costos.stickerGrande||0);
 
@@ -318,7 +320,7 @@ const Pages = {
       return b.nombre.toLowerCase().indexOf(search) !== -1 ||
         ((b.categoria || '').toLowerCase().indexOf(search) !== -1) ||
         ((b.categorias || []).join(', ').toLowerCase().indexOf(search) !== -1) ||
-        ((b.ingredientes || []).map(function(x){return (x.especiaNombre||'').toLowerCase()}).join(', ').indexOf(search) !== -1);
+        ((b.ingredientes || []).map(function(x){return (x.especiaNombre || _espMap[x.especiaId] || '').toLowerCase()}).join(', ').indexOf(search) !== -1);
     }) : blends;
     var filteredPacks = search ? packs.filter(function(p) {
       return p.nombre.toLowerCase().indexOf(search) !== -1 ||
@@ -392,7 +394,7 @@ const Pages = {
         h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Region</th><th>Ingredientes</th><th>$Pequeño</th><th>$Grande</th><th>Fr.Ch</th><th>Fr.Gr</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredBlends.length; i++) {
           var b = filteredBlends[i];
-          var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre||'?'}).join(', ');
+          var ingN = (b.ingredientes||[]).map(function(x){return x.especiaNombre || _espMap[x.especiaId] || '?'}).join(', ');
           h += '<tr>' +
             '<td class="fw7">' + b.nombre + '</td>' +
             '<td><span class="badge badge-blue">' + ((b.categorias||[]).length ? (b.categorias||[]).join(', ') : (b.categoria||'—')) + '</span></td>' +
@@ -2662,17 +2664,20 @@ const Pages = {
     espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
 
     // === Sheet BLENDS ===
-    var blRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Gramos', 'Costo Ingr. ($/g)', 'Subcosto']];
+    var blRows = [['ID', 'Nombre', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var _expEspMap = {};
+    for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
     for (var j = 0; j < blends.length; j++) {
       var b = blends[j];
       var ings = b.ingredientes || [];
       if (ings.length === 0) {
-        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '']);
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '', '', '']);
       } else {
         for (var k = 0; k < ings.length; k++) {
           var ing = ings[k];
           var costoGr = (costos.especias && costos.especias[ing.especiaId]) || 0;
-          var subcosto = costoGr * (ing.gramos || 0);
+          var gc = ing.gramosChico || 0;
+          var gg = ing.gramosGrande || 0;
           blRows.push([
             k === 0 ? b.id : '',
             k === 0 ? b.nombre : '',
@@ -2682,16 +2687,18 @@ const Pages = {
             k === 0 ? (b.stockChico || 0) : '',
             k === 0 ? (b.stockGrande || 0) : '',
             k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
-            ing.especiaNombre || '',
-            ing.gramos || 0,
+            ing.especiaNombre || _expEspMap[ing.especiaId] || '',
+            gc,
+            gg,
             costoGr,
-            Math.round(subcosto)
+            Math.round(costoGr * gc),
+            Math.round(costoGr * gg)
           ]);
         }
       }
     }
     var blSheet = XLSX.utils.aoa_to_sheet(blRows);
-    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 12 }];
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
 
     // === Sheet COSTOS ===
     var costRows = [['Campo', 'Valor']];
