@@ -165,6 +165,25 @@ function _saveToFirebase() {
   }, 500);
 }
 
+function saveNow() {
+  return new Promise(function(resolve) {
+    if (!_firebaseRef) { resolve(false); return; }
+    clearTimeout(_saveTimer);
+    _localDirty = true;
+    try {
+      _firebaseRef.update(_db, function(error) {
+        _localDirty = false;
+        if (error) { console.error('[DB] Firebase save error:', error); resolve(false); }
+        else resolve(true);
+      });
+    } catch (e) {
+      console.error('[DB] Firebase save error:', e);
+      _localDirty = false;
+      resolve(false);
+    }
+  });
+}
+
 function _notify(type, col, id) {
   for (var i = 0; i < _listeners.length; i++) {
     try { _listeners[i](type, col, id); } catch (e) {}
@@ -1771,5 +1790,6 @@ window.ArcanoDB = {
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
-  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig
+  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
+  saveNow: saveNow
 };
