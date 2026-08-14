@@ -3053,16 +3053,21 @@ const Pages = {
                 ArcanoDB.saveCostosInsumos(newCostos);
               }
 
-              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
-                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
-                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
-                '</div>' +
-                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
-              '</div></div>';
+              // Force immediate Firebase save and wait for confirmation
+              btn.textContent = 'Guardando en Firebase...';
+              ArcanoDB.saveNow().then(function(ok) {
+                previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                  '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                  '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                    '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                    '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
+                  '</div>' +
+                  (!ok ? '<p class="text-red text-sm mt-8">Error al guardar en Firebase. Los datos estan solo de forma local.</p>' : '') +
+                  '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
+                '</div></div>';
+                footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove()">Cerrar</button>';
+              });
 
-              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
             } catch (err) {
               previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
               btn.disabled = false;
