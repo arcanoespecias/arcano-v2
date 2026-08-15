@@ -2936,8 +2936,9 @@ const Pages = {
               for (var i = 0; i < espUpdates.length; i++) {
                 var u = espUpdates[i];
                 var existing = u.id ? ArcanoDB.getEspecia(u.id) : null;
+                var saved;
                 if (existing) {
-                  ArcanoDB.saveEspecia({
+                  saved = ArcanoDB.saveEspecia({
                     id: u.id,
                     nombre: u.nombre || existing.nombre,
                     descripcion: u.descripcion || existing.descripcion || '',
@@ -2946,12 +2947,10 @@ const Pages = {
                     precioGrande: u.precioGrande,
                     enTienda: u.enTienda
                   });
-                  espOk++;
                 } else {
-                  // New especia - check by name first
                   var byName = ArcanoDB.findEspeciaByName(u.nombre);
                   if (byName) {
-                    ArcanoDB.saveEspecia({
+                    saved = ArcanoDB.saveEspecia({
                       id: byName.id,
                       nombre: u.nombre,
                       descripcion: u.descripcion,
@@ -2961,7 +2960,7 @@ const Pages = {
                       enTienda: u.enTienda
                     });
                   } else {
-                    ArcanoDB.saveEspecia({
+                    saved = ArcanoDB.saveEspecia({
                       nombre: u.nombre,
                       descripcion: u.descripcion,
                       categoria: u.categoria,
@@ -2970,8 +2969,11 @@ const Pages = {
                       enTienda: u.enTienda
                     });
                   }
-                  espOk++;
                 }
+                if (saved && saved.id && u.descripcion) {
+                  ArcanoDB.writeField('especias/' + saved.id + '/descripcion', u.descripcion);
+                }
+                espOk++;
               }
 
               // Update/create blends
@@ -3000,8 +3002,9 @@ const Pages = {
                 }
 
                 var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
+                var savedBl;
                 if (existingBl) {
-                  ArcanoDB.saveBlend({
+                  savedBl = ArcanoDB.saveBlend({
                     id: bU.id,
                     nombre: bU.nombre || existingBl.nombre,
                     descripcion: bU.descripcion || existingBl.descripcion || '',
@@ -3011,16 +3014,14 @@ const Pages = {
                     enTienda: bU.enTienda,
                     ingredientes: resolvedIngs
                   });
-                  blOk++;
                 } else {
-                  // New blend - check by name first
                   var allBlends = ArcanoDB.getBlends();
                   var matchBl = null;
                   for (var mb = 0; mb < allBlends.length; mb++) {
                     if (allBlends[mb].nombre.toLowerCase() === bU.nombre.toLowerCase()) { matchBl = allBlends[mb]; break; }
                   }
                   if (matchBl) {
-                    ArcanoDB.saveBlend({
+                    savedBl = ArcanoDB.saveBlend({
                       id: matchBl.id,
                       nombre: bU.nombre,
                       descripcion: bU.descripcion,
@@ -3031,7 +3032,7 @@ const Pages = {
                       ingredientes: resolvedIngs
                     });
                   } else {
-                    ArcanoDB.saveBlend({
+                    savedBl = ArcanoDB.saveBlend({
                       nombre: bU.nombre,
                       descripcion: bU.descripcion,
                       categoria: bU.categoria,
@@ -3041,8 +3042,11 @@ const Pages = {
                       ingredientes: resolvedIngs
                     });
                   }
-                  blOk++;
                 }
+                if (savedBl && savedBl.id && bU.descripcion) {
+                  ArcanoDB.writeField('blends/' + savedBl.id + '/descripcion', bU.descripcion);
+                }
+                blOk++;
               }
 
               // Update costos
