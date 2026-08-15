@@ -165,6 +165,17 @@ function _saveToFirebase() {
   }, 500);
 }
 
+function writeField(path, value) {
+  if (!_firebaseRef) return;
+  try {
+    _firebaseRef.child(path).set(value, function(error) {
+      if (error) console.error('[DB] writeField error:', path, error);
+    });
+  } catch (e) {
+    console.error('[DB] writeField error:', path, e);
+  }
+}
+
 function saveNow() {
   return new Promise(function(resolve) {
     if (!_firebaseRef) { resolve(false); return; }
@@ -1791,5 +1802,6 @@ window.ArcanoDB = {
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
-  saveNow: saveNow
+  saveNow: saveNow,
+  writeField: writeField
 };
