@@ -78,6 +78,7 @@ var PDV = {
           '<div style="display:flex;gap:6px;margin-top:12px">' +
           '<button class="btn btn-sm btn-outline" style="flex:1" onclick="event.stopPropagation();PDV.go(' + p.id + ',\'stock\')">Stock</button>' +
           '<button class="btn btn-sm btn-outline" style="flex:1" onclick="event.stopPropagation();PDV.go(' + p.id + ',\'ventas\')">Ventas</button>' +
+          '<button class="btn btn-sm btn-outline" style="flex:1" onclick="event.stopPropagation();PDV.go(' + p.id + ',\'gastos\')">Gastos</button>' +
           '<button class="btn btn-sm btn-outline" style="flex:1" onclick="event.stopPropagation();PDV.go(' + p.id + ',\'stats\')">Stats</button>' +
           '<button class="btn btn-sm btn-gold" onclick="event.stopPropagation();PDV.showQR(' + p.id + ')" title="Generar QR de ventas">QR</button>' +
           '</div></div></div>';
@@ -160,6 +161,7 @@ var PDV = {
       '<button class="btn btn-gold" onclick="PDV.formMoverStock()">Mover Stock al PDV</button>' +
       '<button class="btn btn-green" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stats\')">Stats</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'gastos\')">Gastos</button>' +
       '<button class="btn btn-outline" onclick="PDV.formDevolverStock()">Devolver Stock</button>' +
       '<button class="btn btn-outline" onclick="PDV.formEditar(' + pdv.id + ')">Editar</button>' +
       '<button class="btn btn-red" onclick="PDV.doEliminar(' + pdv.id + ')">Eliminar</button>' +
@@ -316,6 +318,7 @@ var PDV = {
       '<button class="btn btn-gold" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="PDV.showQR(' + pdv.id + ')">Mostrar QR</button>' +
       '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stock\')">Stock</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'gastos\')">Gastos</button>' +
       '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stats\')">Stats</button>' +
       '</div>';
     h += '<div style="border-bottom:2px solid var(--border);margin:0 0 16px"></div>';
@@ -589,6 +592,7 @@ var PDV = {
       '<button class="btn btn-sm btn-green" onclick="PDV.go(' + pdv.id + ',\'pos\')">Nueva Venta</button>' +
       '<button class="btn btn-sm btn-outline" onclick="PDV.go(' + pdv.id + ',\'stock\')">Stock</button>' +
       '<button class="btn btn-sm btn-outline" onclick="PDV.go(' + pdv.id + ',\'ventas\')">Ventas</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="PDV.go(' + pdv.id + ',\'gastos\')">Gastos</button>' +
       '</div>';
     h += '<div style="border-bottom:2px solid var(--border);margin:8px 0 16px"></div>';
     h += '<div style="display:flex;gap:4px;margin-bottom:16px;background:var(--bg2);border-radius:var(--radius);padding:4px">' +
@@ -1152,6 +1156,122 @@ var PDV = {
   esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  },
+
+  /* ==================== GASTOS PDV ==================== */
+  renderGastos(container) {
+    var pdv = this.currentPDV;
+    if (!pdv) return;
+    var allGastos = ArcanoDB.getGastos();
+    var gastos = [];
+    for (var gi = 0; gi < allGastos.length; gi++) {
+      if (allGastos[gi].puntoDeVentaId === pdv.id) gastos.push(allGastos[gi]);
+    }
+    var today = new Date().toISOString().slice(0, 10);
+    var mes = new Date().toISOString().slice(0, 7);
+    var totalMes = 0;
+    var gastoPorCat = {};
+    for (var i = 0; i < gastos.length; i++) {
+      var monto = gastos[i].monto || 0;
+      if (gastos[i].fecha && gastos[i].fecha.startsWith(mes)) totalMes += monto;
+      gastoPorCat[gastos[i].categoria || 'Otros'] = (gastoPorCat[gastos[i].categoria || 'Otros'] || 0) + monto;
+    }
+    var stats = ArcanoDB.getPDVStats(pdv.id);
+    var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-ghost" onclick="PDV.go(null)">← Puntos de Venta</button>' +
+      '<h3 style="margin:0">' + this.esc(pdv.nombre) + '</h3>' +
+      '<span class="badge" style="border:1px solid var(--red);color:var(--red)">Gastos</span></div>';
+    h += '<div style="display:flex;gap:6px;margin:12px 0;flex-wrap:wrap">' +
+      '<button class="btn btn-gold" onclick="PDV.formGasto()">+ Nuevo Gasto</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stock\')">Stock</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'ventas\')">Ventas</button>' +
+      '<button class="btn btn-outline" onclick="PDV.go(' + pdv.id + ',\'stats\')">Stats</button>' +
+      '</div>';
+    h += '<div style="border-bottom:2px solid var(--border);margin:0 0 16px"></div>';
+    // KPIs
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">' +
+      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.3em;color:var(--red)">$' + totalMes.toLocaleString() + '</div><div class="text-muted text-sm">Gastos del Mes</div></div></div>' +
+      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">$' + (stats.totalIngresos || 0).toLocaleString() + '</div><div class="text-muted text-sm">Ingresos Totales</div></div></div>' +
+      '<div class="card"><div class="card-body text-center"><div class="fw7" style="font-size:1.3em;color:' + ((stats.totalIngresos || 0) - totalMes >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + ((stats.totalIngresos || 0) - totalMes).toLocaleString() + '</div><div class="text-muted text-sm">Ganancia Neta</div></div></div>' +
+      '</div>';
+    // Por categoria
+    var catKeys = Object.keys(gastoPorCat).sort(function(a, b) { return gastoPorCat[b] - gastoPorCat[a]; });
+    if (catKeys.length > 0) {
+      var maxCat = gastoPorCat[catKeys[0]] || 1;
+      h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><h4>Por Categoria</h4></div><div class="card-body">';
+      for (var ci = 0; ci < catKeys.length; ci++) {
+        var pct = Math.round(gastoPorCat[catKeys[ci]] / maxCat * 100);
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:80px;font-size:0.85rem">' + catKeys[ci] + '</span><div style="flex:1;height:8px;background:var(--bg2);border-radius:4px"><div style="width:' + pct + '%;height:100%;background:var(--red);border-radius:4px"></div></div><span style="font-size:0.85rem;font-weight:600">$' + gastoPorCat[catKeys[ci]].toLocaleString() + '</span></div>';
+      }
+      h += '</div></div>';
+    }
+    // Tabla
+    h += '<div class="card"><div class="card-header"><h4>Historial de Gastos</h4></div><div class="card-body">';
+    if (gastos.length === 0) {
+      h += '<p class="text-muted text-center">Sin gastos registrados en este punto de venta.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Categoria</th><th>Descripcion</th><th>Monto</th><th></th></tr></thead><tbody>';
+      for (var i = 0; i < gastos.length; i++) {
+        var g = gastos[i];
+        h += '<tr><td>' + (g.fecha || '') + '</td><td><span class="badge" style="border:1px solid var(--red);color:var(--red)">' + (g.categoria || 'Otros') + '</span></td><td class="text-sm">' + this.esc(g.descripcion || '-') + '</td><td class="fw7" style="color:var(--red)">$' + (g.monto || 0).toLocaleString() + '</td>' +
+          '<td><button class="btn btn-sm btn-red" onclick="PDV.delGasto(' + g.id + ')">X</button></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+  },
+
+  formGasto(editId) {
+    var pdv = this.currentPDV;
+    if (!pdv) return;
+    var cats = ArcanoDB.getGastosCategorias();
+    var existing = null;
+    if (editId) {
+      var allGastos = ArcanoDB.getGastos();
+      for (var i = 0; i < allGastos.length; i++) { if (allGastos[i].id === editId && allGastos[i].puntoDeVentaId === pdv.id) { existing = allGastos[i]; break; } }
+    }
+    var isEdit = !!existing;
+    var catOpts = '';
+    for (var ci = 0; ci < cats.length; ci++) {
+      var sel = (existing && existing.categoria === cats[ci]) ? ' selected' : '';
+      catOpts += '<option value="' + cats[ci] + '"' + sel + '>' + cats[ci] + '</option>';
+    }
+    var h = '<div class="form-group"><label>Fecha</label>' +
+      '<input type="date" class="input" id="pdv-g-fecha" value="' + (existing ? existing.fecha : new Date().toISOString().slice(0, 10)) + '"></div>' +
+      '<div class="form-group"><label>Categoria</label><select class="input" id="pdv-g-cat"><option value="">Seleccionar</option>' + catOpts + '</select></div>' +
+      '<div class="form-group"><label>Descripcion</label><input type="text" class="input" id="pdv-g-desc" value="' + this.esc(existing ? existing.descripcion : '') + '" placeholder="Ej: Pago puesto feria"></div>' +
+      '<div class="form-group"><label>Monto ($)</label><input type="number" class="input" id="pdv-g-monto" value="' + (existing ? existing.monto : '') + '" placeholder="0" min="0"></div>';
+    h += '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>' +
+      '<button class="btn btn-gold" id="btn-save-pdv-g">' + (isEdit ? 'Guardar' : 'Agregar') + '</button></div>';
+    openModal(isEdit ? 'Editar Gasto' : 'Nuevo Gasto', h);
+    document.getElementById('btn-save-pdv-g').addEventListener('click', function() {
+      var fecha = document.getElementById('pdv-g-fecha').value;
+      var cat = document.getElementById('pdv-g-cat').value;
+      var desc = document.getElementById('pdv-g-desc').value.trim();
+      var monto = Number(document.getElementById('pdv-g-monto').value) || 0;
+      if (!fecha) { alert('Selecciona una fecha'); return; }
+      if (!cat) { alert('Selecciona una categoria'); return; }
+      if (monto <= 0) { alert('Ingresa un monto mayor a 0'); return; }
+      var data = isEdit ? Object.assign({}, existing) : {};
+      data.fecha = fecha;
+      data.categoria = cat;
+      data.descripcion = desc;
+      data.monto = monto;
+      data.puntoDeVentaId = pdv.id;
+      try {
+        ArcanoDB.saveGasto(data);
+        closeModal();
+        PDV.renderGastos(document.getElementById('page-content'));
+      } catch (err) { alert('Error: ' + err.message); }
+    });
+  },
+
+  delGasto(id) {
+    if (!confirm('Eliminar este gasto?')) return;
+    ArcanoDB.deleteGasto(id);
+    this.renderGastos(document.getElementById('page-content'));
   }
 };
 
