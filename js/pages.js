@@ -2,11 +2,13 @@
 const Pages = {
   _qrPagoImage: localStorage.getItem('arcano_qr_pago_image') || '',
   _pendingImages: {},
+  _clearPendingImages: function() { Pages._pendingImages = {}; },
   _getImageForArea: function(areaId) {
+    if (Pages._pendingImages[areaId]) return Pages._pendingImages[areaId];
     var suffix = areaId.split('-').pop();
     var previewEl = document.getElementById('img-preview-' + suffix);
     if (previewEl && previewEl.src && previewEl.src.indexOf('data:') === 0) return previewEl.src;
-    return Pages._pendingImages[areaId] || '';
+    return '';
   },
 
   _getCheckedCats: function(prefix) {
@@ -507,6 +509,7 @@ const Pages = {
 
   /* ==================== ESPECIA FORM ====================  /* ==================== ESPECIA FORM ==================== */
   formEspecia(editId) {
+    Pages._clearPendingImages();
     var esp = (editId != null) ? ArcanoDB.getEspecia(editId) : null;
     var isEdit = (esp != null);
 
@@ -598,6 +601,7 @@ const Pages = {
 
   /* ==================== BLEND FORM ==================== */
   formBlend(editId) {
+    Pages._clearPendingImages();
     var bl = (editId != null) ? ArcanoDB.getBlend(editId) : null;
     var isEdit = (bl != null);
     var especias = ArcanoDB.getEspecias();
@@ -784,6 +788,7 @@ const Pages = {
 
   /* ---------- PACK FORM ---------- */
   formPack(editId) {
+    Pages._clearPendingImages();
     var existing = (editId != null) ? ArcanoDB.getPack(editId) : null;
     var isEdit = !!existing;
     var blends = ArcanoDB.getBlends();
