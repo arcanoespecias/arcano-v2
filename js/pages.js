@@ -1598,6 +1598,7 @@ const Pages = {
         var dataUrl = e.target.result;
         Pages._qrPagoImage = dataUrl;
         localStorage.setItem('arcano_qr_pago_image', dataUrl);
+        writeField('tiendaConfig/qrPagoImage', dataUrl);
         App.renderPage('ventas');
       };
       reader.readAsDataURL(file);
@@ -1609,6 +1610,7 @@ const Pages = {
   _removeQrPago() {
     Pages._qrPagoImage = '';
     localStorage.removeItem('arcano_qr_pago_image');
+    writeField('tiendaConfig/qrPagoImage', '');
     App.renderPage('ventas');
   },
 
