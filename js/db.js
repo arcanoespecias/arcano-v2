@@ -900,6 +900,93 @@ function deleteProduccion(id) {
   return true;
 }
 
+function producirPack(packId, cantidad) {
+  _ensureStructure();
+  var pk = _db.packs[packId];
+  if (!pk) throw new Error('Pack no encontrado');
+  cantidad = Number(cantidad) || 0;
+  if (cantidad <= 0) throw new Error('La cantidad debe ser mayor a 0');
+
+  var blendItems = pk.blendItems || [];
+  if (blendItems.length === 0) throw new Error('El pack no tiene blends definidos');
+
+  // Validar stock de cada blend
+  var detalleItems = [];
+  for (var i = 0; i < blendItems.length; i++) {
+    var bi = blendItems[i];
+    var bl = _db.blends[bi.blendId];
+    if (!bl) throw new Error('Blend no encontrado (ID: ' + bi.blendId + ')');
+    var talla = bi.talla || 'chico';
+    var stockKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+    var disponible = Number(bl[stockKey]) || 0;
+    var biCant = Number(bi.cantidad) || 1;
+    var needed = biCant * cantidad;
+    if (disponible < needed) {
+      throw new Error('Stock insuficiente de "' + bl.nombre + '" (' + talla + '). Necesitas ' + needed + ', tienes ' + disponible);
+    }
+    detalleItems.push({ blendId: bi.blendId, blendNombre: bl.nombre, talla: talla, cantidadPorPack: biCant, totalNecesario: needed });
+  }
+
+  // Validar stock de packaging (bolsas para el pack)
+  // Los frascos individuales ya tienen su packaging consumido al producirse
+  // Aqui solo validamos si necesitamos packaging extra para armar el pack
+  var costos = getCostosInsumos();
+  var packBolsaStock = 0; // stock de bolsas para packs si existe
+
+  // Consumir stock de blends
+  for (var j = 0; j < detalleItems.length; j++) {
+    var d = detalleItems[j];
+    var blend = _db.blends[d.blendId];
+    var sk = d.talla === 'grande' ? 'stockGrande' : 'stockChico';
+    blend[sk] = (Number(blend[sk]) || 0) - d.totalNecesario;
+    _notify('update', 'blends', d.blendId);
+  }
+
+  // Guardar packs producidos en el pack (stock propio)
+  pk.stock = (Number(pk.stock) || 0) + cantidad;
+
+  // Registro de produccion
+  var prodId = nextId('producciones');
+  var prod = {
+    id: prodId, tipo: 'pack', productoId: packId, productoNombre: pk.nombre,
+    categoria: 'Packs', talla: 'pack', cantidad: cantidad,
+    items: detalleItems,
+    precioVenta: Number(pk.precio) || 0,
+    fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
+  };
+  _db.producciones[prodId] = prod;
+  _saveToFirebase(); _cacheLocal();
+  _notify('create', 'producciones', prodId);
+  _notify('update', 'packs', packId);
+  return { producto: pk, produccion: prod };
+}
+
+function getCostoPack(packId) {
+  var pk = (_db.packs || {})[packId];
+  if (!pk) return 0;
+  var costos = getCostosInsumos();
+  var pkgC = (costos.envaseChico||0) + (costos.bolsaChica||0) + (costos.cinta||0) + (costos.stickerChico||0);
+  var pkgG = (costos.envaseGrande||0) + (costos.bolsaGrande||0) + (costos.cinta||0) + (costos.stickerGrande||0);
+  var totalCosto = 0;
+  var blendItems = pk.blendItems || [];
+  for (var i = 0; i < blendItems.length; i++) {
+    var bi = blendItems[i];
+    var bl = _db.blends[bi.blendId];
+    if (!bl) continue;
+    var talla = bi.talla || 'chico';
+    var c = 0;
+    var ings = bl.ingredientes || [];
+    for (var j = 0; j < ings.length; j++) {
+      var cp = (costos.especias && costos.especias[ings[j].especiaId]) || 0;
+      c += ((talla === 'grande' ? (ings[j].gramosGrande||0) : (ings[j].gramosChico||0))) * cp;
+    }
+    c += (talla === 'grande' ? pkgG : pkgC);
+    var biCant = Number(bi.cantidad) || 1;
+    totalCosto += c * biCant;
+  }
+  return totalCosto;
+}
+
 /* ==================== VENTAS ==================== */
 
 function saveVenta(data) {
@@ -919,20 +1006,43 @@ function saveVenta(data) {
       if (item.tipo === 'especia') {
         producto = _db.especias[item.productoId];
         if (!producto) throw new Error('Especia no encontrada: ' + item.productoId);
+        item.productoNombre = producto.nombre;
+        var cant = Number(item.cantidad) || 0;
+        var talla = item.talla || 'chico';
+        var stockKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+        if ((producto[stockKey] || 0) < cant) {
+          throw new Error('Stock insuficiente de frascos ' + talla + ' de "' + producto.nombre + '". Solicitado: ' + cant + ', Disponible: ' + (producto[stockKey] || 0));
+        }
+        producto[stockKey] = (producto[stockKey] || 0) - cant;
+        item.precioUnitario = Number(item.precioUnitario) || 0;
+        item.subtotal = item.precioUnitario * cant;
+      } else if (item.tipo === 'pack') {
+        producto = _db.packs[item.productoId];
+        if (!producto) throw new Error('Pack no encontrado: ' + item.productoId);
+        item.productoNombre = producto.nombre;
+        var cantP = Number(item.cantidad) || 0;
+        var packStock = Number(producto.stock) || 0;
+        if (packStock < cantP) {
+          throw new Error('Stock insuficiente de pack "' + producto.nombre + '". Solicitado: ' + cantP + ', Disponible: ' + packStock);
+        }
+        producto.stock = packStock - cantP;
+        item.precioUnitario = Number(item.precioUnitario) || 0;
+        item.subtotal = item.precioUnitario * cantP;
+        _notify('update', 'packs', item.productoId);
       } else {
         producto = _db.blends[item.productoId];
         if (!producto) throw new Error('Blend no encontrado: ' + item.productoId);
+        item.productoNombre = producto.nombre;
+        var cantB = Number(item.cantidad) || 0;
+        var tallaB = item.talla || 'chico';
+        var stockKeyB = tallaB === 'grande' ? 'stockGrande' : 'stockChico';
+        if ((producto[stockKeyB] || 0) < cantB) {
+          throw new Error('Stock insuficiente de frascos ' + tallaB + ' de "' + producto.nombre + '". Solicitado: ' + cantB + ', Disponible: ' + (producto[stockKeyB] || 0));
+        }
+        producto[stockKeyB] = (producto[stockKeyB] || 0) - cantB;
+        item.precioUnitario = Number(item.precioUnitario) || 0;
+        item.subtotal = item.precioUnitario * cantB;
       }
-      item.productoNombre = producto.nombre;
-      var cant = Number(item.cantidad) || 0;
-      var talla = item.talla || 'chico';
-      var stockKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-      if ((producto[stockKey] || 0) < cant) {
-        throw new Error('Stock insuficiente de frascos ' + talla + ' de "' + producto.nombre + '". Solicitado: ' + cant + ', Disponible: ' + (producto[stockKey] || 0));
-      }
-      producto[stockKey] = (producto[stockKey] || 0) - cant;
-      item.precioUnitario = Number(item.precioUnitario) || 0;
-      item.subtotal = item.precioUnitario * cant;
     }
     // Recalculate total
     data.total = data.items.reduce(function(s, it) { return s + (it.subtotal || 0); }, 0);
@@ -1082,25 +1192,17 @@ function getTiendaProductos() {
       region: b.region || '', uso: b.uso || ''
     });
   }
-  // Packs
+  // Packs - usar stock producido
   var pkKeys = Object.keys(_db.packs || {});
   for (var i = 0; i < pkKeys.length; i++) {
     var pk = _db.packs[pkKeys[i]];
     if (!pk || !pk.enTienda) continue;
-    var blendItems = pk.blendItems || [];
-    var minStock = 999999;
-    for (var j = 0; j < blendItems.length; j++) {
-      var bi2 = blendItems[j];
-      var bl2 = _db.blends[bi2.blendId];
-      if (!bl2) { minStock = 0; break; }
-      var st = bi2.talla === 'grande' ? (bl2.stockGrande || 0) : (bl2.stockChico || 0);
-      if (st < minStock) minStock = st;
-    }
-    if (minStock <= 0) continue;
+    var packStock = Number(pk.stock) || 0;
+    if (packStock <= 0) continue;
     products.push({
       id: pk.id, nombre: pk.nombre, tipo: 'pack', categoria: 'Packs', categorias: ['Packs'],
       precioChico: 0, precioGrande: 0, precio: Number(pk.precio) || 0,
-      stockChico: 0, stockGrande: 0, stock: minStock,
+      stockChico: 0, stockGrande: 0, stock: packStock,
       region: '', uso: pk.descripcion || '', imagen: pk.imagen || ''
     });
   }
@@ -1849,10 +1951,11 @@ window.ArcanoDB = {
   savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
-  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack,
+  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, getCostoPack: getCostoPack, producirPack: producirPack,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
   saveNow: saveNow,
   writeField: writeField
 };
+
