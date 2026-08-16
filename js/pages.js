@@ -1,6 +1,13 @@
 /* ===================== ARCANO V3 — PAGES (FIXED) ===================== */
 const Pages = {
   _qrPagoImage: localStorage.getItem('arcano_qr_pago_image') || '',
+  _pendingImages: {},
+  _getImageForArea: function(areaId) {
+    var suffix = areaId.split('-').pop();
+    var previewEl = document.getElementById('img-preview-' + suffix);
+    if (previewEl && previewEl.src && previewEl.src.indexOf('data:') === 0) return previewEl.src;
+    return Pages._pendingImages[areaId] || '';
+  },
 
   _getCheckedCats: function(prefix) {
     var cats = [];
@@ -547,7 +554,11 @@ const Pages = {
     document.getElementById('btn-save-esp').addEventListener('click', function() {
       var nombre = document.getElementById('f-esp-nombre').value.trim();
       if (!nombre) { alert('Ingresa un nombre'); return; }
-      var previewEl = document.getElementById('img-preview-esp');
+      var imagen = Pages._getImageForArea('img-area-esp');
+      if (isEdit && !imagen) {
+        var espData = ArcanoDB.getEspecia(editId);
+        if (espData && espData.imagen) imagen = espData.imagen;
+      }
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('esp'),
@@ -558,7 +569,7 @@ const Pages = {
         enTienda: document.getElementById('f-esp-tienda').value === '1' || (Number(document.getElementById('f-esp-pc').value) || Number(document.getElementById('f-esp-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
-        imagen: previewEl ? previewEl.src : '',
+        imagen: imagen,
         descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
         uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : '',
         tags: Pages.getSelectedTags()
@@ -568,6 +579,7 @@ const Pages = {
       }
       try {
         ArcanoDB.saveEspecia(data);
+        delete Pages._pendingImages['img-area-esp'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -685,6 +697,11 @@ const Pages = {
         for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espObj = especias[s]; break; } }
         ingredientes.push({ especiaId: espId, especiaNombre: espObj ? espObj.nombre : '', gramosChico: gc, gramosGrande: gg });
       }
+      var imagen = Pages._getImageForArea('img-area-bl');
+      if (isEdit && !imagen) {
+        var blData = ArcanoDB.getBlend(editId);
+        if (blData && blData.imagen) imagen = blData.imagen;
+      }
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('bl'),
@@ -696,7 +713,7 @@ const Pages = {
         enTienda: document.getElementById('f-bl-tienda').value === '1' || (Number(document.getElementById('f-bl-pc').value) || Number(document.getElementById('f-bl-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
-        imagen: (document.getElementById('img-preview-bl') || {}).src || '',
+        imagen: imagen,
         descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : '',
         tags: Pages.getSelectedTags()
       };
@@ -705,6 +722,7 @@ const Pages = {
       }
       try {
         ArcanoDB.saveBlend(data);
+        delete Pages._pendingImages['img-area-bl'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -824,17 +842,20 @@ const Pages = {
         }
       }
       if (blendItems.length < 2) { alert('Un pack debe tener al menos 2 blends'); return; }
+      var imagen = Pages._getImageForArea('img-area-pk');
+      if (isEdit && !imagen && existing.imagen) imagen = existing.imagen;
       var data = {
         nombre: nombre,
         descripcion: document.getElementById('f-pk-desc').value.trim(),
         precio: Number(document.getElementById('f-pk-precio').value) || 0,
-        imagen: (document.getElementById('img-preview-pk') || {}).src || '',
+        imagen: imagen,
         blendItems: blendItems,
         enTienda: isEdit ? (existing.enTienda || false) : false
       };
       if (isEdit) data.id = editId;
       try {
         ArcanoDB.savePack(data);
+        delete Pages._pendingImages['img-area-pk'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -3576,7 +3597,9 @@ const Pages = {
     if (!file) return;
     ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
       if (err) { alert(err); return; }
+      Pages._pendingImages[areaId] = dataUrl;
       var area = document.getElementById(areaId);
+      if (!area) return;
       var placeholder = area.querySelector('.img-upload-placeholder');
       if (placeholder) placeholder.style.display = 'none';
       var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
@@ -3598,6 +3621,7 @@ const Pages = {
   },
 
   removeImage(areaId, inputId) {
+    delete Pages._pendingImages[areaId];
     var area = document.getElementById(areaId);
     var preview = area.querySelector('.img-preview');
     if (preview) preview.remove();
