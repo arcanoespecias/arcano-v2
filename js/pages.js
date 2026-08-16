@@ -557,11 +557,7 @@ const Pages = {
     document.getElementById('btn-save-esp').addEventListener('click', function() {
       var nombre = document.getElementById('f-esp-nombre').value.trim();
       if (!nombre) { alert('Ingresa un nombre'); return; }
-      var imagen = Pages._getImageForArea('img-area-esp');
-      if (isEdit && !imagen) {
-        var espData = ArcanoDB.getEspecia(editId);
-        if (espData && espData.imagen) imagen = espData.imagen;
-      }
+      var newImagen = Pages._pendingImages['img-area-esp'] || '';
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('esp'),
@@ -572,11 +568,11 @@ const Pages = {
         enTienda: document.getElementById('f-esp-tienda').value === '1' || (Number(document.getElementById('f-esp-pc').value) || Number(document.getElementById('f-esp-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
-        imagen: imagen,
         descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
         uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : '',
         tags: Pages.getSelectedTags()
       };
+      if (newImagen === '__REMOVE__') { data.imagen = ''; } else if (newImagen) { data.imagen = newImagen; }
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
       }
@@ -701,11 +697,7 @@ const Pages = {
         for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espObj = especias[s]; break; } }
         ingredientes.push({ especiaId: espId, especiaNombre: espObj ? espObj.nombre : '', gramosChico: gc, gramosGrande: gg });
       }
-      var imagen = Pages._getImageForArea('img-area-bl');
-      if (isEdit && !imagen) {
-        var blData = ArcanoDB.getBlend(editId);
-        if (blData && blData.imagen) imagen = blData.imagen;
-      }
+      var newImagen = Pages._pendingImages['img-area-bl'] || '';
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('bl'),
@@ -717,10 +709,10 @@ const Pages = {
         enTienda: document.getElementById('f-bl-tienda').value === '1' || (Number(document.getElementById('f-bl-pc').value) || Number(document.getElementById('f-bl-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
-        imagen: imagen,
         descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : '',
         tags: Pages.getSelectedTags()
       };
+      if (newImagen === '__REMOVE__') { data.imagen = ''; } else if (newImagen) { data.imagen = newImagen; }
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
       }
@@ -847,16 +839,21 @@ const Pages = {
         }
       }
       if (blendItems.length < 2) { alert('Un pack debe tener al menos 2 blends'); return; }
-      var imagen = Pages._getImageForArea('img-area-pk');
-      if (isEdit && !imagen && existing.imagen) imagen = existing.imagen;
+      var newImagen = Pages._pendingImages['img-area-pk'] || '';
       var data = {
         nombre: nombre,
         descripcion: document.getElementById('f-pk-desc').value.trim(),
         precio: Number(document.getElementById('f-pk-precio').value) || 0,
-        imagen: imagen,
         blendItems: blendItems,
         enTienda: isEdit ? (existing.enTienda || false) : false
       };
+      if (newImagen === '__REMOVE__') {
+        data.imagen = '';
+      } else if (newImagen) {
+        data.imagen = newImagen;
+      } else if (isEdit && existing.imagen) {
+        data.imagen = existing.imagen;
+      }
       if (isEdit) data.id = editId;
       try {
         ArcanoDB.savePack(data);
@@ -3626,7 +3623,7 @@ const Pages = {
   },
 
   removeImage(areaId, inputId) {
-    delete Pages._pendingImages[areaId];
+    Pages._pendingImages[areaId] = '__REMOVE__';
     var area = document.getElementById(areaId);
     var preview = area.querySelector('.img-preview');
     if (preview) preview.remove();
