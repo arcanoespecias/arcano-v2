@@ -33,6 +33,7 @@ const Pages = {
     var especias = ArcanoDB.getEspecias();
     var blends = ArcanoDB.getBlends();
     var stickers = ArcanoDB.getStickers();
+    var gastos = ArcanoDB.getGastos();
     var today = new Date().toISOString().slice(0, 10);
     var mes = new Date().toISOString().slice(0, 7);
 
@@ -155,6 +156,11 @@ const Pages = {
     h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalFrascos + '</div><div class="dash-mini-lbl">Frascos en Stock</div><div class="dash-mini-sub">' + stats.frascosChico + ' pq / ' + stats.frascosGrande + ' gr</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalProductos + '</div><div class="dash-mini-lbl">Productos Activos</div><div class="dash-mini-sub">' + stats.totalEspecias + ' esp + ' + stats.totalBlends + ' bl</div></div>';
     h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
+    var gastosMes = 0;
+    for (var gm = 0; gm < gastos.length; gm++) { if (gastos[gm].fecha && gastos[gm].fecha.startsWith(mes)) gastosMes += (gastos[gm].monto || 0); }
+    var gananciaNeta = ingresosMes - totalCostos - gastosMes;
+    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:var(--red)">$' + gastosMes.toLocaleString() + '</div><div class="dash-mini-lbl">Gastos del Mes</div></div>';
+    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:' + (gananciaNeta >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + gananciaNeta.toLocaleString() + '</div><div class="dash-mini-lbl">Ganancia Neta</div><div class="dash-mini-sub">ingreso - costos - gastos</div></div>';
     h += '</div>';
 
     // Canal de venta + Composicion
@@ -1604,6 +1610,173 @@ const Pages = {
     Pages._qrPagoImage = '';
     localStorage.removeItem('arcano_qr_pago_image');
     App.renderPage('ventas');
+  },
+
+  /* ================================================================
+     GASTOS
+     ================================================================ */
+  renderGastos(container) {
+    var gastos = ArcanoDB.getGastos();
+    var cats = ArcanoDB.getGastosCategorias();
+    var today = new Date().toISOString().slice(0, 10);
+    var mes = new Date().toISOString().slice(0, 7);
+
+    // Calcular totales
+    var totalMes = 0, totalHoy = 0, totalGeneral = 0;
+    var gastoPorCat = {};
+    for (var gi = 0; gi < gastos.length; gi++) {
+      var g = gastos[gi];
+      var monto = g.monto || 0;
+      totalGeneral += monto;
+      if (g.fecha && g.fecha.startsWith(mes)) totalMes += monto;
+      if (g.fecha === today) totalHoy += monto;
+      gastoPorCat[g.categoria || 'Otros'] = (gastoPorCat[g.categoria || 'Otros'] || 0) + monto;
+    }
+
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formGasto()">+ Nuevo Gasto</button>' +
+      '<button class="btn btn-outline" onclick="Pages.formGastosCategorias()" style="margin-left:8px">Categorias</button></div>';
+
+    // KPIs
+    h += '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value text-red">$' + totalHoy.toLocaleString() + '</div><div class="stat-label">Gastos Hoy</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value text-gold">$' + totalMes.toLocaleString() + '</div><div class="stat-label">Gastos del Mes</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--muted)"><div class="stat-value">$' + totalGeneral.toLocaleString() + '</div><div class="stat-label">Total General</div></div>';
+    h += '</div>';
+
+    // Por categoria
+    var catKeys = Object.keys(gastoPorCat).sort(function(a, b) { return gastoPorCat[b] - gastoPorCat[a]; });
+    if (catKeys.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Gastos por Categoria (General)</h3></div><div class="card-body">';
+      var maxCat = gastoPorCat[catKeys[0]] || 1;
+      for (var ci = 0; ci < catKeys.length; ci++) {
+        var catName = catKeys[ci];
+        var catVal = gastoPorCat[catName];
+        var pct = Math.round(catVal / maxCat * 100);
+        h += '<div class="dash-canal-item" style="margin-bottom:8px"><div class="dash-canal-bar-track"><div class="dash-canal-bar-fill" style="width:' + pct + '%;background:var(--red)"></div></div><div class="dash-canal-info"><span class="dash-canal-name">' + catName + '</span><span class="dash-canal-val">$' + catVal.toLocaleString() + '</span></div></div>';
+      }
+      h += '</div></div>';
+    }
+
+    // Tabla de gastos
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Gastos</h3></div><div class="card-body">';
+    if (gastos.length === 0) {
+      h += '<p class="text-muted text-center">Sin gastos registrados.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Categoria</th><th>Descripcion</th><th>Monto</th><th></th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(gastos.length, 50); i++) {
+        var gasto = gastos[i];
+        h += '<tr><td>' + (gasto.fecha || '') + '</td><td><span class="badge badge-red" style="border:1px solid">' + (gasto.categoria || 'Otros') + '</span></td><td class="text-sm">' + (gasto.descripcion || '-') + '</td><td class="fw7" style="color:var(--red)">$' + (gasto.monto || 0).toLocaleString() + '</td>' +
+          '<td><button class="btn btn-sm btn-outline" onclick="Pages.formGasto(' + gasto.id + ')" style="margin-right:4px">Edit</button><button class="btn btn-sm btn-red" onclick="Pages.delGasto(' + gasto.id + ')">X</button></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+  },
+
+  formGasto(editId) {
+    var cats = ArcanoDB.getGastosCategorias();
+    var existing = editId ? null : null;
+    var gastos = ArcanoDB.getGastos();
+    if (editId) {
+      for (var i = 0; i < gastos.length; i++) { if (gastos[i].id === editId) { existing = gastos[i]; break; } }
+    }
+    var isEdit = !!existing;
+    var catOpts = '<option value="">Seleccionar</option>';
+    for (var ci = 0; ci < cats.length; ci++) {
+      var sel = (existing && existing.categoria === cats[ci]) ? ' selected' : '';
+      catOpts += '<option value="' + cats[ci] + '"' + sel + '>' + cats[ci] + '</option>';
+    }
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal" style="max-width:460px">' +
+      '<div class="modal-header"><h3>' + (isEdit ? 'Editar Gasto' : 'Nuevo Gasto') + '</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Fecha</label><input type="date" class="input" id="f-g-fecha" value="' + (existing ? existing.fecha : new Date().toISOString().slice(0, 10)) + '"></div>' +
+        '<div class="form-group"><label>Categoria</label><select class="input" id="f-g-cat">' + catOpts + '</select></div>' +
+        '<div class="form-group"><label>Descripcion</label><input type="text" class="input" id="f-g-desc" value="' + (existing ? (existing.descripcion || '').replace(/'/g, "&#39;") : '') + '" placeholder="Ej: Pago arriendo local"></div>' +
+        '<div class="form-group"><label>Monto ($)</label><input type="number" class="input" id="f-g-monto" value="' + (existing ? existing.monto : '') + '" placeholder="0" min="0"></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-g">' + (isEdit ? 'Guardar' : 'Agregar') + '</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+    document.getElementById('btn-save-g').addEventListener('click', function() {
+      var fecha = document.getElementById('f-g-fecha').value;
+      var cat = document.getElementById('f-g-cat').value;
+      var desc = document.getElementById('f-g-desc').value.trim();
+      var monto = Number(document.getElementById('f-g-monto').value) || 0;
+      if (!fecha) { alert('Selecciona una fecha'); return; }
+      if (!cat) { alert('Selecciona una categoria'); return; }
+      if (monto <= 0) { alert('Ingresa un monto mayor a 0'); return; }
+      var data = isEdit ? Object.assign({}, existing) : {};
+      data.fecha = fecha;
+      data.categoria = cat;
+      data.descripcion = desc;
+      data.monto = monto;
+      try {
+        ArcanoDB.saveGasto(data);
+        modal.remove();
+        App.renderPage('gastos');
+      } catch (err) { alert('Error: ' + err.message); }
+    });
+  },
+
+  formGastosCategorias() {
+    var cats = ArcanoDB.getGastosCategorias();
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    var h = '<div class="modal" style="max-width:460px">' +
+      '<div class="modal-header"><h3>Categorias de Gastos</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted" style="margin-bottom:12px">Agrega o elimina categorias para organizar tus gastos.</p>' +
+        '<div id="gastos-cats-list">';
+    for (var i = 0; i < cats.length; i++) {
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="input" style="flex:1;text-align:center;padding:8px">' + cats[i] + '</span><button class="btn btn-sm btn-red" data-cat-name="' + cats[i].replace(/"/g, '&quot;') + '">X</button></div>';
+    }
+    h += '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px"><input type="text" class="input" id="new-gasto-cat" placeholder="Nueva categoria" style="flex:1"><button class="btn btn-gold" id="btn-add-gasto-cat">+</button></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>' +
+      '</div></div>';
+    modal.innerHTML = h;
+    document.body.appendChild(modal);
+
+    var removeBtns = modal.querySelectorAll('[data-cat-name]');
+    for (var ri = 0; ri < removeBtns.length; ri++) {
+      removeBtns[ri].addEventListener('click', function() {
+        var catName = this.getAttribute('data-cat-name');
+        var current = ArcanoDB.getGastosCategorias();
+        var idx = current.indexOf(catName);
+        if (idx > -1) {
+          current.splice(idx, 1);
+          ArcanoDB.saveGastosCategorias(current);
+          modal.remove();
+          Pages.formGastosCategorias();
+        }
+      });
+    }
+
+    document.getElementById('btn-add-gasto-cat').addEventListener('click', function() {
+      var input = document.getElementById('new-gasto-cat');
+      var val = input.value.trim();
+      if (!val) return;
+      var current = ArcanoDB.getGastosCategorias();
+      if (current.indexOf(val) === -1) {
+        current.push(val);
+        ArcanoDB.saveGastosCategorias(current);
+        modal.remove();
+        Pages.formGastosCategorias();
+      } else {
+        alert('Esta categoria ya existe');
+      }
+    });
+  },
+
+  delGasto(id) {
+    if (!confirm('Eliminar este gasto?')) return;
+    ArcanoDB.deleteGasto(id);
+    App.renderPage('gastos');
   },
 
   /* ================================================================
