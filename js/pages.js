@@ -1727,7 +1727,7 @@ const Pages = {
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
     var h = '<div class="modal" style="max-width:460px">' +
-      '<div class="modal-header"><h3>Categorias de Gastos</h3><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">X</button></div>' +
+      '<div class="modal-header"><h3>Categorias de Gastos</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
         '<p class="text-sm text-muted" style="margin-bottom:12px">Agrega o elimina categorias para organizar tus gastos.</p>' +
         '<div id="gastos-cats-list">';
@@ -1737,7 +1737,7 @@ const Pages = {
     h += '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px"><input type="text" class="input" id="new-gasto-cat" placeholder="Nueva categoria" style="flex:1"><button class="btn btn-gold" id="btn-add-gasto-cat">+</button></div>' +
       '</div><div class="modal-footer">' +
-        '<button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cerrar</button>' +
       '</div></div>';
     modal.innerHTML = h;
     document.body.appendChild(modal);
