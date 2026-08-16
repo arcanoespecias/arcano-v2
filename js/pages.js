@@ -430,7 +430,7 @@ const Pages = {
       } else if (filteredPacks.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron packs para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Stock</th><th>Costo</th><th>Margen</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredPacks.length; i++) {
           var pk = filteredPacks[i];
           var bi3 = pk.blendItems || [];
@@ -460,10 +460,12 @@ const Pages = {
             '<td class="fw7">' + pk.nombre + '</td>' +
             '<td class="text-sm">' + (pkBlendNames.length ? pkBlendNames.join(', ') : '<span class="text-muted">Sin blends</span>') + '</td>' +
             '<td class="fw7" style="color:var(--gold)">$' + pkPrecio.toLocaleString() + '</td>' +
+            '<td class="fw7">' + (Number(pk.stock)||0) + '</td>' +
             '<td style="color:var(--red)">$' + pkCosto.toFixed(1) + '</td>' +
             '<td style="color:' + pkMC + '">$' + pkMargen.toFixed(1) + ' (' + pkPct.toFixed(0) + '%)</td>' +
             '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" onclick="ArcanoDB.toggleTienda(\'pack\',' + pk.id + ');App.renderPage(\'productos\')" title="Tienda">' + (pk.enTienda ? 'ON' : 'OFF') + '</button></td>' +
             '<td style="white-space:nowrap">' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'pack\',' + pk.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delPack(' + pk.id + ')">X</button>' +
             '</td></tr>';
@@ -1073,7 +1075,7 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else {
-          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
+          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option><option value="pack">Pack</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
           var stkSel = detailDiv.querySelector('.ent-stk-nombre');
           var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
           var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
@@ -1305,10 +1307,10 @@ const Pages = {
     modal.innerHTML = '<div class="modal modal-lg">' +
       '<div class="modal-header"><h3>Nueva Produccion</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option></select></div>' +
+        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option><option value="pack">Pack</option></select></div>' +
         '<div class="form-group"><label>Producto</label><select class="input" id="f-prod-prod"><option value="">Seleccionar</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
-        '<div class="form-group"><label>Cantidad de frascos</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
+        '<div class="g2"><div class="form-group" id="f-prod-talla-wrap"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
+        '<div class="form-group"><label>Cantidad</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
         '<div id="f-prod-preview" class="mt-12"></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -1326,7 +1328,12 @@ const Pages = {
 
     function loadProductos() {
       var tipo = tipoSel.value;
-      var list = tipo === 'blend' ? ArcanoDB.getBlends() : ArcanoDB.getEspecias();
+      var list;
+      if (tipo === 'pack') list = ArcanoDB.getPacks();
+      else if (tipo === 'blend') list = ArcanoDB.getBlends();
+      else list = ArcanoDB.getEspecias();
+      var tallaWrap = document.getElementById('f-prod-talla-wrap');
+      if (tallaWrap) tallaWrap.style.display = tipo === 'pack' ? 'none' : '';
       prodSel.innerHTML = '<option value="">Seleccionar</option>';
       for (var i = 0; i < list.length; i++) {
         prodSel.innerHTML += '<option value="' + list[i].id + '">' + list[i].nombre + '</option>';
@@ -1342,7 +1349,10 @@ const Pages = {
       var cant = Number(cantInput.value) || 0;
       if (!prodId || cant <= 0) { previewDiv.innerHTML = ''; prodBtn.disabled = true; return; }
 
-      var producto = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
+      var producto;
+      if (tipo === 'pack') producto = ArcanoDB.getPack(prodId);
+      else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
+      else producto = ArcanoDB.getEspecia(prodId);
       if (!producto) { previewDiv.innerHTML = '<p class="text-red">Producto no encontrado</p>'; prodBtn.disabled = true; return; }
 
       var db = ArcanoDB.getDB();
@@ -1376,7 +1386,60 @@ const Pages = {
         }
       }
 
-      // Envases
+      // Pack: show blend stock check
+      if (tipo === 'pack') {
+        var blendItems = producto.blendItems || [];
+        if (blendItems.length === 0) {
+          h += '<p class="text-red">Este pack no tiene blends definidos</p>';
+          allOk = false;
+        } else {
+          for (var pi = 0; pi < blendItems.length; pi++) {
+            var pbi = blendItems[pi];
+            var pbl = ArcanoDB.getBlend(pbi.blendId);
+            if (!pbl) { h += '<div class="list-row"><span>Blend ID ' + pbi.blendId + '</span><span class="text-red fw7">NO ENCONTRADO</span></div>'; allOk = false; continue; }
+            var pstk = pbi.talla === 'grande' ? (pbl.stockGrande||0) : (pbl.stockChico||0);
+            var pbiCant = Number(pbi.cantidad) || 1;
+            var pneeded = pbiCant * cant;
+            var pok = pstk >= pneeded;
+            if (!pok) allOk = false;
+            h += '<div class="list-row"><span>' + pbl.nombre + ' (' + pbi.talla + ') x' + pbiCant + '</span><span class="' + (pok?'text-green':'text-red fw7') + '">' + pstk + ' disp. → necesita ' + pneeded + ' ' + (pok?'OK':'FALTA') + '</span></div>';
+          }
+          var currentPackStock = Number(producto.stock) || 0;
+          var newPackStock = currentPackStock + cant;
+          h += '<div class="list-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span>Stock actual del pack</span><span class="fw7">' + currentPackStock + ' → ' + newPackStock + '</span></div>';
+          var costo = ArcanoDB.getCostoPack(prodId);
+          var precio = Number(producto.precio) || 0;
+          var margen = precio - costo;
+          var pct = precio > 0 ? (margen / precio * 100).toFixed(1) : '0';
+          h += '<div class="list-row"><span>Costo por pack</span><span class="text-red">$' + costo.toFixed(2) + '</span></div>';
+          if (precio > 0) h += '<div class="list-row"><span>Margen por pack</span><span style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toFixed(2) + ' (' + pct + '%)</span></div>';
+        }
+      } else if (tipo === 'especia') {
+        var gpf = talla === 'grande' ? (Number(producto.gramosGrande)||0) : (Number(producto.gramosChico)||0);
+        var grsTotal = gpf * cant;
+        var bolsaOk = (producto.stockBolsa||0) >= grsTotal;
+        if (!bolsaOk) allOk = false;
+        h += '<div class="list-row"><span>Pala de ' + producto.nombre + '</span><span class="' + (bolsaOk?'text-green':'text-red fw7') + '">' + (producto.stockBolsa||0) + 'g disponible → necesita ' + grsTotal + 'g ' + (bolsaOk?'OK':'FALTA') + '</span></div>';
+      } else {
+        var ings = producto.ingredientes || [];
+        if (ings.length === 0) {
+          h += '<p class="text-red">Este blend no tiene ingredientes definidos. Editalo primero.</p>';
+          allOk = false;
+        } else {
+          for (var i = 0; i < ings.length; i++) {
+            var esp = ArcanoDB.getEspecia(ings[i].especiaId);
+            var gpf2 = talla === 'grande' ? (Number(ings[i].gramosGrande)||0) : (Number(ings[i].gramosChico)||0);
+            var needed = gpf2 * cant;
+            var avail = esp ? (esp.stockBolsa||0) : 0;
+            var ok = avail >= needed;
+            if (!ok) allOk = false;
+            h += '<div class="list-row"><span>' + (esp?esp.nombre:'?') + ' (pala)</span><span class="' + (ok?'text-green':'text-red fw7') + '">' + avail + 'g → necesita ' + needed + 'g ' + (ok?'OK':'FALTA') + '</span></div>';
+          }
+        }
+      }
+
+      // Envases (solo para especia y blend, no pack)
+      if (tipo !== 'pack') {
       var envAvail = envases[talla] || 0;
       var envOk = envAvail >= cant;
       if (!envOk) allOk = false;
@@ -1407,6 +1470,7 @@ const Pages = {
       if (!cintaOk) allOk = false;
       h += '<div class="list-row"><span>Cintas</span><span class="' + (cintaOk?'text-green':'text-red fw7') + '">' + cintaAvail + ' → necesita ' + cant + ' ' + (cintaOk?'OK':'FALTA') + '</span></div>';
 
+      } // end if (!= pack) for packaging checks
       h += '</div></div>';
       previewDiv.innerHTML = h;
       prodBtn.disabled = !allOk;
@@ -1425,7 +1489,9 @@ const Pages = {
       var cant = Number(cantInput.value) || 0;
       if (!prodId || cant <= 0) { alert('Selecciona producto y cantidad'); return; }
       try {
-        if (tipo === 'blend') {
+        if (tipo === 'pack') {
+          ArcanoDB.producirPack(prodId, cant);
+        } else if (tipo === 'blend') {
           ArcanoDB.producirBlend(prodId, talla, cant);
         } else {
           ArcanoDB.producirEspecia(prodId, talla, cant);
@@ -5045,4 +5111,5 @@ const Pages = {
     el.innerHTML = h;
   }
 };
+
 
