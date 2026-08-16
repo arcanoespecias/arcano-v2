@@ -1,5 +1,7 @@
 /* ===================== ARCANO V3 — PAGES (FIXED) ===================== */
 const Pages = {
+  _qrPagoImage: localStorage.getItem('arcano_qr_pago_image') || '',
+
   _getCheckedCats: function(prefix) {
     var cats = [];
     var el;
@@ -1444,6 +1446,20 @@ const Pages = {
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formVenta()">+ Nueva Venta</button>' +
       '<button class="btn btn-outline" onclick="Pages.formVentaQR()" style="margin-left:8px">\u{1F4F7} Vender por QR</button></div>';
 
+    // Configuracion de Pago (QR)
+    var qrImg = Pages._qrPagoImage;
+    h += '<div class="card mt-16"><div class="card-header"><h3>Configuracion de Pago</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted" style="margin-bottom:12px">Imagen QR para mostrar al cliente al pagar. Se usa en Puntos de Venta y al entregar pedidos.</p>';
+    if (qrImg) {
+      h += '<div style="margin-bottom:12px"><img src="' + qrImg + '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid var(--border)"></div>';
+      h += '<button class="btn btn-outline" onclick="Pages._removeQrPago()" style="margin-right:8px">Eliminar QR</button>';
+    } else {
+      h += '<div style="padding:20px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted);text-align:center">No hay QR configurado</div>';
+    }
+    h += '<button class="btn btn-gold" onclick="Pages._uploadQrPago()">Subir QR</button>';
+    h += '<input type="file" id="qr-pago-input" accept="image/*" style="display:none">';
+    h += '</div></div>';
+
     h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
@@ -1554,6 +1570,39 @@ const Pages = {
   delVenta(id) {
     if (!confirm('Eliminar esta venta?')) return;
     ArcanoDB.deleteVenta(id);
+    App.renderPage('ventas');
+  },
+
+  _uploadQrPago() {
+    var input = document.getElementById('qr-pago-input');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'file';
+      input.id = 'qr-pago-input';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+    }
+    input.onchange = function() {
+      var file = input.files[0];
+      if (!file) return;
+      if (file.size > 512000) { alert('La imagen es muy grande. Maximo 500KB.'); return; }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var dataUrl = e.target.result;
+        Pages._qrPagoImage = dataUrl;
+        localStorage.setItem('arcano_qr_pago_image', dataUrl);
+        App.renderPage('ventas');
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    };
+    input.click();
+  },
+
+  _removeQrPago() {
+    Pages._qrPagoImage = '';
+    localStorage.removeItem('arcano_qr_pago_image');
     App.renderPage('ventas');
   },
 
@@ -2287,11 +2336,18 @@ const Pages = {
     if (cl.direccion) h += '<p class="mt-8 text-sm text-muted">Direccion: <b>' + cl.direccion + '</b></p>';
     if (p.notas) h += '<p class="mt-4 text-sm text-muted">Notas: <b>' + p.notas + '</b></p>';
 
+    // Metodo de pago
+    if (p.metodoPago) {
+      var mpLabel = p.metodoPago === 'qr' ? 'QR' : 'Efectivo';
+      var mpColor = p.metodoPago === 'qr' ? 'var(--blue)' : 'var(--green)';
+      h += '<div class="mt-12" style="padding:10px 16px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"><span class="text-sm text-muted">Metodo de pago: </span><span class="fw7" style="color:' + mpColor + '">' + mpLabel + '</span></div>';
+    }
+
     h += '<h4 class="mt-16">Productos</h4>';
     h += '<div class="table-wrap mt-8"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
     for (var i = 0; i < (p.items || []).length; i++) {
       var it = p.items[i];
-      var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Pequeño';
+      var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Pequeno';
       h += '<tr><td class="fw7">' + (it.nombre || '?') + '</td><td>' + tallaLabel + '</td><td>' + (it.qty || 0) + '</td><td>$' + (it.precio || 0).toLocaleString() + '</td><td class="fw7">$' + (it.subtotal || 0).toLocaleString() + '</td></tr>';
     }
     h += '</tbody></table></div>';
@@ -2321,10 +2377,78 @@ const Pages = {
   },
 
   cambiarEstadoPedido(pedidoKey, nuevoEstado) {
+    if (nuevoEstado === 'entregado') {
+      Pages._showPagoModal(pedidoKey, nuevoEstado);
+      return;
+    }
     ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
     var modal = document.getElementById('pedido-modal');
     if (modal) modal.remove();
     App.renderPage(App.currentPage);
+  },
+
+  _showPagoModal(pedidoKey, nuevoEstado) {
+    var pedidos = ArcanoDB.getPedidos();
+    var p = null;
+    for (var i = 0; i < pedidos.length; i++) { if (pedidos[i]._key === pedidoKey) { p = pedidos[i]; break; } }
+    if (!p) return;
+    var qrImg = Pages._qrPagoImage;
+    var qrContent = qrImg
+      ? '<div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Muestra este QR al cliente:</div>' +
+        '<div style="margin-bottom:16px"><img src="' + qrImg + '" style="max-width:240px;max-height:240px;border-radius:8px;border:1px solid var(--border)"></div>'
+      : '<div style="padding:16px;margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;color:var(--muted);text-align:center">No hay QR configurado.<br>Configuralo en Ventas > Configuracion de Pago.</div>';
+    var pm = document.createElement('div');
+    pm.className = 'modal-overlay';
+    pm.id = 'pedido-pago-modal';
+    pm.innerHTML =
+      '<div class="modal" style="max-width:420px;text-align:center">' +
+        '<div class="modal-header"><button class="btn btn-ghost" id="pedido-pago-volver" style="margin-right:auto;padding:4px 12px;font-size:0.85rem">< Volver</button><h3>Metodo de Pago</h3></div>' +
+        '<div class="modal-body">' +
+          '<div style="font-size:1.8rem;font-weight:800;color:var(--gold);margin-bottom:8px">$' + (p.total || 0).toLocaleString() + '</div>' +
+          '<p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem">Selecciona como recibiste el pago antes de entregar</p>' +
+          '<div style="display:flex;gap:12px;justify-content:center">' +
+            '<button class="btn btn-gold" id="pedido-pago-efectivo" style="flex:1;padding:16px;font-size:1rem;font-weight:700">Efectivo</button>' +
+            '<button class="btn btn-outline" id="pedido-pago-qr-btn" style="flex:1;padding:16px;font-size:1rem;font-weight:700;border-color:var(--gold);color:var(--gold)">QR</button>' +
+          '</div>' +
+          '<div id="pedido-pago-qr-area" style="display:none;margin-top:20px">' +
+            qrContent +
+            '<div style="display:flex;gap:12px;justify-content:center;margin-top:12px">' +
+              '<button class="btn btn-gold" id="pedido-pago-recibido" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Confirmar Entrega</button>' +
+              '<button class="btn btn-outline" id="pedido-pago-qr-cancel" style="flex:1;padding:14px;font-size:1rem;font-weight:700">Cancelar</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(pm);
+    document.getElementById('pedido-pago-efectivo').addEventListener('click', function() {
+      ArcanoDB.updatePedidoField(pedidoKey, 'metodoPago', 'efectivo');
+      ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
+      pm.remove();
+      var modal2 = document.getElementById('pedido-modal');
+      if (modal2) modal2.remove();
+      App.renderPage(App.currentPage);
+    });
+    document.getElementById('pedido-pago-qr-btn').addEventListener('click', function() {
+      document.getElementById('pedido-pago-qr-area').style.display = 'block';
+      document.getElementById('pedido-pago-efectivo').style.display = 'none';
+      document.getElementById('pedido-pago-qr-btn').style.display = 'none';
+    });
+    document.getElementById('pedido-pago-recibido').addEventListener('click', function() {
+      ArcanoDB.updatePedidoField(pedidoKey, 'metodoPago', 'qr');
+      ArcanoDB.updatePedidoEstado(pedidoKey, nuevoEstado);
+      pm.remove();
+      var modal2 = document.getElementById('pedido-modal');
+      if (modal2) modal2.remove();
+      App.renderPage(App.currentPage);
+    });
+    document.getElementById('pedido-pago-qr-cancel').addEventListener('click', function() {
+      document.getElementById('pedido-pago-qr-area').style.display = 'none';
+      document.getElementById('pedido-pago-efectivo').style.display = '';
+      document.getElementById('pedido-pago-qr-btn').style.display = '';
+    });
+    document.getElementById('pedido-pago-volver').addEventListener('click', function() {
+      pm.remove();
+    });
   },
 
   eliminarPedido(pedidoKey) {
@@ -4746,3 +4870,4 @@ const Pages = {
     el.innerHTML = h;
   }
 };
+
