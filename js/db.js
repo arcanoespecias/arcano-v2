@@ -420,6 +420,7 @@ function saveEspecia(data) {
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.especias[data.id] = data;
   _getOrCreateSticker(data.nombre);
+  if (data.imagen) writeField('especias/' + data.id + '/imagen', data.imagen);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'especias', data.id);
   return data;
@@ -465,6 +466,7 @@ function saveBlend(data) {
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.blends[data.id] = data;
   _getOrCreateSticker(data.nombre);
+  if (data.imagen) writeField('blends/' + data.id + '/imagen', data.imagen);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'blends', data.id);
   return data;
