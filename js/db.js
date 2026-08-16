@@ -690,6 +690,51 @@ function deleteAjuste(id) {
   return true;
 }
 
+/* ==================== GASTOS ==================== */
+
+function getGastos() {
+  return _filterValid(Object.values(_db.gastos || {})).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''); });
+}
+
+function getGastosCategorias() {
+  if (!_db.gastosCategorias || !Array.isArray(_db.gastosCategorias) || _db.gastosCategorias.length === 0) {
+    return ['Envio', 'Arriendo', 'Servicios', 'Impuestos', 'Marketing', 'Empaque', 'Transporte', 'Otros'];
+  }
+  return _db.gastosCategorias;
+}
+
+function saveGasto(data) {
+  _ensureStructure();
+  if (!_db.gastos) _db.gastos = {};
+  var isNew = !data.id;
+  if (isNew) {
+    data.id = nextId('gastos');
+    data.creado = new Date().toISOString();
+    data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  }
+  data.monto = Number(data.monto) || 0;
+  data.categoria = data.categoria || 'Otros';
+  data.descripcion = data.descripcion || '';
+  _db.gastos[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'gastos', data.id);
+  return data;
+}
+
+function deleteGasto(id) {
+  if (!_db.gastos || !_db.gastos[id]) return false;
+  delete _db.gastos[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'gastos', id);
+  return true;
+}
+
+function saveGastosCategorias(categorias) {
+  _ensureStructure();
+  _db.gastosCategorias = categorias;
+  _saveToFirebase(); _cacheLocal();
+}
+
 /* ==================== PRODUCCION ==================== */
 
 function producirEspecia(especiaId, talla, cantidad) {
@@ -1782,6 +1827,7 @@ window.ArcanoDB = {
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
+  getGastos: getGastos, getGastosCategorias: getGastosCategorias, saveGasto: saveGasto, deleteGasto: deleteGasto, saveGastosCategorias: saveGastosCategorias,
   getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
   getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, updatePedidoField: updatePedidoField, deletePedido: deletePedido, onPedidosChange: onPedidosChange,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
