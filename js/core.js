@@ -171,6 +171,8 @@ const App = {
               '<span class="nav-icon">🏭</span><span class="nav-label">Produccion</span></a>' +
             '<a class="nav-item" data-page="ventas" onclick="App.navigate(\'ventas\')">' +
               '<span class="nav-icon">💰</span><span class="nav-label">Ventas</span></a>' +
+            '<a class="nav-item" data-page="gastos" onclick="App.navigate(\'gastos\')">' +
+              '<span class="nav-icon">📉</span><span class="nav-label">Gastos</span></a>' +
             '<a class="nav-item" data-page="pedidos" onclick="App.navigate(\'pedidos\')" id="nav-pedidos">' +
               '<span class="nav-icon">📦</span><span class="nav-label">Pedidos</span><span class="nav-badge" id="pedidos-badge" style="display:none"></span></a>' +
             '<a class="nav-item" data-page="stock" onclick="App.navigate(\'stock\')">' +
@@ -223,7 +225,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
+      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -270,6 +272,7 @@ const App = {
         case 'insumos': Pages.renderInsumos(container); break;
         case 'produccion': Pages.renderProduccion(container); break;
         case 'ventas': Pages.renderVentas(container); break;
+        case 'gastos': Pages.renderGastos(container); break;
         case 'pedidos': Pages.renderPedidos(container); break;
         case 'stock': Pages.renderStock(container); break;
         case 'tienda': Pages.renderTiendaAdmin(container); break;
