@@ -1796,107 +1796,37 @@ function producirPack(packId, cantidad) {
   var blendItems = pack.blendItems || [];
   if (blendItems.length === 0) throw new Error('El pack no tiene blends asignados');
 
-  // Count envases/bolsas needed per talla
-  var chicoCount = 0, grandeCount = 0;
-  for (var bi = 0; bi < blendItems.length; bi++) {
-    if ((blendItems[bi].talla || 'chico') === 'grande') grandeCount += cantidad;
-    else chicoCount += cantidad;
-  }
-
-  // Check envases
-  if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
-  if (chicoCount > 0 && (_db.stockEnvases.chico || 0) < chicoCount) {
-    throw new Error('Envases pequenos insuficientes. Necesitas ' + chicoCount + ', tienes ' + (_db.stockEnvases.chico || 0));
-  }
-  if (grandeCount > 0 && (_db.stockEnvases.grande || 0) < grandeCount) {
-    throw new Error('Envases grandes insuficientes. Necesitas ' + grandeCount + ', tienes ' + (_db.stockEnvases.grande || 0));
-  }
-
-  // Check bolsas
-  if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
-  if (chicoCount > 0 && (_db.stockBolsas.chico || 0) < chicoCount) {
-    throw new Error('Bolsas pequenas insuficientes. Necesitas ' + chicoCount + ', tienes ' + (_db.stockBolsas.chico || 0));
-  }
-  if (grandeCount > 0 && (_db.stockBolsas.grande || 0) < grandeCount) {
-    throw new Error('Bolsas grandes insuficientes. Necesitas ' + grandeCount + ', tienes ' + (_db.stockBolsas.grande || 0));
-  }
-
-  // Check cintas
-  var totalItems = blendItems.length * cantidad;
-  if (!_db.stockCintas) _db.stockCintas = 0;
-  if ((_db.stockCintas || 0) < totalItems) {
-    throw new Error('Cintas insuficientes. Necesitas ' + totalItems + ', tienes ' + (_db.stockCintas || 0));
-  }
-
-  // All checks passed — produce each blend in the pack
-  var blendProduced = [];
+  // Check and consume blend stock (frascos ya producidos)
+  var detalleBlends = [];
   for (var i = 0; i < blendItems.length; i++) {
-    var bi2 = blendItems[i];
-    var blend = _db.blends[bi2.blendId];
-    if (!blend) throw new Error('Blend #' + bi2.blendId + ' no encontrado en la base de datos');
-    var talla = (bi2.talla === 'grande') ? 'grande' : 'chico';
-    var ingredientes = blend.ingredientes || [];
-    var grsTotalBlend = 0;
-    var detalleIngredientes = [];
-
-    // If blend has ingredients, consume spices
-    if (ingredientes.length > 0) {
-      for (var j = 0; j < ingredientes.length; j++) {
-        var ing = ingredientes[j];
-        var esp = _db.especias[ing.especiaId];
-        if (!esp) throw new Error('Especia "' + (ing.especiaNombre || ing.especiaId) + '" no encontrada para blend ' + blend.nombre);
-        var grsPorFrasco = (talla === 'grande') ? (Number(ing.gramosGrande) || 0) : (Number(ing.gramosChico) || 0);
-        var grsNeeded = grsPorFrasco * cantidad;
-        if (grsPorFrasco > 0 && (esp.stockBolsa || 0) < grsNeeded) {
-          throw new Error('Stock insuficiente de pala de ' + esp.nombre + '. Necesitas ' + grsNeeded + 'g, tienes ' + (esp.stockBolsa || 0) + 'g');
-        }
-        if (grsPorFrasco > 0) {
-          esp.stockBolsa = (esp.stockBolsa || 0) - grsNeeded;
-          detalleIngredientes.push({ especiaId: ing.especiaId, especiaNombre: esp.nombre, gramosPorFrasco: grsPorFrasco, gramosTotal: grsNeeded });
-          grsTotalBlend += grsNeeded;
-        }
-      }
-    }
-
-    // Consume sticker for this blend
-    var stk = (_db.stickers || {})[blend.id];
-    if (stk) {
-      var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-      if ((stk[stkKey] || 0) < cantidad) {
-        throw new Error('Stickers insuficientes para ' + blend.nombre + '. Necesitas ' + cantidad + ', tienes ' + (stk[stkKey] || 0));
-      }
-      stk[stkKey] = (stk[stkKey] || 0) - cantidad;
-    }
-
-    // Increase blend stock
+    var bi = blendItems[i];
+    var blend = _db.blends[bi.blendId];
+    if (!blend) throw new Error('Blend #' + bi.blendId + ' no encontrado');
+    var talla = (bi.talla === 'grande') ? 'grande' : 'chico';
     var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
-    blend[frascoKey] = (blend[frascoKey] || 0) + cantidad;
-
-    // Create production record for this blend
-    var prodId = nextId('producciones');
-    var prod = {
-      id: prodId, tipo: 'blend', productoId: blend.id, productoNombre: blend.nombre,
-      categoria: blend.categoria || '', talla: talla, cantidad: cantidad,
-      ingredientes: detalleIngredientes, gramosTotal: grsTotalBlend,
-      envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad, cintasConsumidas: cantidad,
-      packId: packId, packNombre: pack.nombre,
-      fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
-    };
-    _db.producciones[prodId] = prod;
-    _notify('create', 'producciones', prodId);
+    var disponible = blend[frascoKey] || 0;
+    if (disponible < cantidad) {
+      throw new Error('Stock insuficiente de ' + blend.nombre + ' (' + talla + '). Necesitas ' + cantidad + ' frascos, tienes ' + disponible);
+    }
+    blend[frascoKey] = disponible - cantidad;
+    detalleBlends.push({ blendId: blend.id, blendNombre: blend.nombre, talla: talla, cantidad: cantidad });
     _notify('update', 'blends', blend.id);
-    blendProduced.push(blend.nombre + ' (' + talla + ') x' + cantidad);
   }
 
-  // Consume shared packaging
-  _db.stockEnvases.chico = (_db.stockEnvases.chico || 0) - chicoCount;
-  _db.stockEnvases.grande = (_db.stockEnvases.grande || 0) - grandeCount;
-  _db.stockBolsas.chico = (_db.stockBolsas.chico || 0) - chicoCount;
-  _db.stockBolsas.grande = (_db.stockBolsas.grande || 0) - grandeCount;
-  _db.stockCintas = (_db.stockCintas || 0) - totalItems;
+  // Create production record
+  var prodId = nextId('producciones');
+  var prod = {
+    id: prodId, tipo: 'pack', productoId: packId, productoNombre: pack.nombre,
+    categoria: 'Pack', talla: '-', cantidad: cantidad,
+    ingredientes: detalleBlends, gramosTotal: 0,
+    envasesConsumidos: 0, stickersConsumidos: 0, bolsasConsumidas: 0, cintasConsumidas: 0,
+    fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
+  };
+  _db.producciones[prodId] = prod;
+  _notify('create', 'producciones', prodId);
 
   _saveToFirebase(); _cacheLocal();
-  return { pack: pack, blendProduced: blendProduced };
+  return { pack: pack, produccion: prod };
 }
 
 function savePack(data) {
