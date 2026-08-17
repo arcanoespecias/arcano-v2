@@ -1,15 +1,6 @@
 /* ===================== ARCANO V3 — PAGES (FIXED) ===================== */
 const Pages = {
   _qrPagoImage: localStorage.getItem('arcano_qr_pago_image') || '',
-  _pendingImages: {},
-  _clearPendingImages: function() { Pages._pendingImages = {}; },
-  _getImageForArea: function(areaId) {
-    if (Pages._pendingImages[areaId]) return Pages._pendingImages[areaId];
-    var suffix = areaId.split('-').pop();
-    var previewEl = document.getElementById('img-preview-' + suffix);
-    if (previewEl && previewEl.src && previewEl.src.indexOf('data:') === 0) return previewEl.src;
-    return '';
-  },
 
   _getCheckedCats: function(prefix) {
     var cats = [];
@@ -439,7 +430,7 @@ const Pages = {
       } else if (filteredPacks.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron packs para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Stock</th><th>Costo</th><th>Margen</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredPacks.length; i++) {
           var pk = filteredPacks[i];
           var bi3 = pk.blendItems || [];
@@ -469,12 +460,11 @@ const Pages = {
             '<td class="fw7">' + pk.nombre + '</td>' +
             '<td class="text-sm">' + (pkBlendNames.length ? pkBlendNames.join(', ') : '<span class="text-muted">Sin blends</span>') + '</td>' +
             '<td class="fw7" style="color:var(--gold)">$' + pkPrecio.toLocaleString() + '</td>' +
-            '<td class="fw7">' + (Number(pk.stock)||0) + '</td>' +
             '<td style="color:var(--red)">$' + pkCosto.toFixed(1) + '</td>' +
             '<td style="color:' + pkMC + '">$' + pkMargen.toFixed(1) + ' (' + pkPct.toFixed(0) + '%)</td>' +
             '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" onclick="ArcanoDB.toggleTienda(\'pack\',' + pk.id + ');App.renderPage(\'productos\')" title="Tienda">' + (pk.enTienda ? 'ON' : 'OFF') + '</button></td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionRapida(\'pack\',' + pk.id + ')">Producir</button>' +
+              '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionPack(' + pk.id + ')">Producir</button>' +
               '<button class="btn btn-sm btn-outline mr-4" onclick="Pages.formPack(' + pk.id + ')">Editar</button>' +
               '<button class="btn btn-sm btn-red" onclick="Pages.delPack(' + pk.id + ')">X</button>' +
             '</td></tr>';
@@ -509,7 +499,6 @@ const Pages = {
 
   /* ==================== ESPECIA FORM ====================  /* ==================== ESPECIA FORM ==================== */
   formEspecia(editId) {
-    Pages._clearPendingImages();
     var esp = (editId != null) ? ArcanoDB.getEspecia(editId) : null;
     var isEdit = (esp != null);
 
@@ -557,7 +546,7 @@ const Pages = {
     document.getElementById('btn-save-esp').addEventListener('click', function() {
       var nombre = document.getElementById('f-esp-nombre').value.trim();
       if (!nombre) { alert('Ingresa un nombre'); return; }
-      var newImagen = Pages._pendingImages['img-area-esp'] || '';
+      var previewEl = document.getElementById('img-preview-esp');
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('esp'),
@@ -568,17 +557,16 @@ const Pages = {
         enTienda: document.getElementById('f-esp-tienda').value === '1' || (Number(document.getElementById('f-esp-pc').value) || Number(document.getElementById('f-esp-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-esp-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
+        imagen: previewEl ? previewEl.src : '',
         descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
         uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : '',
         tags: Pages.getSelectedTags()
       };
-      if (newImagen === '__REMOVE__') { data.imagen = ''; } else if (newImagen) { data.imagen = newImagen; }
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
       }
       try {
         ArcanoDB.saveEspecia(data);
-        delete Pages._pendingImages['img-area-esp'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -597,7 +585,6 @@ const Pages = {
 
   /* ==================== BLEND FORM ==================== */
   formBlend(editId) {
-    Pages._clearPendingImages();
     var bl = (editId != null) ? ArcanoDB.getBlend(editId) : null;
     var isEdit = (bl != null);
     var especias = ArcanoDB.getEspecias();
@@ -697,7 +684,6 @@ const Pages = {
         for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espObj = especias[s]; break; } }
         ingredientes.push({ especiaId: espId, especiaNombre: espObj ? espObj.nombre : '', gramosChico: gc, gramosGrande: gg });
       }
-      var newImagen = Pages._pendingImages['img-area-bl'] || '';
       var data = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('bl'),
@@ -709,16 +695,15 @@ const Pages = {
         enTienda: document.getElementById('f-bl-tienda').value === '1' || (Number(document.getElementById('f-bl-pc').value) || Number(document.getElementById('f-bl-pg').value)) > 0,
         precioTiendaChico: Number(document.getElementById('f-bl-tc').value) || 0,
         precioTiendaGrande: Number(document.getElementById('f-bl-tg').value) || 0,
+        imagen: (document.getElementById('img-preview-bl') || {}).src || '',
         descripcion: (document.getElementById('f-bl-desc') || {}).value ? document.getElementById('f-bl-desc').value.trim() : '',
         tags: Pages.getSelectedTags()
       };
-      if (newImagen === '__REMOVE__') { data.imagen = ''; } else if (newImagen) { data.imagen = newImagen; }
       if (isEdit) {
         data.id = editId;  // CRITICAL: set the existing ID
       }
       try {
         ArcanoDB.saveBlend(data);
-        delete Pages._pendingImages['img-area-bl'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -780,7 +765,6 @@ const Pages = {
 
   /* ---------- PACK FORM ---------- */
   formPack(editId) {
-    Pages._clearPendingImages();
     var existing = (editId != null) ? ArcanoDB.getPack(editId) : null;
     var isEdit = !!existing;
     var blends = ArcanoDB.getBlends();
@@ -839,25 +823,17 @@ const Pages = {
         }
       }
       if (blendItems.length < 2) { alert('Un pack debe tener al menos 2 blends'); return; }
-      var newImagen = Pages._pendingImages['img-area-pk'] || '';
       var data = {
         nombre: nombre,
         descripcion: document.getElementById('f-pk-desc').value.trim(),
         precio: Number(document.getElementById('f-pk-precio').value) || 0,
+        imagen: (document.getElementById('img-preview-pk') || {}).src || '',
         blendItems: blendItems,
         enTienda: isEdit ? (existing.enTienda || false) : false
       };
-      if (newImagen === '__REMOVE__') {
-        data.imagen = '';
-      } else if (newImagen) {
-        data.imagen = newImagen;
-      } else if (isEdit && existing.imagen) {
-        data.imagen = existing.imagen;
-      }
       if (isEdit) data.id = editId;
       try {
         ArcanoDB.savePack(data);
-        delete Pages._pendingImages['img-area-pk'];
         modal.remove();
         App.renderPage('productos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -918,6 +894,151 @@ const Pages = {
         (precio > 0 ? ' | <span class="fw7">Margen: </span><span style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toFixed(2) + ' (' + pct + '%)</span>' : '') +
         '</div></div></div>';
     }
+  },
+
+  formProduccionPack(packId) {
+    var pk = ArcanoDB.getPack(packId);
+    if (!pk) { alert('Pack no encontrado'); return; }
+    var blendItems = pk.blendItems || [];
+    if (blendItems.length === 0) { alert('Este pack no tiene blends asignados'); return; }
+
+    var db = ArcanoDB.getDB();
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var stickers = db.stickers || {};
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var cintas = db.stockCintas || 0;
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+
+    var blendRows = '';
+    for (var i = 0; i < blendItems.length; i++) {
+      var bl = ArcanoDB.getBlend(blendItems[i].blendId);
+      var blName = bl ? bl.nombre : 'Blend #' + blendItems[i].blendId;
+      var talla = blendItems[i].talla || 'chico';
+      var ings = (bl && bl.ingredientes) ? bl.ingredientes : [];
+      var ingInfo = ings.length > 0
+        ? ings.map(function(x) { return (x.especiaNombre || '?') + ' ' + (talla === 'grande' ? (x.gramosGrande||0) : (x.gramosChico||0)) + 'g'; }).join(', ')
+        : '<span class="text-muted">Sin ingredientes definidos</span>';
+      blendRows += '<div class="card mb-8" style="background:var(--bg)"><div class="card-body" style="padding:10px">' +
+        '<div class="fw7">' + blName + ' <span class="badge ' + (talla==='grande' ? 'badge-gold' : 'badge-blue') + '">' + talla + '</span></div>' +
+        '<div class="text-sm mt-4">' + ingInfo + '</div>' +
+        '</div></div>';
+    }
+
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:600px">' +
+      '<div class="modal-header"><h3>Producir Pack: ' + pk.nombre + '</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Cantidad de packs</label><input type="number" class="input" id="f-pkprod-cant" value="1" min="1" style="max-width:120px" oninput="Pages._updatePackProdPreview(' + packId + ')"></div>' +
+        '<h4 class="mt-12 mb-8">Blends del pack</h4>' +
+        '<div id="f-pkprod-items">' + blendRows + '</div>' +
+        '<div id="f-pkprod-preview" class="mt-12"></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-pkprod">Producir</button>' +
+      '</div></div>';
+
+    document.body.appendChild(modal);
+    setTimeout(function() { Pages._updatePackProdPreview(packId); }, 100);
+
+    document.getElementById('btn-pkprod').addEventListener('click', function() {
+      var cant = Number(document.getElementById('f-pkprod-cant').value) || 0;
+      if (cant <= 0) { alert('Ingresa una cantidad valida'); return; }
+      try {
+        ArcanoDB.producirPack(packId, cant);
+        modal.remove();
+        App.renderPage('productos');
+      } catch (err) { alert('Error: ' + err.message); }
+    });
+  },
+
+  _updatePackProdPreview: function(packId) {
+    var pk = ArcanoDB.getPack(packId);
+    if (!pk) return;
+    var blendItems = pk.blendItems || [];
+    var cant = Number((document.getElementById('f-pkprod-cant') || {}).value) || 0;
+    var db = ArcanoDB.getDB();
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var cintas = db.stockCintas || 0;
+    var stickers = db.stickers || {};
+
+    var totalItems = blendItems.length * cant;
+    var allOk = true;
+    var h = '<div class="card"><div class="card-body">';
+
+    // Check envases per talla
+    var chicoCount = 0, grandeCount = 0;
+    for (var i = 0; i < blendItems.length; i++) {
+      if ((blendItems[i].talla || 'chico') === 'grande') grandeCount += cant;
+      else chicoCount += cant;
+    }
+
+    if (chicoCount > 0) {
+      var envC = (envases.chico || 0) >= chicoCount;
+      if (!envC) allOk = false;
+      h += '<div class="list-row"><span>Envases pequenos</span><span class="' + (envC ? 'text-green' : 'text-red fw7') + '">' + (envases.chico||0) + ' → necesita ' + chicoCount + ' ' + (envC ? 'OK' : 'FALTA') + '</span></div>';
+    }
+    if (grandeCount > 0) {
+      var envG = (envases.grande || 0) >= grandeCount;
+      if (!envG) allOk = false;
+      h += '<div class="list-row"><span>Envases grandes</span><span class="' + (envG ? 'text-green' : 'text-red fw7') + '">' + (envases.grande||0) + ' → necesita ' + grandeCount + ' ' + (envG ? 'OK' : 'FALTA') + '</span></div>';
+    }
+
+    // Check bolsas
+    if (chicoCount > 0) {
+      var bolC = (bolsas.chico || 0) >= chicoCount;
+      if (!bolC) allOk = false;
+      h += '<div class="list-row"><span>Bolsas pequenas</span><span class="' + (bolC ? 'text-green' : 'text-red fw7') + '">' + (bolsas.chico||0) + ' → necesita ' + chicoCount + ' ' + (bolC ? 'OK' : 'FALTA') + '</span></div>';
+    }
+    if (grandeCount > 0) {
+      var bolG = (bolsas.grande || 0) >= grandeCount;
+      if (!bolG) allOk = false;
+      h += '<div class="list-row"><span>Bolsas grandes</span><span class="' + (bolG ? 'text-green' : 'text-red fw7') + '">' + (bolsas.grande||0) + ' → necesita ' + grandeCount + ' ' + (bolG ? 'OK' : 'FALTA') + '</span></div>';
+    }
+
+    // Check cintas
+    var cinOk = cintas >= totalItems;
+    if (!cinOk) allOk = false;
+    h += '<div class="list-row"><span>Cintas</span><span class="' + (cinOk ? 'text-green' : 'text-red fw7') + '">' + cintas + ' → necesita ' + totalItems + ' ' + (cinOk ? 'OK' : 'FALTA') + '</span></div>';
+
+    // Check stickers per blend
+    for (var j = 0; j < blendItems.length; j++) {
+      var bl = ArcanoDB.getBlend(blendItems[j].blendId);
+      if (bl) {
+        var stk = stickers[bl.id] || {};
+        var t = blendItems[j].talla || 'chico';
+        var stkAvail = t === 'grande' ? (stk.stockGrande || 0) : (stk.stockChico || 0);
+        var stkNeed = cant;
+        var stkOk = stkAvail >= stkNeed;
+        if (!stkOk) allOk = false;
+        h += '<div class="list-row"><span>Sticker ' + bl.nombre + '</span><span class="' + (stkOk ? 'text-green' : 'text-red fw7') + '">' + stkAvail + ' → necesita ' + stkNeed + ' ' + (stkOk ? 'OK' : 'FALTA') + '</span></div>';
+      }
+    }
+
+    // Check spices for blends that have ingredients
+    for (var k = 0; k < blendItems.length; k++) {
+      var bl2 = ArcanoDB.getBlend(blendItems[k].blendId);
+      if (bl2 && bl2.ingredientes && bl2.ingredientes.length > 0) {
+        var t2 = blendItems[k].talla || 'chico';
+        for (var m = 0; m < bl2.ingredientes.length; m++) {
+          var ing = bl2.ingredientes[m];
+          var esp = ArcanoDB.getEspecia(ing.especiaId);
+          var gpf = t2 === 'grande' ? (Number(ing.gramosGrande) || 0) : (Number(ing.gramosChico) || 0);
+          var needed = gpf * cant;
+          var avail = esp ? (esp.stockBolsa || 0) : 0;
+          var ok = avail >= needed;
+          if (!ok) allOk = false;
+          h += '<div class="list-row"><span>' + (esp ? esp.nombre : '?') + ' (pala)</span><span class="' + (ok ? 'text-green' : 'text-red fw7') + '">' + avail + 'g → necesita ' + needed + 'g ' + (ok ? 'OK' : 'FALTA') + '</span></div>';
+        }
+      }
+    }
+
+    h += '</div></div>';
+    var el = document.getElementById('f-pkprod-preview');
+    if (el) el.innerHTML = h;
+    var btn = document.getElementById('btn-pkprod');
+    if (btn) btn.disabled = !allOk || cant <= 0;
   },
 
   delPack(id) {
@@ -1098,7 +1219,7 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else {
-          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option><option value="pack">Pack</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
+          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
           var stkSel = detailDiv.querySelector('.ent-stk-nombre');
           var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
           var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
@@ -1330,10 +1451,10 @@ const Pages = {
     modal.innerHTML = '<div class="modal modal-lg">' +
       '<div class="modal-header"><h3>Nueva Produccion</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option><option value="pack">Pack</option></select></div>' +
+        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option></select></div>' +
         '<div class="form-group"><label>Producto</label><select class="input" id="f-prod-prod"><option value="">Seleccionar</option></select></div>' +
-        '<div class="g2"><div class="form-group" id="f-prod-talla-wrap"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
-        '<div class="form-group"><label>Cantidad</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
+        '<div class="g2"><div class="form-group"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
+        '<div class="form-group"><label>Cantidad de frascos</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
         '<div id="f-prod-preview" class="mt-12"></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -1351,12 +1472,7 @@ const Pages = {
 
     function loadProductos() {
       var tipo = tipoSel.value;
-      var list;
-      if (tipo === 'pack') list = ArcanoDB.getPacks();
-      else if (tipo === 'blend') list = ArcanoDB.getBlends();
-      else list = ArcanoDB.getEspecias();
-      var tallaWrap = document.getElementById('f-prod-talla-wrap');
-      if (tallaWrap) tallaWrap.style.display = tipo === 'pack' ? 'none' : '';
+      var list = tipo === 'blend' ? ArcanoDB.getBlends() : ArcanoDB.getEspecias();
       prodSel.innerHTML = '<option value="">Seleccionar</option>';
       for (var i = 0; i < list.length; i++) {
         prodSel.innerHTML += '<option value="' + list[i].id + '">' + list[i].nombre + '</option>';
@@ -1372,10 +1488,7 @@ const Pages = {
       var cant = Number(cantInput.value) || 0;
       if (!prodId || cant <= 0) { previewDiv.innerHTML = ''; prodBtn.disabled = true; return; }
 
-      var producto;
-      if (tipo === 'pack') producto = ArcanoDB.getPack(prodId);
-      else if (tipo === 'blend') producto = ArcanoDB.getBlend(prodId);
-      else producto = ArcanoDB.getEspecia(prodId);
+      var producto = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
       if (!producto) { previewDiv.innerHTML = '<p class="text-red">Producto no encontrado</p>'; prodBtn.disabled = true; return; }
 
       var db = ArcanoDB.getDB();
@@ -1409,60 +1522,7 @@ const Pages = {
         }
       }
 
-      // Pack: show blend stock check
-      if (tipo === 'pack') {
-        var blendItems = producto.blendItems || [];
-        if (blendItems.length === 0) {
-          h += '<p class="text-red">Este pack no tiene blends definidos</p>';
-          allOk = false;
-        } else {
-          for (var pi = 0; pi < blendItems.length; pi++) {
-            var pbi = blendItems[pi];
-            var pbl = ArcanoDB.getBlend(pbi.blendId);
-            if (!pbl) { h += '<div class="list-row"><span>Blend ID ' + pbi.blendId + '</span><span class="text-red fw7">NO ENCONTRADO</span></div>'; allOk = false; continue; }
-            var pstk = pbi.talla === 'grande' ? (pbl.stockGrande||0) : (pbl.stockChico||0);
-            var pbiCant = Number(pbi.cantidad) || 1;
-            var pneeded = pbiCant * cant;
-            var pok = pstk >= pneeded;
-            if (!pok) allOk = false;
-            h += '<div class="list-row"><span>' + pbl.nombre + ' (' + pbi.talla + ') x' + pbiCant + '</span><span class="' + (pok?'text-green':'text-red fw7') + '">' + pstk + ' disp. → necesita ' + pneeded + ' ' + (pok?'OK':'FALTA') + '</span></div>';
-          }
-          var currentPackStock = Number(producto.stock) || 0;
-          var newPackStock = currentPackStock + cant;
-          h += '<div class="list-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span>Stock actual del pack</span><span class="fw7">' + currentPackStock + ' → ' + newPackStock + '</span></div>';
-          var costo = ArcanoDB.getCostoPack(prodId);
-          var precio = Number(producto.precio) || 0;
-          var margen = precio - costo;
-          var pct = precio > 0 ? (margen / precio * 100).toFixed(1) : '0';
-          h += '<div class="list-row"><span>Costo por pack</span><span class="text-red">$' + costo.toFixed(2) + '</span></div>';
-          if (precio > 0) h += '<div class="list-row"><span>Margen por pack</span><span style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toFixed(2) + ' (' + pct + '%)</span></div>';
-        }
-      } else if (tipo === 'especia') {
-        var gpf = talla === 'grande' ? (Number(producto.gramosGrande)||0) : (Number(producto.gramosChico)||0);
-        var grsTotal = gpf * cant;
-        var bolsaOk = (producto.stockBolsa||0) >= grsTotal;
-        if (!bolsaOk) allOk = false;
-        h += '<div class="list-row"><span>Pala de ' + producto.nombre + '</span><span class="' + (bolsaOk?'text-green':'text-red fw7') + '">' + (producto.stockBolsa||0) + 'g disponible → necesita ' + grsTotal + 'g ' + (bolsaOk?'OK':'FALTA') + '</span></div>';
-      } else {
-        var ings = producto.ingredientes || [];
-        if (ings.length === 0) {
-          h += '<p class="text-red">Este blend no tiene ingredientes definidos. Editalo primero.</p>';
-          allOk = false;
-        } else {
-          for (var i = 0; i < ings.length; i++) {
-            var esp = ArcanoDB.getEspecia(ings[i].especiaId);
-            var gpf2 = talla === 'grande' ? (Number(ings[i].gramosGrande)||0) : (Number(ings[i].gramosChico)||0);
-            var needed = gpf2 * cant;
-            var avail = esp ? (esp.stockBolsa||0) : 0;
-            var ok = avail >= needed;
-            if (!ok) allOk = false;
-            h += '<div class="list-row"><span>' + (esp?esp.nombre:'?') + ' (pala)</span><span class="' + (ok?'text-green':'text-red fw7') + '">' + avail + 'g → necesita ' + needed + 'g ' + (ok?'OK':'FALTA') + '</span></div>';
-          }
-        }
-      }
-
-      // Envases (solo para especia y blend, no pack)
-      if (tipo !== 'pack') {
+      // Envases
       var envAvail = envases[talla] || 0;
       var envOk = envAvail >= cant;
       if (!envOk) allOk = false;
@@ -1493,7 +1553,6 @@ const Pages = {
       if (!cintaOk) allOk = false;
       h += '<div class="list-row"><span>Cintas</span><span class="' + (cintaOk?'text-green':'text-red fw7') + '">' + cintaAvail + ' → necesita ' + cant + ' ' + (cintaOk?'OK':'FALTA') + '</span></div>';
 
-      } // end if (!= pack) for packaging checks
       h += '</div></div>';
       previewDiv.innerHTML = h;
       prodBtn.disabled = !allOk;
@@ -1512,9 +1571,7 @@ const Pages = {
       var cant = Number(cantInput.value) || 0;
       if (!prodId || cant <= 0) { alert('Selecciona producto y cantidad'); return; }
       try {
-        if (tipo === 'pack') {
-          ArcanoDB.producirPack(prodId, cant);
-        } else if (tipo === 'blend') {
+        if (tipo === 'blend') {
           ArcanoDB.producirBlend(prodId, talla, cant);
         } else {
           ArcanoDB.producirEspecia(prodId, talla, cant);
@@ -3599,9 +3656,7 @@ const Pages = {
     if (!file) return;
     ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
       if (err) { alert(err); return; }
-      Pages._pendingImages[areaId] = dataUrl;
       var area = document.getElementById(areaId);
-      if (!area) return;
       var placeholder = area.querySelector('.img-upload-placeholder');
       if (placeholder) placeholder.style.display = 'none';
       var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
@@ -3623,7 +3678,6 @@ const Pages = {
   },
 
   removeImage(areaId, inputId) {
-    Pages._pendingImages[areaId] = '__REMOVE__';
     var area = document.getElementById(areaId);
     var preview = area.querySelector('.img-preview');
     if (preview) preview.remove();
@@ -5137,5 +5191,4 @@ const Pages = {
     el.innerHTML = h;
   }
 };
-
 
