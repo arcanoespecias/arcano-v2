@@ -916,13 +916,11 @@ const Pages = {
       var bl = ArcanoDB.getBlend(blendItems[i].blendId);
       var blName = bl ? bl.nombre : 'Blend #' + blendItems[i].blendId;
       var talla = blendItems[i].talla || 'chico';
-      var ings = (bl && bl.ingredientes) ? bl.ingredientes : [];
-      var ingInfo = ings.length > 0
-        ? ings.map(function(x) { return (x.especiaNombre || '?') + ' ' + (talla === 'grande' ? (x.gramosGrande||0) : (x.gramosChico||0)) + 'g'; }).join(', ')
-        : '<span class="text-muted">Sin ingredientes definidos</span>';
+      var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+      var stockDisp = bl ? (bl[frascoKey] || 0) : 0;
       blendRows += '<div class="card mb-8" style="background:var(--bg)"><div class="card-body" style="padding:10px">' +
         '<div class="fw7">' + blName + ' <span class="badge ' + (talla==='grande' ? 'badge-gold' : 'badge-blue') + '">' + talla + '</span></div>' +
-        '<div class="text-sm mt-4">' + ingInfo + '</div>' +
+        '<div class="text-sm mt-4">Stock disponible: <span class="fw7">' + stockDisp + ' frascos</span></div>' +
         '</div></div>';
     }
 
@@ -957,80 +955,19 @@ const Pages = {
     if (!pk) return;
     var blendItems = pk.blendItems || [];
     var cant = Number((document.getElementById('f-pkprod-cant') || {}).value) || 0;
-    var db = ArcanoDB.getDB();
-    var envases = db.stockEnvases || { chico: 0, grande: 0 };
-    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
-    var cintas = db.stockCintas || 0;
-    var stickers = db.stickers || {};
-
-    var totalItems = blendItems.length * cant;
     var allOk = true;
     var h = '<div class="card"><div class="card-body">';
 
-    // Check envases per talla
-    var chicoCount = 0, grandeCount = 0;
+    // Check stock de cada blend
     for (var i = 0; i < blendItems.length; i++) {
-      if ((blendItems[i].talla || 'chico') === 'grande') grandeCount += cant;
-      else chicoCount += cant;
-    }
-
-    if (chicoCount > 0) {
-      var envC = (envases.chico || 0) >= chicoCount;
-      if (!envC) allOk = false;
-      h += '<div class="list-row"><span>Envases pequenos</span><span class="' + (envC ? 'text-green' : 'text-red fw7') + '">' + (envases.chico||0) + ' → necesita ' + chicoCount + ' ' + (envC ? 'OK' : 'FALTA') + '</span></div>';
-    }
-    if (grandeCount > 0) {
-      var envG = (envases.grande || 0) >= grandeCount;
-      if (!envG) allOk = false;
-      h += '<div class="list-row"><span>Envases grandes</span><span class="' + (envG ? 'text-green' : 'text-red fw7') + '">' + (envases.grande||0) + ' → necesita ' + grandeCount + ' ' + (envG ? 'OK' : 'FALTA') + '</span></div>';
-    }
-
-    // Check bolsas
-    if (chicoCount > 0) {
-      var bolC = (bolsas.chico || 0) >= chicoCount;
-      if (!bolC) allOk = false;
-      h += '<div class="list-row"><span>Bolsas pequenas</span><span class="' + (bolC ? 'text-green' : 'text-red fw7') + '">' + (bolsas.chico||0) + ' → necesita ' + chicoCount + ' ' + (bolC ? 'OK' : 'FALTA') + '</span></div>';
-    }
-    if (grandeCount > 0) {
-      var bolG = (bolsas.grande || 0) >= grandeCount;
-      if (!bolG) allOk = false;
-      h += '<div class="list-row"><span>Bolsas grandes</span><span class="' + (bolG ? 'text-green' : 'text-red fw7') + '">' + (bolsas.grande||0) + ' → necesita ' + grandeCount + ' ' + (bolG ? 'OK' : 'FALTA') + '</span></div>';
-    }
-
-    // Check cintas
-    var cinOk = cintas >= totalItems;
-    if (!cinOk) allOk = false;
-    h += '<div class="list-row"><span>Cintas</span><span class="' + (cinOk ? 'text-green' : 'text-red fw7') + '">' + cintas + ' → necesita ' + totalItems + ' ' + (cinOk ? 'OK' : 'FALTA') + '</span></div>';
-
-    // Check stickers per blend
-    for (var j = 0; j < blendItems.length; j++) {
-      var bl = ArcanoDB.getBlend(blendItems[j].blendId);
+      var bl = ArcanoDB.getBlend(blendItems[i].blendId);
       if (bl) {
-        var stk = stickers[bl.id] || {};
-        var t = blendItems[j].talla || 'chico';
-        var stkAvail = t === 'grande' ? (stk.stockGrande || 0) : (stk.stockChico || 0);
-        var stkNeed = cant;
-        var stkOk = stkAvail >= stkNeed;
-        if (!stkOk) allOk = false;
-        h += '<div class="list-row"><span>Sticker ' + bl.nombre + '</span><span class="' + (stkOk ? 'text-green' : 'text-red fw7') + '">' + stkAvail + ' → necesita ' + stkNeed + ' ' + (stkOk ? 'OK' : 'FALTA') + '</span></div>';
-      }
-    }
-
-    // Check spices for blends that have ingredients
-    for (var k = 0; k < blendItems.length; k++) {
-      var bl2 = ArcanoDB.getBlend(blendItems[k].blendId);
-      if (bl2 && bl2.ingredientes && bl2.ingredientes.length > 0) {
-        var t2 = blendItems[k].talla || 'chico';
-        for (var m = 0; m < bl2.ingredientes.length; m++) {
-          var ing = bl2.ingredientes[m];
-          var esp = ArcanoDB.getEspecia(ing.especiaId);
-          var gpf = t2 === 'grande' ? (Number(ing.gramosGrande) || 0) : (Number(ing.gramosChico) || 0);
-          var needed = gpf * cant;
-          var avail = esp ? (esp.stockBolsa || 0) : 0;
-          var ok = avail >= needed;
-          if (!ok) allOk = false;
-          h += '<div class="list-row"><span>' + (esp ? esp.nombre : '?') + ' (pala)</span><span class="' + (ok ? 'text-green' : 'text-red fw7') + '">' + avail + 'g → necesita ' + needed + 'g ' + (ok ? 'OK' : 'FALTA') + '</span></div>';
-        }
+        var talla = blendItems[i].talla || 'chico';
+        var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+        var disponible = bl[frascoKey] || 0;
+        var ok = disponible >= cant;
+        if (!ok) allOk = false;
+        h += '<div class="list-row"><span>' + bl.nombre + ' (' + talla + ')</span><span class="' + (ok ? 'text-green' : 'text-red fw7') + '">' + disponible + ' fr → necesita ' + cant + ' ' + (ok ? 'OK' : 'FALTA') + '</span></div>';
       }
     }
 
