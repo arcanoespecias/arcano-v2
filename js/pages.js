@@ -429,7 +429,7 @@ const Pages = {
       } else if (filteredPacks.length === 0) {
         h += '<div class="card"><div class="card-body"><p class="text-muted text-center" style="padding:32px">No se encontraron packs para "' + (window._prodSearch || '').replace(/"/g, '&quot;') + '"</p></div></div>';
       } else {
-        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Blends</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Stock</th><th>Tienda</th><th>Acciones</th></tr></thead><tbody>';
         for (var i = 0; i < filteredPacks.length; i++) {
           var pk = filteredPacks[i];
           var bi3 = pk.blendItems || [];
@@ -455,12 +455,14 @@ const Pages = {
           var pkMargen = pkPrecio - pkCosto;
           var pkPct = pkPrecio > 0 ? (pkMargen / pkPrecio * 100) : 0;
           var pkMC = pkMargen >= 0 ? 'var(--green)' : 'var(--red)';
+          var pkStk = pk.stock || 0;
           h += '<tr>' +
             '<td class="fw7">' + pk.nombre + '</td>' +
             '<td class="text-sm">' + (pkBlendNames.length ? pkBlendNames.join(', ') : '<span class="text-muted">Sin blends</span>') + '</td>' +
             '<td class="fw7" style="color:var(--gold)">$' + pkPrecio.toLocaleString() + '</td>' +
             '<td style="color:var(--red)">$' + pkCosto.toFixed(1) + '</td>' +
             '<td style="color:' + pkMC + '">$' + pkMargen.toFixed(1) + ' (' + pkPct.toFixed(0) + '%)</td>' +
+            '<td class="fw7" style="color:' + (pkStk > 0 ? 'var(--green)' : 'var(--red)') + '">' + pkStk + '</td>' +
             '<td><button class="btn btn-sm ' + (pk.enTienda ? 'btn-green' : 'btn-outline') + '" onclick="ArcanoDB.toggleTienda(\'pack\',' + pk.id + ');App.renderPage(\'productos\')" title="Tienda">' + (pk.enTienda ? 'ON' : 'OFF') + '</button></td>' +
             '<td style="white-space:nowrap">' +
               '<button class="btn btn-sm btn-green mr-4" onclick="Pages.formProduccionPack(' + pk.id + ')">Producir</button>' +
