@@ -2946,7 +2946,25 @@ const Pages = {
         sd += '</article>';
       }
 
-      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd };
+      // BreadcrumbList JSON-LD
+      var bcJsonLd = '<!-- SEO: BreadcrumbList estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": [\n    { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://arcanoespecias.github.io/" },\n    { "@type": "ListItem", "position": 2, "name": "Catalogo de Especias y Blends", "item": "https://arcanoespecias.github.io/" }\n  ]\n}\n</script>'
+
+      // FAQ JSON-LD
+      var faqQ = [
+        {q: '¿Qué es Arcano Especias?', a: 'Arcano Especias es una marca colombiana especializada en blends y mezclas artesanales de especias selectas de cada rincón del mundo. Creamos combinaciones únicas para comidas, infusiones y coctelería, con ingredientes 100% naturales y de alta calidad.'},
+        {q: '¿Realizan envíos a toda Colombia?', a: 'Sí, Arcano Especias realiza envíos a todas las ciudades y municipios de Colombia. Los pedidos se envían una vez confirmado el pago y el tiempo de entrega varía según la ubicación.'},
+        {q: '¿Cuáles son las formas de pago aceptadas?', a: 'Aceptamos pagos mediante Nequi, transferencia bancaria a Bancolombia y otros métodos de pago disponibles. Los datos de pago se proporcionan al confirmar el pedido.'},
+        {q: '¿Qué presentaciones de productos ofrecen?', a: 'Nuestros blends y especias se ofrecen en dos presentaciones: tamaño pequeño y tamaño grande. También contamos con packs exclusivos que combinan varios productos a un precio especial.'},
+        {q: '¿Son productos naturales?', a: 'Sí, todos los productos de Arcano Especias son 100% naturales. Utilizamos especias y ingredientes de alta calidad, sin aditivos artificiales ni conservantes. Cada blend es mezclado de forma artesanal.'},
+        {q: '¿Para qué se pueden usar los blends de especias?', a: 'Nuestros blends están categorizados según su uso ideal: para comidas (carnes, sopas, arroces), para infusiones (tés y bebidas calientes) y para coctelería (bebidas y cócteles). Cada blend está diseñado para realzar el sabor de tus preparaciones.'}
+      ];
+      var faqItems = [];
+      for (var _qi = 0; _qi < faqQ.length; _qi++) {
+        faqItems.push('    { "@type": "Question", "name": "' + escJ(faqQ[_qi].q) + '", "acceptedAnswer": { "@type": "Answer", "text": "' + escJ(faqQ[_qi].a) + '" }}');
+      }
+      var faqJsonLd = '<!-- SEO: FAQ estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": [\n' + faqItems.join(',\n') + '\n  ]\n}\n</script>'
+
+      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd, breadcrumbJsonLd: bcJsonLd, faqJsonLd: faqJsonLd };
     }
 
     // Flujo principal
@@ -2979,6 +2997,32 @@ const Pages = {
         var hi = content.indexOf('</head>');
         if (hi === -1) throw new Error('No se encontro </head>');
         content = content.substring(0, hi) + '\n' + seo.jsonLd + '\n' + content.substring(hi);
+
+        // Inyectar BreadcrumbList JSON-LD
+        var _bcMk = '<!-- SEO: BreadcrumbList estatico -->';
+        if (content.indexOf(_bcMk) !== -1) {
+          var _bmi = content.indexOf(_bcMk);
+          var _bme = content.indexOf('</script>', _bmi);
+          if (_bme !== -1) content = content.substring(0, _bmi) + content.substring(_bme + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.breadcrumbJsonLd + '\n' + content.substring(hi);
+
+        // Inyectar FAQ JSON-LD
+        var _fqMk = '<!-- SEO: FAQ estatico -->';
+        if (content.indexOf(_fqMk) !== -1) {
+          var _fqi = content.indexOf(_fqMk);
+          var _fqe = content.indexOf('</script>', _fqi);
+          if (_fqe !== -1) content = content.substring(0, _fqi) + content.substring(_fqe + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.faqJsonLd + '\n' + content.substring(hi);
+
+        // Google Search Console verification meta
+        if (content.indexOf('google-site-verification') === -1) {
+          var _ghHead = content.indexOf('</head>');
+          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="9jnXsA8vOO1MAAwZGEv-XEJNhHFn36XjJiKHMVfVhMg">\n' + content.substring(_ghHead);
+        }
 
         // Remover bloque noscript anterior
         var marker2 = '<!-- SEO: Pre-rendered noscript (regenerar con deploy-seo-prerender.js) -->';
