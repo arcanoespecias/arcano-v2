@@ -1418,10 +1418,16 @@ function moverStockAPDV(pdvId, items) {
         throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
       }
     }
-    if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
-    var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
-    if ((producto[frascoKey] || 0) < it.cantidad) {
-      throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
+    if (it.tipo === 'pack') {
+      if ((producto.stock || 0) < it.cantidad) {
+        throw new Error('Stock insuficiente de ' + producto.nombre + ' (pack): tienes ' + (producto.stock || 0) + ', necesitas ' + it.cantidad);
+      }
+    } else {
+      if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
+      var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
+      if ((producto[frascoKey] || 0) < it.cantidad) {
+        throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
+      }
     }
   }
   // All checks passed - deduct from main, add to PDV
@@ -1430,13 +1436,8 @@ function moverStockAPDV(pdvId, items) {
     var prod2, fk2, stockKey;
     if (it2.tipo === 'pack') {
       var pack2 = _db.packs[it2.productoId];
-      var bi4 = pack2.blendItems || [];
-      for (var dk = 0; dk < bi4.length; dk++) {
-        var db2 = _db.blends[bi4[dk].blendId];
-        var dfk = bi4[dk].talla === 'grande' ? 'stockGrande' : 'stockChico';
-        db2[dfk] = (db2[dfk] || 0) - it2.cantidad;
-        _notify('update', 'blends', bi4[dk].blendId);
-      }
+      pack2.stock = (pack2.stock || 0) - it2.cantidad;
+      _notify('update', 'packs', it2.productoId);
       stockKey = 'pack_' + it2.productoId + '_-';
     } else {
       prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
@@ -1469,13 +1470,8 @@ function devolverStockDePDV(pdvId, items) {
     var prod2;
     if (it2.tipo === 'pack') {
       var pack3 = _db.packs[it2.productoId];
-      var bi5 = pack3.blendItems || [];
-      for (var ek = 0; ek < bi5.length; ek++) {
-        var eb = _db.blends[bi5[ek].blendId];
-        var efk = bi5[ek].talla === 'grande' ? 'stockGrande' : 'stockChico';
-        eb[efk] = (eb[efk] || 0) + it2.cantidad;
-        _notify('update', 'blends', bi5[ek].blendId);
-      }
+      pack3.stock = (pack3.stock || 0) + it2.cantidad;
+      _notify('update', 'packs', it2.productoId);
     } else {
       prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
       if (prod2) {
@@ -1855,6 +1851,10 @@ function producirPack(packId, cantidad) {
     detalleBlends.push({ blendId: blend.id, blendNombre: blend.nombre, talla: talla, cantidad: cantidad });
     _notify('update', 'blends', blend.id);
   }
+
+  // Store pack stock
+  pack.stock = (pack.stock || 0) + cantidad;
+  _notify('update', 'packs', pack.id);
 
   // Create production record
   var prodId = nextId('producciones');
