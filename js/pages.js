@@ -3989,26 +3989,14 @@ const Pages = {
     // Load existing recipes from Firebase
     Pages._loadRecetasAdmin();
 
-    // Load Groq key from Firebase (persistent across devices/deploys)
-    Pages._groqKeyLoaded = false;
-    try {
-      firebase.database().ref('arcano/config/groqKey').once('value').then(function(snap) {
-        var fbKey = snap.val();
-        var statusEl = document.getElementById('ra-key-status');
-        if (fbKey) {
-          var inp = document.getElementById('ra-groq-key');
-          if (inp) inp.value = fbKey;
-          localStorage.setItem('arcano_groq_key', fbKey);
-          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
-          Pages._groqKeyLoaded = true;
-        } else {
-          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube, haz clic en Guardar</span>';
-        }
-      }).catch(function() {
-        var statusEl = document.getElementById('ra-key-status');
-        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error de conexion</span>';
-      });
-    } catch(e) {}
+    // Groq key: se usa localStorage (la key por defecto ya esta en el input)
+    var statusEl2 = document.getElementById('ra-key-status');
+    if (savedKey) {
+      if (statusEl2) statusEl2.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+      Pages._groqKeyLoaded = true;
+    } else {
+      if (statusEl2) statusEl2.innerHTML = ' <span style="color:var(--yellow)">clave por defecto, haz clic en Guardar</span>';
+    }
   },
 
   _saveGroqKey: function(showFeedback) {
@@ -4021,19 +4009,8 @@ const Pages = {
       return;
     }
     localStorage.setItem('arcano_groq_key', key);
-    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">guardando...</span>';
-    try {
-      firebase.database().ref('arcano/config/groqKey').set(key, function(err) {
-        if (err) {
-          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error al guardar</span>';
-        } else {
-          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
-          Pages._groqKeyLoaded = true;
-        }
-      });
-    } catch(e) {
-      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">local OK</span>';
-    }
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+    Pages._groqKeyLoaded = true;
   },
 
   _loadRecetasAdmin: function() {
@@ -4107,7 +4084,6 @@ const Pages = {
 
     if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
     localStorage.setItem('arcano_groq_key', apiKey);
-    try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
 
     btn.disabled = true;
     btn.textContent = 'Generando...';
