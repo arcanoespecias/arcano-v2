@@ -4214,10 +4214,17 @@ const Pages = {
       })
       .then(function(data) {
         if (!data.choices || !data.choices[0]) throw new Error('Respuesta inesperada de la API');
-        var content = data.choices[0].message.content.trim();
-        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+        var raw = data.choices[0].message.content.trim();
+        // Qwen 3.6 incluye razonamiento antes del JSON. Extraer solo el JSON.
+        var jsonStr = raw;
+        var jsonStart = raw.indexOf('{');
+        var jsonEnd = raw.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd > jsonStart) {
+          jsonStr = raw.substring(jsonStart, jsonEnd + 1);
+        }
+        jsonStr = jsonStr.replace(/^\s*```json?\s*/i, '').replace(/\s*```\s*$/, '');
         var receta;
-        try { receta = JSON.parse(content); } catch(pe) { throw new Error('La IA no devolvio un JSON valido: ' + content.slice(0, 100)); }
+        try { receta = JSON.parse(jsonStr); } catch(pe) { throw new Error('La IA no devolvio un JSON valido: ' + jsonStr.slice(0, 100)); }
 
         if (!receta.titulo) throw new Error('La receta no tiene titulo');
         if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
