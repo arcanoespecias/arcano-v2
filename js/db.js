@@ -1403,26 +1403,11 @@ function moverStockAPDV(pdvId, items) {
     if (it.tipo === 'pack') {
       producto = _db.packs[it.productoId];
       if (!producto) throw new Error('Pack no encontrado: ' + it.productoId);
-      var bi3 = producto.blendItems || [];
-      for (var ck = 0; ck < bi3.length; ck++) {
-        var cb = _db.blends[bi3[ck].blendId];
-        if (!cb) throw new Error('Blend del pack no encontrado');
-        var cfk = bi3[ck].talla === 'grande' ? 'stockGrande' : 'stockChico';
-        if ((cb[cfk] || 0) < it.cantidad) throw new Error('Stock insuficiente de ' + cb.nombre + ' (' + (bi3[ck].talla||'chico') + ') para armar ' + it.cantidad + ' packs: tienes ' + (cb[cfk]||0));
-      }
-    } else {
-      producto = it.tipo === 'blend' ? _db.blends[it.productoId] : _db.especias[it.productoId];
-      if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
-      var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
-      if ((producto[frascoKey] || 0) < it.cantidad) {
-        throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
-      }
-    }
-    if (it.tipo === 'pack') {
       if ((producto.stock || 0) < it.cantidad) {
         throw new Error('Stock insuficiente de ' + producto.nombre + ' (pack): tienes ' + (producto.stock || 0) + ', necesitas ' + it.cantidad);
       }
     } else {
+      producto = it.tipo === 'blend' ? _db.blends[it.productoId] : _db.especias[it.productoId];
       if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
       var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
       if ((producto[frascoKey] || 0) < it.cantidad) {
