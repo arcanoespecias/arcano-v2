@@ -3936,7 +3936,7 @@ const Pages = {
   },
 
   /* ================================================================
-     RECETAS IA  (Groq API — modelo opensource Llama 3.1 70B)
+     RECETAS IA  (Groq API — modelo opensource Qwen 3.6 27B)
      ================================================================ */
   _groqKeyLoaded: false,
   renderRecetasAdmin(container) {
@@ -3952,7 +3952,7 @@ const Pages = {
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.1 70B</b> (opensource).</p>' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Qwen 3.6 27B</b> (opensource).</p>' +
         '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
         '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,102,66,82,53,85,103,72,55,107,86,107,78,108,75,83,108,75,116,88,97,87,71,100,121,98,51,70,89,54,53,65,109,116,75,112,86,97,99,50,80,89,90,111,86,70,90,99,66,75,81,98,121];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
         '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
@@ -4205,7 +4205,7 @@ const Pages = {
         'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
         'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
 
-      status.textContent = 'Consultando Llama 3.1 70B via Groq...';
+      status.textContent = 'Consultando Qwen 3.6 27B via Groq...';
 
       fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -4214,7 +4214,7 @@ const Pages = {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
+          model: 'qwen/qwen3.6-27b',
           temperature: 0.9,
           max_tokens: 2000,
           messages: [
