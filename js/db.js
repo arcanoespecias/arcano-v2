@@ -1399,7 +1399,25 @@ function moverStockAPDV(pdvId, items) {
   if (!pdv.stock) pdv.stock = {};
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
-    var producto = it.tipo === 'blend' ? _db.blends[it.productoId] : _db.especias[it.productoId];
+    var producto;
+    if (it.tipo === 'pack') {
+      producto = _db.packs[it.productoId];
+      if (!producto) throw new Error('Pack no encontrado: ' + it.productoId);
+      var bi3 = producto.blendItems || [];
+      for (var ck = 0; ck < bi3.length; ck++) {
+        var cb = _db.blends[bi3[ck].blendId];
+        if (!cb) throw new Error('Blend del pack no encontrado');
+        var cfk = bi3[ck].talla === 'grande' ? 'stockGrande' : 'stockChico';
+        if ((cb[cfk] || 0) < it.cantidad) throw new Error('Stock insuficiente de ' + cb.nombre + ' (' + (bi3[ck].talla||'chico') + ') para armar ' + it.cantidad + ' packs: tienes ' + (cb[cfk]||0));
+      }
+    } else {
+      producto = it.tipo === 'blend' ? _db.blends[it.productoId] : _db.especias[it.productoId];
+      if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
+      var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
+      if ((producto[frascoKey] || 0) < it.cantidad) {
+        throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
+      }
+    }
     if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
     var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
     if ((producto[frascoKey] || 0) < it.cantidad) {
@@ -1409,10 +1427,23 @@ function moverStockAPDV(pdvId, items) {
   // All checks passed - deduct from main, add to PDV
   for (var j = 0; j < items.length; j++) {
     var it2 = items[j];
-    var prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
-    var fk = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
-    prod2[fk] = (prod2[fk] || 0) - it2.cantidad;
-    var stockKey = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
+    var prod2, fk2, stockKey;
+    if (it2.tipo === 'pack') {
+      var pack2 = _db.packs[it2.productoId];
+      var bi4 = pack2.blendItems || [];
+      for (var dk = 0; dk < bi4.length; dk++) {
+        var db2 = _db.blends[bi4[dk].blendId];
+        var dfk = bi4[dk].talla === 'grande' ? 'stockGrande' : 'stockChico';
+        db2[dfk] = (db2[dfk] || 0) - it2.cantidad;
+        _notify('update', 'blends', bi4[dk].blendId);
+      }
+      stockKey = 'pack_' + it2.productoId + '_-';
+    } else {
+      prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
+      fk2 = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
+      prod2[fk2] = (prod2[fk2] || 0) - it2.cantidad;
+      stockKey = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
+    }
     pdv.stock[stockKey] = (pdv.stock[stockKey] || 0) + it2.cantidad;
   }
   _saveToFirebase(); _cacheLocal();
@@ -1435,10 +1466,22 @@ function devolverStockDePDV(pdvId, items) {
     var it2 = items[j];
     var stockKey2 = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
     pdv.stock[stockKey2] = (pdv.stock[stockKey2] || 0) - it2.cantidad;
-    var prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
-    if (prod2) {
-      var fk2 = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
-      prod2[fk2] = (prod2[fk2] || 0) + it2.cantidad;
+    var prod2;
+    if (it2.tipo === 'pack') {
+      var pack3 = _db.packs[it2.productoId];
+      var bi5 = pack3.blendItems || [];
+      for (var ek = 0; ek < bi5.length; ek++) {
+        var eb = _db.blends[bi5[ek].blendId];
+        var efk = bi5[ek].talla === 'grande' ? 'stockGrande' : 'stockChico';
+        eb[efk] = (eb[efk] || 0) + it2.cantidad;
+        _notify('update', 'blends', bi5[ek].blendId);
+      }
+    } else {
+      prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
+      if (prod2) {
+        var fk2 = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
+        prod2[fk2] = (prod2[fk2] || 0) + it2.cantidad;
+      }
     }
   }
   _saveToFirebase(); _cacheLocal();
