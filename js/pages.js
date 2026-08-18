@@ -3021,7 +3021,7 @@ const Pages = {
         // Google Search Console verification meta
         if (content.indexOf('google-site-verification') === -1) {
           var _ghHead = content.indexOf('</head>');
-          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="9jnXsA8vOO1MAAwZGEv-XEJNhHFn36XjJiKHMVfVhMg">\n' + content.substring(_ghHead);
+          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="wxrzz6ncgVEJHMcS7-vx3uj3VUM8abPdlYoDw93P4ek">\n' + content.substring(_ghHead);
         }
 
         // Remover bloque noscript anterior
