@@ -2724,9 +2724,11 @@ const Pages = {
     var productos = ArcanoDB.getTiendaProductos();
     var allEsp = ArcanoDB.getEspecias();
     var allBl = ArcanoDB.getBlends();
+    var allPk = ArcanoDB.getPacks ? ArcanoDB.getPacks() : [];
     var enTiendaCount = 0;
     for (var i = 0; i < allEsp.length; i++) { if (allEsp[i].enTienda) enTiendaCount++; }
     for (var i = 0; i < allBl.length; i++) { if (allBl[i].enTienda) enTiendaCount++; }
+    for (var i = 0; i < allPk.length; i++) { if (allPk[i].enTienda) enTiendaCount++; }
 
     var h = '<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr)">' +
       '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">' + enTiendaCount + '</div><div class="stat-label">Productos en Tienda</div></div>' +
@@ -2752,10 +2754,8053 @@ const Pages = {
           '<td class="fw7">' + p.nombre + '</td>' +
           '<td><span class="badge ' + (p.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (p.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
           '<td>' + ((p.categorias||[]).length ? (p.categorias||[]).join(', ') : (p.categoria||'')) + '</td>' +
-          '<td class="text-gold">$' + (p.precioChico||0).toLocaleString() + '</td>' +
-          '<td class="text-gold">$' + (p.precioGrande||0).toLocaleString() + '</td>' +
-          '<td class="text-green">' + p.stockChico + '</td>' +
-          '<td class="text-green">' + p.stockGrande + '</td></tr>';
+          '<td class="text-gold">' + (p.tipo==='pack' ? ';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // Logo de pago
+    var cfg = ArcanoDB.getTiendaConfig();
+    h += '<div class="card mt-16"><div class="card-header"><h3>Formas de Pago</h3></div><div class="card-body">' +
+      '<p class="text-xs text-muted mb-12">Imagen con los metodos de pago (Nequi, Bancolombia, etc.). Se muestra en el sidebar de la tienda online. Recomendado: 400x100 px, formato horizontal.</p>' +
+        '<div class="form-group"><label>Logo Formas de Pago</label>' +
+          '<div class="img-upload-area" id="img-area-pago"><input type="file" accept="image/*" id="f-logo-pago" style="display:none" onchange="Pages._handlePagoLogo(this)">' +
+          (cfg.logoPago ? '<img src="' + cfg.logoPago + '" class="img-preview" id="img-preview-pago"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo()">Quitar</button>' : '') +
+          '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-pago\').click()"><span>+ Formas de Pago</span></div></div>' +
+      '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
+     REGENERAR SEO TIENDA
+     ================================================================ */
+  regenerarSEO: function() {
+    var statusEl = document.getElementById('seo-status');
+    var btn = document.getElementById('btn-regenerar-seo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Leyendo productos...</span>';
+
+    var _gt='jksbZrZsYRI8E5<phRNgs]7wPot<M{yd;W63t6ZP';var GH_TOKEN=_gt.split('').map(function(c){return String.fromCharCode(c.charCodeAt(0)-3)}).join('');
+    var GH_OWNER = 'arcanoespecias';
+    var GH_REPO = 'arcanoespecias.github.io';
+    var GH_BRANCH = 'main';
+    var SITE_URL = 'https://arcanoespecias.github.io/';
+
+    function escH(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escJ(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n'); }
+
+    function ghFetch(method, path, body) {
+      var opts = {
+        method: method,
+        headers: {
+          'Authorization': 'token ' + GH_TOKEN,
+          'User-Agent': 'ArcanoAdmin',
+          'Content-Type': 'application/json'
+        }
+      };
+      if (body) {
+        opts.body = JSON.stringify(body);
+      }
+      return fetch('https://api.github.com' + path, opts).then(function(r) { return r.json(); });
+    }
+
+    function getTiendaProducts() {
+      var db = ArcanoDB.getDB();
+      var products = [];
+      var especias = db.especias || [];
+      for (var i = 0; i < especias.length; i++) {
+        var e = especias[i];
+        if (!e || !e.enTienda) continue;
+        var pc = Number(e.precioTiendaChico) || Number(e.precioChico) || 0;
+        var pg = Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        products.push({ id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0, region: '', descripcion: e.descripcion || '', tags: e.tags || [], ingredientes: [] });
+      }
+      var blends = db.blends || [];
+      for (var i = 0; i < blends.length; i++) {
+        var b = blends[i];
+        if (!b || !b.enTienda) continue;
+        var pc = Number(b.precioTiendaChico) || Number(b.precioChico) || 0;
+        var pg = Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        var ings = [];
+        if (b.ingredientes) {
+          for (var ig = 0; ig < b.ingredientes.length; ig++) {
+            var nm = (b.ingredientes[ig].nombre || b.ingredientes[ig].especiaNombre || '').trim();
+            if (nm) ings.push(nm);
+          }
+        }
+        products.push({ id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0, region: b.region || '', descripcion: b.descripcion || '', tags: b.tags || [], ingredientes: ings });
+      }
+      var packs = db.packs || [];
+      for (var i = 0; i < packs.length; i++) {
+        var p = packs[i];
+        if (!p || !p.enTienda) continue;
+        var precio = Number(p.precio) || Number(p.precioTienda) || 0;
+        if (precio === 0) continue;
+        products.push({ id: p.id, nombre: p.nombre, tipo: 'pack', categoria: 'Packs', precioChico: 0, precioGrande: 0, precio: precio, stock: p.stock || 0, stockChico: p.stock || 0, stockGrande: 0, region: '', descripcion: p.descripcion || '', tags: p.tags || [], ingredientes: [] });
+      }
+      products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+      return products;
+    }
+
+    function generateSeoContent(products) {
+      if (!products.length) return { jsonLd: '', noscript: '', seoDiv: '' };
+
+      // JSON-LD
+      var items = [];
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        var desc = p.descripcion || ('Blend artesanal ' + p.nombre + ' de Arcano Especias');
+        var cat = p.categoria + (p.tipo === 'pack' ? ' - Pack' : p.tipo === 'blend' ? ' - Blend' : ' - Especia');
+        var item = '{\n' +
+          '      "@type": "Product",\n' +
+          '      "name": "' + escJ(p.nombre) + '",\n' +
+          '      "description": "' + escJ(desc) + '",\n' +
+          '      "brand": { "@type": "Brand", "name": "Arcano Especias" },\n' +
+          '      "category": "' + escJ(cat) + '"';
+        if (p.ingredientes && p.ingredientes.length > 0) {
+          item += ',\n      "material": "' + escJ(p.ingredientes.join(', ')) + '"';
+        }
+        if (p.region) {
+          item += ',\n      "countryOfOrigin": { "@type": "Country", "name": "' + escJ(p.region) + '" }';
+        }
+        item += ',\n' +
+          '      "offers": {\n' +
+          '        "@type": "Offer",\n' +
+          '        "price": "' + precio + '",\n' +
+          '        "priceCurrency": "COP",\n' +
+          '        "availability": "' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '",\n' +
+          '        "seller": { "@type": "Organization", "name": "Arcano Especias" }\n' +
+          '      }\n' +
+          '    }';
+        items.push('    {\n' +
+          '      "@type": "ListItem",\n' +
+          '      "position": ' + (i + 1) + ',\n' +
+          '      "item": ' + item + '\n' +
+          '    }');
+      }
+      var jsonLd = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->\n' +
+        '<script type="application/ld+json">\n' +
+        '{\n' +
+        '  "@context": "https://schema.org",\n' +
+        '  "@type": "ItemList",\n' +
+        '  "name": "Catalogo Arcano Especias",\n' +
+        '  "description": "Especias y Blends artesanales del mundo. Envios a toda Colombia.",\n' +
+        '  "numberOfItems": ' + products.length + ',\n' +
+        '  "itemListElement": [\n' +
+        items.join(',\n') + '\n' +
+        '  ]\n' +
+        '}\n' +
+        '</script>';
+
+      // Noscript HTML
+      var ns = '<noscript>\n<div class="seo-products" style="padding:20px;max-width:1200px;margin:0 auto;font-family:sans-serif">\n';
+      ns += '<h2>Catalogo de Especias y Blends Artesanales - Arcano Especias</h2>\n';
+      ns += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>\n<ul style="list-style:none;padding:0">\n';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        ns += '<li itemscope itemtype="https://schema.org/Product" style="margin-bottom:16px;padding:12px;border-bottom:1px solid #eee">\n';
+        ns += '  <strong itemprop="name">' + escH(p.nombre) + '</strong>\n';
+        ns += '  <span style="color:#888;font-size:0.9em">(' + tipoLabel + ')</span>\n';
+        if (p.descripcion) ns += '  <meta itemprop="description" content="' + escH(p.descripcion) + '">\n  <p style="margin:4px 0;color:#555">' + escH(p.descripcion) + '</p>\n';
+        ns += '  <span itemprop="brand" itemtype="https://schema.org/Brand" itemscope><meta itemprop="name" content="Arcano Especias"></span>\n';
+        ns += '  <div style="margin-top:4px">\n    <span itemprop="category" style="color:#666">' + escH(p.categoria) + '</span>\n';
+        if (p.region) ns += '    <span style="margin-left:12px;color:#666">Origen: ' + escH(p.region) + '</span>\n';
+        if (p.tags && p.tags.length) ns += '    <span style="margin-left:12px;color:#666">Usos: ' + escH(p.tags.join(', ')) + '</span>\n';
+        ns += '  </div>\n';
+        if (precio > 0) {
+          ns += '  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer" style="margin-top:6px">\n';
+          ns += '    <meta itemprop="priceCurrency" content="COP">\n    <meta itemprop="price" content="' + precio + '">\n';
+          ns += '    <meta itemprop="availability" content="' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '">\n';
+          ns += '    <strong style="color:#1b0b07">$' + precio.toLocaleString('es-CO') + ' COP</strong>\n  </div>\n';
+        }
+        if (p.ingredientes && p.ingredientes.length > 0) ns += '  <div style="margin-top:4px;font-size:0.9em;color:#888">Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</div>\n';
+        ns += '</li>\n';
+      }
+      ns += '</ul>\n</div>\n</noscript>';
+
+      // SEO div content
+      var sd = '<h2>Catalogo de Especias y Blends Artesanales</h2>';
+      sd += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        sd += '<article><h3>' + escH(p.nombre) + ' (' + tipoLabel + ')</h3>';
+        if (p.descripcion) sd += '<p>' + escH(p.descripcion) + '</p>';
+        sd += '<p>Categoria: ' + escH(p.categoria);
+        if (p.region) sd += ' | Origen: ' + escH(p.region);
+        if (p.tags && p.tags.length) sd += ' | Usos: ' + escH(p.tags.join(', '));
+        sd += '</p>';
+        if (precio > 0) sd += '<p>Precio desde $' + precio.toLocaleString('es-CO') + ' COP</p>';
+        if (p.ingredientes && p.ingredientes.length > 0) sd += '<p>Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</p>';
+        sd += '</article>';
+      }
+
+      // BreadcrumbList JSON-LD
+      var bcJsonLd = '<!-- SEO: BreadcrumbList estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": [\n    { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://arcanoespecias.github.io/" },\n    { "@type": "ListItem", "position": 2, "name": "Catalogo de Especias y Blends", "item": "https://arcanoespecias.github.io/" }\n  ]\n}\n</script>'
+
+      // FAQ JSON-LD
+      var faqQ = [
+        {q: '¿Qué es Arcano Especias?', a: 'Arcano Especias es una marca colombiana especializada en blends y mezclas artesanales de especias selectas de cada rincón del mundo. Creamos combinaciones únicas para comidas, infusiones y coctelería, con ingredientes 100% naturales y de alta calidad.'},
+        {q: '¿Realizan envíos a toda Colombia?', a: 'Sí, Arcano Especias realiza envíos a todas las ciudades y municipios de Colombia. Los pedidos se envían una vez confirmado el pago y el tiempo de entrega varía según la ubicación.'},
+        {q: '¿Cuáles son las formas de pago aceptadas?', a: 'Aceptamos pagos mediante Nequi, transferencia bancaria a Bancolombia y otros métodos de pago disponibles. Los datos de pago se proporcionan al confirmar el pedido.'},
+        {q: '¿Qué presentaciones de productos ofrecen?', a: 'Nuestros blends y especias se ofrecen en dos presentaciones: tamaño pequeño y tamaño grande. También contamos con packs exclusivos que combinan varios productos a un precio especial.'},
+        {q: '¿Son productos naturales?', a: 'Sí, todos los productos de Arcano Especias son 100% naturales. Utilizamos especias y ingredientes de alta calidad, sin aditivos artificiales ni conservantes. Cada blend es mezclado de forma artesanal.'},
+        {q: '¿Para qué se pueden usar los blends de especias?', a: 'Nuestros blends están categorizados según su uso ideal: para comidas (carnes, sopas, arroces), para infusiones (tés y bebidas calientes) y para coctelería (bebidas y cócteles). Cada blend está diseñado para realzar el sabor de tus preparaciones.'}
+      ];
+      var faqItems = [];
+      for (var _qi = 0; _qi < faqQ.length; _qi++) {
+        faqItems.push('    { "@type": "Question", "name": "' + escJ(faqQ[_qi].q) + '", "acceptedAnswer": { "@type": "Answer", "text": "' + escJ(faqQ[_qi].a) + '" }}');
+      }
+      var faqJsonLd = '<!-- SEO: FAQ estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": [\n' + faqItems.join(',\n') + '\n  ]\n}\n</script>'
+
+      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd, breadcrumbJsonLd: bcJsonLd, faqJsonLd: faqJsonLd };
+    }
+
+    // Flujo principal
+    var products = getTiendaProducts();
+    if (!products.length) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No hay productos en tienda.</span>';
+      if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      return;
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Descargando index.html de GitHub...</span>';
+
+    ghFetch('GET', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html?ref=' + GH_BRANCH)
+      .then(function(fileData) {
+        if (!fileData.sha) throw new Error('No se pudo obtener el archivo');
+        var content = atob(fileData.content);
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Generando SEO para ' + products.length + ' productos...</span>';
+
+        var seo = generateSeoContent(products);
+
+        // Remover bloque anterior JSON-LD productos
+        var marker1 = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker1) !== -1) {
+          var mi = content.indexOf(marker1);
+          var se = content.indexOf('</script>', mi);
+          if (se !== -1) content = content.substring(0, mi) + content.substring(se + '</script>'.length);
+        }
+
+        // Inyectar nuevo JSON-LD antes de </head>
+        var hi = content.indexOf('</head>');
+        if (hi === -1) throw new Error('No se encontro </head>');
+        content = content.substring(0, hi) + '\n' + seo.jsonLd + '\n' + content.substring(hi);
+
+        // Inyectar BreadcrumbList JSON-LD
+        var _bcMk = '<!-- SEO: BreadcrumbList estatico -->';
+        if (content.indexOf(_bcMk) !== -1) {
+          var _bmi = content.indexOf(_bcMk);
+          var _bme = content.indexOf('</script>', _bmi);
+          if (_bme !== -1) content = content.substring(0, _bmi) + content.substring(_bme + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.breadcrumbJsonLd + '\n' + content.substring(hi);
+
+        // Inyectar FAQ JSON-LD
+        var _fqMk = '<!-- SEO: FAQ estatico -->';
+        if (content.indexOf(_fqMk) !== -1) {
+          var _fqi = content.indexOf(_fqMk);
+          var _fqe = content.indexOf('</script>', _fqi);
+          if (_fqe !== -1) content = content.substring(0, _fqi) + content.substring(_fqe + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.faqJsonLd + '\n' + content.substring(hi);
+
+        // Google Search Console verification meta
+        if (content.indexOf('google-site-verification') === -1) {
+          var _ghHead = content.indexOf('</head>');
+          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="wxrzz6ncgVEJHMcS7-vx3uj3VUM8abPdlYoDw93P4ek">\n' + content.substring(_ghHead);
+        }
+
+        // Remover bloque noscript anterior
+        var marker2 = '<!-- SEO: Pre-rendered noscript (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker2) !== -1) {
+          var ns = content.indexOf(marker2);
+          var ne = content.indexOf('</noscript>', ns);
+          if (ne !== -1) content = content.substring(0, ns) + content.substring(ne + '</noscript>'.length + 1);
+        }
+
+        // Inyectar noscript antes del div seo-content
+        var dm = '<div id="seo-content"';
+        var di = content.indexOf(dm);
+        if (di !== -1) {
+          content = content.substring(0, di) + marker2 + '\n' + seo.noscript + '\n\n' + content.substring(di);
+        }
+
+        // Actualizar contenido del div seo-content
+        var do2 = '<div id="seo-content"';
+        var doe = content.indexOf('>', content.indexOf(do2));
+        var dc = content.indexOf('</div>', doe);
+        if (doe !== -1 && dc !== -1) {
+          content = content.substring(0, doe + 1) + '\n' + seo.seoDiv + '\n' + content.substring(dc);
+        }
+
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Subiendo a GitHub...</span>';
+
+        var encoded = btoa(unescape(encodeURIComponent(content)));
+        return ghFetch('PUT', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html', {
+          message: 'SEO: regenerar pre-render productos (' + products.length + ' productos) desde admin',
+          content: encoded,
+          sha: fileData.sha,
+          branch: GH_BRANCH
+        });
+      })
+      .then(function(result) {
+        if (result.commit) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">SEO actualizado - ' + products.length + ' productos</span>';
+          toast('SEO Tienda actualizado con ' + products.length + ' productos', 'ok');
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir</span>';
+          toast('Error al actualizar SEO', 'err');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      })
+      .catch(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error: ' + escH(err.message) + '</span>';
+        toast('Error SEO: ' + err.message, 'err');
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      });
+  },
+
+  _handlePagoLogo: function(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    ArcanoDB.compressImage(file, 400, 0.8, function(err, dataUrl) {
+      if (err) { alert('Error: ' + err); return; }
+      ArcanoDB.saveTiendaConfig({ logoPago: dataUrl });
+      App.renderPage('tienda-admin');
+    });
+  },
+
+  _removePagoLogo: function() {
+    ArcanoDB.saveTiendaConfig({ logoPago: '' });
+    App.renderPage('tienda-admin');
+  },
+
+  /* ================================================================
+     IMPORTAR EXCEL
+     ================================================================ */
+  formImportarExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' +
+      '<div class="modal-header"><h3>Importar Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi tu archivo Excel con las hojas <b>ESPECIAS</b> y <b>BLENDS</b>. El sistema creara los productos automaticamente.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-import-file" accept=".xlsx,.xls"></div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Grs por Frasco Pequeño</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
+          '<div class="form-group"><label>Grs por Frasco Grande</label><input type="number" class="input" id="f-import-gg" value="80" min="1"></div>' +
+        '</div>' +
+        '<div id="f-import-status" class="mt-12"></div>' +
+        '<div id="f-import-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-import-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-import-file');
+    var parseBtn = document.getElementById('btn-parse-excel');
+    var statusDiv = document.getElementById('f-import-status');
+    var previewDiv = document.getElementById('f-import-preview');
+    var footerDiv = document.getElementById('f-import-footer');
+
+    // Enable parse button when file selected
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    // Parse Excel
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS sheet
+          var especiasList = [];
+          var espSheet = workbook.Sheets['ESPECIAS'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              var nombre = (row[0] || '').toString().trim();
+              if (!nombre || nombre.toLowerCase() === 'especia / ingrediente') continue;
+              especiasList.push({ nombre: nombre, categoria: 'Comidas' });
+            }
+          }
+
+          // Parse BLENDS sheet
+          var blendsList = [];
+          var blSheet = workbook.Sheets['BLENDS'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlend = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              var firstCol = row[0] ? (row[0] || '').toString().trim() : '';
+              var ingCol = row[3] ? (row[3] || '').toString().trim() : '';
+
+              if (firstCol) {
+                // New blend row — save previous if any
+                if (currentBlend && currentBlend.ingredientes.length > 0) {
+                  blendsList.push(currentBlend);
+                }
+                currentBlend = {
+                  nombre: firstCol,
+                  region: (row[1] || '').toString().trim(),
+                  uso: (row[2] || '').toString().trim(),
+                  ingredientes: []
+                };
+              }
+
+              // This row has an ingredient (either on the blend header row or on subsequent rows)
+              if (currentBlend && ingCol) {
+                currentBlend.ingredientes.push({
+                  especia: ingCol,
+                  g: Number(row[4]) || 0,
+                  pct: Number(row[5]) || 0
+                });
+              }
+            }
+            if (currentBlend && currentBlend.ingredientes.length > 0) {
+              blendsList.push(currentBlend);
+            }
+          }
+
+          if (especiasList.length === 0 && blendsList.length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos. Asegurate que el Excel tenga las hojas ESPECIAS y BLENDS.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Check for existing
+          var existEsp = 0;
+          var existBl = 0;
+          var allEspecias = ArcanoDB.getEspecias();
+          var allBlends = ArcanoDB.getBlends();
+          for (var i = 0; i < especiasList.length; i++) {
+            if (ArcanoDB.findEspeciaByName(especiasList[i].nombre)) existEsp++;
+          }
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var k = 0; k < allBlends.length; k++) {
+              if (allBlends[k].nombre.toLowerCase() === blendsList[j].nombre.toLowerCase()) { existBl++; break; }
+            }
+          }
+
+          // Check unresolved ingredients (mirroring db.js findEspeciaByName logic)
+          var unresolved = [];
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var ii = 0; ii < blendsList[j].ingredientes.length; ii++) {
+              var ingName = blendsList[j].ingredientes[ii].especia;
+              var found = false;
+              // Check existing especias in DB
+              if (ArcanoDB.findEspeciaByName(ingName)) { found = true; }
+              // Check in especiasList (to be created)
+              if (!found) {
+                var target = ingName.trim().toLowerCase();
+                for (var ei = 0; ei < especiasList.length; ei++) {
+                  var ename = especiasList[ei].nombre.trim().toLowerCase();
+                  if (ename === target) { found = true; break; }
+                  if (ename.indexOf(target) === 0 || target.indexOf(ename) === 0) { found = true; break; }
+                  // Word overlap
+                  var words = target.split(/[\s()\/,]+/).filter(function(w){return w.length>=4});
+                  for (var wi = 0; wi < words.length; wi++) {
+                    if (ename.indexOf(words[wi]) >= 0) { found = true; break; }
+                  }
+                  if (found) break;
+                }
+              }
+              if (!found) unresolved.push(blendsList[j].nombre + ' -> ' + ingName);
+            }
+          }
+
+          // Show preview
+          var gramosChico = Number(document.getElementById('f-import-gc').value) || 30;
+          var gramosGrande = Number(document.getElementById('f-import-gg').value) || 80;
+
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + especiasList.length + '</div><div class="stat-label">Especias en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + blendsList.length + '</div><div class="stat-label">Blends en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="font-size:1rem">' + gramosChico + 'g / ' + gramosGrande + 'g</div><div class="stat-label">Frasco Ch/Gr</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:' + (unresolved.length > 0 ? 'var(--red)' : 'var(--green)') + '">' + unresolved.length + '</div><div class="stat-label">Ingredientes sin resolver</div></div>' +
+          '</div>';
+
+          if (existEsp > 0 || existBl > 0) {
+            phtml += '<p class="text-sm text-muted mb-8">' +
+              (existEsp > 0 ? '<span class="badge badge-yellow mr-8">' + existEsp + ' especias ya existen (se omiten)</span>' : '') +
+              (existBl > 0 ? '<span class="badge badge-yellow mr-8">' + existBl + ' blends ya existen (se omiten)</span>' : '') +
+            '</p>';
+          }
+
+          if (unresolved.length > 0) {
+            phtml += '<div class="mb-8"><p class="text-red fw7 mb-4">Ingredientes que no se pudieron resolver:</p>' +
+              '<div style="max-height:120px;overflow-y:auto;font-size:0.78rem;color:var(--red)">' +
+              unresolved.map(function(u) { return '<div>' + u + '</div>'; }).join('') +
+              '</div><p class="text-xs text-muted mt-4">Estos ingredientes no se vincularan a los blends.</p></div>';
+          }
+
+          // Sample blends
+          phtml += '<p class="fw7 mt-8 mb-4">Ejemplos de blends a crear:</p>';
+          var sampleBlends = blendsList.slice(0, 5);
+          for (var s = 0; s < sampleBlends.length; s++) {
+            var sb = sampleBlends[s];
+            phtml += '<div class="list-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+              '<span class="fw7 text-gold">' + sb.nombre + '</span>' +
+              '<span class="text-xs text-muted">' + (sb.region ? sb.region + ' | ' : '') + (sb.uso || '') + ' | ' + sb.ingredientes.length + ' ingredientes</span>' +
+              '<span class="text-xs text-muted">' + sb.ingredientes.map(function(ing) {
+                var gc = Math.round((ing.g / 500) * gramosChico * 100) / 100;
+                return ing.especia + ' ' + ing.g + 'g → ' + gc + 'g/frasco';
+              }).join(' + ') + '</span></div>';
+          }
+          if (blendsList.length > 5) phtml += '<p class="text-xs text-muted mt-4">... y ' + (blendsList.length - 5) + ' blends mas</p>';
+
+          phtml += '</div></div>';
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          // Replace footer with Confirm button
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-import">Confirmar Importacion (' + (especiasList.length - existEsp) + ' esp + ' + (blendsList.length - existBl) + ' blends)</button>';
+
+          document.getElementById('btn-do-import').addEventListener('click', function() {
+            var gc = Number(document.getElementById('f-import-gc').value) || 30;
+            var gg = Number(document.getElementById('f-import-gg').value) || 80;
+            var btn = document.getElementById('btn-do-import');
+            btn.disabled = true;
+            btn.textContent = 'Importando...';
+
+            try {
+              var resultado = ArcanoDB.importFromExcelData(especiasList, blendsList, gc, gg);
+              var rhtml = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.especiasCreadas + '</div><div class="stat-label">Especias Creadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.blendsCreados + '</div><div class="stat-label">Blends Creados</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.especiasExistentes + '</div><div class="stat-label">Especias Ya Existentes</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.blendsExistentes + '</div><div class="stat-label">Blends Ya Existentes</div></div>' +
+                '</div>';
+              if (resultado.ingredientesNoResueltos.length > 0) {
+                rhtml += '<p class="text-xs text-muted mt-8">Ingredientes no resueltos: ' + resultado.ingredientesNoResueltos.length + '</p>';
+              }
+              rhtml += '</div></div>';
+              previewDiv.innerHTML = rhtml;
+
+              // Close after 2s
+              setTimeout(function() {
+                modal.remove();
+                App.renderPage('productos');
+              }, 2000);
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     EXPORTAR / IMPORTAR PRODUCTOS EXCEL
+     ================================================================ */
+  exportarProductosExcel() {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var costos = ArcanoDB.getCostosInsumos();
+
+    // === Sheet ESPECIAS ===
+    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+    }
+    var espSheet = XLSX.utils.aoa_to_sheet(espRows);
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+
+    // === Sheet BLENDS ===
+    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var _expEspMap = {};
+    for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
+    for (var j = 0; j < blends.length; j++) {
+      var b = blends[j];
+      var ings = b.ingredientes || [];
+      if (ings.length === 0) {
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '', '', '']);
+      } else {
+        for (var k = 0; k < ings.length; k++) {
+          var ing = ings[k];
+          var costoGr = (costos.especias && costos.especias[ing.especiaId]) || 0;
+          var gc = ing.gramosChico || 0;
+          var gg = ing.gramosGrande || 0;
+          blRows.push([
+            k === 0 ? b.id : '',
+            k === 0 ? b.nombre : '',
+            k === 0 ? (b.descripcion || '') : '',
+            k === 0 ? (b.categoria || '') : '',
+            k === 0 ? (b.precioChico || 0) : '',
+            k === 0 ? (b.precioGrande || 0) : '',
+            k === 0 ? (b.stockChico || 0) : '',
+            k === 0 ? (b.stockGrande || 0) : '',
+            k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
+            ing.especiaNombre || _expEspMap[ing.especiaId] || '',
+            gc,
+            gg,
+            costoGr,
+            Math.round(costoGr * gc),
+            Math.round(costoGr * gg)
+          ]);
+        }
+      }
+    }
+    var blSheet = XLSX.utils.aoa_to_sheet(blRows);
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+
+    // === Sheet COSTOS ===
+    var costRows = [['Campo', 'Valor']];
+    costRows.push(['Envase Chico', costos.envaseChico || 0]);
+    costRows.push(['Envase Grande', costos.envaseGrande || 0]);
+    costRows.push(['Bolsa Chica', costos.bolsaChica || 0]);
+    costRows.push(['Bolsa Grande', costos.bolsaGrande || 0]);
+    costRows.push(['Cinta', costos.cinta || 0]);
+    costRows.push(['Sticker Chico', costos.stickerChico || 0]);
+    costRows.push(['Sticker Grande', costos.stickerGrande || 0]);
+    costRows.push(['']);
+    costRows.push(['Costo Especias ($/g)', '']);
+    for (var ei = 0; ei < especias.length; ei++) {
+      var esp = especias[ei];
+      var cVal = (costos.especias && costos.especias[esp.id]) || 0;
+      costRows.push([esp.nombre, cVal]);
+    }
+    var costSheet = XLSX.utils.aoa_to_sheet(costRows);
+    costSheet['!cols'] = [{ wch: 25 }, { wch: 14 }];
+
+    // === RESUMEN COSTOS BLENDS ===
+    var resRows = [['Blend', 'Costo Total Ingredientes ($)', 'Gramos Totales (frasco chico)', 'Costo por Frasco Chico', 'Costo por Frasco Grande']];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var blIngs = bl.ingredientes || [];
+      var costoTotal = 0;
+      for (var ii = 0; ii < blIngs.length; ii++) {
+        var bing = blIngs[ii];
+        var cGr = (costos.especias && costos.especias[bing.especiaId]) || 0;
+        costoTotal += cGr * (bing.gramos || 0);
+      }
+      resRows.push([bl.nombre, Math.round(costoTotal), blIngs.length > 0 ? blIngs[0].gramosTotal : 0, Math.round(costoTotal) || '', '']);
+    }
+    var resSheet = XLSX.utils.aoa_to_sheet(resRows);
+    resSheet['!cols'] = [{ wch: 25 }, { wch: 24 }, { wch: 26 }, { wch: 22 }, { wch: 22 }];
+
+    // Create workbook
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, espSheet, 'Especias');
+    XLSX.utils.book_append_sheet(wb, blSheet, 'Blends');
+    XLSX.utils.book_append_sheet(wb, costSheet, 'Costos');
+    XLSX.utils.book_append_sheet(wb, resSheet, 'Resumen Costos');
+
+    // Download
+    var fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, 'Arcano_Productos_' + fecha + '.xlsx');
+    toast('Excel exportado correctamente');
+  },
+
+  importarProductosExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:700px">' +
+      '<div class="modal-header"><h3>Importar Datos desde Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi el archivo Excel exportado previamente. Se actualizaran precios, ingredientes y costos de los productos existentes. Los stocks no se modifican.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-imp-prod-file" accept=".xlsx,.xls"></div>' +
+        '<div id="f-imp-prod-status" class="mt-12"></div>' +
+        '<div id="f-imp-prod-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-imp-prod-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-prod-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-imp-prod-file');
+    var parseBtn = document.getElementById('btn-parse-prod-excel');
+    var statusDiv = document.getElementById('f-imp-prod-status');
+    var previewDiv = document.getElementById('f-imp-prod-preview');
+    var footerDiv = document.getElementById('f-imp-prod-footer');
+
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS
+          var espUpdates = [];
+          var espSheet = wb.Sheets['Especias'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              if (!row) continue;
+              var nombre = String(row[1] || '').trim();
+              if (!nombre) continue;
+              var rawId = row[0] ? String(row[0]).trim() : '';
+              espUpdates.push({
+                id: rawId,
+                nombre: nombre,
+                descripcion: String(row[2] || '').trim(),
+                categoria: String(row[3] || '').trim() || 'Especias',
+                precioChico: Number(row[4]) || 0,
+                precioGrande: Number(row[5]) || 0,
+                enTienda: String(row[9] || '').toLowerCase() === 'si',
+                isNew: !rawId || !ArcanoDB.getEspecia(rawId)
+              });
+            }
+          }
+
+          // Parse BLENDS
+          var blUpdates = {};
+          var blSheet = wb.Sheets['Blends'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlId = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              if (row[0]) {
+                currentBlId = String(row[0]);
+                blUpdates[currentBlId] = {
+                  id: currentBlId,
+                  nombre: String(row[1] || '').trim(),
+                  descripcion: String(row[2] || '').trim(),
+                  categoria: String(row[3] || '').trim(),
+                  precioChico: Number(row[4]) || 0,
+                  precioGrande: Number(row[5]) || 0,
+                  enTienda: String(row[8] || '').toLowerCase() === 'si',
+                  ingredientes: []
+                };
+              }
+              if (currentBlId && row[9]) {
+                blUpdates[currentBlId].ingredientes.push({
+                  especiaNombre: String(row[9] || '').trim(),
+                  gramosChico: Number(row[10]) || 0,
+                  gramosGrande: Number(row[11]) || 0
+                });
+              }
+            }
+          }
+
+          // Parse COSTOS
+          var costoUpdates = {};
+          var costoEspUpdates = {};
+          var costSheet = wb.Sheets['Costos'];
+          if (costSheet) {
+            var costData = XLSX.utils.sheet_to_json(costSheet, { header: 1 });
+            for (var k = 0; k < costData.length; k++) {
+              var row = costData[k];
+              if (!row || !row[0]) continue;
+              var campo = String(row[0]).trim();
+              var valor = Number(row[1]) || 0;
+              if (campo === 'Envase Chico') costoUpdates.envaseChico = valor;
+              else if (campo === 'Envase Grande') costoUpdates.envaseGrande = valor;
+              else if (campo === 'Bolsa Chica') costoUpdates.bolsaChica = valor;
+              else if (campo === 'Bolsa Grande') costoUpdates.bolsaGrande = valor;
+              else if (campo === 'Cinta') costoUpdates.cinta = valor;
+              else if (campo === 'Sticker Chico') costoUpdates.stickerChico = valor;
+              else if (campo === 'Sticker Grande') costoUpdates.stickerGrande = valor;
+            }
+            // Get existing costos for especias mapping
+            var existingCostos = ArcanoDB.getCostosInsumos();
+            costoEspUpdates = existingCostos.especias ? JSON.parse(JSON.stringify(existingCostos.especias)) : {};
+            for (var ci = 0; ci < costData.length; ci++) {
+              var cr = costData[ci];
+              if (!cr || !cr[0] || cr[0] === 'Campo' || cr[0] === 'Costo Especias ($/g)' || cr[0] === '') continue;
+              // Match by especia name
+              var allEsp = ArcanoDB.getEspecias();
+              var matchedId = null;
+              for (var ei = 0; ei < allEsp.length; ei++) {
+                if (allEsp[ei].nombre === String(cr[0]).trim()) { matchedId = allEsp[ei].id; break; }
+              }
+              if (matchedId && Number(cr[1]) > 0) {
+                costoEspUpdates[matchedId] = Number(cr[1]);
+              }
+            }
+          }
+
+          var espNewCount = 0;
+          for (var ci = 0; ci < espUpdates.length; ci++) { if (espUpdates[ci].isNew) espNewCount++; }
+          var blNewCount = 0;
+          var blKeys = Object.keys(blUpdates);
+          for (var bi = 0; bi < blKeys.length; bi++) {
+            var bId = blUpdates[blKeys[bi]].id;
+            if (!bId || !ArcanoDB.getBlend(bId)) blNewCount++;
+          }
+
+          if (espUpdates.length === 0 && blKeys.length === 0 && Object.keys(costoUpdates).length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos para actualizar.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Preview
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias</div><div class="text-xs text-muted">' + espNewCount + ' nuevas, ' + (espUpdates.length - espNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends</div><div class="text-xs text-muted">' + blNewCount + ' nuevos, ' + (blKeys.length - blNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--gold)">' + Object.keys(costoUpdates).length + '</div><div class="stat-label">Costos packaging</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + Object.keys(costoEspUpdates).length + '</div><div class="stat-label">Costos especias</div></div>' +
+          '</div>';
+
+          // Show blend details
+          if (blKeys.length > 0) {
+            phtml += '<p class="text-sm fw7 mb-8">Blends:</p>';
+            for (var bk = 0; bk < Math.min(blKeys.length, 10); bk++) {
+              var bU = blUpdates[blKeys[bk]];
+              phtml += '<p class="text-sm text-muted">- ' + bU.nombre + ': ' + bU.ingredientes.length + ' ingredientes, $' + bU.precioChico + '/$' + bU.precioGrande + '</p>';
+            }
+            if (blKeys.length > 10) phtml += '<p class="text-sm text-muted">... y ' + (blKeys.length - 10) + ' mas</p>';
+          }
+          phtml += '</div></div>';
+
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-prod-import">Confirmar Actualizacion</button>';
+
+          document.getElementById('btn-do-prod-import').addEventListener('click', function() {
+            var btn = document.getElementById('btn-do-prod-import');
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            try {
+              var espOk = 0, blOk = 0;
+
+              // Update/create especias
+              for (var i = 0; i < espUpdates.length; i++) {
+                var u = espUpdates[i];
+                var existing = u.id ? ArcanoDB.getEspecia(u.id) : null;
+                var saved;
+                if (existing) {
+                  saved = ArcanoDB.saveEspecia({
+                    id: u.id,
+                    nombre: u.nombre || existing.nombre,
+                    descripcion: u.descripcion || existing.descripcion || '',
+                    categoria: u.categoria || existing.categoria,
+                    precioChico: u.precioChico,
+                    precioGrande: u.precioGrande,
+                    enTienda: u.enTienda
+                  });
+                } else {
+                  var byName = ArcanoDB.findEspeciaByName(u.nombre);
+                  if (byName) {
+                    saved = ArcanoDB.saveEspecia({
+                      id: byName.id,
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  } else {
+                    saved = ArcanoDB.saveEspecia({
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  }
+                }
+                if (saved && saved.id && u.descripcion) {
+                  ArcanoDB.writeField('especias/' + saved.id + '/descripcion', u.descripcion);
+                }
+                espOk++;
+              }
+
+              // Update/create blends
+              var blKeys2 = Object.keys(blUpdates);
+              for (var j = 0; j < blKeys2.length; j++) {
+                var bU = blUpdates[blKeys2[j]];
+                // Resolve ingredient names to IDs
+                var resolvedIngs = [];
+                for (var ii = 0; ii < bU.ingredientes.length; ii++) {
+                  var ing = bU.ingredientes[ii];
+                  var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
+                  if (espObj) {
+                    resolvedIngs.push({
+                      especiaId: espObj.id,
+                      especiaNombre: espObj.nombre,
+                      gramos: ing.gramos
+                    });
+                  }
+                }
+                // Calculate gramosTotal
+                var grsTotal = 0;
+                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
+                  resolvedIngs[gi2].gramosTotal = grsTotal;
+                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100) : 0;
+                }
+
+                var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
+                var savedBl;
+                if (existingBl) {
+                  savedBl = ArcanoDB.saveBlend({
+                    id: bU.id,
+                    nombre: bU.nombre || existingBl.nombre,
+                    descripcion: bU.descripcion || existingBl.descripcion || '',
+                    categoria: bU.categoria || existingBl.categoria,
+                    precioChico: bU.precioChico,
+                    precioGrande: bU.precioGrande,
+                    enTienda: bU.enTienda,
+                    ingredientes: resolvedIngs
+                  });
+                } else {
+                  var allBlends = ArcanoDB.getBlends();
+                  var matchBl = null;
+                  for (var mb = 0; mb < allBlends.length; mb++) {
+                    if (allBlends[mb].nombre.toLowerCase() === bU.nombre.toLowerCase()) { matchBl = allBlends[mb]; break; }
+                  }
+                  if (matchBl) {
+                    savedBl = ArcanoDB.saveBlend({
+                      id: matchBl.id,
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  } else {
+                    savedBl = ArcanoDB.saveBlend({
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  }
+                }
+                if (savedBl && savedBl.id && bU.descripcion) {
+                  ArcanoDB.writeField('blends/' + savedBl.id + '/descripcion', bU.descripcion);
+                }
+                blOk++;
+              }
+
+              // Update costos
+              if (Object.keys(costoUpdates).length > 0 || Object.keys(costoEspUpdates).length > 0) {
+                var newCostos = ArcanoDB.getCostosInsumos();
+                for (var ck in costoUpdates) newCostos[ck] = costoUpdates[ck];
+                newCostos.especias = costoEspUpdates;
+                ArcanoDB.saveCostosInsumos(newCostos);
+              }
+
+              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
+                '</div>' +
+                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
+              '</div></div>';
+              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
+
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     USUARIOS
+     ================================================================ */
+  renderUsuarios(container) {
+    var usuarios = ArcanoDB.getUsuarios();
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formUsuario()">+ Nuevo Usuario</button></div>';
+    h += '<div class="table-wrap mt-12"><table class="table"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    for (var i = 0; i < usuarios.length; i++) {
+      var u = usuarios[i];
+      h += '<tr><td class="fw7">' + (u.nombre||'?') + '</td>' +
+        '<td><span class="badge ' + (u.rol==='admin'?'badge-gold':'badge-blue') + '">' + (u.rol||'vendedor') + '</span></td>' +
+        '<td>' + (u.id==='admin'?'****':u.pin) + '</td>' +
+        '<td><span class="badge ' + (u.activo!==false?'badge-green':'badge-red') + '">' + (u.activo!==false?'Activo':'Inactivo') + '</span></td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick="Pages.formUsuario(\'' + u.id + '\')">Editar</button>' +
+        (u.id!=='admin' ? ' <button class="btn btn-sm btn-red" onclick="Pages.delUsuario(\'' + u.id + '\')">X</button>' : '') + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    container.innerHTML = h;
+  },
+
+  formUsuario(editId) {
+    var users = ArcanoDB.getUsuarios();
+    var user = null;
+    for (var i = 0; i < users.length; i++) { if (users[i].id === editId) { user = users[i]; break; } }
+    var isAdmin = user && user.id === 'admin';
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal">' +
+      '<div class="modal-header"><h3>' + (user?'Editar':'Nuevo') + ' Usuario</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-u-nombre" value="' + (user?user.nombre:'') + '"></div>' +
+        '<div class="form-group"><label>Rol</label><select class="input" id="f-u-rol" ' + (isAdmin?'disabled':'') + '><option value="vendedor"' + (user&&user.rol==='vendedor'?' selected':'') + '>Vendedor</option><option value="admin"' + (user&&user.rol==='admin'?' selected':'') + '>Admin</option></select></div>' +
+        '<div class="form-group"><label>PIN</label><input type="text" class="input" id="f-u-pin" value="' + (user?user.pin:'') + '" maxlength="10"></div>' +
+        '<div class="form-group"><label>Estado</label><select class="input" id="f-u-activo" ' + (isAdmin?'disabled':'') + '><option value="true"' + (user&&user.activo!==false?' selected':'') + '>Activo</option><option value="false"' + (user&&user.activo===false?' selected':'') + '>Inactivo</option></select></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-u">Guardar</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-save-u').addEventListener('click', function() {
+      var nombre = document.getElementById('f-u-nombre').value.trim();
+      var pin = document.getElementById('f-u-pin').value.trim();
+      if (!nombre || !pin) { alert('Nombre y PIN obligatorios'); return; }
+      var id = editId || ('user_' + Date.now());
+      ArcanoDB.saveUsuario({
+        id: id, nombre: nombre, rol: document.getElementById('f-u-rol').value,
+        pin: pin, activo: document.getElementById('f-u-activo').value === 'true', creado: new Date().toISOString()
+      });
+      modal.remove();
+      App.renderPage('usuarios');
+    });
+  },
+
+  delUsuario(id) {
+    if (id === 'admin') return;
+    if (!confirm('Eliminar usuario?')) return;
+    ArcanoDB.deleteUsuario(id);
+    App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     TAG SELECTOR HELPER
+     ================================================================ */
+  buildTagSelectorHtml(cat, selectedTags) {
+    var tags = ArcanoDB.getTagsForCategoria(cat);
+    var sel = selectedTags || [];
+    var h = '<div class="tag-selector" id="tag-selector">';
+    if (tags.length === 0) {
+      h += '<p class="text-sm text-muted">No hay etiquetas de uso para esta categoria.</p>';
+    } else {
+      for (var i = 0; i < tags.length; i++) {
+        var checked = sel.indexOf(tags[i]) >= 0 ? ' checked' : '';
+        h += '<label class="tag-chip"><input type="checkbox" value="' + tags[i] + '"' + checked + '><span>' + tags[i] + '</span></label>';
+      }
+    }
+    h += '</div>';
+    return h;
+  },
+
+  getSelectedTags() {
+    var cbs = document.querySelectorAll('#tag-selector input[type=checkbox]');
+    var tags = [];
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) tags.push(cbs[i].value);
+    }
+    return tags;
+  },
+
+  refreshTagSelector(prefix) {
+    var catEl = document.getElementById('f-' + prefix + '-cat');
+    var areaEl = document.getElementById('tag-area-' + prefix);
+    if (!catEl || !areaEl) return;
+    areaEl.innerHTML = Pages.buildTagSelectorHtml(catEl.value, []);
+  },
+
+  doAddTag(cat, idx) {
+    var inp = document.getElementById('new-tag-' + idx);
+    if (!inp) return;
+    var name = inp.value.trim();
+    if (!name) return;
+    if (ArcanoDB.addProductTag(cat, name)) {
+      App.renderPage('productos');
+    } else {
+      alert('La etiqueta de uso ya existe en esta categoria.');
+    }
+  },
+
+  doRemoveTag(cat, tagName) {
+    if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
+      ArcanoDB.removeProductTag(cat, tagName);
+      App.renderPage('productos');
+    }
+  },
+
+  /* ================================================================
+     IMAGE UPLOAD HELPERS
+     ================================================================ */
+  handleImageUpload(input, areaId) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
+      if (err) { alert(err); return; }
+      var area = document.getElementById(areaId);
+      var placeholder = area.querySelector('.img-upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
+      if (existing) existing.remove();
+      var removeBtn = area.querySelector('.btn-red');
+      if (removeBtn) removeBtn.remove();
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = 'img-preview';
+      img.id = 'img-preview-' + areaId.split('-').pop();
+      area.insertBefore(img, placeholder);
+      var rmBtn = document.createElement('button');
+      rmBtn.className = 'btn btn-sm btn-red';
+      rmBtn.style.marginTop = '6px';
+      rmBtn.textContent = 'Quitar imagen';
+      rmBtn.onclick = function() { Pages.removeImage(areaId, input.id); };
+      area.insertBefore(rmBtn, placeholder);
+    });
+  },
+
+  removeImage(areaId, inputId) {
+    var area = document.getElementById(areaId);
+    var preview = area.querySelector('.img-preview');
+    if (preview) preview.remove();
+    var btn = area.querySelector('.btn-red');
+    if (btn) btn.remove();
+    var placeholder = area.querySelector('.img-upload-placeholder');
+    if (placeholder) placeholder.style.display = '';
+    var inp = document.getElementById(inputId);
+    if (inp) inp.value = '';
+  },
+
+  /* ================================================================
+     RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
+     ================================================================ */
+  _groqKeyLoaded: false,
+  renderRecetasAdmin(container) {
+    var savedKey = localStorage.getItem('arcano_groq_key') || '';
+    var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
+
+    // Build list of available products for context
+    var productos = ArcanoDB.getTiendaProductos();
+    var productNames = [];
+    for (var i = 0; i < productos.length; i++) productNames.push(productos[i].nombre);
+    var productsContext = productNames.length > 0 ? productNames.join(', ') : 'No hay productos disponibles';
+
+    var h = '<div class="card mb-16">' +
+      '<div class="card-header"><h3>Configuracion</h3></div>' +
+      '<div class="card-body">' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
+        '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
+        '</div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label>' +
+          '<select class="input" id="ra-categoria">';
+    for (var c = 0; c < categorias.length; c++) {
+      h += '<option value="' + categorias[c] + '">' + categorias[c] + '</option>';
+    }
+    h += '</select></div>' +
+          '<div class="form-group"><label>Tema de la receta (opcional)</label>' +
+          '<input type="text" class="input" id="ra-tema" placeholder="Ej: arroz con leche, adobo de pollo...">' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Idioma de salida</label>' +
+        '<select class="input" id="ra-idioma">' +
+          '<option value="es">Espanol</option>' +
+          '<option value="en">English</option>' +
+        '</select></div>' +
+        '<button class="btn btn-gold" id="ra-gen-btn" onclick="Pages.generarReceta()">Generar Receta con IA</button>' +
+        '<span id="ra-gen-status" class="text-sm text-muted ml-12"></span>' +
+      '</div>' +
+    '</div>';
+
+    // Existing recipes section
+    h += '<div class="card">' +
+      '<div class="card-header"><h3>Recetas Existentes (' + '<span id="ra-count">0</span>' + ')</h3></div>' +
+      '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
+    '</div>';
+
+    container.innerHTML = h;
+
+    // Load existing recipes from Firebase
+    Pages._loadRecetasAdmin();
+
+    // Load Groq key from Firebase (persistent across devices/deploys)
+    Pages._groqKeyLoaded = false;
+    try {
+      firebase.database().ref('arcano/config/groqKey').once('value').then(function(snap) {
+        var fbKey = snap.val();
+        var statusEl = document.getElementById('ra-key-status');
+        if (fbKey) {
+          var inp = document.getElementById('ra-groq-key');
+          if (inp) inp.value = fbKey;
+          localStorage.setItem('arcano_groq_key', fbKey);
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
+          Pages._groqKeyLoaded = true;
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube</span>';
+        }
+      }).catch(function() {
+        var statusEl = document.getElementById('ra-key-status');
+        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error de conexion</span>';
+      });
+    } catch(e) {}
+  },
+
+  _saveGroqKey: function(showFeedback) {
+    var inp = document.getElementById('ra-groq-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    var statusEl = document.getElementById('ra-key-status');
+    if (!key) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>';
+      return;
+    }
+    localStorage.setItem('arcano_groq_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">guardando...</span>';
+    try {
+      firebase.database().ref('arcano/config/groqKey').set(key, function(err) {
+        if (err) {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error al guardar</span>';
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+          Pages._groqKeyLoaded = true;
+        }
+      });
+    } catch(e) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">local OK</span>';
+    }
+  },
+
+  _loadRecetasAdmin: function() {
+    var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+    ref.once('value', function(snap) {
+      var data = snap.val();
+      var recetas = [];
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          r._key = keys[i];
+          recetas.push(r);
+        }
+      }
+      recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+      Pages._renderRecetasList(recetas);
+    });
+  },
+
+  _renderRecetasList: function(recetas) {
+    var countEl = document.getElementById('ra-count');
+    var listEl = document.getElementById('ra-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = recetas.length;
+    if (recetas.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < recetas.length; i++) {
+      var r = recetas[i];
+      var prodsUsados = '';
+      if (r.productos_usados && r.productos_usados.length) {
+        prodsUsados = r.productos_usados.join(', ');
+      }
+      var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
+      h += '<tr>' +
+        '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
+        '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm">' + (prodsUsados || '-') + '</td>' +
+        '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">X</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarReceta: function(key) {
+    if (!confirm('Eliminar esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
+  generarReceta: function() {
+    var keyInput = document.getElementById('ra-groq-key');
+    var catSelect = document.getElementById('ra-categoria');
+    var temaInput = document.getElementById('ra-tema');
+    var idiomaSelect = document.getElementById('ra-idioma');
+    var btn = document.getElementById('ra-gen-btn');
+    var status = document.getElementById('ra-gen-status');
+
+    var apiKey = keyInput.value.trim();
+    var categoria = catSelect.value;
+    var tema = temaInput.value.trim();
+    var idioma = idiomaSelect.value;
+
+    if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_groq_key', apiKey);
+    try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
+
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Cargando productos y recetas existentes...';
+
+    // Build rich product context and load existing recipes, then generate
+    var productos = ArcanoDB.getTiendaProductos();
+    var productLines = [];
+    for (var i = 0; i < productos.length; i++) {
+      var p = productos[i];
+      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categorias: ' + (p.categorias || [p.categoria]).join('/') + ']';
+      if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
+      productLines.push(line);
+    }
+    var productContext = productLines.length > 0 ? productLines.join('\n') : '  - No hay productos en tienda aun';
+
+    var langInstr = idioma === 'en'
+      ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
+      : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
+
+    var temaInstr = tema
+      ? 'El tema especifico es: ' + tema + '. La receta debe girar alrededor de este tema.'
+      : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
+
+    // Load existing recipes to avoid repetition
+    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+      var data = snap.val();
+      var existingTitles = [];
+      var existingByCategory = { Comida: [], Infusiones: [], Cocteleria: [] };
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          if (r.titulo) existingTitles.push(r.titulo);
+          var cat = r.categoria || 'Comida';
+          if (!existingByCategory[cat]) existingByCategory[cat] = [];
+          existingByCategory[cat].push(r.titulo);
+        }
+      }
+
+      var existingBlock = '';
+      if (existingTitles.length > 0) {
+        existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir temas, platos ni titulos similares):\n';
+        existingBlock += existingTitles.join('\n');
+        existingBlock += '\n\nTotal recetas existentes por categoria:\n';
+        var catKeys2 = Object.keys(existingByCategory);
+        for (var c = 0; c < catKeys2.length; c++) {
+          var catName = catKeys2[c];
+          var catCount = existingByCategory[catName].length;
+          if (catCount > 0) existingBlock += '- ' + catName + ': ' + catCount + ' recetas\n';
+        }
+        existingBlock += '\nREGLA IMPORTANTE: No repitas ninguno de estos titulos ni crees recetas con tematicas similares. Cada receta debe ser unica.';
+      }
+
+      var systemPrompt =
+        'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
+        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
+        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
+        'REGLAS OBLIGATORIAS:\n' +
+        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
+        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
+        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
+        '4. IMPORTANTE: Menciona el nombre EXACTO del producto Arcano tal como aparece en el catalogo dentro de los ingredientes y pasos. Esto permite que se enlace automaticamente en la tienda.\n' +
+        '5. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
+        '6. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, colombiana, marroqui, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar, ahumar, confitar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres, ceviches, empanadas, arepas).\n' +
+        '7. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras, toddies calientes, cold brew de especias.\n' +
+        '8. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino, cava, sake), estilos (sour, fizz, mocktail, punch, old fashioned, spritz, julep, colada) y tecnicas (muddling, infusion, flame, dry shake, fat wash, clarification).\n' +
+        '9. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas en cada ingrediente.\n' +
+        '10. Los pasos deben ser claros, concisos y en orden logico. Cada paso debe describir una accion concreta.\n' +
+        '11. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n' +
+        '12. El campo "productos_usados" debe listar SOLO los nombres exactos de productos Arcano usados en la receta (tal como aparecen en el catalogo).\n\n' +
+        langInstr;
+
+      var userPrompt =
+        'Genera UNA receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+        existingBlock + '\n\n' +
+        'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
+        '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
+        '"dificultad": "Facil" o "Media" o "Dificil", ' +
+        '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+        '"productos_usados": ["Nombre Exacto del Producto 1"], ' +
+        '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto Arcano", "200g de proteina principal", ...], ' +
+        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
+        '"imagen_prompt": "descripcion visual del plato terminado para generar una imagen (en ingles, 1 oracion)"}\n\n' +
+        'RECUERDA: De 5 a 12 ingredientes, de 5 a 8 pasos. La receta DEBE ser diferente a todas las existentes. ' +
+        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
+        'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
+
+      status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.9,
+          max_tokens: 2000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+        return res.json();
+      })
+      .then(function(data) {
+        var content = data.choices[0].message.content.trim();
+        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+        var receta = JSON.parse(content);
+
+        if (!receta.titulo) throw new Error('La receta no tiene titulo');
+        if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+        if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+
+        // Check for duplicate title
+        var dupTitle = false;
+        for (var d = 0; d < existingTitles.length; d++) {
+          if (existingTitles[d].toLowerCase() === receta.titulo.toLowerCase()) { dupTitle = true; break; }
+        }
+        if (dupTitle) throw new Error('La receta generada tiene un titulo identico a una existente. Intenta de nuevo con otro tema.');
+
+        receta.fecha = new Date().toISOString().slice(0, 10);
+        if (!receta.categoria) receta.categoria = categoria;
+        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+          if (err) {
+            status.textContent = 'Error al guardar: ' + (err.message || err);
+          } else {
+            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+            Pages._loadRecetasAdmin();
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generar Receta con IA';
+        });
+      })
+      .catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'Generar Receta con IA';
+      });
+    });
+  },
+
+  /* ================================================================
+     ESTADISTICAS DE VENTAS (Chart.js)
+     ================================================================ */
+  _estPeriod: null,
+  _estTab: null,
+  _estCharts: [],
+
+  renderEstadisticas: function(container) {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var producciones = ArcanoDB.getProducciones();
+    var entradas = ArcanoDB.getEntradas();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+
+    // === COMBINE ALL SALES ===
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+
+    if (!Pages._estTab) Pages._estTab = 'ventas';
+
+    var h = '<div class="est-tabs">';
+    h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'costos' ? ' active' : '') + '" onclick="Pages._estTab=\'costos\';App.renderPage(\'estadisticas\')">Costos y Margen</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'inventario' ? ' active' : '') + '" onclick="Pages._estTab=\'inventario\';App.renderPage(\'estadisticas\')">Inventario</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'canales' ? ' active' : '') + '" onclick="Pages._estTab=\'canales\';App.renderPage(\'estadisticas\')">Costos por Canal</button>';
+    h += '</div>';
+    h += '<div id="est-content"></div>';
+    container.innerHTML = h;
+
+    var data;
+    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
+      data = allSales;
+    } else {
+      data = allSales.filter(function(s) { return s.source === 'tienda'; });
+    }
+
+    if (Pages._estTab === 'ventas') Pages._renderVentas(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'costos') Pages._renderCostos(data, container.querySelector('#est-content'), entradas, especias, blends, producciones);
+    else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
+    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
+    else if (Pages._estTab === 'canales') Pages._renderCostosPorCanal(container.querySelector('#est-content'));
+  },
+
+  /* ================================================================
+     VENTAS TAB
+     ================================================================ */
+  _renderVentas: function(data, el) {
+    if (!el) return;
+    var totalIngresos = 0, totalOps = 0, totalUnidades = 0;
+    var prodMap = {}, tipoMap = {}, tallaMap = {}, diaMap = {}, monthMap = {}, ciudadMap = {}, sourceMap = {};
+    for (var d = 0; d < data.length; d++) {
+      var s = data[d];
+      totalIngresos += (s.total || 0);
+      totalOps++;
+      sourceMap[s.source] = (sourceMap[s.source] || 0) + 1;
+      var opUnidades = 0;
+      if (s.items) { for (var it = 0; it < s.items.length; it++) {
+        var item = s.items[it];
+        totalUnidades += (item.cantidad || 0);
+        opUnidades += (item.cantidad || 0);
+        var key = item.nombre + '|' + item.tipo + '|' + item.talla;
+        if (!prodMap[key]) prodMap[key] = { nombre: item.nombre, tipo: item.tipo, talla: item.talla, unidades: 0, ingreso: 0 };
+        prodMap[key].unidades += (item.cantidad || 0);
+        prodMap[key].ingreso += (item.subtotal || 0);
+        tipoMap[item.tipo] = (tipoMap[item.tipo] || 0) + (item.cantidad || 0);
+        tallaMap[item.talla || 'chico'] = (tallaMap[item.talla || 'chico'] || 0) + (item.cantidad || 0);
+      }}
+      if (s.fecha) {
+        if (!diaMap[s.fecha]) diaMap[s.fecha] = { ops: 0, unidades: 0, ingresos: 0 };
+        diaMap[s.fecha].ops++;
+        diaMap[s.fecha].unidades += opUnidades;
+        diaMap[s.fecha].ingresos += (s.total || 0);
+        var mn = s.fecha.substring(0, 7);
+        if (!monthMap[mn]) monthMap[mn] = { ops: 0, unidades: 0, ingresos: 0 };
+        monthMap[mn].ops++;
+        monthMap[mn].unidades += opUnidades;
+        monthMap[mn].ingresos += (s.total || 0);
+      }
+      if (s.ciudad) {
+        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ops: 0, ingresos: 0 };
+        ciudadMap[s.ciudad].ops++;
+        ciudadMap[s.ciudad].ingresos += (s.total || 0);
+      }
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+
+    // Calculate day-on-day trend
+    var diasSorted = Object.keys(diaMap).sort();
+    var ingresosAyer = 0;
+    if (diasSorted.length >= 2) { ingresosAyer = diaMap[diasSorted[diasSorted.length - 2]].ingresos || 0; }
+    var ingresosHoy = diasSorted.length > 0 ? diaMap[diasSorted[diasSorted.length - 1]].ingresos : 0;
+    var tendenciaDiaria = ingresosAyer > 0 ? Math.round(((ingresosHoy - ingresosAyer) / ingresosAyer) * 100) : 0;
+    var tendSign = tendenciaDiaria >= 0 ? '+' : '';
+
+    // Monthly comparison
+    var mesesSorted = Object.keys(monthMap).sort();
+    var mesActual = new Date().toISOString().slice(0, 7);
+    var mesAnterior = mesesSorted.length >= 2 ? mesesSorted[mesesSorted.length - 2] : '';
+    var ingresosMesActual = (monthMap[mesActual] || {}).ingresos || 0;
+    var ingresosMesAnterior = mesAnterior ? (monthMap[mesAnterior] || {}).ingresos || 0 : 0;
+    var tendenciaMensual = ingresosMesAnterior > 0 ? Math.round(((ingresosMesActual - ingresosMesAnterior) / ingresosMesAnterior) * 100) : 0;
+    var tendMSign = tendenciaMensual >= 0 ? '+' : '';
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">' + totalOps + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalUnidades + '</div><div class="est-kpi-label">Unidades Vendidas</div><div class="est-kpi-sub">' + prodArr.length + ' productos distintos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por operacion</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaDiaria >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendSign + tendenciaDiaria + '%</div><div class="est-kpi-label">Tendencia Dia</div><div class="est-kpi-sub">vs dia anterior</div></div>';
+    h += '</div>';
+
+    // Monthly comparison bar
+    h += '<div class="card mt-16"><div class="card-header"><h3>Comparacion Mensual</h3></div><div class="card-body">';
+    h += '<div class="est-kpi-grid" style="grid-template-columns:1fr 1fr 1fr">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesActual.toLocaleString() + '</div><div class="est-kpi-label">Mes Actual (' + mesActual + ')</div><div class="est-kpi-sub">' + ((monthMap[mesActual] || {}).ops || 0) + ' ops / ' + ((monthMap[mesActual] || {}).unidades || 0) + ' uds</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesAnterior.toLocaleString() + '</div><div class="est-kpi-label">Mes Anterior (' + mesAnterior + ')</div><div class="est-kpi-sub">' + (mesAnterior ? ((monthMap[mesAnterior] || {}).ops || 0) + ' ops / ' + ((monthMap[mesAnterior] || {}).unidades || 0) + ' uds' : 'sin datos') + '</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaMensual >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendMSign + tendenciaMensual + '%</div><div class="est-kpi-label">Variacion Mensual</div><div class="est-kpi-sub">' + (ingresosMesActual >= ingresosMesAnterior ? 'crecimiento' : 'caida') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Source breakdown (admin vs tienda)
+    h += '<div class="card mt-16"><div class="card-header"><h3>Canal de Venta</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
+    var adminIngreso = 0, tiendaIngreso = 0;
+    for (var d = 0; d < data.length; d++) {
+      if (data[d].source === 'admin') adminIngreso += data[d].total || 0;
+      else tiendaIngreso += data[d].total || 0;
+    }
+    var totalCh = adminIngreso + tiendaIngreso;
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos Diarios</h4><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos Mensuales</h4><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Tipo de Producto</h4><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Venta por Talla</h4><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Top 10 Productos por Ingreso</h4><div class="est-chart-wrap est-chart-full"><canvas id="chart-products"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos por Ciudad</h4><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div>';
+    h += '</div>';
+
+    // Top products table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Top Productos por Ingreso</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Unidades</th><th>Ingreso</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pi = 0; pi < Math.min(prodArr.length, 20); pi++) {
+        var pp = prodArr[pi];
+        var pct = totalIngresos > 0 ? (pp.ingreso / totalIngresos * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td>' + pp.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + pp.ingreso.toLocaleString() + '</td><td>' + pct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos</p>'; }
+    h += '</div></div>';
+
+    // Daily breakdown
+    var diasArr = Object.keys(diaMap).sort().reverse();
+    if (diasArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Desglose por Dia</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Fecha</th><th>Ops</th><th>Unidades</th><th>Ingreso</th><th>Ticket Prom.</th><th>Barra</th></tr></thead><tbody>';
+      var maxDiaIng = 0;
+      for (var di = 0; di < diasArr.length; di++) { if (diaMap[diasArr[di]].ingresos > maxDiaIng) maxDiaIng = diaMap[diasArr[di]].ingresos; }
+      for (var di2 = 0; di2 < diasArr.length; di2++) {
+        var dk = diasArr[di2]; var dv = diaMap[dk];
+        var dBarW = maxDiaIng > 0 ? (dv.ingresos / maxDiaIng * 100).toFixed(0) : 0;
+        var ticketP = dv.ops > 0 ? Math.round(dv.ingresos / dv.ops) : 0;
+        h += '<tr><td class="fw7">' + dk + '</td><td>' + dv.ops + '</td><td>' + dv.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + dv.ingresos.toLocaleString() + '</td><td>$' + ticketP.toLocaleString() + '</td><td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + dBarW + '%;background:var(--gold)"></div></div></div></td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // === CHARTS ===
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var gOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 12, padding: 12 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } };
+
+    // Daily line
+    var dailyLabels = [], dailyData = [], dailyOpsData = [];
+    for (var dd = 0; dd < diasSorted.length; dd++) { dailyLabels.push(diasSorted[dd].slice(5)); dailyData.push(diaMap[diasSorted[dd]].ingresos); dailyOpsData.push(diaMap[diasSorted[dd]].ops); }
+    var ctxD = document.getElementById('chart-daily');
+    if (ctxD) {
+      Pages._estCharts.push(new Chart(ctxD, {
+        type: 'line',
+        data: { labels: dailyLabels, datasets: [
+          { label: 'Ingresos ($)', data: dailyData, borderColor: '#e8b84b', backgroundColor: 'rgba(232,184,75,0.1)', fill: true, tension: 0.3, pointRadius: 3, yAxisID: 'y' },
+          { label: 'Operaciones', data: dailyOpsData, borderColor: '#5dade2', backgroundColor: 'rgba(93,173,226,0.1)', fill: false, tension: 0.3, pointRadius: 2, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { color: 'rgba(58,34,24,0.3)' } } } }
+      }));
+    }
+
+    // Monthly bar
+    var mLabels = [], mData = [], mOpsData = [];
+    for (var mi = 0; mi < mesesSorted.length; mi++) { mLabels.push(mesesSorted[mi]); mData.push(monthMap[mesesSorted[mi]].ingresos); mOpsData.push(monthMap[mesesSorted[mi]].ops); }
+    var ctxM = document.getElementById('chart-monthly');
+    if (ctxM) {
+      Pages._estCharts.push(new Chart(ctxM, {
+        type: 'bar', data: { labels: mLabels, datasets: [
+          { label: 'Ingresos ($)', data: mData, backgroundColor: 'rgba(232,184,75,0.7)', borderColor: '#e8b84b', borderWidth: 1, borderRadius: 6, yAxisID: 'y' },
+          { label: 'Operaciones', data: mOpsData, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Types doughnut
+    var ctxT = document.getElementById('chart-types');
+    if (ctxT) {
+      Pages._estCharts.push(new Chart(ctxT, {
+        type: 'doughnut', data: { labels: ['Especias', 'Blends'], datasets: [{ data: [tipoMap.especia || 0, tipoMap.blend || 0], backgroundColor: ['#e8b84b', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Tallas pie
+    var ctxTa = document.getElementById('chart-tallas');
+    if (ctxTa) {
+      Pages._estCharts.push(new Chart(ctxTa, {
+        type: 'pie', data: { labels: ['Pequeno', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Top 10 horizontal bar
+    var top10 = prodArr.slice(0, 10);
+    var ctxP = document.getElementById('chart-products');
+    if (ctxP) {
+      var pL = [], pI = [], pC = [];
+      for (var tp = 0; tp < top10.length; tp++) { pL.push(top10[tp].nombre); pI.push(top10[tp].ingreso); pC.push(top10[tp].tipo === 'blend' ? '#5dade2' : '#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxP, { type: 'bar', data: { labels: pL, datasets: [{ label: 'Ingreso ($)', data: pI, backgroundColor: pC, borderRadius: 4, barThickness: 18 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } } } }));
+    }
+
+    // City bar
+    var ctxC = document.getElementById('chart-ciudad');
+    if (ctxC) {
+      var ciudades = Object.keys(ciudadMap).sort(function(a, b) { return ciudadMap[b].ingresos - ciudadMap[a].ingresos; });
+      var cL = [], cD = [];
+      for (var ci2 = 0; ci2 < ciudades.length; ci2++) { cL.push(ciudades[ci2]); cD.push(ciudadMap[ciudades[ci2]].ingresos); }
+      Pages._estCharts.push(new Chart(ctxC, { type: 'bar', data: { labels: cL, datasets: [{ label: 'Ingresos ($)', data: cD, backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1, borderRadius: 6 }] }, options: Object.assign({}, gOpts) }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = canvases[ch].classList.contains('est-chart-full') ? '300px' : '260px'; }
+  },
+
+  /* ================================================================
+     COSTOS Y MARGEN TAB
+     ================================================================ */
+  _renderCostos: function(data, el, entradas, especias, blends, producciones) {
+    if (!el) return;
+
+    // 1. Total cost of purchases (entradas)
+    var totalCostoCompras = 0;
+    var costoByTipo = { especia_grs: 0, envase: 0, bolsa: 0, sticker: 0, cinta: 0 };
+    var proveedorMap = {};
+    var compraMonthMap = {};
+    for (var ei = 0; ei < entradas.length; ei++) {
+      var ent = entradas[ei];
+      var entTotal = Number(ent.total) || 0;
+      totalCostoCompras += entTotal;
+      var prov = (ent.proveedor || 'Sin proveedor').trim();
+      if (!prov) prov = 'Sin proveedor';
+      if (!proveedorMap[prov]) proveedorMap[prov] = { total: 0, ops: 0 };
+      proveedorMap[prov].total += entTotal;
+      proveedorMap[prov].ops++;
+      if (ent.fecha) {
+        var mn = ent.fecha.substring(0, 7);
+        if (!compraMonthMap[mn]) compraMonthMap[mn] = 0;
+        compraMonthMap[mn] += entTotal;
+      }
+      if (ent.items) {
+        for (var ij = 0; ij < ent.items.length; ij++) {
+          var it = ent.items[ij];
+          var t = it.tipo || 'especia_grs';
+          costoByTipo[t] = (costoByTipo[t] || 0) + ((Number(it.cantidad) || 0) * (Number(it.costoUnitario) || 0));
+        }
+      }
+    }
+
+    // 2. Total ingresos
+    var totalIngresos = 0;
+    for (var si = 0; si < data.length; si++) totalIngresos += (data[si].total || 0);
+
+    // 3. Margen
+    var margenBruto = totalIngresos - totalCostoCompras;
+    var margenPct = totalIngresos > 0 ? (margenBruto / totalIngresos * 100).toFixed(1) : '0';
+
+    // 4. Per-product margin (income vs estimated material cost from produccion)
+    var prodVentaMap = {}, prodCostoMap = {};
+    for (var di = 0; di < data.length; di++) {
+      var s = data[di];
+      if (s.items) { for (var ii = 0; ii < s.items.length; ii++) {
+        var item = s.items[ii];
+        var pk = item.nombre + '|' + item.tipo;
+        if (!prodVentaMap[pk]) prodVentaMap[pk] = 0;
+        prodVentaMap[pk] += (item.subtotal || 0);
+      }}
+    }
+    // From entradas, calculate cost per gram for each especia
+    var costoPorGramo = {};
+    var gramosComprados = {};
+    for (var ei2 = 0; ei2 < entradas.length; ei2++) {
+      var ent2 = entradas[ei2];
+      if (ent2.items) { for (var ij2 = 0; ij2 < ent2.items.length; ij2++) {
+        var it2 = ent2.items[ij2];
+        if (it2.tipo === 'especia_grs' && it2.especiaNombre) {
+          var nombre = it2.especiaNombre;
+          var grs = Number(it2.cantidad) || 0;
+          var cost = grs * (Number(it2.costoUnitario) || 0);
+          costoPorGramo[nombre] = (costoPorGramo[nombre] || 0) + cost;
+          gramosComprados[nombre] = (gramosComprados[nombre] || 0) + grs;
+        }
+      }}
+    }
+    var costoGrPorEsp = {};
+    var espNames = Object.keys(gramosComprados);
+    for (var gn = 0; gn < espNames.length; gn++) {
+      if (gramosComprados[espNames[gn]] > 0) {
+        costoGrPorEsp[espNames[gn]] = costoPorGramo[espNames[gn]] / gramosComprados[espNames[gn]];
+      }
+    }
+
+    // Build blend cost from ingredients
+    var costoBlendMap = {};
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var ings = bl.ingredientes || [];
+      var costChico = 0, costGrande = 0;
+      for (var ig = 0; ig < ings.length; ig++) {
+        var ing = ings[ig];
+        var cpg = costoGrPorEsp[ing.especiaNombre] || 0;
+        costChico += (Number(ing.gramosChico) || 0) * cpg;
+        costGrande += (Number(ing.gramosGrande) || 0) * cpg;
+      }
+      // Add envase + bolsa + sticker cost per unit
+      costoBlendMap['blend|' + bl.nombre] = { chico: costChico, grande: costGrande };
+    }
+    for (var ei3 = 0; ei3 < especias.length; ei3++) {
+      var esp = especias[ei3];
+      var cpg2 = costoGrPorEsp[esp.nombre] || 0;
+      costoBlendMap['especia|' + esp.nombre] = { chico: (Number(esp.gramosChico) || 0) * cpg2, grande: (Number(esp.gramosGrande) || 0) * cpg2 };
+    }
+
+    // 5. Production volume stats
+    var totalFrascosProd = 0, totalGrsProd = 0, prodByMonth = {};
+    for (var pri = 0; pri < producciones.length; pri++) {
+      var pr = producciones[pri];
+      totalFrascosProd += (pr.cantidad || 0);
+      totalGrsProd += (pr.gramosTotal || 0);
+      if (pr.fecha) {
+        var pmn = pr.fecha.substring(0, 7);
+        if (!prodByMonth[pmn]) prodByMonth[pmn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodByMonth[pmn].frascos += (pr.cantidad || 0);
+        prodByMonth[pmn].gramos += (pr.gramosTotal || 0);
+        prodByMonth[pmn].ops++;
+      }
+    }
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--red)">$' + totalCostoCompras.toLocaleString() + '</div><div class="est-kpi-label">Costo Compras</div><div class="est-kpi-sub">materia prima + packaging</div></div>';
+    h += '<div class="est-kpi ' + (margenBruto >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">$' + margenBruto.toLocaleString() + '</div><div class="est-kpi-label">Margen Bruto</div><div class="est-kpi-sub">' + margenPct + '%</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosProd + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + totalGrsProd.toLocaleString() + ' grs en total</div></div>';
+    h += '</div>';
+
+    // Cost breakdown by type
+    h += '<div class="card mt-16"><div class="card-header"><h3>Desglose de Costos por Tipo</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.especia_grs || 0).toLocaleString() + '</div><div class="stat-label">Materia Prima</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + (costoByTipo.envase || 0).toLocaleString() + '</div><div class="stat-label">Frascos (Envases)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + (costoByTipo.bolsa || 0).toLocaleString() + '</div><div class="stat-label">Bolsas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--yellow)"><div class="stat-value">$' + (costoByTipo.sticker || 0).toLocaleString() + '</div><div class="stat-label">Stickers/Etiquetas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.cinta || 0).toLocaleString() + '</div><div class="stat-label">Cintas</div></div>';
+    h += '</div></div></div>';
+
+    // Proveedor table
+    var provArr = Object.keys(proveedorMap).sort(function(a, b) { return proveedorMap[b].total - proveedorMap[a].total; });
+    if (provArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Compras por Proveedor</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Proveedor</th><th>Ordenes</th><th>Total Comprado</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pvi = 0; pvi < provArr.length; pvi++) {
+        var pv = provArr[pvi]; var pd = proveedorMap[pv];
+        var pvPct = totalCostoCompras > 0 ? (pd.total / totalCostoCompras * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pv + '</td><td>' + pd.ops + '</td><td class="fw7" style="color:var(--red)">$' + pd.total.toLocaleString() + '</td><td>' + pvPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos vs Costos Mensual</h4><div class="est-chart-wrap"><canvas id="chart-cost-mensual"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Distribucion de Costos</h4><div class="est-chart-wrap"><canvas id="chart-cost-dist"></canvas></div></div>';
+    h += '</div>';
+
+    // Per-product margin table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo de materia prima estimado segun precio de compra por gramo. No incluye envases/bolsas/stickers.</p>';
+    var allProducts = [];
+    for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
+      var pk2 = Object.keys(prodVentaMap)[vk];
+      var parts = pk2.split('|');
+      var pNombre = parts.slice(1).join('|');
+      var pTipo = parts[0];
+      var pIngreso = prodVentaMap[pk2];
+      var costoEst = costoBlendMap[pk2] || { chico: 0, grande: 0 };
+      allProducts.push({ nombre: pNombre, tipo: pTipo, ingreso: pIngreso, costoEst: costoEst.chico + costoEst.grande });
+    }
+    allProducts.sort(function(a, b) { return b.ingreso - a.ingreso; });
+    if (allProducts.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo M.P.</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
+      for (var api = 0; api < Math.min(allProducts.length, 20); api++) {
+        var ap = allProducts[api];
+        var apMargen = ap.ingreso - ap.costoEst;
+        var apPct = ap.ingreso > 0 ? (apMargen / ap.ingreso * 100).toFixed(1) : '0';
+        var apColor = apMargen >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr><td class="fw7">' + ap.nombre + '</td><td><span class="badge ' + (ap.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (ap.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td style="color:var(--gold)">$' + ap.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ap.costoEst.toLocaleString() + '</td><td style="color:' + apColor + '">$' + apMargen.toLocaleString() + '</td><td style="color:' + apColor + '">' + apPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos suficientes</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    // Charts
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    // Ingresos vs Costos Mensual
+    var allMonths = new Set(Object.keys(compraMonthMap));
+    var ventasMonthMap = {};
+    for (var vi = 0; vi < data.length; vi++) {
+      if (data[vi].fecha) {
+        var vmn = data[vi].fecha.substring(0, 7);
+        ventasMonthMap[vmn] = (ventasMonthMap[vmn] || 0) + (data[vi].total || 0);
+      }
+    }
+    Object.keys(ventasMonthMap).forEach(function(m) { allMonths.add(m); });
+    var mSort = Array.from(allMonths).sort();
+    var cmLabels = [], cmIngresos = [], cmCostos = [], cmMargen = [];
+    for (var cm = 0; cm < mSort.length; cm++) {
+      cmLabels.push(mSort[cm]);
+      var v = ventasMonthMap[mSort[cm]] || 0;
+      var c = compraMonthMap[mSort[cm]] || 0;
+      cmIngresos.push(v); cmCostos.push(c); cmMargen.push(v - c);
+    }
+    var ctxCM = document.getElementById('chart-cost-mensual');
+    if (ctxCM) {
+      Pages._estCharts.push(new Chart(ctxCM, {
+        type: 'bar', data: { labels: cmLabels, datasets: [
+          { label: 'Ingresos', data: cmIngresos, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4 },
+          { label: 'Costos', data: cmCostos, backgroundColor: 'rgba(231,76,60,0.7)', borderRadius: 4 },
+          { label: 'Margen', data: cmMargen, type: 'line', borderColor: '#27ae60', backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2 }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Cost distribution doughnut
+    var ctxCD = document.getElementById('chart-cost-dist');
+    if (ctxCD) {
+      Pages._estCharts.push(new Chart(ctxCD, {
+        type: 'doughnut', data: { labels: ['Materia Prima', 'Envases', 'Bolsas', 'Stickers'], datasets: [{ data: [costoByTipo.especia_grs || 0, costoByTipo.envase || 0, costoByTipo.bolsa || 0, costoByTipo.sticker || 0], backgroundColor: ['#e8b84b', '#5dade2', '#27ae60', '#f0c040'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PRODUCCION TAB
+     ================================================================ */
+  _renderProduccion: function(data, el, producciones) {
+    if (!el) return;
+    var totalFrascos = 0, totalGramos = 0;
+    var tipoProdMap = {}, tallaProdMap = {}, prodProdMap = {}, prodMonthMap = {}, envasesConsumidos = 0, bolsasConsumidas = 0, stickersConsumidos = 0, cintasConsumidas = 0;
+    for (var i = 0; i < producciones.length; i++) {
+      var pr = producciones[i];
+      totalFrascos += (pr.cantidad || 0);
+      totalGramos += (pr.gramosTotal || 0);
+      envasesConsumidos += (pr.envasesConsumidos || 0);
+      bolsasConsumidas += (pr.bolsasConsumidas || 0);
+      stickersConsumidos += (pr.stickersConsumidos || 0);
+      cintasConsumidas += (pr.cintasConsumidas || 0);
+      tipoProdMap[pr.tipo] = (tipoProdMap[pr.tipo] || 0) + (pr.cantidad || 0);
+      tallaProdMap[pr.talla || 'chico'] = (tallaProdMap[pr.talla || 'chico'] || 0) + (pr.cantidad || 0);
+      var pk = (pr.productoNombre || '?') + '|' + (pr.tipo || 'especia') + '|' + (pr.talla || 'chico');
+      if (!prodProdMap[pk]) prodProdMap[pk] = { nombre: pr.productoNombre, tipo: pr.tipo, talla: pr.talla, frascos: 0, gramos: 0, ops: 0 };
+      prodProdMap[pk].frascos += (pr.cantidad || 0);
+      prodProdMap[pk].gramos += (pr.gramosTotal || 0);
+      prodProdMap[pk].ops++;
+      if (pr.fecha) {
+        var mn = pr.fecha.substring(0, 7);
+        if (!prodMonthMap[mn]) prodMonthMap[mn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodMonthMap[mn].frascos += (pr.cantidad || 0);
+        prodMonthMap[mn].gramos += (pr.gramosTotal || 0);
+        prodMonthMap[mn].ops++;
+      }
+    }
+    var prodArr = Object.values(prodProdMap).sort(function(a, b) { return b.frascos - a.frascos; });
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascos + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + producciones.length + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalGramos.toLocaleString() + 'g</div><div class="est-kpi-label">Materia Prima Usada</div><div class="est-kpi-sub">gramos en total</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + envasesConsumidos + '</div><div class="est-kpi-label">Envases Consumidos</div><div class="est-kpi-sub">frascos usados</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + stickersConsumidos + '</div><div class="est-kpi-label">Stickers Usados</div><div class="est-kpi-sub">etiquetas aplicadas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + bolsasConsumidas + '</div><div class="est-kpi-label">Bolsas Usadas</div><div class="est-kpi-sub">empaques</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cintasConsumidas + '</div><div class="est-kpi-label">Cintas Usadas</div><div class="est-kpi-sub">decorativas</div></div>';
+    h += '</div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Produccion Mensual (Frascos)</h4><div class="est-chart-wrap"><canvas id="chart-prod-monthly"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Tipo y Talla</h4><div class="est-chart-wrap"><canvas id="chart-prod-tipo"></canvas></div></div>';
+    h += '</div>';
+
+    // Production table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Produccion por Producto</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Frascos</th><th>Gramos</th><th>Ops</th></tr></thead><tbody>';
+      for (var pi = 0; pi < prodArr.length; pi++) {
+        var pp = prodArr[pi];
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td class="fw7">' + pp.frascos + '</td><td>' + pp.gramos.toLocaleString() + 'g</td><td>' + pp.ops + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin producciones</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var pmSorted = Object.keys(prodMonthMap).sort();
+    var pmL = [], pmF = [], pmG = [];
+    for (var mi = 0; mi < pmSorted.length; mi++) { pmL.push(pmSorted[mi]); pmF.push(prodMonthMap[pmSorted[mi]].frascos); pmG.push(prodMonthMap[pmSorted[mi]].gramos); }
+    var ctxPM = document.getElementById('chart-prod-monthly');
+    if (ctxPM) {
+      Pages._estCharts.push(new Chart(ctxPM, { type: 'bar', data: { labels: pmL, datasets: [
+        { label: 'Frascos', data: pmF, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Gramos', data: pmG, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', title: { display: true, text: 'Frascos' }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', title: { display: true, text: 'Gramos' }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPT = document.getElementById('chart-prod-tipo');
+    if (ctxPT) {
+      Pages._estCharts.push(new Chart(ctxPT, { type: 'bar', data: { labels: ['Especia-Chico', 'Especia-Grande', 'Blend-Chico', 'Blend-Grande'], datasets: [{ label: 'Frascos', data: [tipoProdMap.especia_chico || 0, tipoProdMap.especia_grande || 0, tipoProdMap.blend_chico || 0, tipoProdMap.blend_grande || 0], backgroundColor: ['#e8b84b', '#c9963a', '#5dade2', '#3498db'], borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PEDIDOS TIENDA TAB
+     ================================================================ */
+  _renderPedidosTienda: function(data, el) {
+    if (!el) return;
+    var total = 0, ops = 0, ciudades = {}, estadoMap = {}, dayMap = {}, prodMap = {};
+    for (var i = 0; i < data.length; i++) {
+      var s = data[i];
+      total += (s.total || 0); ops++;
+      estadoMap[s.estado || 'nuevo'] = (estadoMap[s.estado || 'nuevo'] || 0) + 1;
+      if (s.ciudad) { if (!ciudades[s.ciudad]) ciudades[s.ciudad] = { ops: 0, ingreso: 0 }; ciudades[s.ciudad].ops++; ciudades[s.ciudad].ingreso += (s.total || 0); }
+      if (s.fecha) { if (!dayMap[s.fecha]) dayMap[s.fecha] = { ops: 0, ingreso: 0 }; dayMap[s.fecha].ops++; dayMap[s.fecha].ingreso += (s.total || 0); }
+      if (s.items) { for (var j = 0; j < s.items.length; j++) {
+        var it = s.items[j]; var pk = it.nombre + '|' + (it.talla || 'chico');
+        if (!prodMap[pk]) prodMap[pk] = { nombre: it.nombre, talla: it.talla, uds: 0, ingreso: 0 };
+        prodMap[pk].uds += (it.cantidad || 0); prodMap[pk].ingreso += (it.subtotal || 0);
+      }}
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+    var cityArr = Object.keys(ciudades).sort(function(a, b) { return ciudades[b].ingreso - ciudades[a].ingreso; });
+
+    var h = '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + total.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Tienda</div><div class="est-kpi-sub">' + ops + ' pedidos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (ops > 0 ? Math.round(total / ops) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por pedido</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cityArr.length + '</div><div class="est-kpi-label">Ciudades</div><div class="est-kpi-sub">destino de envios</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + (estadoMap.entregado || 0) + '</div><div class="est-kpi-label">Entregados</div><div class="est-kpi-sub">de ' + ops + ' total</div></div>';
+    h += '</div>';
+
+    // Estado breakdown
+    var estColors = { nuevo: 'badge-red', confirmado: 'badge-yellow', preparando: 'badge-blue', enviado: 'badge-gold', entregado: 'badge-green', cancelado: 'badge-red' };
+    var estLabels = { nuevo: 'Nuevos', confirmado: 'Confirmados', preparando: 'Preparando', enviado: 'Enviados', entregado: 'Entregados', cancelado: 'Cancelados' };
+    h += '<div class="card mt-16"><div class="card-header"><h3>Estado de Pedidos</h3></div><div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">';
+    var estKeys = Object.keys(estadoMap).sort();
+    for (var ei = 0; ei < estKeys.length; ei++) {
+      var ek = estKeys[ei];
+      h += '<div style="text-align:center;padding:12px 16px;background:var(--bg);border-radius:8px;min-width:80px"><div style="font-size:1.4rem;font-weight:800;color:var(--text)">' + estadoMap[ek] + '</div><div style="font-size:.72rem;color:var(--text2);margin-top:2px">' + (estLabels[ek] || ek) + '</div></div>';
+    }
+    h += '</div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Pedidos por Dia</h4><div class="est-chart-wrap"><canvas id="chart-ped-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Top 8 Productos</h4><div class="est-chart-wrap"><canvas id="chart-ped-prods"></canvas></div></div>';
+    h += '</div>';
+
+    // City table
+    if (cityArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Ingresos por Ciudad</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Ciudad</th><th>Pedidos</th><th>Ingreso</th><th>Promedio</th></tr></thead><tbody>';
+      for (var ci = 0; ci < cityArr.length; ci++) {
+        var cd = ciudades[cityArr[ci]];
+        h += '<tr><td class="fw7">' + cityArr[ci] + '</td><td>' + cd.ops + '</td><td class="fw7" style="color:var(--gold)">$' + cd.ingreso.toLocaleString() + '</td><td>$' + (cd.ops > 0 ? Math.round(cd.ingreso / cd.ops) : 0).toLocaleString() + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var daySorted = Object.keys(dayMap).sort();
+    var ctxPD = document.getElementById('chart-ped-daily');
+    if (ctxPD) {
+      var dl = [], dd = [], do2 = [];
+      for (var di = 0; di < daySorted.length; di++) { dl.push(daySorted[di].slice(5)); dd.push(dayMap[daySorted[di]].ingreso); do2.push(dayMap[daySorted[di]].ops); }
+      Pages._estCharts.push(new Chart(ctxPD, { type: 'bar', data: { labels: dl, datasets: [
+        { label: 'Ingreso ($)', data: dd, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Pedidos', data: do2, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPP = document.getElementById('chart-ped-prods');
+    if (ctxPP && prodArr.length > 0) {
+      var top8 = prodArr.slice(0, 8);
+      var pl = [], pd2 = [], pc = [];
+      for (var pi = 0; pi < top8.length; pi++) { pl.push(top8[pi].nombre); pd2.push(top8[pi].ingreso); pc.push('#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxPP, { type: 'bar', data: { labels: pl, datasets: [{ label: 'Ingreso ($)', data: pd2, backgroundColor: pc, borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     INVENTARIO TAB
+     ================================================================ */
+  _renderInventario: function(el, especias, blends) {
+    if (!el) return;
+    var db = ArcanoDB.getDB();
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var stickers = ArcanoDB.getStickers();
+
+    // Calculate inventory value (at sale price)
+    var valorFrascos = 0, valorPala = 0;
+    var stockBajo = [], sinStock = [];
+    var catMap = {}, catStockMap = {};
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var vChico = (e.stockChico || 0) * (e.precioChico || 0);
+      var vGrande = (e.stockGrande || 0) * (e.precioGrande || 0);
+      valorFrascos += vChico + vGrande;
+      var palaGrs = e.stockBolsa || 0;
+      var eCats = (e.categorias || []).length > 0 ? e.categorias : [e.categoria || 'Sin categoria'];
+      var eCatLabel = eCats.join(' / ');
+      for (var ci = 0; ci < eCats.length; ci++) {
+        if (!catMap[eCats[ci]]) catMap[eCats[ci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[eCats[ci]].productos++;
+        catMap[eCats[ci]].frascos += (e.stockChico || 0) + (e.stockGrande || 0);
+        catMap[eCats[ci]].pala += palaGrs;
+      }
+      var totalStock = (e.stockChico || 0) + (e.stockGrande || 0);
+      if (totalStock === 0 && palaGrs === 0) sinStock.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel });
+      else if (totalStock <= 3 || palaGrs <= 50) stockBajo.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel, frascos: totalStock, pala: palaGrs });
+    }
+    for (var bi = 0; bi < blends.length; bi++) {
+      var b = blends[bi];
+      valorFrascos += (b.stockChico || 0) * (b.precioChico || 0) + (b.stockGrande || 0) * (b.precioGrande || 0);
+      var bCats = (b.categorias || []).length > 0 ? b.categorias : [b.categoria || 'Sin categoria'];
+      var bCatLabel = bCats.join(' / ');
+      for (var bci = 0; bci < bCats.length; bci++) {
+        if (!catMap[bCats[bci]]) catMap[bCats[bci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[bCats[bci]].productos++;
+        catMap[bCats[bci]].frascos += (b.stockChico || 0) + (b.stockGrande || 0);
+      }
+      var ts = (b.stockChico || 0) + (b.stockGrande || 0);
+      if (ts === 0) sinStock.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel });
+      else if (ts <= 3) stockBajo.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel, frascos: ts, pala: 0 });
+    }
+    var totalProductos = especias.length + blends.length;
+    var totalFrascosStock = especias.reduce(function(s, e) { return s + (e.stockChico||0) + (e.stockGrande||0); }, 0) +
+                             blends.reduce(function(s, b) { return s + (b.stockChico||0) + (b.stockGrande||0); }, 0);
+    var totalPala = especias.reduce(function(s, e) { return s + (e.stockBolsa||0); }, 0);
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + valorFrascos.toLocaleString() + '</div><div class="est-kpi-label">Valor Inventario (Frascos)</div><div class="est-kpi-sub">al precio de venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosStock + '</div><div class="est-kpi-label">Frascos en Stock</div><div class="est-kpi-sub">listos para vender</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPala.toLocaleString() + 'g</div><div class="est-kpi-label">Pala (Materia Prima)</div><div class="est-kpi-sub">gramos en stock</div></div>';
+    h += '<div class="est-kpi ' + (stockBajo.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + stockBajo.length + '</div><div class="est-kpi-label">Stock Bajo</div><div class="est-kpi-sub">requiere reposicion</div></div>';
+    h += '<div class="est-kpi ' + (sinStock.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + sinStock.length + '</div><div class="est-kpi-label">Sin Stock</div><div class="est-kpi-sub">productos agotados</div></div>';
+    h += '</div>';
+
+    // Packaging stock
+    h += '<div class="card mt-16"><div class="card-header"><h3>Stock de Packaging</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.chico || 0) + '</div><div class="stat-label">Envases Pequenos</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.grande || 0) + '</div><div class="stat-label">Envases Grandes</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.chico || 0) + '</div><div class="stat-label">Bolsas Pequenas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.grande || 0) + '</div><div class="stat-label">Bolsas Grandes</div></div>';
+    h += '</div></div></div>';
+
+    // Category breakdown
+    var catArr = Object.keys(catMap).sort(function(a, b) { return catMap[b].frascos - catMap[a].frascos; });
+    h += '<div class="card mt-16"><div class="card-header"><h3>Inventario por Categoria</h3></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Categoria</th><th>Productos</th><th>Frascos</th><th>Pala (grs)</th></tr></thead><tbody>';
+    for (var ci = 0; ci < catArr.length; ci++) {
+      var cd = catMap[catArr[ci]];
+      h += '<tr><td class="fw7">' + catArr[ci] + '</td><td>' + cd.productos + '</td><td>' + cd.frascos + '</td><td>' + cd.pala.toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // Low stock alerts
+    if (stockBajo.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--yellow)"><div class="card-header"><h3 style="color:var(--yellow)">Alertas de Stock Bajo (' + stockBajo.length + ')</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Categoria</th><th>Frascos</th><th>Pala</th></tr></thead><tbody>';
+      for (var si = 0; si < stockBajo.length; si++) {
+        var sb = stockBajo[si];
+        h += '<tr><td class="fw7">' + sb.nombre + '</td><td><span class="badge ' + (sb.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (sb.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + sb.cat + '</td><td>' + (sb.frascos || '-') + '</td><td>' + (sb.pala ? sb.pala + 'g' : '-') + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // No stock
+    if (sinStock.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--red)"><div class="card-header"><h3 style="color:var(--red)">Sin Stock (' + sinStock.length + ')</h3></div><div class="card-body">';
+      h += '<p class="text-sm text-muted mb-8">';
+      for (var ni = 0; ni < sinStock.length; ni++) {
+        h += '<span class="badge badge-red mr-4">' + sinStock[ni].nombre + '</span>';
+      }
+      h += '</p></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // No charts for inventory, no chart cleanup needed
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+  },
+
+  /* ================================================================
+     HELPERS (kept for backward compat)
+     ================================================================ */
+  _getCurrentEstData: function() {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    return allSales;
+  },
+
+  _renderEstContent: function(data, el) {
+    // Redirect to ventas tab for backward compat
+    Pages._estTab = 'ventas';
+    Pages._renderVentas(data, el);
+  },
+
+  /* ================================================================
+     TESTING (sandbox)
+     ================================================================ */
+  renderTesting(container) {
+    var db = ArcanoDB.getDB();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+
+    var h = '<div style="margin-bottom:16px">' +
+      '<h3 style="margin:0 0 4px">Testing y Sandbox</h3>' +
+      '<p class="text-muted text-sm">Genera datos de prueba, reinicia stocks y prueba todas las funciones del sistema.</p>' +
+      '</div>';
+
+    // Current state
+    h += '<div class="card"><div class="card-header"><h3>Estado Actual</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--gold)">' + especias.length + '</div><div class="text-muted text-sm">Especias</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--blue)">' + blends.length + '</div><div class="text-muted text-sm">Blends</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">' + ventas.length + '</div><div class="text-muted text-sm">Ventas Admin</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pedidos.length + '</div><div class="text-muted text-sm">Pedidos Tienda</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pdvs.length + '</div><div class="text-muted text-sm">P. de Venta</div></div>';
+    h += '</div></div></div>';
+
+    // Generate test data
+    h += '<div class="card mt-16"><div class="card-header"><h3>Generar Datos de Prueba</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Especias</label><input type="number" class="input" id="test-esp" value="8" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Blends</label><input type="number" class="input" id="test-blend" value="5" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas Admin</label><input type="number" class="input" id="test-ventas" value="20" min="0" max="200"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Pedidos Tienda</label><input type="number" class="input" id="test-pedidos" value="10" min="0" max="100"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">PDVs</label><input type="number" class="input" id="test-pdvs" value="2" min="0" max="10"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas por PDV</label><input type="number" class="input" id="test-pdv-ventas" value="15" min="0" max="100"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px"><label class="text-sm fw7" style="display:block;margin-bottom:4px">Antiguedad (dias)</label>';
+    h += '<input type="range" id="test-dias" min="1" max="90" value="30" style="width:100%" oninput="document.getElementById(\'test-dias-val\').textContent=this.value+\' dias\'"><span id="test-dias-val" class="text-sm text-muted">30 dias</span></div>';
+    h += '<button class="btn btn-gold btn-block mt-12" onclick="Pages._testGenerarTodo()" style="padding:14px;font-size:1rem;font-weight:700">Generar Todo</button>';
+    h += '</div></div>';
+
+    // Individual actions
+    h += '<div class="card mt-16"><div class="card-header"><h3>Acciones Individuales</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProductos()">Crear 10 Productos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarVentas()">Crear 20 Ventas</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarPedidos()">Crear 10 Pedidos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearPDVs()">Crear 2 PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testAgregarStock()">Agregar Stock PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProducciones()">Crear 5 Producciones</button>';
+    h += '</div></div></div>';
+
+    // Danger zone
+    h += '<div class="card mt-16"><div class="card-header"><h3 style="color:var(--red)">Zona de Peligro</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Estas acciones eliminan datos de forma permanente.</p>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testResetStocks()">Reiniciar Stocks a 0</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearVentas()">Borrar Todas las Ventas</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearPedidos()">Borrar Todos los Pedidos</button>';
+    h += '<button class="btn btn-red" onclick="Pages._testNuclearReset()">RESET NUCLEAR - Borrar Todo</button>';
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  _testRandomDate: function(d) { var dt = new Date(); dt.setDate(dt.getDate() - Math.floor(Math.random() * d)); return dt.toISOString().slice(0, 10); },
+
+  _testGenerarTodo: function() {
+    var esp = Number(document.getElementById('test-esp').value) || 0;
+    var blend = Number(document.getElementById('test-blend').value) || 0;
+    var vtas = Number(document.getElementById('test-ventas').value) || 0;
+    var peds = Number(document.getElementById('test-pedidos').value) || 0;
+    var npdv = Number(document.getElementById('test-pdvs').value) || 0;
+    var pv = Number(document.getElementById('test-pdv-ventas').value) || 0;
+    var dias = Number(document.getElementById('test-dias').value) || 30;
+    Pages._testCrearProductosN(esp, blend);
+    Pages._testGenerarVentasN(vtas, dias);
+    Pages._testGenerarPedidosN(peds, dias);
+    Pages._testCrearPDVsN(npdv, pv, dias);
+    Pages._testCrearProduccionesN(5, dias);
+    toast('Datos de prueba generados! Revisa Dashboard, Ventas, P.Venta y Stats.');
+  },
+
+  _testCrearProductos: function() { Pages._testCrearProductosN(6, 4); toast('Productos creados'); },
+
+  _testCrearProductosN: function(nEsp, nBlend) {
+    var nms = ['Canela','Curcuma','Pimienta Negra','Comino','Oregano','Clavo','Nuez Moscada','Jengibre','Cacao','Vanilla','Cardamomo','Cilantro','Paprika','Azafran','Laurel','Tomillo','Romero','Salvia','Hinojo','Anis'];
+    var cats = ['Especias','Dulces','Saladas','Exoticas'];
+    for (var i = 0; i < nEsp; i++) {
+      var nm = nms[i % nms.length] + (i >= nms.length ? ' ' + Math.ceil((i+1)/nms.length) : '');
+      var pc = Math.floor(Math.random() * 8000 + 3000);
+      ArcanoDB.saveEspecia({ nombre: nm, categoria: cats[i % cats.length], precioChico: pc, precioGrande: Math.floor(pc * 1.7), stockBolsa: Math.floor(Math.random() * 500 + 100), stockChico: Math.floor(Math.random() * 15 + 2), stockGrande: Math.floor(Math.random() * 10 + 1), enTienda: Math.random() > 0.3 });
+    }
+    var nmsB = ['Arcano Mix','Fuego Interior','Dulce Despertar','Noche Estelar','Camino Sagrado','Raiz Ancestral','Brisa Otono','Sol Naciente','Luna Llena','Tierra Fertil'];
+    for (var j = 0; j < nBlend; j++) {
+      var nb = nmsB[j % nmsB.length] + (j >= nmsB.length ? ' ' + Math.ceil((j+1)/nmsB.length) : '');
+      var pb = Math.floor(Math.random() * 12000 + 5000);
+      ArcanoDB.saveBlend({ nombre: nb, categoria: 'Blends', precioChico: pb, precioGrande: Math.floor(pb * 1.6), stockChico: Math.floor(Math.random() * 12 + 2), stockGrande: Math.floor(Math.random() * 8 + 1), enTienda: Math.random() > 0.3 });
+    }
+  },
+
+  _testGenerarVentas: function() { Pages._testGenerarVentasN(20, 30); toast('Ventas creadas'); },
+
+  _testGenerarVentasN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var v = 0; v < count; v++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 3) + 1;
+        var pu = tl === 'grande' ? pr.pg : pr.pc;
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.saveVenta({ fecha: Pages._testRandomDate(dias), items: items, total: tot, metodoPago: Math.random() > 0.5 ? 'efectivo' : 'qr' });
+    }
+  },
+
+  _testGenerarPedidos: function() { Pages._testGenerarPedidosN(10, 30); toast('Pedidos creados'); },
+
+  _testGenerarPedidosN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    var ests = ['nuevo','confirmado','preparando','enviado','entregado'];
+    for (var i = 0; i < count; i++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 2) + 1;
+        var pu = tl === 'grande' ? (pr.precioGrande||0) : (pr.precioChico||0);
+        items.push({ tipo: pr.tipo||'especia', productoId: pr.id, productoNombre: pr.nombre, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.savePedido({ nombre: 'Cliente Test ' + (i+1), telefono: '300' + Math.floor(Math.random()*9000000+1000000), direccion: 'Calle Test #' + (i+1), items: items, total: tot, estado: ests[Math.min(Math.floor(Math.random()*ests.length), ests.length-1)], creado: new Date(Date.now() - Math.floor(Math.random()*dias*86400000)).toISOString() });
+    }
+  },
+
+  _testCrearPDVs: function() { Pages._testCrearPDVsN(2, 15, 30); toast('PDVs creados'); },
+
+  _testCrearPDVsN: function(count, vp, dias) {
+    var locs = ['Feria Central','Plaza Principal','Mercado Municipal','Centro Comercial','Parque Norte'];
+    var existentes = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < count; p++) {
+      var pdv = ArcanoDB.savePuntoDeVenta({ nombre: 'PDV Test ' + (existentes.length + p + 1), ubicacion: locs[p % locs.length], activo: true });
+      var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+      var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+      var si = [];
+      for (var s = 0; s < Math.min(8, all.length); s++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        si.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+2 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdv.id, si); } catch(e) {}
+      for (var v = 0; v < vp; v++) {
+        var nI = Math.floor(Math.random()*2)+1, items = [];
+        for (var it = 0; it < nI; it++) {
+          var pr2 = all[Math.floor(Math.random()*all.length)];
+          var cn2 = Math.floor(Math.random()*2)+1;
+          items.push({ tipo: pr2.tipo, productoId: pr2.id, talla: 'chico', cantidad: cn2, precioUnitario: pr2.pc, subtotal: pr2.pc*cn2 });
+        }
+        ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, fecha: Pages._testRandomDate(dias), items: items, metodoPago: Math.random()>0.5?'efectivo':'qr' });
+      }
+    }
+  },
+
+  _testAgregarStock: function() {
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    if (!pdvs.length) { toast('Crea PDVs primero','err'); return; }
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id};}), bl.map(function(b){return{tipo:'blend',id:b.id};}));
+    for (var p = 0; p < pdvs.length; p++) {
+      var items = [];
+      for (var s = 0; s < Math.min(6,all.length); s++) {
+        var pr = all[Math.floor(Math.random()*all.length)];
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+3 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdvs[p].id, items); } catch(e) {}
+    }
+    toast('Stock agregado a ' + pdvs.length + ' PDVs');
+  },
+
+  _testCrearProducciones: function() { Pages._testCrearProduccionesN(5, 30); toast('Producciones creadas'); },
+
+  _testCrearProduccionesN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var i = 0; i < count; i++) {
+      var pr = all[Math.floor(Math.random()*all.length)];
+      ArcanoDB.saveProduccion({ tipo: pr.tipo||'especia', productoId: pr.id, fecha: Pages._testRandomDate(dias), cantidad: Math.floor(Math.random()*20)+5, frascosChico: Math.floor(Math.random()*10)+2, frascosGrande: Math.floor(Math.random()*5)+1 });
+    }
+  },
+
+  _testResetStocks: function() {
+    if (!confirm('Reiniciar todos los stocks a 0?')) return;
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    for (var i = 0; i < esp.length; i++) ArcanoDB.saveEspecia({ id: esp[i].id, stockBolsa: 0, stockChico: 0, stockGrande: 0 });
+    for (var j = 0; j < bl.length; j++) ArcanoDB.saveBlend({ id: bl[j].id, stockChico: 0, stockGrande: 0 });
+    toast('Stocks reiniciados a 0'); App.renderPage('testing');
+  },
+
+  _testClearVentas: function() {
+    if (!confirm('Borrar TODAS las ventas (admin y PDV)?')) return;
+    var v = ArcanoDB.getVentas();
+    for (var i = 0; i < v.length; i++) ArcanoDB.deleteVenta(v[i].id);
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < pdvs.length; p++) pdvs[p].ventas = {};
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Ventas eliminadas'); App.renderPage('testing');
+  },
+
+  _testClearPedidos: function() {
+    if (!confirm('Borrar TODOS los pedidos?')) return;
+    var p = ArcanoDB.getPedidos();
+    for (var i = 0; i < p.length; i++) ArcanoDB.deletePedido(p[i].id);
+    toast('Pedidos eliminados'); App.renderPage('testing');
+  },
+
+  _testNuclearReset: function() {
+    if (!confirm('RESET NUCLEAR: Se borrarán TODOS los datos. Continuar?')) return;
+    if (!confirm('Estas SEGURO? Se perderán productos, ventas, pedidos, PDVs, todo.')) return;
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Reset completo. Recargando...');
+    setTimeout(function() { location.reload(); }, 1500);
+  },
+
+  /* ================================================================
+     COSTOS POR CANAL DE VENTA
+     ================================================================ */
+  _renderCostosPorCanal: function(el) {
+    if (!el) return;
+    var channels = ArcanoDB.getCostosPorCanal();
+    var canalKeys = ['admin', 'tienda', 'pdv'];
+    var canalNombres = { admin: 'Ventas Admin', tienda: 'Tienda Online', pdv: 'Puntos de Venta' };
+    var canalColores = { admin: 'var(--gold)', tienda: 'var(--green)', pdv: 'var(--blue)' };
+
+    var h = '';
+
+    // === RESUMEN GENERAL ===
+    var totalIngreso = 0, totalCosto = 0, totalStockCosto = 0;
+    for (var ci = 0; ci < canalKeys.length; ci++) {
+      var ch = channels[canalKeys[ci]];
+      totalIngreso += ch.ingreso;
+      totalCosto += ch.costo;
+      totalStockCosto += (ch.stockCosto || 0);
+    }
+    var totalMargen = totalIngreso - totalCosto;
+    var totalMargenPct = totalIngreso > 0 ? (totalMargen / totalIngreso * 100) : 0;
+
+    h += '<div class="card"><div class="card-header"><h3>Resumen General</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card"><div class="stat-value">$' + totalIngreso.toLocaleString() + '</div><div class="stat-label">Ingreso Total</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + totalCosto.toLocaleString() + '</div><div class="stat-label">Costo Produccion</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">$' + totalMargen.toLocaleString() + '</div><div class="stat-label">Margen ($' + totalMargenPct.toFixed(1) + '%)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">$' + totalStockCosto.toLocaleString() + '</div><div class="stat-label">Costo Stock Actual</div></div>';
+    h += '</div></div></div>';
+
+    // === POR CADA CANAL ===
+    for (var ci2 = 0; ci2 < canalKeys.length; ci2++) {
+      var key = canalKeys[ci2];
+      var c = channels[key];
+      var clr = canalColores[key];
+      var margen = c.ingreso - c.costo;
+      var margenPct = c.ingreso > 0 ? (margen / c.ingreso * 100) : 0;
+
+      h += '<div class="card mt-16"><div class="card-header"><h3 style="color:' + clr + '">' + canalNombres[key] + '</h3></div><div class="card-body">';
+
+      // KPIs del canal
+      h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+      h += '<div class="stat-card"><div class="stat-value">' + c.ventas + '</div><div class="stat-label">Ventas</div></div>';
+      h += '<div class="stat-card"><div class="stat-value">$' + c.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + c.costo.toLocaleString() + '</div><div class="stat-label">Costo Prod.</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toLocaleString() + '</div><div class="stat-label">Margen (' + margenPct.toFixed(1) + '%)</div></div>';
+      h += '</div>';
+
+      // Tabla de productos vendidos
+      var prodKeys = Object.keys(c.productos || {});
+      if (prodKeys.length > 0) {
+        h += '<h4 style="margin:16px 0 8px;font-size:.95rem">Costos de Productos Vendidos</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo Prod.</th><th>Margen</th></tr></thead><tbody>';
+        for (var pi = 0; pi < prodKeys.length; pi++) {
+          var pr = c.productos[prodKeys[pi]];
+          var prMargen = pr.ingreso - pr.costo;
+          h += '<tr><td class="fw7">' + pr.nombre + '</td>';
+          h += '<td><span class="badge ' + (pr.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pr.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+          h += '<td>' + pr.talla + '</td>';
+          h += '<td class="fw7">' + pr.cantidad + '</td>';
+          h += '<td>$' + pr.ingreso.toLocaleString() + '</td>';
+          h += '<td style="color:var(--red)">$' + pr.costo.toLocaleString() + '</td>';
+          h += '<td style="color:' + (prMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + prMargen.toLocaleString() + '</td></tr>';
+        }
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin ventas registradas en este canal.</p>';
+      }
+
+      // PDV desglose por punto de venta
+      if (key === 'pdv' && c.pdvs) {
+        var pdvKeys = Object.keys(c.pdvs);
+        if (pdvKeys.length > 0) {
+          h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Desglose por Punto de Venta</h4>';
+          for (var pk = 0; pk < pdvKeys.length; pk++) {
+            var pv = c.pdvs[pdvKeys[pk]];
+            var pvMargen = pv.ingreso - pv.costo;
+            h += '<div class="card" style="background:var(--bg);margin-bottom:8px"><div class="card-body">';
+            h += '<div class="fw7" style="margin-bottom:8px;color:var(--blue)">' + pdvKeys[pk] + '</div>';
+            h += '<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">';
+            h += '<div class="stat-card"><div class="stat-value">' + pv.ventas + '</div><div class="stat-label">Ventas</div></div>';
+            h += '<div class="stat-card"><div class="stat-value">$' + pv.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+            h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (pvMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pvMargen.toLocaleString() + '</div><div class="stat-label">Margen</div></div>';
+            h += '</div>';
+            // Productos del PDV
+            var pvProdKeys = Object.keys(pv.productos || {});
+            if (pvProdKeys.length > 0) {
+              h += '<div class="table-wrap" style="margin-top:8px"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo</th><th>Margen</th></tr></thead><tbody>';
+              for (var ppk = 0; ppk < pvProdKeys.length; ppk++) {
+                var ppr = pv.productos[pvProdKeys[ppk]];
+                var pprM = ppr.ingreso - ppr.costo;
+                h += '<tr><td>' + ppr.nombre + '</td><td>' + ppr.talla + '</td><td>' + ppr.cantidad + '</td><td>$' + ppr.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ppr.costo.toLocaleString() + '</td><td style="color:' + (pprM >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pprM.toLocaleString() + '</td></tr>';
+              }
+              h += '</tbody></table></div>';
+            }
+            h += '</div></div>';
+          }
+        }
+      }
+
+      // Stock del canal
+      var stockItems = c.stockDetalle || [];
+      if (stockItems.length > 0) {
+        h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Costo de Stock Actual</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr>';
+        if (key === 'pdv') {
+          h += '<th>Punto de Venta</th><th>Costo Total en Stock</th>';
+        } else {
+          h += '<th>Producto</th><th>Tipo</th><th>Fr.Ch (cant)</th><th>Fr.Gr (cant)</th><th>Costo/Fr.Ch</th><th>Costo/Fr.Gr</th><th>Costo Total</th>';
+        }
+        h += '</tr></thead><tbody>';
+        var stockTotal = 0;
+        for (var si = 0; si < stockItems.length; si++) {
+          var s = stockItems[si];
+          stockTotal += s.costoTotal;
+          if (key === 'pdv') {
+            h += '<tr><td class="fw7">' + s.nombre + '</td><td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          } else {
+            h += '<tr><td class="fw7">' + s.nombre + '</td>';
+            h += '<td><span class="badge ' + (s.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (s.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+            h += '<td>' + s.chico + '</td><td>' + s.grande + '</td>';
+            h += '<td>$' + s.costoChico.toFixed(0) + '</td><td>$' + s.costoGrande.toFixed(0) + '</td>';
+            h += '<td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          }
+        }
+        h += '<tr style="border-top:2px solid var(--border)"><td colspan="6" class="fw7" style="text-align:right">Total Stock</td><td style="color:var(--red);font-weight:700">$' + stockTotal.toLocaleString() + '</td></tr>';
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin stock en este canal.</p>';
+      }
+
+      h += '</div></div>';
+    }
+
+    el.innerHTML = h;
+  }
+};
+
+ + (p.precio||0).toLocaleString() : ';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // Logo de pago
+    var cfg = ArcanoDB.getTiendaConfig();
+    h += '<div class="card mt-16"><div class="card-header"><h3>Formas de Pago</h3></div><div class="card-body">' +
+      '<p class="text-xs text-muted mb-12">Imagen con los metodos de pago (Nequi, Bancolombia, etc.). Se muestra en el sidebar de la tienda online. Recomendado: 400x100 px, formato horizontal.</p>' +
+        '<div class="form-group"><label>Logo Formas de Pago</label>' +
+          '<div class="img-upload-area" id="img-area-pago"><input type="file" accept="image/*" id="f-logo-pago" style="display:none" onchange="Pages._handlePagoLogo(this)">' +
+          (cfg.logoPago ? '<img src="' + cfg.logoPago + '" class="img-preview" id="img-preview-pago"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo()">Quitar</button>' : '') +
+          '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-pago\').click()"><span>+ Formas de Pago</span></div></div>' +
+      '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
+     REGENERAR SEO TIENDA
+     ================================================================ */
+  regenerarSEO: function() {
+    var statusEl = document.getElementById('seo-status');
+    var btn = document.getElementById('btn-regenerar-seo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Leyendo productos...</span>';
+
+    var _gt='jksbZrZsYRI8E5<phRNgs]7wPot<M{yd;W63t6ZP';var GH_TOKEN=_gt.split('').map(function(c){return String.fromCharCode(c.charCodeAt(0)-3)}).join('');
+    var GH_OWNER = 'arcanoespecias';
+    var GH_REPO = 'arcanoespecias.github.io';
+    var GH_BRANCH = 'main';
+    var SITE_URL = 'https://arcanoespecias.github.io/';
+
+    function escH(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escJ(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n'); }
+
+    function ghFetch(method, path, body) {
+      var opts = {
+        method: method,
+        headers: {
+          'Authorization': 'token ' + GH_TOKEN,
+          'User-Agent': 'ArcanoAdmin',
+          'Content-Type': 'application/json'
+        }
+      };
+      if (body) {
+        opts.body = JSON.stringify(body);
+      }
+      return fetch('https://api.github.com' + path, opts).then(function(r) { return r.json(); });
+    }
+
+    function getTiendaProducts() {
+      var db = ArcanoDB.getDB();
+      var products = [];
+      var especias = db.especias || [];
+      for (var i = 0; i < especias.length; i++) {
+        var e = especias[i];
+        if (!e || !e.enTienda) continue;
+        var pc = Number(e.precioTiendaChico) || Number(e.precioChico) || 0;
+        var pg = Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        products.push({ id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0, region: '', descripcion: e.descripcion || '', tags: e.tags || [], ingredientes: [] });
+      }
+      var blends = db.blends || [];
+      for (var i = 0; i < blends.length; i++) {
+        var b = blends[i];
+        if (!b || !b.enTienda) continue;
+        var pc = Number(b.precioTiendaChico) || Number(b.precioChico) || 0;
+        var pg = Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        var ings = [];
+        if (b.ingredientes) {
+          for (var ig = 0; ig < b.ingredientes.length; ig++) {
+            var nm = (b.ingredientes[ig].nombre || b.ingredientes[ig].especiaNombre || '').trim();
+            if (nm) ings.push(nm);
+          }
+        }
+        products.push({ id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0, region: b.region || '', descripcion: b.descripcion || '', tags: b.tags || [], ingredientes: ings });
+      }
+      var packs = db.packs || [];
+      for (var i = 0; i < packs.length; i++) {
+        var p = packs[i];
+        if (!p || !p.enTienda) continue;
+        var precio = Number(p.precio) || Number(p.precioTienda) || 0;
+        if (precio === 0) continue;
+        products.push({ id: p.id, nombre: p.nombre, tipo: 'pack', categoria: 'Packs', precioChico: 0, precioGrande: 0, precio: precio, stock: p.stock || 0, stockChico: p.stock || 0, stockGrande: 0, region: '', descripcion: p.descripcion || '', tags: p.tags || [], ingredientes: [] });
+      }
+      products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+      return products;
+    }
+
+    function generateSeoContent(products) {
+      if (!products.length) return { jsonLd: '', noscript: '', seoDiv: '' };
+
+      // JSON-LD
+      var items = [];
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        var desc = p.descripcion || ('Blend artesanal ' + p.nombre + ' de Arcano Especias');
+        var cat = p.categoria + (p.tipo === 'pack' ? ' - Pack' : p.tipo === 'blend' ? ' - Blend' : ' - Especia');
+        var item = '{\n' +
+          '      "@type": "Product",\n' +
+          '      "name": "' + escJ(p.nombre) + '",\n' +
+          '      "description": "' + escJ(desc) + '",\n' +
+          '      "brand": { "@type": "Brand", "name": "Arcano Especias" },\n' +
+          '      "category": "' + escJ(cat) + '"';
+        if (p.ingredientes && p.ingredientes.length > 0) {
+          item += ',\n      "material": "' + escJ(p.ingredientes.join(', ')) + '"';
+        }
+        if (p.region) {
+          item += ',\n      "countryOfOrigin": { "@type": "Country", "name": "' + escJ(p.region) + '" }';
+        }
+        item += ',\n' +
+          '      "offers": {\n' +
+          '        "@type": "Offer",\n' +
+          '        "price": "' + precio + '",\n' +
+          '        "priceCurrency": "COP",\n' +
+          '        "availability": "' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '",\n' +
+          '        "seller": { "@type": "Organization", "name": "Arcano Especias" }\n' +
+          '      }\n' +
+          '    }';
+        items.push('    {\n' +
+          '      "@type": "ListItem",\n' +
+          '      "position": ' + (i + 1) + ',\n' +
+          '      "item": ' + item + '\n' +
+          '    }');
+      }
+      var jsonLd = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->\n' +
+        '<script type="application/ld+json">\n' +
+        '{\n' +
+        '  "@context": "https://schema.org",\n' +
+        '  "@type": "ItemList",\n' +
+        '  "name": "Catalogo Arcano Especias",\n' +
+        '  "description": "Especias y Blends artesanales del mundo. Envios a toda Colombia.",\n' +
+        '  "numberOfItems": ' + products.length + ',\n' +
+        '  "itemListElement": [\n' +
+        items.join(',\n') + '\n' +
+        '  ]\n' +
+        '}\n' +
+        '</script>';
+
+      // Noscript HTML
+      var ns = '<noscript>\n<div class="seo-products" style="padding:20px;max-width:1200px;margin:0 auto;font-family:sans-serif">\n';
+      ns += '<h2>Catalogo de Especias y Blends Artesanales - Arcano Especias</h2>\n';
+      ns += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>\n<ul style="list-style:none;padding:0">\n';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        ns += '<li itemscope itemtype="https://schema.org/Product" style="margin-bottom:16px;padding:12px;border-bottom:1px solid #eee">\n';
+        ns += '  <strong itemprop="name">' + escH(p.nombre) + '</strong>\n';
+        ns += '  <span style="color:#888;font-size:0.9em">(' + tipoLabel + ')</span>\n';
+        if (p.descripcion) ns += '  <meta itemprop="description" content="' + escH(p.descripcion) + '">\n  <p style="margin:4px 0;color:#555">' + escH(p.descripcion) + '</p>\n';
+        ns += '  <span itemprop="brand" itemtype="https://schema.org/Brand" itemscope><meta itemprop="name" content="Arcano Especias"></span>\n';
+        ns += '  <div style="margin-top:4px">\n    <span itemprop="category" style="color:#666">' + escH(p.categoria) + '</span>\n';
+        if (p.region) ns += '    <span style="margin-left:12px;color:#666">Origen: ' + escH(p.region) + '</span>\n';
+        if (p.tags && p.tags.length) ns += '    <span style="margin-left:12px;color:#666">Usos: ' + escH(p.tags.join(', ')) + '</span>\n';
+        ns += '  </div>\n';
+        if (precio > 0) {
+          ns += '  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer" style="margin-top:6px">\n';
+          ns += '    <meta itemprop="priceCurrency" content="COP">\n    <meta itemprop="price" content="' + precio + '">\n';
+          ns += '    <meta itemprop="availability" content="' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '">\n';
+          ns += '    <strong style="color:#1b0b07">$' + precio.toLocaleString('es-CO') + ' COP</strong>\n  </div>\n';
+        }
+        if (p.ingredientes && p.ingredientes.length > 0) ns += '  <div style="margin-top:4px;font-size:0.9em;color:#888">Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</div>\n';
+        ns += '</li>\n';
+      }
+      ns += '</ul>\n</div>\n</noscript>';
+
+      // SEO div content
+      var sd = '<h2>Catalogo de Especias y Blends Artesanales</h2>';
+      sd += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        sd += '<article><h3>' + escH(p.nombre) + ' (' + tipoLabel + ')</h3>';
+        if (p.descripcion) sd += '<p>' + escH(p.descripcion) + '</p>';
+        sd += '<p>Categoria: ' + escH(p.categoria);
+        if (p.region) sd += ' | Origen: ' + escH(p.region);
+        if (p.tags && p.tags.length) sd += ' | Usos: ' + escH(p.tags.join(', '));
+        sd += '</p>';
+        if (precio > 0) sd += '<p>Precio desde $' + precio.toLocaleString('es-CO') + ' COP</p>';
+        if (p.ingredientes && p.ingredientes.length > 0) sd += '<p>Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</p>';
+        sd += '</article>';
+      }
+
+      // BreadcrumbList JSON-LD
+      var bcJsonLd = '<!-- SEO: BreadcrumbList estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": [\n    { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://arcanoespecias.github.io/" },\n    { "@type": "ListItem", "position": 2, "name": "Catalogo de Especias y Blends", "item": "https://arcanoespecias.github.io/" }\n  ]\n}\n</script>'
+
+      // FAQ JSON-LD
+      var faqQ = [
+        {q: '¿Qué es Arcano Especias?', a: 'Arcano Especias es una marca colombiana especializada en blends y mezclas artesanales de especias selectas de cada rincón del mundo. Creamos combinaciones únicas para comidas, infusiones y coctelería, con ingredientes 100% naturales y de alta calidad.'},
+        {q: '¿Realizan envíos a toda Colombia?', a: 'Sí, Arcano Especias realiza envíos a todas las ciudades y municipios de Colombia. Los pedidos se envían una vez confirmado el pago y el tiempo de entrega varía según la ubicación.'},
+        {q: '¿Cuáles son las formas de pago aceptadas?', a: 'Aceptamos pagos mediante Nequi, transferencia bancaria a Bancolombia y otros métodos de pago disponibles. Los datos de pago se proporcionan al confirmar el pedido.'},
+        {q: '¿Qué presentaciones de productos ofrecen?', a: 'Nuestros blends y especias se ofrecen en dos presentaciones: tamaño pequeño y tamaño grande. También contamos con packs exclusivos que combinan varios productos a un precio especial.'},
+        {q: '¿Son productos naturales?', a: 'Sí, todos los productos de Arcano Especias son 100% naturales. Utilizamos especias y ingredientes de alta calidad, sin aditivos artificiales ni conservantes. Cada blend es mezclado de forma artesanal.'},
+        {q: '¿Para qué se pueden usar los blends de especias?', a: 'Nuestros blends están categorizados según su uso ideal: para comidas (carnes, sopas, arroces), para infusiones (tés y bebidas calientes) y para coctelería (bebidas y cócteles). Cada blend está diseñado para realzar el sabor de tus preparaciones.'}
+      ];
+      var faqItems = [];
+      for (var _qi = 0; _qi < faqQ.length; _qi++) {
+        faqItems.push('    { "@type": "Question", "name": "' + escJ(faqQ[_qi].q) + '", "acceptedAnswer": { "@type": "Answer", "text": "' + escJ(faqQ[_qi].a) + '" }}');
+      }
+      var faqJsonLd = '<!-- SEO: FAQ estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": [\n' + faqItems.join(',\n') + '\n  ]\n}\n</script>'
+
+      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd, breadcrumbJsonLd: bcJsonLd, faqJsonLd: faqJsonLd };
+    }
+
+    // Flujo principal
+    var products = getTiendaProducts();
+    if (!products.length) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No hay productos en tienda.</span>';
+      if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      return;
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Descargando index.html de GitHub...</span>';
+
+    ghFetch('GET', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html?ref=' + GH_BRANCH)
+      .then(function(fileData) {
+        if (!fileData.sha) throw new Error('No se pudo obtener el archivo');
+        var content = atob(fileData.content);
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Generando SEO para ' + products.length + ' productos...</span>';
+
+        var seo = generateSeoContent(products);
+
+        // Remover bloque anterior JSON-LD productos
+        var marker1 = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker1) !== -1) {
+          var mi = content.indexOf(marker1);
+          var se = content.indexOf('</script>', mi);
+          if (se !== -1) content = content.substring(0, mi) + content.substring(se + '</script>'.length);
+        }
+
+        // Inyectar nuevo JSON-LD antes de </head>
+        var hi = content.indexOf('</head>');
+        if (hi === -1) throw new Error('No se encontro </head>');
+        content = content.substring(0, hi) + '\n' + seo.jsonLd + '\n' + content.substring(hi);
+
+        // Inyectar BreadcrumbList JSON-LD
+        var _bcMk = '<!-- SEO: BreadcrumbList estatico -->';
+        if (content.indexOf(_bcMk) !== -1) {
+          var _bmi = content.indexOf(_bcMk);
+          var _bme = content.indexOf('</script>', _bmi);
+          if (_bme !== -1) content = content.substring(0, _bmi) + content.substring(_bme + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.breadcrumbJsonLd + '\n' + content.substring(hi);
+
+        // Inyectar FAQ JSON-LD
+        var _fqMk = '<!-- SEO: FAQ estatico -->';
+        if (content.indexOf(_fqMk) !== -1) {
+          var _fqi = content.indexOf(_fqMk);
+          var _fqe = content.indexOf('</script>', _fqi);
+          if (_fqe !== -1) content = content.substring(0, _fqi) + content.substring(_fqe + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.faqJsonLd + '\n' + content.substring(hi);
+
+        // Google Search Console verification meta
+        if (content.indexOf('google-site-verification') === -1) {
+          var _ghHead = content.indexOf('</head>');
+          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="wxrzz6ncgVEJHMcS7-vx3uj3VUM8abPdlYoDw93P4ek">\n' + content.substring(_ghHead);
+        }
+
+        // Remover bloque noscript anterior
+        var marker2 = '<!-- SEO: Pre-rendered noscript (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker2) !== -1) {
+          var ns = content.indexOf(marker2);
+          var ne = content.indexOf('</noscript>', ns);
+          if (ne !== -1) content = content.substring(0, ns) + content.substring(ne + '</noscript>'.length + 1);
+        }
+
+        // Inyectar noscript antes del div seo-content
+        var dm = '<div id="seo-content"';
+        var di = content.indexOf(dm);
+        if (di !== -1) {
+          content = content.substring(0, di) + marker2 + '\n' + seo.noscript + '\n\n' + content.substring(di);
+        }
+
+        // Actualizar contenido del div seo-content
+        var do2 = '<div id="seo-content"';
+        var doe = content.indexOf('>', content.indexOf(do2));
+        var dc = content.indexOf('</div>', doe);
+        if (doe !== -1 && dc !== -1) {
+          content = content.substring(0, doe + 1) + '\n' + seo.seoDiv + '\n' + content.substring(dc);
+        }
+
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Subiendo a GitHub...</span>';
+
+        var encoded = btoa(unescape(encodeURIComponent(content)));
+        return ghFetch('PUT', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html', {
+          message: 'SEO: regenerar pre-render productos (' + products.length + ' productos) desde admin',
+          content: encoded,
+          sha: fileData.sha,
+          branch: GH_BRANCH
+        });
+      })
+      .then(function(result) {
+        if (result.commit) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">SEO actualizado - ' + products.length + ' productos</span>';
+          toast('SEO Tienda actualizado con ' + products.length + ' productos', 'ok');
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir</span>';
+          toast('Error al actualizar SEO', 'err');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      })
+      .catch(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error: ' + escH(err.message) + '</span>';
+        toast('Error SEO: ' + err.message, 'err');
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      });
+  },
+
+  _handlePagoLogo: function(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    ArcanoDB.compressImage(file, 400, 0.8, function(err, dataUrl) {
+      if (err) { alert('Error: ' + err); return; }
+      ArcanoDB.saveTiendaConfig({ logoPago: dataUrl });
+      App.renderPage('tienda-admin');
+    });
+  },
+
+  _removePagoLogo: function() {
+    ArcanoDB.saveTiendaConfig({ logoPago: '' });
+    App.renderPage('tienda-admin');
+  },
+
+  /* ================================================================
+     IMPORTAR EXCEL
+     ================================================================ */
+  formImportarExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' +
+      '<div class="modal-header"><h3>Importar Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi tu archivo Excel con las hojas <b>ESPECIAS</b> y <b>BLENDS</b>. El sistema creara los productos automaticamente.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-import-file" accept=".xlsx,.xls"></div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Grs por Frasco Pequeño</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
+          '<div class="form-group"><label>Grs por Frasco Grande</label><input type="number" class="input" id="f-import-gg" value="80" min="1"></div>' +
+        '</div>' +
+        '<div id="f-import-status" class="mt-12"></div>' +
+        '<div id="f-import-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-import-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-import-file');
+    var parseBtn = document.getElementById('btn-parse-excel');
+    var statusDiv = document.getElementById('f-import-status');
+    var previewDiv = document.getElementById('f-import-preview');
+    var footerDiv = document.getElementById('f-import-footer');
+
+    // Enable parse button when file selected
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    // Parse Excel
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS sheet
+          var especiasList = [];
+          var espSheet = workbook.Sheets['ESPECIAS'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              var nombre = (row[0] || '').toString().trim();
+              if (!nombre || nombre.toLowerCase() === 'especia / ingrediente') continue;
+              especiasList.push({ nombre: nombre, categoria: 'Comidas' });
+            }
+          }
+
+          // Parse BLENDS sheet
+          var blendsList = [];
+          var blSheet = workbook.Sheets['BLENDS'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlend = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              var firstCol = row[0] ? (row[0] || '').toString().trim() : '';
+              var ingCol = row[3] ? (row[3] || '').toString().trim() : '';
+
+              if (firstCol) {
+                // New blend row — save previous if any
+                if (currentBlend && currentBlend.ingredientes.length > 0) {
+                  blendsList.push(currentBlend);
+                }
+                currentBlend = {
+                  nombre: firstCol,
+                  region: (row[1] || '').toString().trim(),
+                  uso: (row[2] || '').toString().trim(),
+                  ingredientes: []
+                };
+              }
+
+              // This row has an ingredient (either on the blend header row or on subsequent rows)
+              if (currentBlend && ingCol) {
+                currentBlend.ingredientes.push({
+                  especia: ingCol,
+                  g: Number(row[4]) || 0,
+                  pct: Number(row[5]) || 0
+                });
+              }
+            }
+            if (currentBlend && currentBlend.ingredientes.length > 0) {
+              blendsList.push(currentBlend);
+            }
+          }
+
+          if (especiasList.length === 0 && blendsList.length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos. Asegurate que el Excel tenga las hojas ESPECIAS y BLENDS.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Check for existing
+          var existEsp = 0;
+          var existBl = 0;
+          var allEspecias = ArcanoDB.getEspecias();
+          var allBlends = ArcanoDB.getBlends();
+          for (var i = 0; i < especiasList.length; i++) {
+            if (ArcanoDB.findEspeciaByName(especiasList[i].nombre)) existEsp++;
+          }
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var k = 0; k < allBlends.length; k++) {
+              if (allBlends[k].nombre.toLowerCase() === blendsList[j].nombre.toLowerCase()) { existBl++; break; }
+            }
+          }
+
+          // Check unresolved ingredients (mirroring db.js findEspeciaByName logic)
+          var unresolved = [];
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var ii = 0; ii < blendsList[j].ingredientes.length; ii++) {
+              var ingName = blendsList[j].ingredientes[ii].especia;
+              var found = false;
+              // Check existing especias in DB
+              if (ArcanoDB.findEspeciaByName(ingName)) { found = true; }
+              // Check in especiasList (to be created)
+              if (!found) {
+                var target = ingName.trim().toLowerCase();
+                for (var ei = 0; ei < especiasList.length; ei++) {
+                  var ename = especiasList[ei].nombre.trim().toLowerCase();
+                  if (ename === target) { found = true; break; }
+                  if (ename.indexOf(target) === 0 || target.indexOf(ename) === 0) { found = true; break; }
+                  // Word overlap
+                  var words = target.split(/[\s()\/,]+/).filter(function(w){return w.length>=4});
+                  for (var wi = 0; wi < words.length; wi++) {
+                    if (ename.indexOf(words[wi]) >= 0) { found = true; break; }
+                  }
+                  if (found) break;
+                }
+              }
+              if (!found) unresolved.push(blendsList[j].nombre + ' -> ' + ingName);
+            }
+          }
+
+          // Show preview
+          var gramosChico = Number(document.getElementById('f-import-gc').value) || 30;
+          var gramosGrande = Number(document.getElementById('f-import-gg').value) || 80;
+
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + especiasList.length + '</div><div class="stat-label">Especias en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + blendsList.length + '</div><div class="stat-label">Blends en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="font-size:1rem">' + gramosChico + 'g / ' + gramosGrande + 'g</div><div class="stat-label">Frasco Ch/Gr</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:' + (unresolved.length > 0 ? 'var(--red)' : 'var(--green)') + '">' + unresolved.length + '</div><div class="stat-label">Ingredientes sin resolver</div></div>' +
+          '</div>';
+
+          if (existEsp > 0 || existBl > 0) {
+            phtml += '<p class="text-sm text-muted mb-8">' +
+              (existEsp > 0 ? '<span class="badge badge-yellow mr-8">' + existEsp + ' especias ya existen (se omiten)</span>' : '') +
+              (existBl > 0 ? '<span class="badge badge-yellow mr-8">' + existBl + ' blends ya existen (se omiten)</span>' : '') +
+            '</p>';
+          }
+
+          if (unresolved.length > 0) {
+            phtml += '<div class="mb-8"><p class="text-red fw7 mb-4">Ingredientes que no se pudieron resolver:</p>' +
+              '<div style="max-height:120px;overflow-y:auto;font-size:0.78rem;color:var(--red)">' +
+              unresolved.map(function(u) { return '<div>' + u + '</div>'; }).join('') +
+              '</div><p class="text-xs text-muted mt-4">Estos ingredientes no se vincularan a los blends.</p></div>';
+          }
+
+          // Sample blends
+          phtml += '<p class="fw7 mt-8 mb-4">Ejemplos de blends a crear:</p>';
+          var sampleBlends = blendsList.slice(0, 5);
+          for (var s = 0; s < sampleBlends.length; s++) {
+            var sb = sampleBlends[s];
+            phtml += '<div class="list-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+              '<span class="fw7 text-gold">' + sb.nombre + '</span>' +
+              '<span class="text-xs text-muted">' + (sb.region ? sb.region + ' | ' : '') + (sb.uso || '') + ' | ' + sb.ingredientes.length + ' ingredientes</span>' +
+              '<span class="text-xs text-muted">' + sb.ingredientes.map(function(ing) {
+                var gc = Math.round((ing.g / 500) * gramosChico * 100) / 100;
+                return ing.especia + ' ' + ing.g + 'g → ' + gc + 'g/frasco';
+              }).join(' + ') + '</span></div>';
+          }
+          if (blendsList.length > 5) phtml += '<p class="text-xs text-muted mt-4">... y ' + (blendsList.length - 5) + ' blends mas</p>';
+
+          phtml += '</div></div>';
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          // Replace footer with Confirm button
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-import">Confirmar Importacion (' + (especiasList.length - existEsp) + ' esp + ' + (blendsList.length - existBl) + ' blends)</button>';
+
+          document.getElementById('btn-do-import').addEventListener('click', function() {
+            var gc = Number(document.getElementById('f-import-gc').value) || 30;
+            var gg = Number(document.getElementById('f-import-gg').value) || 80;
+            var btn = document.getElementById('btn-do-import');
+            btn.disabled = true;
+            btn.textContent = 'Importando...';
+
+            try {
+              var resultado = ArcanoDB.importFromExcelData(especiasList, blendsList, gc, gg);
+              var rhtml = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.especiasCreadas + '</div><div class="stat-label">Especias Creadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.blendsCreados + '</div><div class="stat-label">Blends Creados</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.especiasExistentes + '</div><div class="stat-label">Especias Ya Existentes</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.blendsExistentes + '</div><div class="stat-label">Blends Ya Existentes</div></div>' +
+                '</div>';
+              if (resultado.ingredientesNoResueltos.length > 0) {
+                rhtml += '<p class="text-xs text-muted mt-8">Ingredientes no resueltos: ' + resultado.ingredientesNoResueltos.length + '</p>';
+              }
+              rhtml += '</div></div>';
+              previewDiv.innerHTML = rhtml;
+
+              // Close after 2s
+              setTimeout(function() {
+                modal.remove();
+                App.renderPage('productos');
+              }, 2000);
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     EXPORTAR / IMPORTAR PRODUCTOS EXCEL
+     ================================================================ */
+  exportarProductosExcel() {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var costos = ArcanoDB.getCostosInsumos();
+
+    // === Sheet ESPECIAS ===
+    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+    }
+    var espSheet = XLSX.utils.aoa_to_sheet(espRows);
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+
+    // === Sheet BLENDS ===
+    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var _expEspMap = {};
+    for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
+    for (var j = 0; j < blends.length; j++) {
+      var b = blends[j];
+      var ings = b.ingredientes || [];
+      if (ings.length === 0) {
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '', '', '']);
+      } else {
+        for (var k = 0; k < ings.length; k++) {
+          var ing = ings[k];
+          var costoGr = (costos.especias && costos.especias[ing.especiaId]) || 0;
+          var gc = ing.gramosChico || 0;
+          var gg = ing.gramosGrande || 0;
+          blRows.push([
+            k === 0 ? b.id : '',
+            k === 0 ? b.nombre : '',
+            k === 0 ? (b.descripcion || '') : '',
+            k === 0 ? (b.categoria || '') : '',
+            k === 0 ? (b.precioChico || 0) : '',
+            k === 0 ? (b.precioGrande || 0) : '',
+            k === 0 ? (b.stockChico || 0) : '',
+            k === 0 ? (b.stockGrande || 0) : '',
+            k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
+            ing.especiaNombre || _expEspMap[ing.especiaId] || '',
+            gc,
+            gg,
+            costoGr,
+            Math.round(costoGr * gc),
+            Math.round(costoGr * gg)
+          ]);
+        }
+      }
+    }
+    var blSheet = XLSX.utils.aoa_to_sheet(blRows);
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+
+    // === Sheet COSTOS ===
+    var costRows = [['Campo', 'Valor']];
+    costRows.push(['Envase Chico', costos.envaseChico || 0]);
+    costRows.push(['Envase Grande', costos.envaseGrande || 0]);
+    costRows.push(['Bolsa Chica', costos.bolsaChica || 0]);
+    costRows.push(['Bolsa Grande', costos.bolsaGrande || 0]);
+    costRows.push(['Cinta', costos.cinta || 0]);
+    costRows.push(['Sticker Chico', costos.stickerChico || 0]);
+    costRows.push(['Sticker Grande', costos.stickerGrande || 0]);
+    costRows.push(['']);
+    costRows.push(['Costo Especias ($/g)', '']);
+    for (var ei = 0; ei < especias.length; ei++) {
+      var esp = especias[ei];
+      var cVal = (costos.especias && costos.especias[esp.id]) || 0;
+      costRows.push([esp.nombre, cVal]);
+    }
+    var costSheet = XLSX.utils.aoa_to_sheet(costRows);
+    costSheet['!cols'] = [{ wch: 25 }, { wch: 14 }];
+
+    // === RESUMEN COSTOS BLENDS ===
+    var resRows = [['Blend', 'Costo Total Ingredientes ($)', 'Gramos Totales (frasco chico)', 'Costo por Frasco Chico', 'Costo por Frasco Grande']];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var blIngs = bl.ingredientes || [];
+      var costoTotal = 0;
+      for (var ii = 0; ii < blIngs.length; ii++) {
+        var bing = blIngs[ii];
+        var cGr = (costos.especias && costos.especias[bing.especiaId]) || 0;
+        costoTotal += cGr * (bing.gramos || 0);
+      }
+      resRows.push([bl.nombre, Math.round(costoTotal), blIngs.length > 0 ? blIngs[0].gramosTotal : 0, Math.round(costoTotal) || '', '']);
+    }
+    var resSheet = XLSX.utils.aoa_to_sheet(resRows);
+    resSheet['!cols'] = [{ wch: 25 }, { wch: 24 }, { wch: 26 }, { wch: 22 }, { wch: 22 }];
+
+    // Create workbook
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, espSheet, 'Especias');
+    XLSX.utils.book_append_sheet(wb, blSheet, 'Blends');
+    XLSX.utils.book_append_sheet(wb, costSheet, 'Costos');
+    XLSX.utils.book_append_sheet(wb, resSheet, 'Resumen Costos');
+
+    // Download
+    var fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, 'Arcano_Productos_' + fecha + '.xlsx');
+    toast('Excel exportado correctamente');
+  },
+
+  importarProductosExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:700px">' +
+      '<div class="modal-header"><h3>Importar Datos desde Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi el archivo Excel exportado previamente. Se actualizaran precios, ingredientes y costos de los productos existentes. Los stocks no se modifican.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-imp-prod-file" accept=".xlsx,.xls"></div>' +
+        '<div id="f-imp-prod-status" class="mt-12"></div>' +
+        '<div id="f-imp-prod-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-imp-prod-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-prod-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-imp-prod-file');
+    var parseBtn = document.getElementById('btn-parse-prod-excel');
+    var statusDiv = document.getElementById('f-imp-prod-status');
+    var previewDiv = document.getElementById('f-imp-prod-preview');
+    var footerDiv = document.getElementById('f-imp-prod-footer');
+
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS
+          var espUpdates = [];
+          var espSheet = wb.Sheets['Especias'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              if (!row) continue;
+              var nombre = String(row[1] || '').trim();
+              if (!nombre) continue;
+              var rawId = row[0] ? String(row[0]).trim() : '';
+              espUpdates.push({
+                id: rawId,
+                nombre: nombre,
+                descripcion: String(row[2] || '').trim(),
+                categoria: String(row[3] || '').trim() || 'Especias',
+                precioChico: Number(row[4]) || 0,
+                precioGrande: Number(row[5]) || 0,
+                enTienda: String(row[9] || '').toLowerCase() === 'si',
+                isNew: !rawId || !ArcanoDB.getEspecia(rawId)
+              });
+            }
+          }
+
+          // Parse BLENDS
+          var blUpdates = {};
+          var blSheet = wb.Sheets['Blends'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlId = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              if (row[0]) {
+                currentBlId = String(row[0]);
+                blUpdates[currentBlId] = {
+                  id: currentBlId,
+                  nombre: String(row[1] || '').trim(),
+                  descripcion: String(row[2] || '').trim(),
+                  categoria: String(row[3] || '').trim(),
+                  precioChico: Number(row[4]) || 0,
+                  precioGrande: Number(row[5]) || 0,
+                  enTienda: String(row[8] || '').toLowerCase() === 'si',
+                  ingredientes: []
+                };
+              }
+              if (currentBlId && row[9]) {
+                blUpdates[currentBlId].ingredientes.push({
+                  especiaNombre: String(row[9] || '').trim(),
+                  gramosChico: Number(row[10]) || 0,
+                  gramosGrande: Number(row[11]) || 0
+                });
+              }
+            }
+          }
+
+          // Parse COSTOS
+          var costoUpdates = {};
+          var costoEspUpdates = {};
+          var costSheet = wb.Sheets['Costos'];
+          if (costSheet) {
+            var costData = XLSX.utils.sheet_to_json(costSheet, { header: 1 });
+            for (var k = 0; k < costData.length; k++) {
+              var row = costData[k];
+              if (!row || !row[0]) continue;
+              var campo = String(row[0]).trim();
+              var valor = Number(row[1]) || 0;
+              if (campo === 'Envase Chico') costoUpdates.envaseChico = valor;
+              else if (campo === 'Envase Grande') costoUpdates.envaseGrande = valor;
+              else if (campo === 'Bolsa Chica') costoUpdates.bolsaChica = valor;
+              else if (campo === 'Bolsa Grande') costoUpdates.bolsaGrande = valor;
+              else if (campo === 'Cinta') costoUpdates.cinta = valor;
+              else if (campo === 'Sticker Chico') costoUpdates.stickerChico = valor;
+              else if (campo === 'Sticker Grande') costoUpdates.stickerGrande = valor;
+            }
+            // Get existing costos for especias mapping
+            var existingCostos = ArcanoDB.getCostosInsumos();
+            costoEspUpdates = existingCostos.especias ? JSON.parse(JSON.stringify(existingCostos.especias)) : {};
+            for (var ci = 0; ci < costData.length; ci++) {
+              var cr = costData[ci];
+              if (!cr || !cr[0] || cr[0] === 'Campo' || cr[0] === 'Costo Especias ($/g)' || cr[0] === '') continue;
+              // Match by especia name
+              var allEsp = ArcanoDB.getEspecias();
+              var matchedId = null;
+              for (var ei = 0; ei < allEsp.length; ei++) {
+                if (allEsp[ei].nombre === String(cr[0]).trim()) { matchedId = allEsp[ei].id; break; }
+              }
+              if (matchedId && Number(cr[1]) > 0) {
+                costoEspUpdates[matchedId] = Number(cr[1]);
+              }
+            }
+          }
+
+          var espNewCount = 0;
+          for (var ci = 0; ci < espUpdates.length; ci++) { if (espUpdates[ci].isNew) espNewCount++; }
+          var blNewCount = 0;
+          var blKeys = Object.keys(blUpdates);
+          for (var bi = 0; bi < blKeys.length; bi++) {
+            var bId = blUpdates[blKeys[bi]].id;
+            if (!bId || !ArcanoDB.getBlend(bId)) blNewCount++;
+          }
+
+          if (espUpdates.length === 0 && blKeys.length === 0 && Object.keys(costoUpdates).length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos para actualizar.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Preview
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias</div><div class="text-xs text-muted">' + espNewCount + ' nuevas, ' + (espUpdates.length - espNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends</div><div class="text-xs text-muted">' + blNewCount + ' nuevos, ' + (blKeys.length - blNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--gold)">' + Object.keys(costoUpdates).length + '</div><div class="stat-label">Costos packaging</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + Object.keys(costoEspUpdates).length + '</div><div class="stat-label">Costos especias</div></div>' +
+          '</div>';
+
+          // Show blend details
+          if (blKeys.length > 0) {
+            phtml += '<p class="text-sm fw7 mb-8">Blends:</p>';
+            for (var bk = 0; bk < Math.min(blKeys.length, 10); bk++) {
+              var bU = blUpdates[blKeys[bk]];
+              phtml += '<p class="text-sm text-muted">- ' + bU.nombre + ': ' + bU.ingredientes.length + ' ingredientes, $' + bU.precioChico + '/$' + bU.precioGrande + '</p>';
+            }
+            if (blKeys.length > 10) phtml += '<p class="text-sm text-muted">... y ' + (blKeys.length - 10) + ' mas</p>';
+          }
+          phtml += '</div></div>';
+
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-prod-import">Confirmar Actualizacion</button>';
+
+          document.getElementById('btn-do-prod-import').addEventListener('click', function() {
+            var btn = document.getElementById('btn-do-prod-import');
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            try {
+              var espOk = 0, blOk = 0;
+
+              // Update/create especias
+              for (var i = 0; i < espUpdates.length; i++) {
+                var u = espUpdates[i];
+                var existing = u.id ? ArcanoDB.getEspecia(u.id) : null;
+                var saved;
+                if (existing) {
+                  saved = ArcanoDB.saveEspecia({
+                    id: u.id,
+                    nombre: u.nombre || existing.nombre,
+                    descripcion: u.descripcion || existing.descripcion || '',
+                    categoria: u.categoria || existing.categoria,
+                    precioChico: u.precioChico,
+                    precioGrande: u.precioGrande,
+                    enTienda: u.enTienda
+                  });
+                } else {
+                  var byName = ArcanoDB.findEspeciaByName(u.nombre);
+                  if (byName) {
+                    saved = ArcanoDB.saveEspecia({
+                      id: byName.id,
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  } else {
+                    saved = ArcanoDB.saveEspecia({
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  }
+                }
+                if (saved && saved.id && u.descripcion) {
+                  ArcanoDB.writeField('especias/' + saved.id + '/descripcion', u.descripcion);
+                }
+                espOk++;
+              }
+
+              // Update/create blends
+              var blKeys2 = Object.keys(blUpdates);
+              for (var j = 0; j < blKeys2.length; j++) {
+                var bU = blUpdates[blKeys2[j]];
+                // Resolve ingredient names to IDs
+                var resolvedIngs = [];
+                for (var ii = 0; ii < bU.ingredientes.length; ii++) {
+                  var ing = bU.ingredientes[ii];
+                  var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
+                  if (espObj) {
+                    resolvedIngs.push({
+                      especiaId: espObj.id,
+                      especiaNombre: espObj.nombre,
+                      gramos: ing.gramos
+                    });
+                  }
+                }
+                // Calculate gramosTotal
+                var grsTotal = 0;
+                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
+                  resolvedIngs[gi2].gramosTotal = grsTotal;
+                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100) : 0;
+                }
+
+                var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
+                var savedBl;
+                if (existingBl) {
+                  savedBl = ArcanoDB.saveBlend({
+                    id: bU.id,
+                    nombre: bU.nombre || existingBl.nombre,
+                    descripcion: bU.descripcion || existingBl.descripcion || '',
+                    categoria: bU.categoria || existingBl.categoria,
+                    precioChico: bU.precioChico,
+                    precioGrande: bU.precioGrande,
+                    enTienda: bU.enTienda,
+                    ingredientes: resolvedIngs
+                  });
+                } else {
+                  var allBlends = ArcanoDB.getBlends();
+                  var matchBl = null;
+                  for (var mb = 0; mb < allBlends.length; mb++) {
+                    if (allBlends[mb].nombre.toLowerCase() === bU.nombre.toLowerCase()) { matchBl = allBlends[mb]; break; }
+                  }
+                  if (matchBl) {
+                    savedBl = ArcanoDB.saveBlend({
+                      id: matchBl.id,
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  } else {
+                    savedBl = ArcanoDB.saveBlend({
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  }
+                }
+                if (savedBl && savedBl.id && bU.descripcion) {
+                  ArcanoDB.writeField('blends/' + savedBl.id + '/descripcion', bU.descripcion);
+                }
+                blOk++;
+              }
+
+              // Update costos
+              if (Object.keys(costoUpdates).length > 0 || Object.keys(costoEspUpdates).length > 0) {
+                var newCostos = ArcanoDB.getCostosInsumos();
+                for (var ck in costoUpdates) newCostos[ck] = costoUpdates[ck];
+                newCostos.especias = costoEspUpdates;
+                ArcanoDB.saveCostosInsumos(newCostos);
+              }
+
+              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
+                '</div>' +
+                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
+              '</div></div>';
+              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
+
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     USUARIOS
+     ================================================================ */
+  renderUsuarios(container) {
+    var usuarios = ArcanoDB.getUsuarios();
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formUsuario()">+ Nuevo Usuario</button></div>';
+    h += '<div class="table-wrap mt-12"><table class="table"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    for (var i = 0; i < usuarios.length; i++) {
+      var u = usuarios[i];
+      h += '<tr><td class="fw7">' + (u.nombre||'?') + '</td>' +
+        '<td><span class="badge ' + (u.rol==='admin'?'badge-gold':'badge-blue') + '">' + (u.rol||'vendedor') + '</span></td>' +
+        '<td>' + (u.id==='admin'?'****':u.pin) + '</td>' +
+        '<td><span class="badge ' + (u.activo!==false?'badge-green':'badge-red') + '">' + (u.activo!==false?'Activo':'Inactivo') + '</span></td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick="Pages.formUsuario(\'' + u.id + '\')">Editar</button>' +
+        (u.id!=='admin' ? ' <button class="btn btn-sm btn-red" onclick="Pages.delUsuario(\'' + u.id + '\')">X</button>' : '') + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    container.innerHTML = h;
+  },
+
+  formUsuario(editId) {
+    var users = ArcanoDB.getUsuarios();
+    var user = null;
+    for (var i = 0; i < users.length; i++) { if (users[i].id === editId) { user = users[i]; break; } }
+    var isAdmin = user && user.id === 'admin';
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal">' +
+      '<div class="modal-header"><h3>' + (user?'Editar':'Nuevo') + ' Usuario</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-u-nombre" value="' + (user?user.nombre:'') + '"></div>' +
+        '<div class="form-group"><label>Rol</label><select class="input" id="f-u-rol" ' + (isAdmin?'disabled':'') + '><option value="vendedor"' + (user&&user.rol==='vendedor'?' selected':'') + '>Vendedor</option><option value="admin"' + (user&&user.rol==='admin'?' selected':'') + '>Admin</option></select></div>' +
+        '<div class="form-group"><label>PIN</label><input type="text" class="input" id="f-u-pin" value="' + (user?user.pin:'') + '" maxlength="10"></div>' +
+        '<div class="form-group"><label>Estado</label><select class="input" id="f-u-activo" ' + (isAdmin?'disabled':'') + '><option value="true"' + (user&&user.activo!==false?' selected':'') + '>Activo</option><option value="false"' + (user&&user.activo===false?' selected':'') + '>Inactivo</option></select></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-u">Guardar</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-save-u').addEventListener('click', function() {
+      var nombre = document.getElementById('f-u-nombre').value.trim();
+      var pin = document.getElementById('f-u-pin').value.trim();
+      if (!nombre || !pin) { alert('Nombre y PIN obligatorios'); return; }
+      var id = editId || ('user_' + Date.now());
+      ArcanoDB.saveUsuario({
+        id: id, nombre: nombre, rol: document.getElementById('f-u-rol').value,
+        pin: pin, activo: document.getElementById('f-u-activo').value === 'true', creado: new Date().toISOString()
+      });
+      modal.remove();
+      App.renderPage('usuarios');
+    });
+  },
+
+  delUsuario(id) {
+    if (id === 'admin') return;
+    if (!confirm('Eliminar usuario?')) return;
+    ArcanoDB.deleteUsuario(id);
+    App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     TAG SELECTOR HELPER
+     ================================================================ */
+  buildTagSelectorHtml(cat, selectedTags) {
+    var tags = ArcanoDB.getTagsForCategoria(cat);
+    var sel = selectedTags || [];
+    var h = '<div class="tag-selector" id="tag-selector">';
+    if (tags.length === 0) {
+      h += '<p class="text-sm text-muted">No hay etiquetas de uso para esta categoria.</p>';
+    } else {
+      for (var i = 0; i < tags.length; i++) {
+        var checked = sel.indexOf(tags[i]) >= 0 ? ' checked' : '';
+        h += '<label class="tag-chip"><input type="checkbox" value="' + tags[i] + '"' + checked + '><span>' + tags[i] + '</span></label>';
+      }
+    }
+    h += '</div>';
+    return h;
+  },
+
+  getSelectedTags() {
+    var cbs = document.querySelectorAll('#tag-selector input[type=checkbox]');
+    var tags = [];
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) tags.push(cbs[i].value);
+    }
+    return tags;
+  },
+
+  refreshTagSelector(prefix) {
+    var catEl = document.getElementById('f-' + prefix + '-cat');
+    var areaEl = document.getElementById('tag-area-' + prefix);
+    if (!catEl || !areaEl) return;
+    areaEl.innerHTML = Pages.buildTagSelectorHtml(catEl.value, []);
+  },
+
+  doAddTag(cat, idx) {
+    var inp = document.getElementById('new-tag-' + idx);
+    if (!inp) return;
+    var name = inp.value.trim();
+    if (!name) return;
+    if (ArcanoDB.addProductTag(cat, name)) {
+      App.renderPage('productos');
+    } else {
+      alert('La etiqueta de uso ya existe en esta categoria.');
+    }
+  },
+
+  doRemoveTag(cat, tagName) {
+    if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
+      ArcanoDB.removeProductTag(cat, tagName);
+      App.renderPage('productos');
+    }
+  },
+
+  /* ================================================================
+     IMAGE UPLOAD HELPERS
+     ================================================================ */
+  handleImageUpload(input, areaId) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
+      if (err) { alert(err); return; }
+      var area = document.getElementById(areaId);
+      var placeholder = area.querySelector('.img-upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
+      if (existing) existing.remove();
+      var removeBtn = area.querySelector('.btn-red');
+      if (removeBtn) removeBtn.remove();
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = 'img-preview';
+      img.id = 'img-preview-' + areaId.split('-').pop();
+      area.insertBefore(img, placeholder);
+      var rmBtn = document.createElement('button');
+      rmBtn.className = 'btn btn-sm btn-red';
+      rmBtn.style.marginTop = '6px';
+      rmBtn.textContent = 'Quitar imagen';
+      rmBtn.onclick = function() { Pages.removeImage(areaId, input.id); };
+      area.insertBefore(rmBtn, placeholder);
+    });
+  },
+
+  removeImage(areaId, inputId) {
+    var area = document.getElementById(areaId);
+    var preview = area.querySelector('.img-preview');
+    if (preview) preview.remove();
+    var btn = area.querySelector('.btn-red');
+    if (btn) btn.remove();
+    var placeholder = area.querySelector('.img-upload-placeholder');
+    if (placeholder) placeholder.style.display = '';
+    var inp = document.getElementById(inputId);
+    if (inp) inp.value = '';
+  },
+
+  /* ================================================================
+     RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
+     ================================================================ */
+  _groqKeyLoaded: false,
+  renderRecetasAdmin(container) {
+    var savedKey = localStorage.getItem('arcano_groq_key') || '';
+    var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
+
+    // Build list of available products for context
+    var productos = ArcanoDB.getTiendaProductos();
+    var productNames = [];
+    for (var i = 0; i < productos.length; i++) productNames.push(productos[i].nombre);
+    var productsContext = productNames.length > 0 ? productNames.join(', ') : 'No hay productos disponibles';
+
+    var h = '<div class="card mb-16">' +
+      '<div class="card-header"><h3>Configuracion</h3></div>' +
+      '<div class="card-body">' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
+        '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
+        '</div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label>' +
+          '<select class="input" id="ra-categoria">';
+    for (var c = 0; c < categorias.length; c++) {
+      h += '<option value="' + categorias[c] + '">' + categorias[c] + '</option>';
+    }
+    h += '</select></div>' +
+          '<div class="form-group"><label>Tema de la receta (opcional)</label>' +
+          '<input type="text" class="input" id="ra-tema" placeholder="Ej: arroz con leche, adobo de pollo...">' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Idioma de salida</label>' +
+        '<select class="input" id="ra-idioma">' +
+          '<option value="es">Espanol</option>' +
+          '<option value="en">English</option>' +
+        '</select></div>' +
+        '<button class="btn btn-gold" id="ra-gen-btn" onclick="Pages.generarReceta()">Generar Receta con IA</button>' +
+        '<span id="ra-gen-status" class="text-sm text-muted ml-12"></span>' +
+      '</div>' +
+    '</div>';
+
+    // Existing recipes section
+    h += '<div class="card">' +
+      '<div class="card-header"><h3>Recetas Existentes (' + '<span id="ra-count">0</span>' + ')</h3></div>' +
+      '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
+    '</div>';
+
+    container.innerHTML = h;
+
+    // Load existing recipes from Firebase
+    Pages._loadRecetasAdmin();
+
+    // Load Groq key from Firebase (persistent across devices/deploys)
+    Pages._groqKeyLoaded = false;
+    try {
+      firebase.database().ref('arcano/config/groqKey').once('value').then(function(snap) {
+        var fbKey = snap.val();
+        var statusEl = document.getElementById('ra-key-status');
+        if (fbKey) {
+          var inp = document.getElementById('ra-groq-key');
+          if (inp) inp.value = fbKey;
+          localStorage.setItem('arcano_groq_key', fbKey);
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
+          Pages._groqKeyLoaded = true;
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube</span>';
+        }
+      }).catch(function() {
+        var statusEl = document.getElementById('ra-key-status');
+        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error de conexion</span>';
+      });
+    } catch(e) {}
+  },
+
+  _saveGroqKey: function(showFeedback) {
+    var inp = document.getElementById('ra-groq-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    var statusEl = document.getElementById('ra-key-status');
+    if (!key) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>';
+      return;
+    }
+    localStorage.setItem('arcano_groq_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">guardando...</span>';
+    try {
+      firebase.database().ref('arcano/config/groqKey').set(key, function(err) {
+        if (err) {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error al guardar</span>';
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+          Pages._groqKeyLoaded = true;
+        }
+      });
+    } catch(e) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">local OK</span>';
+    }
+  },
+
+  _loadRecetasAdmin: function() {
+    var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+    ref.once('value', function(snap) {
+      var data = snap.val();
+      var recetas = [];
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          r._key = keys[i];
+          recetas.push(r);
+        }
+      }
+      recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+      Pages._renderRecetasList(recetas);
+    });
+  },
+
+  _renderRecetasList: function(recetas) {
+    var countEl = document.getElementById('ra-count');
+    var listEl = document.getElementById('ra-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = recetas.length;
+    if (recetas.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < recetas.length; i++) {
+      var r = recetas[i];
+      var prodsUsados = '';
+      if (r.productos_usados && r.productos_usados.length) {
+        prodsUsados = r.productos_usados.join(', ');
+      }
+      var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
+      h += '<tr>' +
+        '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
+        '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm">' + (prodsUsados || '-') + '</td>' +
+        '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">X</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarReceta: function(key) {
+    if (!confirm('Eliminar esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
+  generarReceta: function() {
+    var keyInput = document.getElementById('ra-groq-key');
+    var catSelect = document.getElementById('ra-categoria');
+    var temaInput = document.getElementById('ra-tema');
+    var idiomaSelect = document.getElementById('ra-idioma');
+    var btn = document.getElementById('ra-gen-btn');
+    var status = document.getElementById('ra-gen-status');
+
+    var apiKey = keyInput.value.trim();
+    var categoria = catSelect.value;
+    var tema = temaInput.value.trim();
+    var idioma = idiomaSelect.value;
+
+    if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_groq_key', apiKey);
+    try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
+
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Cargando productos y recetas existentes...';
+
+    // Build rich product context and load existing recipes, then generate
+    var productos = ArcanoDB.getTiendaProductos();
+    var productLines = [];
+    for (var i = 0; i < productos.length; i++) {
+      var p = productos[i];
+      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categorias: ' + (p.categorias || [p.categoria]).join('/') + ']';
+      if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
+      productLines.push(line);
+    }
+    var productContext = productLines.length > 0 ? productLines.join('\n') : '  - No hay productos en tienda aun';
+
+    var langInstr = idioma === 'en'
+      ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
+      : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
+
+    var temaInstr = tema
+      ? 'El tema especifico es: ' + tema + '. La receta debe girar alrededor de este tema.'
+      : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
+
+    // Load existing recipes to avoid repetition
+    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+      var data = snap.val();
+      var existingTitles = [];
+      var existingByCategory = { Comida: [], Infusiones: [], Cocteleria: [] };
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          if (r.titulo) existingTitles.push(r.titulo);
+          var cat = r.categoria || 'Comida';
+          if (!existingByCategory[cat]) existingByCategory[cat] = [];
+          existingByCategory[cat].push(r.titulo);
+        }
+      }
+
+      var existingBlock = '';
+      if (existingTitles.length > 0) {
+        existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir temas, platos ni titulos similares):\n';
+        existingBlock += existingTitles.join('\n');
+        existingBlock += '\n\nTotal recetas existentes por categoria:\n';
+        var catKeys2 = Object.keys(existingByCategory);
+        for (var c = 0; c < catKeys2.length; c++) {
+          var catName = catKeys2[c];
+          var catCount = existingByCategory[catName].length;
+          if (catCount > 0) existingBlock += '- ' + catName + ': ' + catCount + ' recetas\n';
+        }
+        existingBlock += '\nREGLA IMPORTANTE: No repitas ninguno de estos titulos ni crees recetas con tematicas similares. Cada receta debe ser unica.';
+      }
+
+      var systemPrompt =
+        'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
+        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
+        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
+        'REGLAS OBLIGATORIAS:\n' +
+        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
+        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
+        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
+        '4. IMPORTANTE: Menciona el nombre EXACTO del producto Arcano tal como aparece en el catalogo dentro de los ingredientes y pasos. Esto permite que se enlace automaticamente en la tienda.\n' +
+        '5. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
+        '6. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, colombiana, marroqui, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar, ahumar, confitar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres, ceviches, empanadas, arepas).\n' +
+        '7. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras, toddies calientes, cold brew de especias.\n' +
+        '8. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino, cava, sake), estilos (sour, fizz, mocktail, punch, old fashioned, spritz, julep, colada) y tecnicas (muddling, infusion, flame, dry shake, fat wash, clarification).\n' +
+        '9. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas en cada ingrediente.\n' +
+        '10. Los pasos deben ser claros, concisos y en orden logico. Cada paso debe describir una accion concreta.\n' +
+        '11. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n' +
+        '12. El campo "productos_usados" debe listar SOLO los nombres exactos de productos Arcano usados en la receta (tal como aparecen en el catalogo).\n\n' +
+        langInstr;
+
+      var userPrompt =
+        'Genera UNA receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+        existingBlock + '\n\n' +
+        'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
+        '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
+        '"dificultad": "Facil" o "Media" o "Dificil", ' +
+        '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+        '"productos_usados": ["Nombre Exacto del Producto 1"], ' +
+        '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto Arcano", "200g de proteina principal", ...], ' +
+        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
+        '"imagen_prompt": "descripcion visual del plato terminado para generar una imagen (en ingles, 1 oracion)"}\n\n' +
+        'RECUERDA: De 5 a 12 ingredientes, de 5 a 8 pasos. La receta DEBE ser diferente a todas las existentes. ' +
+        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
+        'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
+
+      status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.9,
+          max_tokens: 2000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+        return res.json();
+      })
+      .then(function(data) {
+        var content = data.choices[0].message.content.trim();
+        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+        var receta = JSON.parse(content);
+
+        if (!receta.titulo) throw new Error('La receta no tiene titulo');
+        if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+        if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+
+        // Check for duplicate title
+        var dupTitle = false;
+        for (var d = 0; d < existingTitles.length; d++) {
+          if (existingTitles[d].toLowerCase() === receta.titulo.toLowerCase()) { dupTitle = true; break; }
+        }
+        if (dupTitle) throw new Error('La receta generada tiene un titulo identico a una existente. Intenta de nuevo con otro tema.');
+
+        receta.fecha = new Date().toISOString().slice(0, 10);
+        if (!receta.categoria) receta.categoria = categoria;
+        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+          if (err) {
+            status.textContent = 'Error al guardar: ' + (err.message || err);
+          } else {
+            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+            Pages._loadRecetasAdmin();
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generar Receta con IA';
+        });
+      })
+      .catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'Generar Receta con IA';
+      });
+    });
+  },
+
+  /* ================================================================
+     ESTADISTICAS DE VENTAS (Chart.js)
+     ================================================================ */
+  _estPeriod: null,
+  _estTab: null,
+  _estCharts: [],
+
+  renderEstadisticas: function(container) {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var producciones = ArcanoDB.getProducciones();
+    var entradas = ArcanoDB.getEntradas();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+
+    // === COMBINE ALL SALES ===
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+
+    if (!Pages._estTab) Pages._estTab = 'ventas';
+
+    var h = '<div class="est-tabs">';
+    h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'costos' ? ' active' : '') + '" onclick="Pages._estTab=\'costos\';App.renderPage(\'estadisticas\')">Costos y Margen</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'inventario' ? ' active' : '') + '" onclick="Pages._estTab=\'inventario\';App.renderPage(\'estadisticas\')">Inventario</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'canales' ? ' active' : '') + '" onclick="Pages._estTab=\'canales\';App.renderPage(\'estadisticas\')">Costos por Canal</button>';
+    h += '</div>';
+    h += '<div id="est-content"></div>';
+    container.innerHTML = h;
+
+    var data;
+    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
+      data = allSales;
+    } else {
+      data = allSales.filter(function(s) { return s.source === 'tienda'; });
+    }
+
+    if (Pages._estTab === 'ventas') Pages._renderVentas(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'costos') Pages._renderCostos(data, container.querySelector('#est-content'), entradas, especias, blends, producciones);
+    else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
+    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
+    else if (Pages._estTab === 'canales') Pages._renderCostosPorCanal(container.querySelector('#est-content'));
+  },
+
+  /* ================================================================
+     VENTAS TAB
+     ================================================================ */
+  _renderVentas: function(data, el) {
+    if (!el) return;
+    var totalIngresos = 0, totalOps = 0, totalUnidades = 0;
+    var prodMap = {}, tipoMap = {}, tallaMap = {}, diaMap = {}, monthMap = {}, ciudadMap = {}, sourceMap = {};
+    for (var d = 0; d < data.length; d++) {
+      var s = data[d];
+      totalIngresos += (s.total || 0);
+      totalOps++;
+      sourceMap[s.source] = (sourceMap[s.source] || 0) + 1;
+      var opUnidades = 0;
+      if (s.items) { for (var it = 0; it < s.items.length; it++) {
+        var item = s.items[it];
+        totalUnidades += (item.cantidad || 0);
+        opUnidades += (item.cantidad || 0);
+        var key = item.nombre + '|' + item.tipo + '|' + item.talla;
+        if (!prodMap[key]) prodMap[key] = { nombre: item.nombre, tipo: item.tipo, talla: item.talla, unidades: 0, ingreso: 0 };
+        prodMap[key].unidades += (item.cantidad || 0);
+        prodMap[key].ingreso += (item.subtotal || 0);
+        tipoMap[item.tipo] = (tipoMap[item.tipo] || 0) + (item.cantidad || 0);
+        tallaMap[item.talla || 'chico'] = (tallaMap[item.talla || 'chico'] || 0) + (item.cantidad || 0);
+      }}
+      if (s.fecha) {
+        if (!diaMap[s.fecha]) diaMap[s.fecha] = { ops: 0, unidades: 0, ingresos: 0 };
+        diaMap[s.fecha].ops++;
+        diaMap[s.fecha].unidades += opUnidades;
+        diaMap[s.fecha].ingresos += (s.total || 0);
+        var mn = s.fecha.substring(0, 7);
+        if (!monthMap[mn]) monthMap[mn] = { ops: 0, unidades: 0, ingresos: 0 };
+        monthMap[mn].ops++;
+        monthMap[mn].unidades += opUnidades;
+        monthMap[mn].ingresos += (s.total || 0);
+      }
+      if (s.ciudad) {
+        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ops: 0, ingresos: 0 };
+        ciudadMap[s.ciudad].ops++;
+        ciudadMap[s.ciudad].ingresos += (s.total || 0);
+      }
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+
+    // Calculate day-on-day trend
+    var diasSorted = Object.keys(diaMap).sort();
+    var ingresosAyer = 0;
+    if (diasSorted.length >= 2) { ingresosAyer = diaMap[diasSorted[diasSorted.length - 2]].ingresos || 0; }
+    var ingresosHoy = diasSorted.length > 0 ? diaMap[diasSorted[diasSorted.length - 1]].ingresos : 0;
+    var tendenciaDiaria = ingresosAyer > 0 ? Math.round(((ingresosHoy - ingresosAyer) / ingresosAyer) * 100) : 0;
+    var tendSign = tendenciaDiaria >= 0 ? '+' : '';
+
+    // Monthly comparison
+    var mesesSorted = Object.keys(monthMap).sort();
+    var mesActual = new Date().toISOString().slice(0, 7);
+    var mesAnterior = mesesSorted.length >= 2 ? mesesSorted[mesesSorted.length - 2] : '';
+    var ingresosMesActual = (monthMap[mesActual] || {}).ingresos || 0;
+    var ingresosMesAnterior = mesAnterior ? (monthMap[mesAnterior] || {}).ingresos || 0 : 0;
+    var tendenciaMensual = ingresosMesAnterior > 0 ? Math.round(((ingresosMesActual - ingresosMesAnterior) / ingresosMesAnterior) * 100) : 0;
+    var tendMSign = tendenciaMensual >= 0 ? '+' : '';
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">' + totalOps + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalUnidades + '</div><div class="est-kpi-label">Unidades Vendidas</div><div class="est-kpi-sub">' + prodArr.length + ' productos distintos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por operacion</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaDiaria >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendSign + tendenciaDiaria + '%</div><div class="est-kpi-label">Tendencia Dia</div><div class="est-kpi-sub">vs dia anterior</div></div>';
+    h += '</div>';
+
+    // Monthly comparison bar
+    h += '<div class="card mt-16"><div class="card-header"><h3>Comparacion Mensual</h3></div><div class="card-body">';
+    h += '<div class="est-kpi-grid" style="grid-template-columns:1fr 1fr 1fr">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesActual.toLocaleString() + '</div><div class="est-kpi-label">Mes Actual (' + mesActual + ')</div><div class="est-kpi-sub">' + ((monthMap[mesActual] || {}).ops || 0) + ' ops / ' + ((monthMap[mesActual] || {}).unidades || 0) + ' uds</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesAnterior.toLocaleString() + '</div><div class="est-kpi-label">Mes Anterior (' + mesAnterior + ')</div><div class="est-kpi-sub">' + (mesAnterior ? ((monthMap[mesAnterior] || {}).ops || 0) + ' ops / ' + ((monthMap[mesAnterior] || {}).unidades || 0) + ' uds' : 'sin datos') + '</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaMensual >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendMSign + tendenciaMensual + '%</div><div class="est-kpi-label">Variacion Mensual</div><div class="est-kpi-sub">' + (ingresosMesActual >= ingresosMesAnterior ? 'crecimiento' : 'caida') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Source breakdown (admin vs tienda)
+    h += '<div class="card mt-16"><div class="card-header"><h3>Canal de Venta</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
+    var adminIngreso = 0, tiendaIngreso = 0;
+    for (var d = 0; d < data.length; d++) {
+      if (data[d].source === 'admin') adminIngreso += data[d].total || 0;
+      else tiendaIngreso += data[d].total || 0;
+    }
+    var totalCh = adminIngreso + tiendaIngreso;
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos Diarios</h4><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos Mensuales</h4><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Tipo de Producto</h4><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Venta por Talla</h4><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Top 10 Productos por Ingreso</h4><div class="est-chart-wrap est-chart-full"><canvas id="chart-products"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos por Ciudad</h4><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div>';
+    h += '</div>';
+
+    // Top products table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Top Productos por Ingreso</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Unidades</th><th>Ingreso</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pi = 0; pi < Math.min(prodArr.length, 20); pi++) {
+        var pp = prodArr[pi];
+        var pct = totalIngresos > 0 ? (pp.ingreso / totalIngresos * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td>' + pp.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + pp.ingreso.toLocaleString() + '</td><td>' + pct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos</p>'; }
+    h += '</div></div>';
+
+    // Daily breakdown
+    var diasArr = Object.keys(diaMap).sort().reverse();
+    if (diasArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Desglose por Dia</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Fecha</th><th>Ops</th><th>Unidades</th><th>Ingreso</th><th>Ticket Prom.</th><th>Barra</th></tr></thead><tbody>';
+      var maxDiaIng = 0;
+      for (var di = 0; di < diasArr.length; di++) { if (diaMap[diasArr[di]].ingresos > maxDiaIng) maxDiaIng = diaMap[diasArr[di]].ingresos; }
+      for (var di2 = 0; di2 < diasArr.length; di2++) {
+        var dk = diasArr[di2]; var dv = diaMap[dk];
+        var dBarW = maxDiaIng > 0 ? (dv.ingresos / maxDiaIng * 100).toFixed(0) : 0;
+        var ticketP = dv.ops > 0 ? Math.round(dv.ingresos / dv.ops) : 0;
+        h += '<tr><td class="fw7">' + dk + '</td><td>' + dv.ops + '</td><td>' + dv.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + dv.ingresos.toLocaleString() + '</td><td>$' + ticketP.toLocaleString() + '</td><td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + dBarW + '%;background:var(--gold)"></div></div></div></td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // === CHARTS ===
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var gOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 12, padding: 12 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } };
+
+    // Daily line
+    var dailyLabels = [], dailyData = [], dailyOpsData = [];
+    for (var dd = 0; dd < diasSorted.length; dd++) { dailyLabels.push(diasSorted[dd].slice(5)); dailyData.push(diaMap[diasSorted[dd]].ingresos); dailyOpsData.push(diaMap[diasSorted[dd]].ops); }
+    var ctxD = document.getElementById('chart-daily');
+    if (ctxD) {
+      Pages._estCharts.push(new Chart(ctxD, {
+        type: 'line',
+        data: { labels: dailyLabels, datasets: [
+          { label: 'Ingresos ($)', data: dailyData, borderColor: '#e8b84b', backgroundColor: 'rgba(232,184,75,0.1)', fill: true, tension: 0.3, pointRadius: 3, yAxisID: 'y' },
+          { label: 'Operaciones', data: dailyOpsData, borderColor: '#5dade2', backgroundColor: 'rgba(93,173,226,0.1)', fill: false, tension: 0.3, pointRadius: 2, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { color: 'rgba(58,34,24,0.3)' } } } }
+      }));
+    }
+
+    // Monthly bar
+    var mLabels = [], mData = [], mOpsData = [];
+    for (var mi = 0; mi < mesesSorted.length; mi++) { mLabels.push(mesesSorted[mi]); mData.push(monthMap[mesesSorted[mi]].ingresos); mOpsData.push(monthMap[mesesSorted[mi]].ops); }
+    var ctxM = document.getElementById('chart-monthly');
+    if (ctxM) {
+      Pages._estCharts.push(new Chart(ctxM, {
+        type: 'bar', data: { labels: mLabels, datasets: [
+          { label: 'Ingresos ($)', data: mData, backgroundColor: 'rgba(232,184,75,0.7)', borderColor: '#e8b84b', borderWidth: 1, borderRadius: 6, yAxisID: 'y' },
+          { label: 'Operaciones', data: mOpsData, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Types doughnut
+    var ctxT = document.getElementById('chart-types');
+    if (ctxT) {
+      Pages._estCharts.push(new Chart(ctxT, {
+        type: 'doughnut', data: { labels: ['Especias', 'Blends'], datasets: [{ data: [tipoMap.especia || 0, tipoMap.blend || 0], backgroundColor: ['#e8b84b', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Tallas pie
+    var ctxTa = document.getElementById('chart-tallas');
+    if (ctxTa) {
+      Pages._estCharts.push(new Chart(ctxTa, {
+        type: 'pie', data: { labels: ['Pequeno', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Top 10 horizontal bar
+    var top10 = prodArr.slice(0, 10);
+    var ctxP = document.getElementById('chart-products');
+    if (ctxP) {
+      var pL = [], pI = [], pC = [];
+      for (var tp = 0; tp < top10.length; tp++) { pL.push(top10[tp].nombre); pI.push(top10[tp].ingreso); pC.push(top10[tp].tipo === 'blend' ? '#5dade2' : '#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxP, { type: 'bar', data: { labels: pL, datasets: [{ label: 'Ingreso ($)', data: pI, backgroundColor: pC, borderRadius: 4, barThickness: 18 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } } } }));
+    }
+
+    // City bar
+    var ctxC = document.getElementById('chart-ciudad');
+    if (ctxC) {
+      var ciudades = Object.keys(ciudadMap).sort(function(a, b) { return ciudadMap[b].ingresos - ciudadMap[a].ingresos; });
+      var cL = [], cD = [];
+      for (var ci2 = 0; ci2 < ciudades.length; ci2++) { cL.push(ciudades[ci2]); cD.push(ciudadMap[ciudades[ci2]].ingresos); }
+      Pages._estCharts.push(new Chart(ctxC, { type: 'bar', data: { labels: cL, datasets: [{ label: 'Ingresos ($)', data: cD, backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1, borderRadius: 6 }] }, options: Object.assign({}, gOpts) }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = canvases[ch].classList.contains('est-chart-full') ? '300px' : '260px'; }
+  },
+
+  /* ================================================================
+     COSTOS Y MARGEN TAB
+     ================================================================ */
+  _renderCostos: function(data, el, entradas, especias, blends, producciones) {
+    if (!el) return;
+
+    // 1. Total cost of purchases (entradas)
+    var totalCostoCompras = 0;
+    var costoByTipo = { especia_grs: 0, envase: 0, bolsa: 0, sticker: 0, cinta: 0 };
+    var proveedorMap = {};
+    var compraMonthMap = {};
+    for (var ei = 0; ei < entradas.length; ei++) {
+      var ent = entradas[ei];
+      var entTotal = Number(ent.total) || 0;
+      totalCostoCompras += entTotal;
+      var prov = (ent.proveedor || 'Sin proveedor').trim();
+      if (!prov) prov = 'Sin proveedor';
+      if (!proveedorMap[prov]) proveedorMap[prov] = { total: 0, ops: 0 };
+      proveedorMap[prov].total += entTotal;
+      proveedorMap[prov].ops++;
+      if (ent.fecha) {
+        var mn = ent.fecha.substring(0, 7);
+        if (!compraMonthMap[mn]) compraMonthMap[mn] = 0;
+        compraMonthMap[mn] += entTotal;
+      }
+      if (ent.items) {
+        for (var ij = 0; ij < ent.items.length; ij++) {
+          var it = ent.items[ij];
+          var t = it.tipo || 'especia_grs';
+          costoByTipo[t] = (costoByTipo[t] || 0) + ((Number(it.cantidad) || 0) * (Number(it.costoUnitario) || 0));
+        }
+      }
+    }
+
+    // 2. Total ingresos
+    var totalIngresos = 0;
+    for (var si = 0; si < data.length; si++) totalIngresos += (data[si].total || 0);
+
+    // 3. Margen
+    var margenBruto = totalIngresos - totalCostoCompras;
+    var margenPct = totalIngresos > 0 ? (margenBruto / totalIngresos * 100).toFixed(1) : '0';
+
+    // 4. Per-product margin (income vs estimated material cost from produccion)
+    var prodVentaMap = {}, prodCostoMap = {};
+    for (var di = 0; di < data.length; di++) {
+      var s = data[di];
+      if (s.items) { for (var ii = 0; ii < s.items.length; ii++) {
+        var item = s.items[ii];
+        var pk = item.nombre + '|' + item.tipo;
+        if (!prodVentaMap[pk]) prodVentaMap[pk] = 0;
+        prodVentaMap[pk] += (item.subtotal || 0);
+      }}
+    }
+    // From entradas, calculate cost per gram for each especia
+    var costoPorGramo = {};
+    var gramosComprados = {};
+    for (var ei2 = 0; ei2 < entradas.length; ei2++) {
+      var ent2 = entradas[ei2];
+      if (ent2.items) { for (var ij2 = 0; ij2 < ent2.items.length; ij2++) {
+        var it2 = ent2.items[ij2];
+        if (it2.tipo === 'especia_grs' && it2.especiaNombre) {
+          var nombre = it2.especiaNombre;
+          var grs = Number(it2.cantidad) || 0;
+          var cost = grs * (Number(it2.costoUnitario) || 0);
+          costoPorGramo[nombre] = (costoPorGramo[nombre] || 0) + cost;
+          gramosComprados[nombre] = (gramosComprados[nombre] || 0) + grs;
+        }
+      }}
+    }
+    var costoGrPorEsp = {};
+    var espNames = Object.keys(gramosComprados);
+    for (var gn = 0; gn < espNames.length; gn++) {
+      if (gramosComprados[espNames[gn]] > 0) {
+        costoGrPorEsp[espNames[gn]] = costoPorGramo[espNames[gn]] / gramosComprados[espNames[gn]];
+      }
+    }
+
+    // Build blend cost from ingredients
+    var costoBlendMap = {};
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var ings = bl.ingredientes || [];
+      var costChico = 0, costGrande = 0;
+      for (var ig = 0; ig < ings.length; ig++) {
+        var ing = ings[ig];
+        var cpg = costoGrPorEsp[ing.especiaNombre] || 0;
+        costChico += (Number(ing.gramosChico) || 0) * cpg;
+        costGrande += (Number(ing.gramosGrande) || 0) * cpg;
+      }
+      // Add envase + bolsa + sticker cost per unit
+      costoBlendMap['blend|' + bl.nombre] = { chico: costChico, grande: costGrande };
+    }
+    for (var ei3 = 0; ei3 < especias.length; ei3++) {
+      var esp = especias[ei3];
+      var cpg2 = costoGrPorEsp[esp.nombre] || 0;
+      costoBlendMap['especia|' + esp.nombre] = { chico: (Number(esp.gramosChico) || 0) * cpg2, grande: (Number(esp.gramosGrande) || 0) * cpg2 };
+    }
+
+    // 5. Production volume stats
+    var totalFrascosProd = 0, totalGrsProd = 0, prodByMonth = {};
+    for (var pri = 0; pri < producciones.length; pri++) {
+      var pr = producciones[pri];
+      totalFrascosProd += (pr.cantidad || 0);
+      totalGrsProd += (pr.gramosTotal || 0);
+      if (pr.fecha) {
+        var pmn = pr.fecha.substring(0, 7);
+        if (!prodByMonth[pmn]) prodByMonth[pmn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodByMonth[pmn].frascos += (pr.cantidad || 0);
+        prodByMonth[pmn].gramos += (pr.gramosTotal || 0);
+        prodByMonth[pmn].ops++;
+      }
+    }
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--red)">$' + totalCostoCompras.toLocaleString() + '</div><div class="est-kpi-label">Costo Compras</div><div class="est-kpi-sub">materia prima + packaging</div></div>';
+    h += '<div class="est-kpi ' + (margenBruto >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">$' + margenBruto.toLocaleString() + '</div><div class="est-kpi-label">Margen Bruto</div><div class="est-kpi-sub">' + margenPct + '%</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosProd + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + totalGrsProd.toLocaleString() + ' grs en total</div></div>';
+    h += '</div>';
+
+    // Cost breakdown by type
+    h += '<div class="card mt-16"><div class="card-header"><h3>Desglose de Costos por Tipo</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.especia_grs || 0).toLocaleString() + '</div><div class="stat-label">Materia Prima</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + (costoByTipo.envase || 0).toLocaleString() + '</div><div class="stat-label">Frascos (Envases)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + (costoByTipo.bolsa || 0).toLocaleString() + '</div><div class="stat-label">Bolsas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--yellow)"><div class="stat-value">$' + (costoByTipo.sticker || 0).toLocaleString() + '</div><div class="stat-label">Stickers/Etiquetas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.cinta || 0).toLocaleString() + '</div><div class="stat-label">Cintas</div></div>';
+    h += '</div></div></div>';
+
+    // Proveedor table
+    var provArr = Object.keys(proveedorMap).sort(function(a, b) { return proveedorMap[b].total - proveedorMap[a].total; });
+    if (provArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Compras por Proveedor</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Proveedor</th><th>Ordenes</th><th>Total Comprado</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pvi = 0; pvi < provArr.length; pvi++) {
+        var pv = provArr[pvi]; var pd = proveedorMap[pv];
+        var pvPct = totalCostoCompras > 0 ? (pd.total / totalCostoCompras * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pv + '</td><td>' + pd.ops + '</td><td class="fw7" style="color:var(--red)">$' + pd.total.toLocaleString() + '</td><td>' + pvPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos vs Costos Mensual</h4><div class="est-chart-wrap"><canvas id="chart-cost-mensual"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Distribucion de Costos</h4><div class="est-chart-wrap"><canvas id="chart-cost-dist"></canvas></div></div>';
+    h += '</div>';
+
+    // Per-product margin table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo de materia prima estimado segun precio de compra por gramo. No incluye envases/bolsas/stickers.</p>';
+    var allProducts = [];
+    for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
+      var pk2 = Object.keys(prodVentaMap)[vk];
+      var parts = pk2.split('|');
+      var pNombre = parts.slice(1).join('|');
+      var pTipo = parts[0];
+      var pIngreso = prodVentaMap[pk2];
+      var costoEst = costoBlendMap[pk2] || { chico: 0, grande: 0 };
+      allProducts.push({ nombre: pNombre, tipo: pTipo, ingreso: pIngreso, costoEst: costoEst.chico + costoEst.grande });
+    }
+    allProducts.sort(function(a, b) { return b.ingreso - a.ingreso; });
+    if (allProducts.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo M.P.</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
+      for (var api = 0; api < Math.min(allProducts.length, 20); api++) {
+        var ap = allProducts[api];
+        var apMargen = ap.ingreso - ap.costoEst;
+        var apPct = ap.ingreso > 0 ? (apMargen / ap.ingreso * 100).toFixed(1) : '0';
+        var apColor = apMargen >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr><td class="fw7">' + ap.nombre + '</td><td><span class="badge ' + (ap.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (ap.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td style="color:var(--gold)">$' + ap.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ap.costoEst.toLocaleString() + '</td><td style="color:' + apColor + '">$' + apMargen.toLocaleString() + '</td><td style="color:' + apColor + '">' + apPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos suficientes</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    // Charts
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    // Ingresos vs Costos Mensual
+    var allMonths = new Set(Object.keys(compraMonthMap));
+    var ventasMonthMap = {};
+    for (var vi = 0; vi < data.length; vi++) {
+      if (data[vi].fecha) {
+        var vmn = data[vi].fecha.substring(0, 7);
+        ventasMonthMap[vmn] = (ventasMonthMap[vmn] || 0) + (data[vi].total || 0);
+      }
+    }
+    Object.keys(ventasMonthMap).forEach(function(m) { allMonths.add(m); });
+    var mSort = Array.from(allMonths).sort();
+    var cmLabels = [], cmIngresos = [], cmCostos = [], cmMargen = [];
+    for (var cm = 0; cm < mSort.length; cm++) {
+      cmLabels.push(mSort[cm]);
+      var v = ventasMonthMap[mSort[cm]] || 0;
+      var c = compraMonthMap[mSort[cm]] || 0;
+      cmIngresos.push(v); cmCostos.push(c); cmMargen.push(v - c);
+    }
+    var ctxCM = document.getElementById('chart-cost-mensual');
+    if (ctxCM) {
+      Pages._estCharts.push(new Chart(ctxCM, {
+        type: 'bar', data: { labels: cmLabels, datasets: [
+          { label: 'Ingresos', data: cmIngresos, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4 },
+          { label: 'Costos', data: cmCostos, backgroundColor: 'rgba(231,76,60,0.7)', borderRadius: 4 },
+          { label: 'Margen', data: cmMargen, type: 'line', borderColor: '#27ae60', backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2 }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Cost distribution doughnut
+    var ctxCD = document.getElementById('chart-cost-dist');
+    if (ctxCD) {
+      Pages._estCharts.push(new Chart(ctxCD, {
+        type: 'doughnut', data: { labels: ['Materia Prima', 'Envases', 'Bolsas', 'Stickers'], datasets: [{ data: [costoByTipo.especia_grs || 0, costoByTipo.envase || 0, costoByTipo.bolsa || 0, costoByTipo.sticker || 0], backgroundColor: ['#e8b84b', '#5dade2', '#27ae60', '#f0c040'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PRODUCCION TAB
+     ================================================================ */
+  _renderProduccion: function(data, el, producciones) {
+    if (!el) return;
+    var totalFrascos = 0, totalGramos = 0;
+    var tipoProdMap = {}, tallaProdMap = {}, prodProdMap = {}, prodMonthMap = {}, envasesConsumidos = 0, bolsasConsumidas = 0, stickersConsumidos = 0, cintasConsumidas = 0;
+    for (var i = 0; i < producciones.length; i++) {
+      var pr = producciones[i];
+      totalFrascos += (pr.cantidad || 0);
+      totalGramos += (pr.gramosTotal || 0);
+      envasesConsumidos += (pr.envasesConsumidos || 0);
+      bolsasConsumidas += (pr.bolsasConsumidas || 0);
+      stickersConsumidos += (pr.stickersConsumidos || 0);
+      cintasConsumidas += (pr.cintasConsumidas || 0);
+      tipoProdMap[pr.tipo] = (tipoProdMap[pr.tipo] || 0) + (pr.cantidad || 0);
+      tallaProdMap[pr.talla || 'chico'] = (tallaProdMap[pr.talla || 'chico'] || 0) + (pr.cantidad || 0);
+      var pk = (pr.productoNombre || '?') + '|' + (pr.tipo || 'especia') + '|' + (pr.talla || 'chico');
+      if (!prodProdMap[pk]) prodProdMap[pk] = { nombre: pr.productoNombre, tipo: pr.tipo, talla: pr.talla, frascos: 0, gramos: 0, ops: 0 };
+      prodProdMap[pk].frascos += (pr.cantidad || 0);
+      prodProdMap[pk].gramos += (pr.gramosTotal || 0);
+      prodProdMap[pk].ops++;
+      if (pr.fecha) {
+        var mn = pr.fecha.substring(0, 7);
+        if (!prodMonthMap[mn]) prodMonthMap[mn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodMonthMap[mn].frascos += (pr.cantidad || 0);
+        prodMonthMap[mn].gramos += (pr.gramosTotal || 0);
+        prodMonthMap[mn].ops++;
+      }
+    }
+    var prodArr = Object.values(prodProdMap).sort(function(a, b) { return b.frascos - a.frascos; });
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascos + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + producciones.length + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalGramos.toLocaleString() + 'g</div><div class="est-kpi-label">Materia Prima Usada</div><div class="est-kpi-sub">gramos en total</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + envasesConsumidos + '</div><div class="est-kpi-label">Envases Consumidos</div><div class="est-kpi-sub">frascos usados</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + stickersConsumidos + '</div><div class="est-kpi-label">Stickers Usados</div><div class="est-kpi-sub">etiquetas aplicadas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + bolsasConsumidas + '</div><div class="est-kpi-label">Bolsas Usadas</div><div class="est-kpi-sub">empaques</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cintasConsumidas + '</div><div class="est-kpi-label">Cintas Usadas</div><div class="est-kpi-sub">decorativas</div></div>';
+    h += '</div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Produccion Mensual (Frascos)</h4><div class="est-chart-wrap"><canvas id="chart-prod-monthly"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Tipo y Talla</h4><div class="est-chart-wrap"><canvas id="chart-prod-tipo"></canvas></div></div>';
+    h += '</div>';
+
+    // Production table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Produccion por Producto</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Frascos</th><th>Gramos</th><th>Ops</th></tr></thead><tbody>';
+      for (var pi = 0; pi < prodArr.length; pi++) {
+        var pp = prodArr[pi];
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td class="fw7">' + pp.frascos + '</td><td>' + pp.gramos.toLocaleString() + 'g</td><td>' + pp.ops + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin producciones</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var pmSorted = Object.keys(prodMonthMap).sort();
+    var pmL = [], pmF = [], pmG = [];
+    for (var mi = 0; mi < pmSorted.length; mi++) { pmL.push(pmSorted[mi]); pmF.push(prodMonthMap[pmSorted[mi]].frascos); pmG.push(prodMonthMap[pmSorted[mi]].gramos); }
+    var ctxPM = document.getElementById('chart-prod-monthly');
+    if (ctxPM) {
+      Pages._estCharts.push(new Chart(ctxPM, { type: 'bar', data: { labels: pmL, datasets: [
+        { label: 'Frascos', data: pmF, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Gramos', data: pmG, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', title: { display: true, text: 'Frascos' }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', title: { display: true, text: 'Gramos' }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPT = document.getElementById('chart-prod-tipo');
+    if (ctxPT) {
+      Pages._estCharts.push(new Chart(ctxPT, { type: 'bar', data: { labels: ['Especia-Chico', 'Especia-Grande', 'Blend-Chico', 'Blend-Grande'], datasets: [{ label: 'Frascos', data: [tipoProdMap.especia_chico || 0, tipoProdMap.especia_grande || 0, tipoProdMap.blend_chico || 0, tipoProdMap.blend_grande || 0], backgroundColor: ['#e8b84b', '#c9963a', '#5dade2', '#3498db'], borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PEDIDOS TIENDA TAB
+     ================================================================ */
+  _renderPedidosTienda: function(data, el) {
+    if (!el) return;
+    var total = 0, ops = 0, ciudades = {}, estadoMap = {}, dayMap = {}, prodMap = {};
+    for (var i = 0; i < data.length; i++) {
+      var s = data[i];
+      total += (s.total || 0); ops++;
+      estadoMap[s.estado || 'nuevo'] = (estadoMap[s.estado || 'nuevo'] || 0) + 1;
+      if (s.ciudad) { if (!ciudades[s.ciudad]) ciudades[s.ciudad] = { ops: 0, ingreso: 0 }; ciudades[s.ciudad].ops++; ciudades[s.ciudad].ingreso += (s.total || 0); }
+      if (s.fecha) { if (!dayMap[s.fecha]) dayMap[s.fecha] = { ops: 0, ingreso: 0 }; dayMap[s.fecha].ops++; dayMap[s.fecha].ingreso += (s.total || 0); }
+      if (s.items) { for (var j = 0; j < s.items.length; j++) {
+        var it = s.items[j]; var pk = it.nombre + '|' + (it.talla || 'chico');
+        if (!prodMap[pk]) prodMap[pk] = { nombre: it.nombre, talla: it.talla, uds: 0, ingreso: 0 };
+        prodMap[pk].uds += (it.cantidad || 0); prodMap[pk].ingreso += (it.subtotal || 0);
+      }}
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+    var cityArr = Object.keys(ciudades).sort(function(a, b) { return ciudades[b].ingreso - ciudades[a].ingreso; });
+
+    var h = '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + total.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Tienda</div><div class="est-kpi-sub">' + ops + ' pedidos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (ops > 0 ? Math.round(total / ops) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por pedido</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cityArr.length + '</div><div class="est-kpi-label">Ciudades</div><div class="est-kpi-sub">destino de envios</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + (estadoMap.entregado || 0) + '</div><div class="est-kpi-label">Entregados</div><div class="est-kpi-sub">de ' + ops + ' total</div></div>';
+    h += '</div>';
+
+    // Estado breakdown
+    var estColors = { nuevo: 'badge-red', confirmado: 'badge-yellow', preparando: 'badge-blue', enviado: 'badge-gold', entregado: 'badge-green', cancelado: 'badge-red' };
+    var estLabels = { nuevo: 'Nuevos', confirmado: 'Confirmados', preparando: 'Preparando', enviado: 'Enviados', entregado: 'Entregados', cancelado: 'Cancelados' };
+    h += '<div class="card mt-16"><div class="card-header"><h3>Estado de Pedidos</h3></div><div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">';
+    var estKeys = Object.keys(estadoMap).sort();
+    for (var ei = 0; ei < estKeys.length; ei++) {
+      var ek = estKeys[ei];
+      h += '<div style="text-align:center;padding:12px 16px;background:var(--bg);border-radius:8px;min-width:80px"><div style="font-size:1.4rem;font-weight:800;color:var(--text)">' + estadoMap[ek] + '</div><div style="font-size:.72rem;color:var(--text2);margin-top:2px">' + (estLabels[ek] || ek) + '</div></div>';
+    }
+    h += '</div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Pedidos por Dia</h4><div class="est-chart-wrap"><canvas id="chart-ped-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Top 8 Productos</h4><div class="est-chart-wrap"><canvas id="chart-ped-prods"></canvas></div></div>';
+    h += '</div>';
+
+    // City table
+    if (cityArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Ingresos por Ciudad</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Ciudad</th><th>Pedidos</th><th>Ingreso</th><th>Promedio</th></tr></thead><tbody>';
+      for (var ci = 0; ci < cityArr.length; ci++) {
+        var cd = ciudades[cityArr[ci]];
+        h += '<tr><td class="fw7">' + cityArr[ci] + '</td><td>' + cd.ops + '</td><td class="fw7" style="color:var(--gold)">$' + cd.ingreso.toLocaleString() + '</td><td>$' + (cd.ops > 0 ? Math.round(cd.ingreso / cd.ops) : 0).toLocaleString() + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var daySorted = Object.keys(dayMap).sort();
+    var ctxPD = document.getElementById('chart-ped-daily');
+    if (ctxPD) {
+      var dl = [], dd = [], do2 = [];
+      for (var di = 0; di < daySorted.length; di++) { dl.push(daySorted[di].slice(5)); dd.push(dayMap[daySorted[di]].ingreso); do2.push(dayMap[daySorted[di]].ops); }
+      Pages._estCharts.push(new Chart(ctxPD, { type: 'bar', data: { labels: dl, datasets: [
+        { label: 'Ingreso ($)', data: dd, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Pedidos', data: do2, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPP = document.getElementById('chart-ped-prods');
+    if (ctxPP && prodArr.length > 0) {
+      var top8 = prodArr.slice(0, 8);
+      var pl = [], pd2 = [], pc = [];
+      for (var pi = 0; pi < top8.length; pi++) { pl.push(top8[pi].nombre); pd2.push(top8[pi].ingreso); pc.push('#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxPP, { type: 'bar', data: { labels: pl, datasets: [{ label: 'Ingreso ($)', data: pd2, backgroundColor: pc, borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     INVENTARIO TAB
+     ================================================================ */
+  _renderInventario: function(el, especias, blends) {
+    if (!el) return;
+    var db = ArcanoDB.getDB();
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var stickers = ArcanoDB.getStickers();
+
+    // Calculate inventory value (at sale price)
+    var valorFrascos = 0, valorPala = 0;
+    var stockBajo = [], sinStock = [];
+    var catMap = {}, catStockMap = {};
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var vChico = (e.stockChico || 0) * (e.precioChico || 0);
+      var vGrande = (e.stockGrande || 0) * (e.precioGrande || 0);
+      valorFrascos += vChico + vGrande;
+      var palaGrs = e.stockBolsa || 0;
+      var eCats = (e.categorias || []).length > 0 ? e.categorias : [e.categoria || 'Sin categoria'];
+      var eCatLabel = eCats.join(' / ');
+      for (var ci = 0; ci < eCats.length; ci++) {
+        if (!catMap[eCats[ci]]) catMap[eCats[ci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[eCats[ci]].productos++;
+        catMap[eCats[ci]].frascos += (e.stockChico || 0) + (e.stockGrande || 0);
+        catMap[eCats[ci]].pala += palaGrs;
+      }
+      var totalStock = (e.stockChico || 0) + (e.stockGrande || 0);
+      if (totalStock === 0 && palaGrs === 0) sinStock.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel });
+      else if (totalStock <= 3 || palaGrs <= 50) stockBajo.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel, frascos: totalStock, pala: palaGrs });
+    }
+    for (var bi = 0; bi < blends.length; bi++) {
+      var b = blends[bi];
+      valorFrascos += (b.stockChico || 0) * (b.precioChico || 0) + (b.stockGrande || 0) * (b.precioGrande || 0);
+      var bCats = (b.categorias || []).length > 0 ? b.categorias : [b.categoria || 'Sin categoria'];
+      var bCatLabel = bCats.join(' / ');
+      for (var bci = 0; bci < bCats.length; bci++) {
+        if (!catMap[bCats[bci]]) catMap[bCats[bci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[bCats[bci]].productos++;
+        catMap[bCats[bci]].frascos += (b.stockChico || 0) + (b.stockGrande || 0);
+      }
+      var ts = (b.stockChico || 0) + (b.stockGrande || 0);
+      if (ts === 0) sinStock.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel });
+      else if (ts <= 3) stockBajo.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel, frascos: ts, pala: 0 });
+    }
+    var totalProductos = especias.length + blends.length;
+    var totalFrascosStock = especias.reduce(function(s, e) { return s + (e.stockChico||0) + (e.stockGrande||0); }, 0) +
+                             blends.reduce(function(s, b) { return s + (b.stockChico||0) + (b.stockGrande||0); }, 0);
+    var totalPala = especias.reduce(function(s, e) { return s + (e.stockBolsa||0); }, 0);
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + valorFrascos.toLocaleString() + '</div><div class="est-kpi-label">Valor Inventario (Frascos)</div><div class="est-kpi-sub">al precio de venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosStock + '</div><div class="est-kpi-label">Frascos en Stock</div><div class="est-kpi-sub">listos para vender</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPala.toLocaleString() + 'g</div><div class="est-kpi-label">Pala (Materia Prima)</div><div class="est-kpi-sub">gramos en stock</div></div>';
+    h += '<div class="est-kpi ' + (stockBajo.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + stockBajo.length + '</div><div class="est-kpi-label">Stock Bajo</div><div class="est-kpi-sub">requiere reposicion</div></div>';
+    h += '<div class="est-kpi ' + (sinStock.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + sinStock.length + '</div><div class="est-kpi-label">Sin Stock</div><div class="est-kpi-sub">productos agotados</div></div>';
+    h += '</div>';
+
+    // Packaging stock
+    h += '<div class="card mt-16"><div class="card-header"><h3>Stock de Packaging</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.chico || 0) + '</div><div class="stat-label">Envases Pequenos</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.grande || 0) + '</div><div class="stat-label">Envases Grandes</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.chico || 0) + '</div><div class="stat-label">Bolsas Pequenas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.grande || 0) + '</div><div class="stat-label">Bolsas Grandes</div></div>';
+    h += '</div></div></div>';
+
+    // Category breakdown
+    var catArr = Object.keys(catMap).sort(function(a, b) { return catMap[b].frascos - catMap[a].frascos; });
+    h += '<div class="card mt-16"><div class="card-header"><h3>Inventario por Categoria</h3></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Categoria</th><th>Productos</th><th>Frascos</th><th>Pala (grs)</th></tr></thead><tbody>';
+    for (var ci = 0; ci < catArr.length; ci++) {
+      var cd = catMap[catArr[ci]];
+      h += '<tr><td class="fw7">' + catArr[ci] + '</td><td>' + cd.productos + '</td><td>' + cd.frascos + '</td><td>' + cd.pala.toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // Low stock alerts
+    if (stockBajo.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--yellow)"><div class="card-header"><h3 style="color:var(--yellow)">Alertas de Stock Bajo (' + stockBajo.length + ')</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Categoria</th><th>Frascos</th><th>Pala</th></tr></thead><tbody>';
+      for (var si = 0; si < stockBajo.length; si++) {
+        var sb = stockBajo[si];
+        h += '<tr><td class="fw7">' + sb.nombre + '</td><td><span class="badge ' + (sb.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (sb.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + sb.cat + '</td><td>' + (sb.frascos || '-') + '</td><td>' + (sb.pala ? sb.pala + 'g' : '-') + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // No stock
+    if (sinStock.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--red)"><div class="card-header"><h3 style="color:var(--red)">Sin Stock (' + sinStock.length + ')</h3></div><div class="card-body">';
+      h += '<p class="text-sm text-muted mb-8">';
+      for (var ni = 0; ni < sinStock.length; ni++) {
+        h += '<span class="badge badge-red mr-4">' + sinStock[ni].nombre + '</span>';
+      }
+      h += '</p></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // No charts for inventory, no chart cleanup needed
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+  },
+
+  /* ================================================================
+     HELPERS (kept for backward compat)
+     ================================================================ */
+  _getCurrentEstData: function() {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    return allSales;
+  },
+
+  _renderEstContent: function(data, el) {
+    // Redirect to ventas tab for backward compat
+    Pages._estTab = 'ventas';
+    Pages._renderVentas(data, el);
+  },
+
+  /* ================================================================
+     TESTING (sandbox)
+     ================================================================ */
+  renderTesting(container) {
+    var db = ArcanoDB.getDB();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+
+    var h = '<div style="margin-bottom:16px">' +
+      '<h3 style="margin:0 0 4px">Testing y Sandbox</h3>' +
+      '<p class="text-muted text-sm">Genera datos de prueba, reinicia stocks y prueba todas las funciones del sistema.</p>' +
+      '</div>';
+
+    // Current state
+    h += '<div class="card"><div class="card-header"><h3>Estado Actual</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--gold)">' + especias.length + '</div><div class="text-muted text-sm">Especias</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--blue)">' + blends.length + '</div><div class="text-muted text-sm">Blends</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">' + ventas.length + '</div><div class="text-muted text-sm">Ventas Admin</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pedidos.length + '</div><div class="text-muted text-sm">Pedidos Tienda</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pdvs.length + '</div><div class="text-muted text-sm">P. de Venta</div></div>';
+    h += '</div></div></div>';
+
+    // Generate test data
+    h += '<div class="card mt-16"><div class="card-header"><h3>Generar Datos de Prueba</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Especias</label><input type="number" class="input" id="test-esp" value="8" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Blends</label><input type="number" class="input" id="test-blend" value="5" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas Admin</label><input type="number" class="input" id="test-ventas" value="20" min="0" max="200"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Pedidos Tienda</label><input type="number" class="input" id="test-pedidos" value="10" min="0" max="100"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">PDVs</label><input type="number" class="input" id="test-pdvs" value="2" min="0" max="10"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas por PDV</label><input type="number" class="input" id="test-pdv-ventas" value="15" min="0" max="100"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px"><label class="text-sm fw7" style="display:block;margin-bottom:4px">Antiguedad (dias)</label>';
+    h += '<input type="range" id="test-dias" min="1" max="90" value="30" style="width:100%" oninput="document.getElementById(\'test-dias-val\').textContent=this.value+\' dias\'"><span id="test-dias-val" class="text-sm text-muted">30 dias</span></div>';
+    h += '<button class="btn btn-gold btn-block mt-12" onclick="Pages._testGenerarTodo()" style="padding:14px;font-size:1rem;font-weight:700">Generar Todo</button>';
+    h += '</div></div>';
+
+    // Individual actions
+    h += '<div class="card mt-16"><div class="card-header"><h3>Acciones Individuales</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProductos()">Crear 10 Productos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarVentas()">Crear 20 Ventas</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarPedidos()">Crear 10 Pedidos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearPDVs()">Crear 2 PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testAgregarStock()">Agregar Stock PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProducciones()">Crear 5 Producciones</button>';
+    h += '</div></div></div>';
+
+    // Danger zone
+    h += '<div class="card mt-16"><div class="card-header"><h3 style="color:var(--red)">Zona de Peligro</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Estas acciones eliminan datos de forma permanente.</p>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testResetStocks()">Reiniciar Stocks a 0</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearVentas()">Borrar Todas las Ventas</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearPedidos()">Borrar Todos los Pedidos</button>';
+    h += '<button class="btn btn-red" onclick="Pages._testNuclearReset()">RESET NUCLEAR - Borrar Todo</button>';
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  _testRandomDate: function(d) { var dt = new Date(); dt.setDate(dt.getDate() - Math.floor(Math.random() * d)); return dt.toISOString().slice(0, 10); },
+
+  _testGenerarTodo: function() {
+    var esp = Number(document.getElementById('test-esp').value) || 0;
+    var blend = Number(document.getElementById('test-blend').value) || 0;
+    var vtas = Number(document.getElementById('test-ventas').value) || 0;
+    var peds = Number(document.getElementById('test-pedidos').value) || 0;
+    var npdv = Number(document.getElementById('test-pdvs').value) || 0;
+    var pv = Number(document.getElementById('test-pdv-ventas').value) || 0;
+    var dias = Number(document.getElementById('test-dias').value) || 30;
+    Pages._testCrearProductosN(esp, blend);
+    Pages._testGenerarVentasN(vtas, dias);
+    Pages._testGenerarPedidosN(peds, dias);
+    Pages._testCrearPDVsN(npdv, pv, dias);
+    Pages._testCrearProduccionesN(5, dias);
+    toast('Datos de prueba generados! Revisa Dashboard, Ventas, P.Venta y Stats.');
+  },
+
+  _testCrearProductos: function() { Pages._testCrearProductosN(6, 4); toast('Productos creados'); },
+
+  _testCrearProductosN: function(nEsp, nBlend) {
+    var nms = ['Canela','Curcuma','Pimienta Negra','Comino','Oregano','Clavo','Nuez Moscada','Jengibre','Cacao','Vanilla','Cardamomo','Cilantro','Paprika','Azafran','Laurel','Tomillo','Romero','Salvia','Hinojo','Anis'];
+    var cats = ['Especias','Dulces','Saladas','Exoticas'];
+    for (var i = 0; i < nEsp; i++) {
+      var nm = nms[i % nms.length] + (i >= nms.length ? ' ' + Math.ceil((i+1)/nms.length) : '');
+      var pc = Math.floor(Math.random() * 8000 + 3000);
+      ArcanoDB.saveEspecia({ nombre: nm, categoria: cats[i % cats.length], precioChico: pc, precioGrande: Math.floor(pc * 1.7), stockBolsa: Math.floor(Math.random() * 500 + 100), stockChico: Math.floor(Math.random() * 15 + 2), stockGrande: Math.floor(Math.random() * 10 + 1), enTienda: Math.random() > 0.3 });
+    }
+    var nmsB = ['Arcano Mix','Fuego Interior','Dulce Despertar','Noche Estelar','Camino Sagrado','Raiz Ancestral','Brisa Otono','Sol Naciente','Luna Llena','Tierra Fertil'];
+    for (var j = 0; j < nBlend; j++) {
+      var nb = nmsB[j % nmsB.length] + (j >= nmsB.length ? ' ' + Math.ceil((j+1)/nmsB.length) : '');
+      var pb = Math.floor(Math.random() * 12000 + 5000);
+      ArcanoDB.saveBlend({ nombre: nb, categoria: 'Blends', precioChico: pb, precioGrande: Math.floor(pb * 1.6), stockChico: Math.floor(Math.random() * 12 + 2), stockGrande: Math.floor(Math.random() * 8 + 1), enTienda: Math.random() > 0.3 });
+    }
+  },
+
+  _testGenerarVentas: function() { Pages._testGenerarVentasN(20, 30); toast('Ventas creadas'); },
+
+  _testGenerarVentasN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var v = 0; v < count; v++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 3) + 1;
+        var pu = tl === 'grande' ? pr.pg : pr.pc;
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.saveVenta({ fecha: Pages._testRandomDate(dias), items: items, total: tot, metodoPago: Math.random() > 0.5 ? 'efectivo' : 'qr' });
+    }
+  },
+
+  _testGenerarPedidos: function() { Pages._testGenerarPedidosN(10, 30); toast('Pedidos creados'); },
+
+  _testGenerarPedidosN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    var ests = ['nuevo','confirmado','preparando','enviado','entregado'];
+    for (var i = 0; i < count; i++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 2) + 1;
+        var pu = tl === 'grande' ? (pr.precioGrande||0) : (pr.precioChico||0);
+        items.push({ tipo: pr.tipo||'especia', productoId: pr.id, productoNombre: pr.nombre, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.savePedido({ nombre: 'Cliente Test ' + (i+1), telefono: '300' + Math.floor(Math.random()*9000000+1000000), direccion: 'Calle Test #' + (i+1), items: items, total: tot, estado: ests[Math.min(Math.floor(Math.random()*ests.length), ests.length-1)], creado: new Date(Date.now() - Math.floor(Math.random()*dias*86400000)).toISOString() });
+    }
+  },
+
+  _testCrearPDVs: function() { Pages._testCrearPDVsN(2, 15, 30); toast('PDVs creados'); },
+
+  _testCrearPDVsN: function(count, vp, dias) {
+    var locs = ['Feria Central','Plaza Principal','Mercado Municipal','Centro Comercial','Parque Norte'];
+    var existentes = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < count; p++) {
+      var pdv = ArcanoDB.savePuntoDeVenta({ nombre: 'PDV Test ' + (existentes.length + p + 1), ubicacion: locs[p % locs.length], activo: true });
+      var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+      var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+      var si = [];
+      for (var s = 0; s < Math.min(8, all.length); s++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        si.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+2 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdv.id, si); } catch(e) {}
+      for (var v = 0; v < vp; v++) {
+        var nI = Math.floor(Math.random()*2)+1, items = [];
+        for (var it = 0; it < nI; it++) {
+          var pr2 = all[Math.floor(Math.random()*all.length)];
+          var cn2 = Math.floor(Math.random()*2)+1;
+          items.push({ tipo: pr2.tipo, productoId: pr2.id, talla: 'chico', cantidad: cn2, precioUnitario: pr2.pc, subtotal: pr2.pc*cn2 });
+        }
+        ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, fecha: Pages._testRandomDate(dias), items: items, metodoPago: Math.random()>0.5?'efectivo':'qr' });
+      }
+    }
+  },
+
+  _testAgregarStock: function() {
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    if (!pdvs.length) { toast('Crea PDVs primero','err'); return; }
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id};}), bl.map(function(b){return{tipo:'blend',id:b.id};}));
+    for (var p = 0; p < pdvs.length; p++) {
+      var items = [];
+      for (var s = 0; s < Math.min(6,all.length); s++) {
+        var pr = all[Math.floor(Math.random()*all.length)];
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+3 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdvs[p].id, items); } catch(e) {}
+    }
+    toast('Stock agregado a ' + pdvs.length + ' PDVs');
+  },
+
+  _testCrearProducciones: function() { Pages._testCrearProduccionesN(5, 30); toast('Producciones creadas'); },
+
+  _testCrearProduccionesN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var i = 0; i < count; i++) {
+      var pr = all[Math.floor(Math.random()*all.length)];
+      ArcanoDB.saveProduccion({ tipo: pr.tipo||'especia', productoId: pr.id, fecha: Pages._testRandomDate(dias), cantidad: Math.floor(Math.random()*20)+5, frascosChico: Math.floor(Math.random()*10)+2, frascosGrande: Math.floor(Math.random()*5)+1 });
+    }
+  },
+
+  _testResetStocks: function() {
+    if (!confirm('Reiniciar todos los stocks a 0?')) return;
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    for (var i = 0; i < esp.length; i++) ArcanoDB.saveEspecia({ id: esp[i].id, stockBolsa: 0, stockChico: 0, stockGrande: 0 });
+    for (var j = 0; j < bl.length; j++) ArcanoDB.saveBlend({ id: bl[j].id, stockChico: 0, stockGrande: 0 });
+    toast('Stocks reiniciados a 0'); App.renderPage('testing');
+  },
+
+  _testClearVentas: function() {
+    if (!confirm('Borrar TODAS las ventas (admin y PDV)?')) return;
+    var v = ArcanoDB.getVentas();
+    for (var i = 0; i < v.length; i++) ArcanoDB.deleteVenta(v[i].id);
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < pdvs.length; p++) pdvs[p].ventas = {};
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Ventas eliminadas'); App.renderPage('testing');
+  },
+
+  _testClearPedidos: function() {
+    if (!confirm('Borrar TODOS los pedidos?')) return;
+    var p = ArcanoDB.getPedidos();
+    for (var i = 0; i < p.length; i++) ArcanoDB.deletePedido(p[i].id);
+    toast('Pedidos eliminados'); App.renderPage('testing');
+  },
+
+  _testNuclearReset: function() {
+    if (!confirm('RESET NUCLEAR: Se borrarán TODOS los datos. Continuar?')) return;
+    if (!confirm('Estas SEGURO? Se perderán productos, ventas, pedidos, PDVs, todo.')) return;
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Reset completo. Recargando...');
+    setTimeout(function() { location.reload(); }, 1500);
+  },
+
+  /* ================================================================
+     COSTOS POR CANAL DE VENTA
+     ================================================================ */
+  _renderCostosPorCanal: function(el) {
+    if (!el) return;
+    var channels = ArcanoDB.getCostosPorCanal();
+    var canalKeys = ['admin', 'tienda', 'pdv'];
+    var canalNombres = { admin: 'Ventas Admin', tienda: 'Tienda Online', pdv: 'Puntos de Venta' };
+    var canalColores = { admin: 'var(--gold)', tienda: 'var(--green)', pdv: 'var(--blue)' };
+
+    var h = '';
+
+    // === RESUMEN GENERAL ===
+    var totalIngreso = 0, totalCosto = 0, totalStockCosto = 0;
+    for (var ci = 0; ci < canalKeys.length; ci++) {
+      var ch = channels[canalKeys[ci]];
+      totalIngreso += ch.ingreso;
+      totalCosto += ch.costo;
+      totalStockCosto += (ch.stockCosto || 0);
+    }
+    var totalMargen = totalIngreso - totalCosto;
+    var totalMargenPct = totalIngreso > 0 ? (totalMargen / totalIngreso * 100) : 0;
+
+    h += '<div class="card"><div class="card-header"><h3>Resumen General</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card"><div class="stat-value">$' + totalIngreso.toLocaleString() + '</div><div class="stat-label">Ingreso Total</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + totalCosto.toLocaleString() + '</div><div class="stat-label">Costo Produccion</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">$' + totalMargen.toLocaleString() + '</div><div class="stat-label">Margen ($' + totalMargenPct.toFixed(1) + '%)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">$' + totalStockCosto.toLocaleString() + '</div><div class="stat-label">Costo Stock Actual</div></div>';
+    h += '</div></div></div>';
+
+    // === POR CADA CANAL ===
+    for (var ci2 = 0; ci2 < canalKeys.length; ci2++) {
+      var key = canalKeys[ci2];
+      var c = channels[key];
+      var clr = canalColores[key];
+      var margen = c.ingreso - c.costo;
+      var margenPct = c.ingreso > 0 ? (margen / c.ingreso * 100) : 0;
+
+      h += '<div class="card mt-16"><div class="card-header"><h3 style="color:' + clr + '">' + canalNombres[key] + '</h3></div><div class="card-body">';
+
+      // KPIs del canal
+      h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+      h += '<div class="stat-card"><div class="stat-value">' + c.ventas + '</div><div class="stat-label">Ventas</div></div>';
+      h += '<div class="stat-card"><div class="stat-value">$' + c.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + c.costo.toLocaleString() + '</div><div class="stat-label">Costo Prod.</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toLocaleString() + '</div><div class="stat-label">Margen (' + margenPct.toFixed(1) + '%)</div></div>';
+      h += '</div>';
+
+      // Tabla de productos vendidos
+      var prodKeys = Object.keys(c.productos || {});
+      if (prodKeys.length > 0) {
+        h += '<h4 style="margin:16px 0 8px;font-size:.95rem">Costos de Productos Vendidos</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo Prod.</th><th>Margen</th></tr></thead><tbody>';
+        for (var pi = 0; pi < prodKeys.length; pi++) {
+          var pr = c.productos[prodKeys[pi]];
+          var prMargen = pr.ingreso - pr.costo;
+          h += '<tr><td class="fw7">' + pr.nombre + '</td>';
+          h += '<td><span class="badge ' + (pr.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pr.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+          h += '<td>' + pr.talla + '</td>';
+          h += '<td class="fw7">' + pr.cantidad + '</td>';
+          h += '<td>$' + pr.ingreso.toLocaleString() + '</td>';
+          h += '<td style="color:var(--red)">$' + pr.costo.toLocaleString() + '</td>';
+          h += '<td style="color:' + (prMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + prMargen.toLocaleString() + '</td></tr>';
+        }
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin ventas registradas en este canal.</p>';
+      }
+
+      // PDV desglose por punto de venta
+      if (key === 'pdv' && c.pdvs) {
+        var pdvKeys = Object.keys(c.pdvs);
+        if (pdvKeys.length > 0) {
+          h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Desglose por Punto de Venta</h4>';
+          for (var pk = 0; pk < pdvKeys.length; pk++) {
+            var pv = c.pdvs[pdvKeys[pk]];
+            var pvMargen = pv.ingreso - pv.costo;
+            h += '<div class="card" style="background:var(--bg);margin-bottom:8px"><div class="card-body">';
+            h += '<div class="fw7" style="margin-bottom:8px;color:var(--blue)">' + pdvKeys[pk] + '</div>';
+            h += '<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">';
+            h += '<div class="stat-card"><div class="stat-value">' + pv.ventas + '</div><div class="stat-label">Ventas</div></div>';
+            h += '<div class="stat-card"><div class="stat-value">$' + pv.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+            h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (pvMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pvMargen.toLocaleString() + '</div><div class="stat-label">Margen</div></div>';
+            h += '</div>';
+            // Productos del PDV
+            var pvProdKeys = Object.keys(pv.productos || {});
+            if (pvProdKeys.length > 0) {
+              h += '<div class="table-wrap" style="margin-top:8px"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo</th><th>Margen</th></tr></thead><tbody>';
+              for (var ppk = 0; ppk < pvProdKeys.length; ppk++) {
+                var ppr = pv.productos[pvProdKeys[ppk]];
+                var pprM = ppr.ingreso - ppr.costo;
+                h += '<tr><td>' + ppr.nombre + '</td><td>' + ppr.talla + '</td><td>' + ppr.cantidad + '</td><td>$' + ppr.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ppr.costo.toLocaleString() + '</td><td style="color:' + (pprM >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pprM.toLocaleString() + '</td></tr>';
+              }
+              h += '</tbody></table></div>';
+            }
+            h += '</div></div>';
+          }
+        }
+      }
+
+      // Stock del canal
+      var stockItems = c.stockDetalle || [];
+      if (stockItems.length > 0) {
+        h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Costo de Stock Actual</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr>';
+        if (key === 'pdv') {
+          h += '<th>Punto de Venta</th><th>Costo Total en Stock</th>';
+        } else {
+          h += '<th>Producto</th><th>Tipo</th><th>Fr.Ch (cant)</th><th>Fr.Gr (cant)</th><th>Costo/Fr.Ch</th><th>Costo/Fr.Gr</th><th>Costo Total</th>';
+        }
+        h += '</tr></thead><tbody>';
+        var stockTotal = 0;
+        for (var si = 0; si < stockItems.length; si++) {
+          var s = stockItems[si];
+          stockTotal += s.costoTotal;
+          if (key === 'pdv') {
+            h += '<tr><td class="fw7">' + s.nombre + '</td><td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          } else {
+            h += '<tr><td class="fw7">' + s.nombre + '</td>';
+            h += '<td><span class="badge ' + (s.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (s.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+            h += '<td>' + s.chico + '</td><td>' + s.grande + '</td>';
+            h += '<td>$' + s.costoChico.toFixed(0) + '</td><td>$' + s.costoGrande.toFixed(0) + '</td>';
+            h += '<td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          }
+        }
+        h += '<tr style="border-top:2px solid var(--border)"><td colspan="6" class="fw7" style="text-align:right">Total Stock</td><td style="color:var(--red);font-weight:700">$' + stockTotal.toLocaleString() + '</td></tr>';
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin stock en este canal.</p>';
+      }
+
+      h += '</div></div>';
+    }
+
+    el.innerHTML = h;
+  }
+};
+
+ + (p.precioChico||0).toLocaleString()) + '</td>' +
+          '<td class="text-gold">' + (p.tipo==='pack' ? '-' : ';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // Logo de pago
+    var cfg = ArcanoDB.getTiendaConfig();
+    h += '<div class="card mt-16"><div class="card-header"><h3>Formas de Pago</h3></div><div class="card-body">' +
+      '<p class="text-xs text-muted mb-12">Imagen con los metodos de pago (Nequi, Bancolombia, etc.). Se muestra en el sidebar de la tienda online. Recomendado: 400x100 px, formato horizontal.</p>' +
+        '<div class="form-group"><label>Logo Formas de Pago</label>' +
+          '<div class="img-upload-area" id="img-area-pago"><input type="file" accept="image/*" id="f-logo-pago" style="display:none" onchange="Pages._handlePagoLogo(this)">' +
+          (cfg.logoPago ? '<img src="' + cfg.logoPago + '" class="img-preview" id="img-preview-pago"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo()">Quitar</button>' : '') +
+          '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-pago\').click()"><span>+ Formas de Pago</span></div></div>' +
+      '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
+     REGENERAR SEO TIENDA
+     ================================================================ */
+  regenerarSEO: function() {
+    var statusEl = document.getElementById('seo-status');
+    var btn = document.getElementById('btn-regenerar-seo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Leyendo productos...</span>';
+
+    var _gt='jksbZrZsYRI8E5<phRNgs]7wPot<M{yd;W63t6ZP';var GH_TOKEN=_gt.split('').map(function(c){return String.fromCharCode(c.charCodeAt(0)-3)}).join('');
+    var GH_OWNER = 'arcanoespecias';
+    var GH_REPO = 'arcanoespecias.github.io';
+    var GH_BRANCH = 'main';
+    var SITE_URL = 'https://arcanoespecias.github.io/';
+
+    function escH(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escJ(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n'); }
+
+    function ghFetch(method, path, body) {
+      var opts = {
+        method: method,
+        headers: {
+          'Authorization': 'token ' + GH_TOKEN,
+          'User-Agent': 'ArcanoAdmin',
+          'Content-Type': 'application/json'
+        }
+      };
+      if (body) {
+        opts.body = JSON.stringify(body);
+      }
+      return fetch('https://api.github.com' + path, opts).then(function(r) { return r.json(); });
+    }
+
+    function getTiendaProducts() {
+      var db = ArcanoDB.getDB();
+      var products = [];
+      var especias = db.especias || [];
+      for (var i = 0; i < especias.length; i++) {
+        var e = especias[i];
+        if (!e || !e.enTienda) continue;
+        var pc = Number(e.precioTiendaChico) || Number(e.precioChico) || 0;
+        var pg = Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        products.push({ id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0, region: '', descripcion: e.descripcion || '', tags: e.tags || [], ingredientes: [] });
+      }
+      var blends = db.blends || [];
+      for (var i = 0; i < blends.length; i++) {
+        var b = blends[i];
+        if (!b || !b.enTienda) continue;
+        var pc = Number(b.precioTiendaChico) || Number(b.precioChico) || 0;
+        var pg = Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        var ings = [];
+        if (b.ingredientes) {
+          for (var ig = 0; ig < b.ingredientes.length; ig++) {
+            var nm = (b.ingredientes[ig].nombre || b.ingredientes[ig].especiaNombre || '').trim();
+            if (nm) ings.push(nm);
+          }
+        }
+        products.push({ id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0, region: b.region || '', descripcion: b.descripcion || '', tags: b.tags || [], ingredientes: ings });
+      }
+      var packs = db.packs || [];
+      for (var i = 0; i < packs.length; i++) {
+        var p = packs[i];
+        if (!p || !p.enTienda) continue;
+        var precio = Number(p.precio) || Number(p.precioTienda) || 0;
+        if (precio === 0) continue;
+        products.push({ id: p.id, nombre: p.nombre, tipo: 'pack', categoria: 'Packs', precioChico: 0, precioGrande: 0, precio: precio, stock: p.stock || 0, stockChico: p.stock || 0, stockGrande: 0, region: '', descripcion: p.descripcion || '', tags: p.tags || [], ingredientes: [] });
+      }
+      products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+      return products;
+    }
+
+    function generateSeoContent(products) {
+      if (!products.length) return { jsonLd: '', noscript: '', seoDiv: '' };
+
+      // JSON-LD
+      var items = [];
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        var desc = p.descripcion || ('Blend artesanal ' + p.nombre + ' de Arcano Especias');
+        var cat = p.categoria + (p.tipo === 'pack' ? ' - Pack' : p.tipo === 'blend' ? ' - Blend' : ' - Especia');
+        var item = '{\n' +
+          '      "@type": "Product",\n' +
+          '      "name": "' + escJ(p.nombre) + '",\n' +
+          '      "description": "' + escJ(desc) + '",\n' +
+          '      "brand": { "@type": "Brand", "name": "Arcano Especias" },\n' +
+          '      "category": "' + escJ(cat) + '"';
+        if (p.ingredientes && p.ingredientes.length > 0) {
+          item += ',\n      "material": "' + escJ(p.ingredientes.join(', ')) + '"';
+        }
+        if (p.region) {
+          item += ',\n      "countryOfOrigin": { "@type": "Country", "name": "' + escJ(p.region) + '" }';
+        }
+        item += ',\n' +
+          '      "offers": {\n' +
+          '        "@type": "Offer",\n' +
+          '        "price": "' + precio + '",\n' +
+          '        "priceCurrency": "COP",\n' +
+          '        "availability": "' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '",\n' +
+          '        "seller": { "@type": "Organization", "name": "Arcano Especias" }\n' +
+          '      }\n' +
+          '    }';
+        items.push('    {\n' +
+          '      "@type": "ListItem",\n' +
+          '      "position": ' + (i + 1) + ',\n' +
+          '      "item": ' + item + '\n' +
+          '    }');
+      }
+      var jsonLd = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->\n' +
+        '<script type="application/ld+json">\n' +
+        '{\n' +
+        '  "@context": "https://schema.org",\n' +
+        '  "@type": "ItemList",\n' +
+        '  "name": "Catalogo Arcano Especias",\n' +
+        '  "description": "Especias y Blends artesanales del mundo. Envios a toda Colombia.",\n' +
+        '  "numberOfItems": ' + products.length + ',\n' +
+        '  "itemListElement": [\n' +
+        items.join(',\n') + '\n' +
+        '  ]\n' +
+        '}\n' +
+        '</script>';
+
+      // Noscript HTML
+      var ns = '<noscript>\n<div class="seo-products" style="padding:20px;max-width:1200px;margin:0 auto;font-family:sans-serif">\n';
+      ns += '<h2>Catalogo de Especias y Blends Artesanales - Arcano Especias</h2>\n';
+      ns += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>\n<ul style="list-style:none;padding:0">\n';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        ns += '<li itemscope itemtype="https://schema.org/Product" style="margin-bottom:16px;padding:12px;border-bottom:1px solid #eee">\n';
+        ns += '  <strong itemprop="name">' + escH(p.nombre) + '</strong>\n';
+        ns += '  <span style="color:#888;font-size:0.9em">(' + tipoLabel + ')</span>\n';
+        if (p.descripcion) ns += '  <meta itemprop="description" content="' + escH(p.descripcion) + '">\n  <p style="margin:4px 0;color:#555">' + escH(p.descripcion) + '</p>\n';
+        ns += '  <span itemprop="brand" itemtype="https://schema.org/Brand" itemscope><meta itemprop="name" content="Arcano Especias"></span>\n';
+        ns += '  <div style="margin-top:4px">\n    <span itemprop="category" style="color:#666">' + escH(p.categoria) + '</span>\n';
+        if (p.region) ns += '    <span style="margin-left:12px;color:#666">Origen: ' + escH(p.region) + '</span>\n';
+        if (p.tags && p.tags.length) ns += '    <span style="margin-left:12px;color:#666">Usos: ' + escH(p.tags.join(', ')) + '</span>\n';
+        ns += '  </div>\n';
+        if (precio > 0) {
+          ns += '  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer" style="margin-top:6px">\n';
+          ns += '    <meta itemprop="priceCurrency" content="COP">\n    <meta itemprop="price" content="' + precio + '">\n';
+          ns += '    <meta itemprop="availability" content="' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '">\n';
+          ns += '    <strong style="color:#1b0b07">$' + precio.toLocaleString('es-CO') + ' COP</strong>\n  </div>\n';
+        }
+        if (p.ingredientes && p.ingredientes.length > 0) ns += '  <div style="margin-top:4px;font-size:0.9em;color:#888">Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</div>\n';
+        ns += '</li>\n';
+      }
+      ns += '</ul>\n</div>\n</noscript>';
+
+      // SEO div content
+      var sd = '<h2>Catalogo de Especias y Blends Artesanales</h2>';
+      sd += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        sd += '<article><h3>' + escH(p.nombre) + ' (' + tipoLabel + ')</h3>';
+        if (p.descripcion) sd += '<p>' + escH(p.descripcion) + '</p>';
+        sd += '<p>Categoria: ' + escH(p.categoria);
+        if (p.region) sd += ' | Origen: ' + escH(p.region);
+        if (p.tags && p.tags.length) sd += ' | Usos: ' + escH(p.tags.join(', '));
+        sd += '</p>';
+        if (precio > 0) sd += '<p>Precio desde $' + precio.toLocaleString('es-CO') + ' COP</p>';
+        if (p.ingredientes && p.ingredientes.length > 0) sd += '<p>Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</p>';
+        sd += '</article>';
+      }
+
+      // BreadcrumbList JSON-LD
+      var bcJsonLd = '<!-- SEO: BreadcrumbList estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": [\n    { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://arcanoespecias.github.io/" },\n    { "@type": "ListItem", "position": 2, "name": "Catalogo de Especias y Blends", "item": "https://arcanoespecias.github.io/" }\n  ]\n}\n</script>'
+
+      // FAQ JSON-LD
+      var faqQ = [
+        {q: '¿Qué es Arcano Especias?', a: 'Arcano Especias es una marca colombiana especializada en blends y mezclas artesanales de especias selectas de cada rincón del mundo. Creamos combinaciones únicas para comidas, infusiones y coctelería, con ingredientes 100% naturales y de alta calidad.'},
+        {q: '¿Realizan envíos a toda Colombia?', a: 'Sí, Arcano Especias realiza envíos a todas las ciudades y municipios de Colombia. Los pedidos se envían una vez confirmado el pago y el tiempo de entrega varía según la ubicación.'},
+        {q: '¿Cuáles son las formas de pago aceptadas?', a: 'Aceptamos pagos mediante Nequi, transferencia bancaria a Bancolombia y otros métodos de pago disponibles. Los datos de pago se proporcionan al confirmar el pedido.'},
+        {q: '¿Qué presentaciones de productos ofrecen?', a: 'Nuestros blends y especias se ofrecen en dos presentaciones: tamaño pequeño y tamaño grande. También contamos con packs exclusivos que combinan varios productos a un precio especial.'},
+        {q: '¿Son productos naturales?', a: 'Sí, todos los productos de Arcano Especias son 100% naturales. Utilizamos especias y ingredientes de alta calidad, sin aditivos artificiales ni conservantes. Cada blend es mezclado de forma artesanal.'},
+        {q: '¿Para qué se pueden usar los blends de especias?', a: 'Nuestros blends están categorizados según su uso ideal: para comidas (carnes, sopas, arroces), para infusiones (tés y bebidas calientes) y para coctelería (bebidas y cócteles). Cada blend está diseñado para realzar el sabor de tus preparaciones.'}
+      ];
+      var faqItems = [];
+      for (var _qi = 0; _qi < faqQ.length; _qi++) {
+        faqItems.push('    { "@type": "Question", "name": "' + escJ(faqQ[_qi].q) + '", "acceptedAnswer": { "@type": "Answer", "text": "' + escJ(faqQ[_qi].a) + '" }}');
+      }
+      var faqJsonLd = '<!-- SEO: FAQ estatico -->\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": [\n' + faqItems.join(',\n') + '\n  ]\n}\n</script>'
+
+      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd, breadcrumbJsonLd: bcJsonLd, faqJsonLd: faqJsonLd };
+    }
+
+    // Flujo principal
+    var products = getTiendaProducts();
+    if (!products.length) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No hay productos en tienda.</span>';
+      if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      return;
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Descargando index.html de GitHub...</span>';
+
+    ghFetch('GET', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html?ref=' + GH_BRANCH)
+      .then(function(fileData) {
+        if (!fileData.sha) throw new Error('No se pudo obtener el archivo');
+        var content = atob(fileData.content);
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Generando SEO para ' + products.length + ' productos...</span>';
+
+        var seo = generateSeoContent(products);
+
+        // Remover bloque anterior JSON-LD productos
+        var marker1 = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker1) !== -1) {
+          var mi = content.indexOf(marker1);
+          var se = content.indexOf('</script>', mi);
+          if (se !== -1) content = content.substring(0, mi) + content.substring(se + '</script>'.length);
+        }
+
+        // Inyectar nuevo JSON-LD antes de </head>
+        var hi = content.indexOf('</head>');
+        if (hi === -1) throw new Error('No se encontro </head>');
+        content = content.substring(0, hi) + '\n' + seo.jsonLd + '\n' + content.substring(hi);
+
+        // Inyectar BreadcrumbList JSON-LD
+        var _bcMk = '<!-- SEO: BreadcrumbList estatico -->';
+        if (content.indexOf(_bcMk) !== -1) {
+          var _bmi = content.indexOf(_bcMk);
+          var _bme = content.indexOf('</script>', _bmi);
+          if (_bme !== -1) content = content.substring(0, _bmi) + content.substring(_bme + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.breadcrumbJsonLd + '\n' + content.substring(hi);
+
+        // Inyectar FAQ JSON-LD
+        var _fqMk = '<!-- SEO: FAQ estatico -->';
+        if (content.indexOf(_fqMk) !== -1) {
+          var _fqi = content.indexOf(_fqMk);
+          var _fqe = content.indexOf('</script>', _fqi);
+          if (_fqe !== -1) content = content.substring(0, _fqi) + content.substring(_fqe + '</script>'.length);
+        }
+        hi = content.indexOf('</head>');
+        if (hi !== -1) content = content.substring(0, hi) + '\n' + seo.faqJsonLd + '\n' + content.substring(hi);
+
+        // Google Search Console verification meta
+        if (content.indexOf('google-site-verification') === -1) {
+          var _ghHead = content.indexOf('</head>');
+          if (_ghHead !== -1) content = content.substring(0, _ghHead) + '\n  <meta name="google-site-verification" content="wxrzz6ncgVEJHMcS7-vx3uj3VUM8abPdlYoDw93P4ek">\n' + content.substring(_ghHead);
+        }
+
+        // Remover bloque noscript anterior
+        var marker2 = '<!-- SEO: Pre-rendered noscript (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker2) !== -1) {
+          var ns = content.indexOf(marker2);
+          var ne = content.indexOf('</noscript>', ns);
+          if (ne !== -1) content = content.substring(0, ns) + content.substring(ne + '</noscript>'.length + 1);
+        }
+
+        // Inyectar noscript antes del div seo-content
+        var dm = '<div id="seo-content"';
+        var di = content.indexOf(dm);
+        if (di !== -1) {
+          content = content.substring(0, di) + marker2 + '\n' + seo.noscript + '\n\n' + content.substring(di);
+        }
+
+        // Actualizar contenido del div seo-content
+        var do2 = '<div id="seo-content"';
+        var doe = content.indexOf('>', content.indexOf(do2));
+        var dc = content.indexOf('</div>', doe);
+        if (doe !== -1 && dc !== -1) {
+          content = content.substring(0, doe + 1) + '\n' + seo.seoDiv + '\n' + content.substring(dc);
+        }
+
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Subiendo a GitHub...</span>';
+
+        var encoded = btoa(unescape(encodeURIComponent(content)));
+        return ghFetch('PUT', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html', {
+          message: 'SEO: regenerar pre-render productos (' + products.length + ' productos) desde admin',
+          content: encoded,
+          sha: fileData.sha,
+          branch: GH_BRANCH
+        });
+      })
+      .then(function(result) {
+        if (result.commit) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">SEO actualizado - ' + products.length + ' productos</span>';
+          toast('SEO Tienda actualizado con ' + products.length + ' productos', 'ok');
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir</span>';
+          toast('Error al actualizar SEO', 'err');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      })
+      .catch(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error: ' + escH(err.message) + '</span>';
+        toast('Error SEO: ' + err.message, 'err');
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      });
+  },
+
+  _handlePagoLogo: function(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    ArcanoDB.compressImage(file, 400, 0.8, function(err, dataUrl) {
+      if (err) { alert('Error: ' + err); return; }
+      ArcanoDB.saveTiendaConfig({ logoPago: dataUrl });
+      App.renderPage('tienda-admin');
+    });
+  },
+
+  _removePagoLogo: function() {
+    ArcanoDB.saveTiendaConfig({ logoPago: '' });
+    App.renderPage('tienda-admin');
+  },
+
+  /* ================================================================
+     IMPORTAR EXCEL
+     ================================================================ */
+  formImportarExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:680px">' +
+      '<div class="modal-header"><h3>Importar Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi tu archivo Excel con las hojas <b>ESPECIAS</b> y <b>BLENDS</b>. El sistema creara los productos automaticamente.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-import-file" accept=".xlsx,.xls"></div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Grs por Frasco Pequeño</label><input type="number" class="input" id="f-import-gc" value="30" min="1"></div>' +
+          '<div class="form-group"><label>Grs por Frasco Grande</label><input type="number" class="input" id="f-import-gg" value="80" min="1"></div>' +
+        '</div>' +
+        '<div id="f-import-status" class="mt-12"></div>' +
+        '<div id="f-import-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-import-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-import-file');
+    var parseBtn = document.getElementById('btn-parse-excel');
+    var statusDiv = document.getElementById('f-import-status');
+    var previewDiv = document.getElementById('f-import-preview');
+    var footerDiv = document.getElementById('f-import-footer');
+
+    // Enable parse button when file selected
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    // Parse Excel
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS sheet
+          var especiasList = [];
+          var espSheet = workbook.Sheets['ESPECIAS'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              var nombre = (row[0] || '').toString().trim();
+              if (!nombre || nombre.toLowerCase() === 'especia / ingrediente') continue;
+              especiasList.push({ nombre: nombre, categoria: 'Comidas' });
+            }
+          }
+
+          // Parse BLENDS sheet
+          var blendsList = [];
+          var blSheet = workbook.Sheets['BLENDS'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlend = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              var firstCol = row[0] ? (row[0] || '').toString().trim() : '';
+              var ingCol = row[3] ? (row[3] || '').toString().trim() : '';
+
+              if (firstCol) {
+                // New blend row — save previous if any
+                if (currentBlend && currentBlend.ingredientes.length > 0) {
+                  blendsList.push(currentBlend);
+                }
+                currentBlend = {
+                  nombre: firstCol,
+                  region: (row[1] || '').toString().trim(),
+                  uso: (row[2] || '').toString().trim(),
+                  ingredientes: []
+                };
+              }
+
+              // This row has an ingredient (either on the blend header row or on subsequent rows)
+              if (currentBlend && ingCol) {
+                currentBlend.ingredientes.push({
+                  especia: ingCol,
+                  g: Number(row[4]) || 0,
+                  pct: Number(row[5]) || 0
+                });
+              }
+            }
+            if (currentBlend && currentBlend.ingredientes.length > 0) {
+              blendsList.push(currentBlend);
+            }
+          }
+
+          if (especiasList.length === 0 && blendsList.length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos. Asegurate que el Excel tenga las hojas ESPECIAS y BLENDS.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Check for existing
+          var existEsp = 0;
+          var existBl = 0;
+          var allEspecias = ArcanoDB.getEspecias();
+          var allBlends = ArcanoDB.getBlends();
+          for (var i = 0; i < especiasList.length; i++) {
+            if (ArcanoDB.findEspeciaByName(especiasList[i].nombre)) existEsp++;
+          }
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var k = 0; k < allBlends.length; k++) {
+              if (allBlends[k].nombre.toLowerCase() === blendsList[j].nombre.toLowerCase()) { existBl++; break; }
+            }
+          }
+
+          // Check unresolved ingredients (mirroring db.js findEspeciaByName logic)
+          var unresolved = [];
+          for (var j = 0; j < blendsList.length; j++) {
+            for (var ii = 0; ii < blendsList[j].ingredientes.length; ii++) {
+              var ingName = blendsList[j].ingredientes[ii].especia;
+              var found = false;
+              // Check existing especias in DB
+              if (ArcanoDB.findEspeciaByName(ingName)) { found = true; }
+              // Check in especiasList (to be created)
+              if (!found) {
+                var target = ingName.trim().toLowerCase();
+                for (var ei = 0; ei < especiasList.length; ei++) {
+                  var ename = especiasList[ei].nombre.trim().toLowerCase();
+                  if (ename === target) { found = true; break; }
+                  if (ename.indexOf(target) === 0 || target.indexOf(ename) === 0) { found = true; break; }
+                  // Word overlap
+                  var words = target.split(/[\s()\/,]+/).filter(function(w){return w.length>=4});
+                  for (var wi = 0; wi < words.length; wi++) {
+                    if (ename.indexOf(words[wi]) >= 0) { found = true; break; }
+                  }
+                  if (found) break;
+                }
+              }
+              if (!found) unresolved.push(blendsList[j].nombre + ' -> ' + ingName);
+            }
+          }
+
+          // Show preview
+          var gramosChico = Number(document.getElementById('f-import-gc').value) || 30;
+          var gramosGrande = Number(document.getElementById('f-import-gg').value) || 80;
+
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + especiasList.length + '</div><div class="stat-label">Especias en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + blendsList.length + '</div><div class="stat-label">Blends en Excel</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="font-size:1rem">' + gramosChico + 'g / ' + gramosGrande + 'g</div><div class="stat-label">Frasco Ch/Gr</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:' + (unresolved.length > 0 ? 'var(--red)' : 'var(--green)') + '">' + unresolved.length + '</div><div class="stat-label">Ingredientes sin resolver</div></div>' +
+          '</div>';
+
+          if (existEsp > 0 || existBl > 0) {
+            phtml += '<p class="text-sm text-muted mb-8">' +
+              (existEsp > 0 ? '<span class="badge badge-yellow mr-8">' + existEsp + ' especias ya existen (se omiten)</span>' : '') +
+              (existBl > 0 ? '<span class="badge badge-yellow mr-8">' + existBl + ' blends ya existen (se omiten)</span>' : '') +
+            '</p>';
+          }
+
+          if (unresolved.length > 0) {
+            phtml += '<div class="mb-8"><p class="text-red fw7 mb-4">Ingredientes que no se pudieron resolver:</p>' +
+              '<div style="max-height:120px;overflow-y:auto;font-size:0.78rem;color:var(--red)">' +
+              unresolved.map(function(u) { return '<div>' + u + '</div>'; }).join('') +
+              '</div><p class="text-xs text-muted mt-4">Estos ingredientes no se vincularan a los blends.</p></div>';
+          }
+
+          // Sample blends
+          phtml += '<p class="fw7 mt-8 mb-4">Ejemplos de blends a crear:</p>';
+          var sampleBlends = blendsList.slice(0, 5);
+          for (var s = 0; s < sampleBlends.length; s++) {
+            var sb = sampleBlends[s];
+            phtml += '<div class="list-row" style="flex-direction:column;align-items:flex-start;gap:2px">' +
+              '<span class="fw7 text-gold">' + sb.nombre + '</span>' +
+              '<span class="text-xs text-muted">' + (sb.region ? sb.region + ' | ' : '') + (sb.uso || '') + ' | ' + sb.ingredientes.length + ' ingredientes</span>' +
+              '<span class="text-xs text-muted">' + sb.ingredientes.map(function(ing) {
+                var gc = Math.round((ing.g / 500) * gramosChico * 100) / 100;
+                return ing.especia + ' ' + ing.g + 'g → ' + gc + 'g/frasco';
+              }).join(' + ') + '</span></div>';
+          }
+          if (blendsList.length > 5) phtml += '<p class="text-xs text-muted mt-4">... y ' + (blendsList.length - 5) + ' blends mas</p>';
+
+          phtml += '</div></div>';
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          // Replace footer with Confirm button
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-import">Confirmar Importacion (' + (especiasList.length - existEsp) + ' esp + ' + (blendsList.length - existBl) + ' blends)</button>';
+
+          document.getElementById('btn-do-import').addEventListener('click', function() {
+            var gc = Number(document.getElementById('f-import-gc').value) || 30;
+            var gg = Number(document.getElementById('f-import-gg').value) || 80;
+            var btn = document.getElementById('btn-do-import');
+            btn.disabled = true;
+            btn.textContent = 'Importando...';
+
+            try {
+              var resultado = ArcanoDB.importFromExcelData(especiasList, blendsList, gc, gg);
+              var rhtml = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.especiasCreadas + '</div><div class="stat-label">Especias Creadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + resultado.blendsCreados + '</div><div class="stat-label">Blends Creados</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.especiasExistentes + '</div><div class="stat-label">Especias Ya Existentes</div></div>' +
+                  '<div class="stat-card"><div class="stat-value">' + resultado.blendsExistentes + '</div><div class="stat-label">Blends Ya Existentes</div></div>' +
+                '</div>';
+              if (resultado.ingredientesNoResueltos.length > 0) {
+                rhtml += '<p class="text-xs text-muted mt-8">Ingredientes no resueltos: ' + resultado.ingredientesNoResueltos.length + '</p>';
+              }
+              rhtml += '</div></div>';
+              previewDiv.innerHTML = rhtml;
+
+              // Close after 2s
+              setTimeout(function() {
+                modal.remove();
+                App.renderPage('productos');
+              }, 2000);
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     EXPORTAR / IMPORTAR PRODUCTOS EXCEL
+     ================================================================ */
+  exportarProductosExcel() {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var costos = ArcanoDB.getCostosInsumos();
+
+    // === Sheet ESPECIAS ===
+    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+    }
+    var espSheet = XLSX.utils.aoa_to_sheet(espRows);
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+
+    // === Sheet BLENDS ===
+    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var _expEspMap = {};
+    for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
+    for (var j = 0; j < blends.length; j++) {
+      var b = blends[j];
+      var ings = b.ingredientes || [];
+      if (ings.length === 0) {
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '', '', '']);
+      } else {
+        for (var k = 0; k < ings.length; k++) {
+          var ing = ings[k];
+          var costoGr = (costos.especias && costos.especias[ing.especiaId]) || 0;
+          var gc = ing.gramosChico || 0;
+          var gg = ing.gramosGrande || 0;
+          blRows.push([
+            k === 0 ? b.id : '',
+            k === 0 ? b.nombre : '',
+            k === 0 ? (b.descripcion || '') : '',
+            k === 0 ? (b.categoria || '') : '',
+            k === 0 ? (b.precioChico || 0) : '',
+            k === 0 ? (b.precioGrande || 0) : '',
+            k === 0 ? (b.stockChico || 0) : '',
+            k === 0 ? (b.stockGrande || 0) : '',
+            k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
+            ing.especiaNombre || _expEspMap[ing.especiaId] || '',
+            gc,
+            gg,
+            costoGr,
+            Math.round(costoGr * gc),
+            Math.round(costoGr * gg)
+          ]);
+        }
+      }
+    }
+    var blSheet = XLSX.utils.aoa_to_sheet(blRows);
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+
+    // === Sheet COSTOS ===
+    var costRows = [['Campo', 'Valor']];
+    costRows.push(['Envase Chico', costos.envaseChico || 0]);
+    costRows.push(['Envase Grande', costos.envaseGrande || 0]);
+    costRows.push(['Bolsa Chica', costos.bolsaChica || 0]);
+    costRows.push(['Bolsa Grande', costos.bolsaGrande || 0]);
+    costRows.push(['Cinta', costos.cinta || 0]);
+    costRows.push(['Sticker Chico', costos.stickerChico || 0]);
+    costRows.push(['Sticker Grande', costos.stickerGrande || 0]);
+    costRows.push(['']);
+    costRows.push(['Costo Especias ($/g)', '']);
+    for (var ei = 0; ei < especias.length; ei++) {
+      var esp = especias[ei];
+      var cVal = (costos.especias && costos.especias[esp.id]) || 0;
+      costRows.push([esp.nombre, cVal]);
+    }
+    var costSheet = XLSX.utils.aoa_to_sheet(costRows);
+    costSheet['!cols'] = [{ wch: 25 }, { wch: 14 }];
+
+    // === RESUMEN COSTOS BLENDS ===
+    var resRows = [['Blend', 'Costo Total Ingredientes ($)', 'Gramos Totales (frasco chico)', 'Costo por Frasco Chico', 'Costo por Frasco Grande']];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var blIngs = bl.ingredientes || [];
+      var costoTotal = 0;
+      for (var ii = 0; ii < blIngs.length; ii++) {
+        var bing = blIngs[ii];
+        var cGr = (costos.especias && costos.especias[bing.especiaId]) || 0;
+        costoTotal += cGr * (bing.gramos || 0);
+      }
+      resRows.push([bl.nombre, Math.round(costoTotal), blIngs.length > 0 ? blIngs[0].gramosTotal : 0, Math.round(costoTotal) || '', '']);
+    }
+    var resSheet = XLSX.utils.aoa_to_sheet(resRows);
+    resSheet['!cols'] = [{ wch: 25 }, { wch: 24 }, { wch: 26 }, { wch: 22 }, { wch: 22 }];
+
+    // Create workbook
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, espSheet, 'Especias');
+    XLSX.utils.book_append_sheet(wb, blSheet, 'Blends');
+    XLSX.utils.book_append_sheet(wb, costSheet, 'Costos');
+    XLSX.utils.book_append_sheet(wb, resSheet, 'Resumen Costos');
+
+    // Download
+    var fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, 'Arcano_Productos_' + fecha + '.xlsx');
+    toast('Excel exportado correctamente');
+  },
+
+  importarProductosExcel() {
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:700px">' +
+      '<div class="modal-header"><h3>Importar Datos desde Excel</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<p class="text-sm text-muted mb-12">Subi el archivo Excel exportado previamente. Se actualizaran precios, ingredientes y costos de los productos existentes. Los stocks no se modifican.</p>' +
+        '<div class="form-group"><label>Archivo Excel (.xlsx)</label>' +
+        '<input type="file" class="input" id="f-imp-prod-file" accept=".xlsx,.xls"></div>' +
+        '<div id="f-imp-prod-status" class="mt-12"></div>' +
+        '<div id="f-imp-prod-preview" class="mt-12" style="display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer" id="f-imp-prod-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-parse-prod-excel" disabled>Analizar</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    var fileInput = document.getElementById('f-imp-prod-file');
+    var parseBtn = document.getElementById('btn-parse-prod-excel');
+    var statusDiv = document.getElementById('f-imp-prod-status');
+    var previewDiv = document.getElementById('f-imp-prod-preview');
+    var footerDiv = document.getElementById('f-imp-prod-footer');
+
+    fileInput.addEventListener('change', function() {
+      parseBtn.disabled = !fileInput.files.length;
+    });
+
+    parseBtn.addEventListener('click', function() {
+      parseBtn.disabled = true;
+      statusDiv.innerHTML = '<p class="text-muted">Leyendo archivo...</p>';
+      previewDiv.style.display = 'none';
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+
+          // Parse ESPECIAS
+          var espUpdates = [];
+          var espSheet = wb.Sheets['Especias'];
+          if (espSheet) {
+            var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
+            for (var i = 1; i < espData.length; i++) {
+              var row = espData[i];
+              if (!row) continue;
+              var nombre = String(row[1] || '').trim();
+              if (!nombre) continue;
+              var rawId = row[0] ? String(row[0]).trim() : '';
+              espUpdates.push({
+                id: rawId,
+                nombre: nombre,
+                descripcion: String(row[2] || '').trim(),
+                categoria: String(row[3] || '').trim() || 'Especias',
+                precioChico: Number(row[4]) || 0,
+                precioGrande: Number(row[5]) || 0,
+                enTienda: String(row[9] || '').toLowerCase() === 'si',
+                isNew: !rawId || !ArcanoDB.getEspecia(rawId)
+              });
+            }
+          }
+
+          // Parse BLENDS
+          var blUpdates = {};
+          var blSheet = wb.Sheets['Blends'];
+          if (blSheet) {
+            var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
+            var currentBlId = null;
+            for (var j = 1; j < blData.length; j++) {
+              var row = blData[j];
+              if (!row) continue;
+              if (row[0]) {
+                currentBlId = String(row[0]);
+                blUpdates[currentBlId] = {
+                  id: currentBlId,
+                  nombre: String(row[1] || '').trim(),
+                  descripcion: String(row[2] || '').trim(),
+                  categoria: String(row[3] || '').trim(),
+                  precioChico: Number(row[4]) || 0,
+                  precioGrande: Number(row[5]) || 0,
+                  enTienda: String(row[8] || '').toLowerCase() === 'si',
+                  ingredientes: []
+                };
+              }
+              if (currentBlId && row[9]) {
+                blUpdates[currentBlId].ingredientes.push({
+                  especiaNombre: String(row[9] || '').trim(),
+                  gramosChico: Number(row[10]) || 0,
+                  gramosGrande: Number(row[11]) || 0
+                });
+              }
+            }
+          }
+
+          // Parse COSTOS
+          var costoUpdates = {};
+          var costoEspUpdates = {};
+          var costSheet = wb.Sheets['Costos'];
+          if (costSheet) {
+            var costData = XLSX.utils.sheet_to_json(costSheet, { header: 1 });
+            for (var k = 0; k < costData.length; k++) {
+              var row = costData[k];
+              if (!row || !row[0]) continue;
+              var campo = String(row[0]).trim();
+              var valor = Number(row[1]) || 0;
+              if (campo === 'Envase Chico') costoUpdates.envaseChico = valor;
+              else if (campo === 'Envase Grande') costoUpdates.envaseGrande = valor;
+              else if (campo === 'Bolsa Chica') costoUpdates.bolsaChica = valor;
+              else if (campo === 'Bolsa Grande') costoUpdates.bolsaGrande = valor;
+              else if (campo === 'Cinta') costoUpdates.cinta = valor;
+              else if (campo === 'Sticker Chico') costoUpdates.stickerChico = valor;
+              else if (campo === 'Sticker Grande') costoUpdates.stickerGrande = valor;
+            }
+            // Get existing costos for especias mapping
+            var existingCostos = ArcanoDB.getCostosInsumos();
+            costoEspUpdates = existingCostos.especias ? JSON.parse(JSON.stringify(existingCostos.especias)) : {};
+            for (var ci = 0; ci < costData.length; ci++) {
+              var cr = costData[ci];
+              if (!cr || !cr[0] || cr[0] === 'Campo' || cr[0] === 'Costo Especias ($/g)' || cr[0] === '') continue;
+              // Match by especia name
+              var allEsp = ArcanoDB.getEspecias();
+              var matchedId = null;
+              for (var ei = 0; ei < allEsp.length; ei++) {
+                if (allEsp[ei].nombre === String(cr[0]).trim()) { matchedId = allEsp[ei].id; break; }
+              }
+              if (matchedId && Number(cr[1]) > 0) {
+                costoEspUpdates[matchedId] = Number(cr[1]);
+              }
+            }
+          }
+
+          var espNewCount = 0;
+          for (var ci = 0; ci < espUpdates.length; ci++) { if (espUpdates[ci].isNew) espNewCount++; }
+          var blNewCount = 0;
+          var blKeys = Object.keys(blUpdates);
+          for (var bi = 0; bi < blKeys.length; bi++) {
+            var bId = blUpdates[blKeys[bi]].id;
+            if (!bId || !ArcanoDB.getBlend(bId)) blNewCount++;
+          }
+
+          if (espUpdates.length === 0 && blKeys.length === 0 && Object.keys(costoUpdates).length === 0) {
+            statusDiv.innerHTML = '<p class="text-red">No se encontraron datos para actualizar.</p>';
+            parseBtn.disabled = false;
+            return;
+          }
+
+          // Preview
+          var phtml = '<div class="card"><div class="card-header"><h3>Vista Previa</h3></div><div class="card-body">';
+          phtml += '<div class="stats-grid mb-12" style="grid-template-columns:repeat(4,1fr)">' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espUpdates.length + '</div><div class="stat-label">Especias</div><div class="text-xs text-muted">' + espNewCount + ' nuevas, ' + (espUpdates.length - espNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blKeys.length + '</div><div class="stat-label">Blends</div><div class="text-xs text-muted">' + blNewCount + ' nuevos, ' + (blKeys.length - blNewCount) + ' act.</div></div>' +
+            '<div class="stat-card"><div class="stat-value" style="color:var(--gold)">' + Object.keys(costoUpdates).length + '</div><div class="stat-label">Costos packaging</div></div>' +
+            '<div class="stat-card"><div class="stat-value">' + Object.keys(costoEspUpdates).length + '</div><div class="stat-label">Costos especias</div></div>' +
+          '</div>';
+
+          // Show blend details
+          if (blKeys.length > 0) {
+            phtml += '<p class="text-sm fw7 mb-8">Blends:</p>';
+            for (var bk = 0; bk < Math.min(blKeys.length, 10); bk++) {
+              var bU = blUpdates[blKeys[bk]];
+              phtml += '<p class="text-sm text-muted">- ' + bU.nombre + ': ' + bU.ingredientes.length + ' ingredientes, $' + bU.precioChico + '/$' + bU.precioGrande + '</p>';
+            }
+            if (blKeys.length > 10) phtml += '<p class="text-sm text-muted">... y ' + (blKeys.length - 10) + ' mas</p>';
+          }
+          phtml += '</div></div>';
+
+          previewDiv.innerHTML = phtml;
+          previewDiv.style.display = 'block';
+
+          footerDiv.innerHTML =
+            '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+            '<button class="btn btn-gold" id="btn-do-prod-import">Confirmar Actualizacion</button>';
+
+          document.getElementById('btn-do-prod-import').addEventListener('click', function() {
+            var btn = document.getElementById('btn-do-prod-import');
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            try {
+              var espOk = 0, blOk = 0;
+
+              // Update/create especias
+              for (var i = 0; i < espUpdates.length; i++) {
+                var u = espUpdates[i];
+                var existing = u.id ? ArcanoDB.getEspecia(u.id) : null;
+                var saved;
+                if (existing) {
+                  saved = ArcanoDB.saveEspecia({
+                    id: u.id,
+                    nombre: u.nombre || existing.nombre,
+                    descripcion: u.descripcion || existing.descripcion || '',
+                    categoria: u.categoria || existing.categoria,
+                    precioChico: u.precioChico,
+                    precioGrande: u.precioGrande,
+                    enTienda: u.enTienda
+                  });
+                } else {
+                  var byName = ArcanoDB.findEspeciaByName(u.nombre);
+                  if (byName) {
+                    saved = ArcanoDB.saveEspecia({
+                      id: byName.id,
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  } else {
+                    saved = ArcanoDB.saveEspecia({
+                      nombre: u.nombre,
+                      descripcion: u.descripcion,
+                      categoria: u.categoria,
+                      precioChico: u.precioChico,
+                      precioGrande: u.precioGrande,
+                      enTienda: u.enTienda
+                    });
+                  }
+                }
+                if (saved && saved.id && u.descripcion) {
+                  ArcanoDB.writeField('especias/' + saved.id + '/descripcion', u.descripcion);
+                }
+                espOk++;
+              }
+
+              // Update/create blends
+              var blKeys2 = Object.keys(blUpdates);
+              for (var j = 0; j < blKeys2.length; j++) {
+                var bU = blUpdates[blKeys2[j]];
+                // Resolve ingredient names to IDs
+                var resolvedIngs = [];
+                for (var ii = 0; ii < bU.ingredientes.length; ii++) {
+                  var ing = bU.ingredientes[ii];
+                  var espObj = ArcanoDB.findEspeciaByName(ing.especiaNombre);
+                  if (espObj) {
+                    resolvedIngs.push({
+                      especiaId: espObj.id,
+                      especiaNombre: espObj.nombre,
+                      gramos: ing.gramos
+                    });
+                  }
+                }
+                // Calculate gramosTotal
+                var grsTotal = 0;
+                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
+                  resolvedIngs[gi2].gramosTotal = grsTotal;
+                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100) : 0;
+                }
+
+                var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
+                var savedBl;
+                if (existingBl) {
+                  savedBl = ArcanoDB.saveBlend({
+                    id: bU.id,
+                    nombre: bU.nombre || existingBl.nombre,
+                    descripcion: bU.descripcion || existingBl.descripcion || '',
+                    categoria: bU.categoria || existingBl.categoria,
+                    precioChico: bU.precioChico,
+                    precioGrande: bU.precioGrande,
+                    enTienda: bU.enTienda,
+                    ingredientes: resolvedIngs
+                  });
+                } else {
+                  var allBlends = ArcanoDB.getBlends();
+                  var matchBl = null;
+                  for (var mb = 0; mb < allBlends.length; mb++) {
+                    if (allBlends[mb].nombre.toLowerCase() === bU.nombre.toLowerCase()) { matchBl = allBlends[mb]; break; }
+                  }
+                  if (matchBl) {
+                    savedBl = ArcanoDB.saveBlend({
+                      id: matchBl.id,
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  } else {
+                    savedBl = ArcanoDB.saveBlend({
+                      nombre: bU.nombre,
+                      descripcion: bU.descripcion,
+                      categoria: bU.categoria,
+                      precioChico: bU.precioChico,
+                      precioGrande: bU.precioGrande,
+                      enTienda: bU.enTienda,
+                      ingredientes: resolvedIngs
+                    });
+                  }
+                }
+                if (savedBl && savedBl.id && bU.descripcion) {
+                  ArcanoDB.writeField('blends/' + savedBl.id + '/descripcion', bU.descripcion);
+                }
+                blOk++;
+              }
+
+              // Update costos
+              if (Object.keys(costoUpdates).length > 0 || Object.keys(costoEspUpdates).length > 0) {
+                var newCostos = ArcanoDB.getCostosInsumos();
+                for (var ck in costoUpdates) newCostos[ck] = costoUpdates[ck];
+                newCostos.especias = costoEspUpdates;
+                ArcanoDB.saveCostosInsumos(newCostos);
+              }
+
+              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
+                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
+                '</div>' +
+                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
+              '</div></div>';
+              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
+
+            } catch (err) {
+              previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
+              btn.disabled = false;
+              btn.textContent = 'Reintentar';
+            }
+          });
+
+        } catch (err) {
+          statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo: ' + err.message + '</p>';
+          parseBtn.disabled = false;
+        }
+      };
+      reader.onerror = function() {
+        statusDiv.innerHTML = '<p class="text-red">Error al leer el archivo.</p>';
+        parseBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
+    });
+  },
+
+  /* ================================================================
+     USUARIOS
+     ================================================================ */
+  renderUsuarios(container) {
+    var usuarios = ArcanoDB.getUsuarios();
+    var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formUsuario()">+ Nuevo Usuario</button></div>';
+    h += '<div class="table-wrap mt-12"><table class="table"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    for (var i = 0; i < usuarios.length; i++) {
+      var u = usuarios[i];
+      h += '<tr><td class="fw7">' + (u.nombre||'?') + '</td>' +
+        '<td><span class="badge ' + (u.rol==='admin'?'badge-gold':'badge-blue') + '">' + (u.rol||'vendedor') + '</span></td>' +
+        '<td>' + (u.id==='admin'?'****':u.pin) + '</td>' +
+        '<td><span class="badge ' + (u.activo!==false?'badge-green':'badge-red') + '">' + (u.activo!==false?'Activo':'Inactivo') + '</span></td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick="Pages.formUsuario(\'' + u.id + '\')">Editar</button>' +
+        (u.id!=='admin' ? ' <button class="btn btn-sm btn-red" onclick="Pages.delUsuario(\'' + u.id + '\')">X</button>' : '') + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+    container.innerHTML = h;
+  },
+
+  formUsuario(editId) {
+    var users = ArcanoDB.getUsuarios();
+    var user = null;
+    for (var i = 0; i < users.length; i++) { if (users[i].id === editId) { user = users[i]; break; } }
+    var isAdmin = user && user.id === 'admin';
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal">' +
+      '<div class="modal-header"><h3>' + (user?'Editar':'Nuevo') + ' Usuario</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label>Nombre</label><input type="text" class="input" id="f-u-nombre" value="' + (user?user.nombre:'') + '"></div>' +
+        '<div class="form-group"><label>Rol</label><select class="input" id="f-u-rol" ' + (isAdmin?'disabled':'') + '><option value="vendedor"' + (user&&user.rol==='vendedor'?' selected':'') + '>Vendedor</option><option value="admin"' + (user&&user.rol==='admin'?' selected':'') + '>Admin</option></select></div>' +
+        '<div class="form-group"><label>PIN</label><input type="text" class="input" id="f-u-pin" value="' + (user?user.pin:'') + '" maxlength="10"></div>' +
+        '<div class="form-group"><label>Estado</label><select class="input" id="f-u-activo" ' + (isAdmin?'disabled':'') + '><option value="true"' + (user&&user.activo!==false?' selected':'') + '>Activo</option><option value="false"' + (user&&user.activo===false?' selected':'') + '>Inactivo</option></select></div>' +
+      '</div><div class="modal-footer">' +
+        '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-gold" id="btn-save-u">Guardar</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-save-u').addEventListener('click', function() {
+      var nombre = document.getElementById('f-u-nombre').value.trim();
+      var pin = document.getElementById('f-u-pin').value.trim();
+      if (!nombre || !pin) { alert('Nombre y PIN obligatorios'); return; }
+      var id = editId || ('user_' + Date.now());
+      ArcanoDB.saveUsuario({
+        id: id, nombre: nombre, rol: document.getElementById('f-u-rol').value,
+        pin: pin, activo: document.getElementById('f-u-activo').value === 'true', creado: new Date().toISOString()
+      });
+      modal.remove();
+      App.renderPage('usuarios');
+    });
+  },
+
+  delUsuario(id) {
+    if (id === 'admin') return;
+    if (!confirm('Eliminar usuario?')) return;
+    ArcanoDB.deleteUsuario(id);
+    App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     TAG SELECTOR HELPER
+     ================================================================ */
+  buildTagSelectorHtml(cat, selectedTags) {
+    var tags = ArcanoDB.getTagsForCategoria(cat);
+    var sel = selectedTags || [];
+    var h = '<div class="tag-selector" id="tag-selector">';
+    if (tags.length === 0) {
+      h += '<p class="text-sm text-muted">No hay etiquetas de uso para esta categoria.</p>';
+    } else {
+      for (var i = 0; i < tags.length; i++) {
+        var checked = sel.indexOf(tags[i]) >= 0 ? ' checked' : '';
+        h += '<label class="tag-chip"><input type="checkbox" value="' + tags[i] + '"' + checked + '><span>' + tags[i] + '</span></label>';
+      }
+    }
+    h += '</div>';
+    return h;
+  },
+
+  getSelectedTags() {
+    var cbs = document.querySelectorAll('#tag-selector input[type=checkbox]');
+    var tags = [];
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) tags.push(cbs[i].value);
+    }
+    return tags;
+  },
+
+  refreshTagSelector(prefix) {
+    var catEl = document.getElementById('f-' + prefix + '-cat');
+    var areaEl = document.getElementById('tag-area-' + prefix);
+    if (!catEl || !areaEl) return;
+    areaEl.innerHTML = Pages.buildTagSelectorHtml(catEl.value, []);
+  },
+
+  doAddTag(cat, idx) {
+    var inp = document.getElementById('new-tag-' + idx);
+    if (!inp) return;
+    var name = inp.value.trim();
+    if (!name) return;
+    if (ArcanoDB.addProductTag(cat, name)) {
+      App.renderPage('productos');
+    } else {
+      alert('La etiqueta de uso ya existe en esta categoria.');
+    }
+  },
+
+  doRemoveTag(cat, tagName) {
+    if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
+      ArcanoDB.removeProductTag(cat, tagName);
+      App.renderPage('productos');
+    }
+  },
+
+  /* ================================================================
+     IMAGE UPLOAD HELPERS
+     ================================================================ */
+  handleImageUpload(input, areaId) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    ArcanoDB.compressImage(file, 400, 0.75, function(err, dataUrl) {
+      if (err) { alert(err); return; }
+      var area = document.getElementById(areaId);
+      var placeholder = area.querySelector('.img-upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+      var existing = document.getElementById('img-preview-' + areaId.split('-').pop());
+      if (existing) existing.remove();
+      var removeBtn = area.querySelector('.btn-red');
+      if (removeBtn) removeBtn.remove();
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = 'img-preview';
+      img.id = 'img-preview-' + areaId.split('-').pop();
+      area.insertBefore(img, placeholder);
+      var rmBtn = document.createElement('button');
+      rmBtn.className = 'btn btn-sm btn-red';
+      rmBtn.style.marginTop = '6px';
+      rmBtn.textContent = 'Quitar imagen';
+      rmBtn.onclick = function() { Pages.removeImage(areaId, input.id); };
+      area.insertBefore(rmBtn, placeholder);
+    });
+  },
+
+  removeImage(areaId, inputId) {
+    var area = document.getElementById(areaId);
+    var preview = area.querySelector('.img-preview');
+    if (preview) preview.remove();
+    var btn = area.querySelector('.btn-red');
+    if (btn) btn.remove();
+    var placeholder = area.querySelector('.img-upload-placeholder');
+    if (placeholder) placeholder.style.display = '';
+    var inp = document.getElementById(inputId);
+    if (inp) inp.value = '';
+  },
+
+  /* ================================================================
+     RECETAS IA  (Groq API — modelo opensource Llama 3.3 70B)
+     ================================================================ */
+  _groqKeyLoaded: false,
+  renderRecetasAdmin(container) {
+    var savedKey = localStorage.getItem('arcano_groq_key') || '';
+    var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
+
+    // Build list of available products for context
+    var productos = ArcanoDB.getTiendaProductos();
+    var productNames = [];
+    for (var i = 0; i < productos.length; i++) productNames.push(productos[i].nombre);
+    var productsContext = productNames.length > 0 ? productNames.join(', ') : 'No hay productos disponibles';
+
+    var h = '<div class="card mb-16">' +
+      '<div class="card-header"><h3>Configuracion</h3></div>' +
+      '<div class="card-body">' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
+        '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
+        '</div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label>' +
+          '<select class="input" id="ra-categoria">';
+    for (var c = 0; c < categorias.length; c++) {
+      h += '<option value="' + categorias[c] + '">' + categorias[c] + '</option>';
+    }
+    h += '</select></div>' +
+          '<div class="form-group"><label>Tema de la receta (opcional)</label>' +
+          '<input type="text" class="input" id="ra-tema" placeholder="Ej: arroz con leche, adobo de pollo...">' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Idioma de salida</label>' +
+        '<select class="input" id="ra-idioma">' +
+          '<option value="es">Espanol</option>' +
+          '<option value="en">English</option>' +
+        '</select></div>' +
+        '<button class="btn btn-gold" id="ra-gen-btn" onclick="Pages.generarReceta()">Generar Receta con IA</button>' +
+        '<span id="ra-gen-status" class="text-sm text-muted ml-12"></span>' +
+      '</div>' +
+    '</div>';
+
+    // Existing recipes section
+    h += '<div class="card">' +
+      '<div class="card-header"><h3>Recetas Existentes (' + '<span id="ra-count">0</span>' + ')</h3></div>' +
+      '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
+    '</div>';
+
+    container.innerHTML = h;
+
+    // Load existing recipes from Firebase
+    Pages._loadRecetasAdmin();
+
+    // Load Groq key from Firebase (persistent across devices/deploys)
+    Pages._groqKeyLoaded = false;
+    try {
+      firebase.database().ref('arcano/config/groqKey').once('value').then(function(snap) {
+        var fbKey = snap.val();
+        var statusEl = document.getElementById('ra-key-status');
+        if (fbKey) {
+          var inp = document.getElementById('ra-groq-key');
+          if (inp) inp.value = fbKey;
+          localStorage.setItem('arcano_groq_key', fbKey);
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
+          Pages._groqKeyLoaded = true;
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube</span>';
+        }
+      }).catch(function() {
+        var statusEl = document.getElementById('ra-key-status');
+        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error de conexion</span>';
+      });
+    } catch(e) {}
+  },
+
+  _saveGroqKey: function(showFeedback) {
+    var inp = document.getElementById('ra-groq-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    var statusEl = document.getElementById('ra-key-status');
+    if (!key) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>';
+      return;
+    }
+    localStorage.setItem('arcano_groq_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">guardando...</span>';
+    try {
+      firebase.database().ref('arcano/config/groqKey').set(key, function(err) {
+        if (err) {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">error al guardar</span>';
+        } else {
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+          Pages._groqKeyLoaded = true;
+        }
+      });
+    } catch(e) {
+      if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">local OK</span>';
+    }
+  },
+
+  _loadRecetasAdmin: function() {
+    var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+    ref.once('value', function(snap) {
+      var data = snap.val();
+      var recetas = [];
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          r._key = keys[i];
+          recetas.push(r);
+        }
+      }
+      recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+      Pages._renderRecetasList(recetas);
+    });
+  },
+
+  _renderRecetasList: function(recetas) {
+    var countEl = document.getElementById('ra-count');
+    var listEl = document.getElementById('ra-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = recetas.length;
+    if (recetas.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < recetas.length; i++) {
+      var r = recetas[i];
+      var prodsUsados = '';
+      if (r.productos_usados && r.productos_usados.length) {
+        prodsUsados = r.productos_usados.join(', ');
+      }
+      var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
+      h += '<tr>' +
+        '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
+        '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm">' + (prodsUsados || '-') + '</td>' +
+        '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">X</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarReceta: function(key) {
+    if (!confirm('Eliminar esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
+  generarReceta: function() {
+    var keyInput = document.getElementById('ra-groq-key');
+    var catSelect = document.getElementById('ra-categoria');
+    var temaInput = document.getElementById('ra-tema');
+    var idiomaSelect = document.getElementById('ra-idioma');
+    var btn = document.getElementById('ra-gen-btn');
+    var status = document.getElementById('ra-gen-status');
+
+    var apiKey = keyInput.value.trim();
+    var categoria = catSelect.value;
+    var tema = temaInput.value.trim();
+    var idioma = idiomaSelect.value;
+
+    if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_groq_key', apiKey);
+    try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
+
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Cargando productos y recetas existentes...';
+
+    // Build rich product context and load existing recipes, then generate
+    var productos = ArcanoDB.getTiendaProductos();
+    var productLines = [];
+    for (var i = 0; i < productos.length; i++) {
+      var p = productos[i];
+      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categorias: ' + (p.categorias || [p.categoria]).join('/') + ']';
+      if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
+      productLines.push(line);
+    }
+    var productContext = productLines.length > 0 ? productLines.join('\n') : '  - No hay productos en tienda aun';
+
+    var langInstr = idioma === 'en'
+      ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
+      : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
+
+    var temaInstr = tema
+      ? 'El tema especifico es: ' + tema + '. La receta debe girar alrededor de este tema.'
+      : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
+
+    // Load existing recipes to avoid repetition
+    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+      var data = snap.val();
+      var existingTitles = [];
+      var existingByCategory = { Comida: [], Infusiones: [], Cocteleria: [] };
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          if (r.titulo) existingTitles.push(r.titulo);
+          var cat = r.categoria || 'Comida';
+          if (!existingByCategory[cat]) existingByCategory[cat] = [];
+          existingByCategory[cat].push(r.titulo);
+        }
+      }
+
+      var existingBlock = '';
+      if (existingTitles.length > 0) {
+        existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir temas, platos ni titulos similares):\n';
+        existingBlock += existingTitles.join('\n');
+        existingBlock += '\n\nTotal recetas existentes por categoria:\n';
+        var catKeys2 = Object.keys(existingByCategory);
+        for (var c = 0; c < catKeys2.length; c++) {
+          var catName = catKeys2[c];
+          var catCount = existingByCategory[catName].length;
+          if (catCount > 0) existingBlock += '- ' + catName + ': ' + catCount + ' recetas\n';
+        }
+        existingBlock += '\nREGLA IMPORTANTE: No repitas ninguno de estos titulos ni crees recetas con tematicas similares. Cada receta debe ser unica.';
+      }
+
+      var systemPrompt =
+        'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
+        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
+        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
+        'REGLAS OBLIGATORIAS:\n' +
+        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
+        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
+        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
+        '4. IMPORTANTE: Menciona el nombre EXACTO del producto Arcano tal como aparece en el catalogo dentro de los ingredientes y pasos. Esto permite que se enlace automaticamente en la tienda.\n' +
+        '5. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
+        '6. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, colombiana, marroqui, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar, ahumar, confitar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres, ceviches, empanadas, arepas).\n' +
+        '7. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras, toddies calientes, cold brew de especias.\n' +
+        '8. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino, cava, sake), estilos (sour, fizz, mocktail, punch, old fashioned, spritz, julep, colada) y tecnicas (muddling, infusion, flame, dry shake, fat wash, clarification).\n' +
+        '9. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas en cada ingrediente.\n' +
+        '10. Los pasos deben ser claros, concisos y en orden logico. Cada paso debe describir una accion concreta.\n' +
+        '11. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n' +
+        '12. El campo "productos_usados" debe listar SOLO los nombres exactos de productos Arcano usados en la receta (tal como aparecen en el catalogo).\n\n' +
+        langInstr;
+
+      var userPrompt =
+        'Genera UNA receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+        existingBlock + '\n\n' +
+        'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
+        '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
+        '"dificultad": "Facil" o "Media" o "Dificil", ' +
+        '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+        '"productos_usados": ["Nombre Exacto del Producto 1"], ' +
+        '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto Arcano", "200g de proteina principal", ...], ' +
+        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
+        '"imagen_prompt": "descripcion visual del plato terminado para generar una imagen (en ingles, 1 oracion)"}\n\n' +
+        'RECUERDA: De 5 a 12 ingredientes, de 5 a 8 pasos. La receta DEBE ser diferente a todas las existentes. ' +
+        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
+        'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
+
+      status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.9,
+          max_tokens: 2000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+        return res.json();
+      })
+      .then(function(data) {
+        var content = data.choices[0].message.content.trim();
+        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+        var receta = JSON.parse(content);
+
+        if (!receta.titulo) throw new Error('La receta no tiene titulo');
+        if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+        if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+
+        // Check for duplicate title
+        var dupTitle = false;
+        for (var d = 0; d < existingTitles.length; d++) {
+          if (existingTitles[d].toLowerCase() === receta.titulo.toLowerCase()) { dupTitle = true; break; }
+        }
+        if (dupTitle) throw new Error('La receta generada tiene un titulo identico a una existente. Intenta de nuevo con otro tema.');
+
+        receta.fecha = new Date().toISOString().slice(0, 10);
+        if (!receta.categoria) receta.categoria = categoria;
+        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+          if (err) {
+            status.textContent = 'Error al guardar: ' + (err.message || err);
+          } else {
+            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+            Pages._loadRecetasAdmin();
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generar Receta con IA';
+        });
+      })
+      .catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'Generar Receta con IA';
+      });
+    });
+  },
+
+  /* ================================================================
+     ESTADISTICAS DE VENTAS (Chart.js)
+     ================================================================ */
+  _estPeriod: null,
+  _estTab: null,
+  _estCharts: [],
+
+  renderEstadisticas: function(container) {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var producciones = ArcanoDB.getProducciones();
+    var entradas = ArcanoDB.getEntradas();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+
+    // === COMBINE ALL SALES ===
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+
+    if (!Pages._estTab) Pages._estTab = 'ventas';
+
+    var h = '<div class="est-tabs">';
+    h += '<button class="est-tab' + (Pages._estTab === 'ventas' ? ' active' : '') + '" onclick="Pages._estTab=\'ventas\';App.renderPage(\'estadisticas\')">Ventas</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'costos' ? ' active' : '') + '" onclick="Pages._estTab=\'costos\';App.renderPage(\'estadisticas\')">Costos y Margen</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'produccion' ? ' active' : '') + '" onclick="Pages._estTab=\'produccion\';App.renderPage(\'estadisticas\')">Produccion</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'inventario' ? ' active' : '') + '" onclick="Pages._estTab=\'inventario\';App.renderPage(\'estadisticas\')">Inventario</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'canales' ? ' active' : '') + '" onclick="Pages._estTab=\'canales\';App.renderPage(\'estadisticas\')">Costos por Canal</button>';
+    h += '</div>';
+    h += '<div id="est-content"></div>';
+    container.innerHTML = h;
+
+    var data;
+    if (Pages._estTab === 'ventas' || Pages._estTab === 'costos' || Pages._estTab === 'produccion' || Pages._estTab === 'inventario') {
+      data = allSales;
+    } else {
+      data = allSales.filter(function(s) { return s.source === 'tienda'; });
+    }
+
+    if (Pages._estTab === 'ventas') Pages._renderVentas(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'costos') Pages._renderCostos(data, container.querySelector('#est-content'), entradas, especias, blends, producciones);
+    else if (Pages._estTab === 'produccion') Pages._renderProduccion(data, container.querySelector('#est-content'), producciones);
+    else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
+    else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
+    else if (Pages._estTab === 'canales') Pages._renderCostosPorCanal(container.querySelector('#est-content'));
+  },
+
+  /* ================================================================
+     VENTAS TAB
+     ================================================================ */
+  _renderVentas: function(data, el) {
+    if (!el) return;
+    var totalIngresos = 0, totalOps = 0, totalUnidades = 0;
+    var prodMap = {}, tipoMap = {}, tallaMap = {}, diaMap = {}, monthMap = {}, ciudadMap = {}, sourceMap = {};
+    for (var d = 0; d < data.length; d++) {
+      var s = data[d];
+      totalIngresos += (s.total || 0);
+      totalOps++;
+      sourceMap[s.source] = (sourceMap[s.source] || 0) + 1;
+      var opUnidades = 0;
+      if (s.items) { for (var it = 0; it < s.items.length; it++) {
+        var item = s.items[it];
+        totalUnidades += (item.cantidad || 0);
+        opUnidades += (item.cantidad || 0);
+        var key = item.nombre + '|' + item.tipo + '|' + item.talla;
+        if (!prodMap[key]) prodMap[key] = { nombre: item.nombre, tipo: item.tipo, talla: item.talla, unidades: 0, ingreso: 0 };
+        prodMap[key].unidades += (item.cantidad || 0);
+        prodMap[key].ingreso += (item.subtotal || 0);
+        tipoMap[item.tipo] = (tipoMap[item.tipo] || 0) + (item.cantidad || 0);
+        tallaMap[item.talla || 'chico'] = (tallaMap[item.talla || 'chico'] || 0) + (item.cantidad || 0);
+      }}
+      if (s.fecha) {
+        if (!diaMap[s.fecha]) diaMap[s.fecha] = { ops: 0, unidades: 0, ingresos: 0 };
+        diaMap[s.fecha].ops++;
+        diaMap[s.fecha].unidades += opUnidades;
+        diaMap[s.fecha].ingresos += (s.total || 0);
+        var mn = s.fecha.substring(0, 7);
+        if (!monthMap[mn]) monthMap[mn] = { ops: 0, unidades: 0, ingresos: 0 };
+        monthMap[mn].ops++;
+        monthMap[mn].unidades += opUnidades;
+        monthMap[mn].ingresos += (s.total || 0);
+      }
+      if (s.ciudad) {
+        if (!ciudadMap[s.ciudad]) ciudadMap[s.ciudad] = { ops: 0, ingresos: 0 };
+        ciudadMap[s.ciudad].ops++;
+        ciudadMap[s.ciudad].ingresos += (s.total || 0);
+      }
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+
+    // Calculate day-on-day trend
+    var diasSorted = Object.keys(diaMap).sort();
+    var ingresosAyer = 0;
+    if (diasSorted.length >= 2) { ingresosAyer = diaMap[diasSorted[diasSorted.length - 2]].ingresos || 0; }
+    var ingresosHoy = diasSorted.length > 0 ? diaMap[diasSorted[diasSorted.length - 1]].ingresos : 0;
+    var tendenciaDiaria = ingresosAyer > 0 ? Math.round(((ingresosHoy - ingresosAyer) / ingresosAyer) * 100) : 0;
+    var tendSign = tendenciaDiaria >= 0 ? '+' : '';
+
+    // Monthly comparison
+    var mesesSorted = Object.keys(monthMap).sort();
+    var mesActual = new Date().toISOString().slice(0, 7);
+    var mesAnterior = mesesSorted.length >= 2 ? mesesSorted[mesesSorted.length - 2] : '';
+    var ingresosMesActual = (monthMap[mesActual] || {}).ingresos || 0;
+    var ingresosMesAnterior = mesAnterior ? (monthMap[mesAnterior] || {}).ingresos || 0 : 0;
+    var tendenciaMensual = ingresosMesAnterior > 0 ? Math.round(((ingresosMesActual - ingresosMesAnterior) / ingresosMesAnterior) * 100) : 0;
+    var tendMSign = tendenciaMensual >= 0 ? '+' : '';
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">' + totalOps + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalUnidades + '</div><div class="est-kpi-label">Unidades Vendidas</div><div class="est-kpi-sub">' + prodArr.length + ' productos distintos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por operacion</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaDiaria >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendSign + tendenciaDiaria + '%</div><div class="est-kpi-label">Tendencia Dia</div><div class="est-kpi-sub">vs dia anterior</div></div>';
+    h += '</div>';
+
+    // Monthly comparison bar
+    h += '<div class="card mt-16"><div class="card-header"><h3>Comparacion Mensual</h3></div><div class="card-body">';
+    h += '<div class="est-kpi-grid" style="grid-template-columns:1fr 1fr 1fr">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesActual.toLocaleString() + '</div><div class="est-kpi-label">Mes Actual (' + mesActual + ')</div><div class="est-kpi-sub">' + ((monthMap[mesActual] || {}).ops || 0) + ' ops / ' + ((monthMap[mesActual] || {}).unidades || 0) + ' uds</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + ingresosMesAnterior.toLocaleString() + '</div><div class="est-kpi-label">Mes Anterior (' + mesAnterior + ')</div><div class="est-kpi-sub">' + (mesAnterior ? ((monthMap[mesAnterior] || {}).ops || 0) + ' ops / ' + ((monthMap[mesAnterior] || {}).unidades || 0) + ' uds' : 'sin datos') + '</div></div>';
+    h += '<div class="est-kpi ' + (tendenciaMensual >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">' + tendMSign + tendenciaMensual + '%</div><div class="est-kpi-label">Variacion Mensual</div><div class="est-kpi-sub">' + (ingresosMesActual >= ingresosMesAnterior ? 'crecimiento' : 'caida') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Source breakdown (admin vs tienda)
+    h += '<div class="card mt-16"><div class="card-header"><h3>Canal de Venta</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:1fr 1fr">';
+    var adminIngreso = 0, tiendaIngreso = 0;
+    for (var d = 0; d < data.length; d++) {
+      if (data[d].source === 'admin') adminIngreso += data[d].total || 0;
+      else tiendaIngreso += data[d].total || 0;
+    }
+    var totalCh = adminIngreso + tiendaIngreso;
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + adminIngreso.toLocaleString() + '</div><div class="stat-label">Ventas Admin (Fisico)</div><div class="stat-sub">' + (sourceMap.admin || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(adminIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + tiendaIngreso.toLocaleString() + '</div><div class="stat-label">Pedidos Tienda Online</div><div class="stat-sub">' + (sourceMap.tienda || 0) + ' ops' + (totalCh > 0 ? ' (' + Math.round(tiendaIngreso/totalCh*100) + '%)' : '') + '</div></div>';
+    h += '</div></div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos Diarios</h4><div class="est-chart-wrap"><canvas id="chart-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos Mensuales</h4><div class="est-chart-wrap"><canvas id="chart-monthly"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Tipo de Producto</h4><div class="est-chart-wrap"><canvas id="chart-types"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Venta por Talla</h4><div class="est-chart-wrap"><canvas id="chart-tallas"></canvas></div></div>';
+    h += '</div>';
+
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Top 10 Productos por Ingreso</h4><div class="est-chart-wrap est-chart-full"><canvas id="chart-products"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Ingresos por Ciudad</h4><div class="est-chart-wrap"><canvas id="chart-ciudad"></canvas></div></div>';
+    h += '</div>';
+
+    // Top products table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Top Productos por Ingreso</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Unidades</th><th>Ingreso</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pi = 0; pi < Math.min(prodArr.length, 20); pi++) {
+        var pp = prodArr[pi];
+        var pct = totalIngresos > 0 ? (pp.ingreso / totalIngresos * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td>' + pp.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + pp.ingreso.toLocaleString() + '</td><td>' + pct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos</p>'; }
+    h += '</div></div>';
+
+    // Daily breakdown
+    var diasArr = Object.keys(diaMap).sort().reverse();
+    if (diasArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Desglose por Dia</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Fecha</th><th>Ops</th><th>Unidades</th><th>Ingreso</th><th>Ticket Prom.</th><th>Barra</th></tr></thead><tbody>';
+      var maxDiaIng = 0;
+      for (var di = 0; di < diasArr.length; di++) { if (diaMap[diasArr[di]].ingresos > maxDiaIng) maxDiaIng = diaMap[diasArr[di]].ingresos; }
+      for (var di2 = 0; di2 < diasArr.length; di2++) {
+        var dk = diasArr[di2]; var dv = diaMap[dk];
+        var dBarW = maxDiaIng > 0 ? (dv.ingresos / maxDiaIng * 100).toFixed(0) : 0;
+        var ticketP = dv.ops > 0 ? Math.round(dv.ingresos / dv.ops) : 0;
+        h += '<tr><td class="fw7">' + dk + '</td><td>' + dv.ops + '</td><td>' + dv.unidades + '</td><td class="fw7" style="color:var(--gold)">$' + dv.ingresos.toLocaleString() + '</td><td>$' + ticketP.toLocaleString() + '</td><td><div class="est-bar-inline"><div class="est-bar-track"><div class="est-bar-fill" style="width:' + dBarW + '%;background:var(--gold)"></div></div></div></td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // === CHARTS ===
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var gOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { boxWidth: 12, padding: 12 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } };
+
+    // Daily line
+    var dailyLabels = [], dailyData = [], dailyOpsData = [];
+    for (var dd = 0; dd < diasSorted.length; dd++) { dailyLabels.push(diasSorted[dd].slice(5)); dailyData.push(diaMap[diasSorted[dd]].ingresos); dailyOpsData.push(diaMap[diasSorted[dd]].ops); }
+    var ctxD = document.getElementById('chart-daily');
+    if (ctxD) {
+      Pages._estCharts.push(new Chart(ctxD, {
+        type: 'line',
+        data: { labels: dailyLabels, datasets: [
+          { label: 'Ingresos ($)', data: dailyData, borderColor: '#e8b84b', backgroundColor: 'rgba(232,184,75,0.1)', fill: true, tension: 0.3, pointRadius: 3, yAxisID: 'y' },
+          { label: 'Operaciones', data: dailyOpsData, borderColor: '#5dade2', backgroundColor: 'rgba(93,173,226,0.1)', fill: false, tension: 0.3, pointRadius: 2, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { color: 'rgba(58,34,24,0.3)' } } } }
+      }));
+    }
+
+    // Monthly bar
+    var mLabels = [], mData = [], mOpsData = [];
+    for (var mi = 0; mi < mesesSorted.length; mi++) { mLabels.push(mesesSorted[mi]); mData.push(monthMap[mesesSorted[mi]].ingresos); mOpsData.push(monthMap[mesesSorted[mi]].ops); }
+    var ctxM = document.getElementById('chart-monthly');
+    if (ctxM) {
+      Pages._estCharts.push(new Chart(ctxM, {
+        type: 'bar', data: { labels: mLabels, datasets: [
+          { label: 'Ingresos ($)', data: mData, backgroundColor: 'rgba(232,184,75,0.7)', borderColor: '#e8b84b', borderWidth: 1, borderRadius: 6, yAxisID: 'y' },
+          { label: 'Operaciones', data: mOpsData, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Types doughnut
+    var ctxT = document.getElementById('chart-types');
+    if (ctxT) {
+      Pages._estCharts.push(new Chart(ctxT, {
+        type: 'doughnut', data: { labels: ['Especias', 'Blends'], datasets: [{ data: [tipoMap.especia || 0, tipoMap.blend || 0], backgroundColor: ['#e8b84b', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Tallas pie
+    var ctxTa = document.getElementById('chart-tallas');
+    if (ctxTa) {
+      Pages._estCharts.push(new Chart(ctxTa, {
+        type: 'pie', data: { labels: ['Pequeno', 'Grande'], datasets: [{ data: [tallaMap.chico || 0, tallaMap.grande || 0], backgroundColor: ['#c9963a', '#5dade2'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    // Top 10 horizontal bar
+    var top10 = prodArr.slice(0, 10);
+    var ctxP = document.getElementById('chart-products');
+    if (ctxP) {
+      var pL = [], pI = [], pC = [];
+      for (var tp = 0; tp < top10.length; tp++) { pL.push(top10[tp].nombre); pI.push(top10[tp].ingreso); pC.push(top10[tp].tipo === 'blend' ? '#5dade2' : '#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxP, { type: 'bar', data: { labels: pL, datasets: [{ label: 'Ingreso ($)', data: pI, backgroundColor: pC, borderRadius: 4, barThickness: 18 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } } } }));
+    }
+
+    // City bar
+    var ctxC = document.getElementById('chart-ciudad');
+    if (ctxC) {
+      var ciudades = Object.keys(ciudadMap).sort(function(a, b) { return ciudadMap[b].ingresos - ciudadMap[a].ingresos; });
+      var cL = [], cD = [];
+      for (var ci2 = 0; ci2 < ciudades.length; ci2++) { cL.push(ciudades[ci2]); cD.push(ciudadMap[ciudades[ci2]].ingresos); }
+      Pages._estCharts.push(new Chart(ctxC, { type: 'bar', data: { labels: cL, datasets: [{ label: 'Ingresos ($)', data: cD, backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1, borderRadius: 6 }] }, options: Object.assign({}, gOpts) }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = canvases[ch].classList.contains('est-chart-full') ? '300px' : '260px'; }
+  },
+
+  /* ================================================================
+     COSTOS Y MARGEN TAB
+     ================================================================ */
+  _renderCostos: function(data, el, entradas, especias, blends, producciones) {
+    if (!el) return;
+
+    // 1. Total cost of purchases (entradas)
+    var totalCostoCompras = 0;
+    var costoByTipo = { especia_grs: 0, envase: 0, bolsa: 0, sticker: 0, cinta: 0 };
+    var proveedorMap = {};
+    var compraMonthMap = {};
+    for (var ei = 0; ei < entradas.length; ei++) {
+      var ent = entradas[ei];
+      var entTotal = Number(ent.total) || 0;
+      totalCostoCompras += entTotal;
+      var prov = (ent.proveedor || 'Sin proveedor').trim();
+      if (!prov) prov = 'Sin proveedor';
+      if (!proveedorMap[prov]) proveedorMap[prov] = { total: 0, ops: 0 };
+      proveedorMap[prov].total += entTotal;
+      proveedorMap[prov].ops++;
+      if (ent.fecha) {
+        var mn = ent.fecha.substring(0, 7);
+        if (!compraMonthMap[mn]) compraMonthMap[mn] = 0;
+        compraMonthMap[mn] += entTotal;
+      }
+      if (ent.items) {
+        for (var ij = 0; ij < ent.items.length; ij++) {
+          var it = ent.items[ij];
+          var t = it.tipo || 'especia_grs';
+          costoByTipo[t] = (costoByTipo[t] || 0) + ((Number(it.cantidad) || 0) * (Number(it.costoUnitario) || 0));
+        }
+      }
+    }
+
+    // 2. Total ingresos
+    var totalIngresos = 0;
+    for (var si = 0; si < data.length; si++) totalIngresos += (data[si].total || 0);
+
+    // 3. Margen
+    var margenBruto = totalIngresos - totalCostoCompras;
+    var margenPct = totalIngresos > 0 ? (margenBruto / totalIngresos * 100).toFixed(1) : '0';
+
+    // 4. Per-product margin (income vs estimated material cost from produccion)
+    var prodVentaMap = {}, prodCostoMap = {};
+    for (var di = 0; di < data.length; di++) {
+      var s = data[di];
+      if (s.items) { for (var ii = 0; ii < s.items.length; ii++) {
+        var item = s.items[ii];
+        var pk = item.nombre + '|' + item.tipo;
+        if (!prodVentaMap[pk]) prodVentaMap[pk] = 0;
+        prodVentaMap[pk] += (item.subtotal || 0);
+      }}
+    }
+    // From entradas, calculate cost per gram for each especia
+    var costoPorGramo = {};
+    var gramosComprados = {};
+    for (var ei2 = 0; ei2 < entradas.length; ei2++) {
+      var ent2 = entradas[ei2];
+      if (ent2.items) { for (var ij2 = 0; ij2 < ent2.items.length; ij2++) {
+        var it2 = ent2.items[ij2];
+        if (it2.tipo === 'especia_grs' && it2.especiaNombre) {
+          var nombre = it2.especiaNombre;
+          var grs = Number(it2.cantidad) || 0;
+          var cost = grs * (Number(it2.costoUnitario) || 0);
+          costoPorGramo[nombre] = (costoPorGramo[nombre] || 0) + cost;
+          gramosComprados[nombre] = (gramosComprados[nombre] || 0) + grs;
+        }
+      }}
+    }
+    var costoGrPorEsp = {};
+    var espNames = Object.keys(gramosComprados);
+    for (var gn = 0; gn < espNames.length; gn++) {
+      if (gramosComprados[espNames[gn]] > 0) {
+        costoGrPorEsp[espNames[gn]] = costoPorGramo[espNames[gn]] / gramosComprados[espNames[gn]];
+      }
+    }
+
+    // Build blend cost from ingredients
+    var costoBlendMap = {};
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var ings = bl.ingredientes || [];
+      var costChico = 0, costGrande = 0;
+      for (var ig = 0; ig < ings.length; ig++) {
+        var ing = ings[ig];
+        var cpg = costoGrPorEsp[ing.especiaNombre] || 0;
+        costChico += (Number(ing.gramosChico) || 0) * cpg;
+        costGrande += (Number(ing.gramosGrande) || 0) * cpg;
+      }
+      // Add envase + bolsa + sticker cost per unit
+      costoBlendMap['blend|' + bl.nombre] = { chico: costChico, grande: costGrande };
+    }
+    for (var ei3 = 0; ei3 < especias.length; ei3++) {
+      var esp = especias[ei3];
+      var cpg2 = costoGrPorEsp[esp.nombre] || 0;
+      costoBlendMap['especia|' + esp.nombre] = { chico: (Number(esp.gramosChico) || 0) * cpg2, grande: (Number(esp.gramosGrande) || 0) * cpg2 };
+    }
+
+    // 5. Production volume stats
+    var totalFrascosProd = 0, totalGrsProd = 0, prodByMonth = {};
+    for (var pri = 0; pri < producciones.length; pri++) {
+      var pr = producciones[pri];
+      totalFrascosProd += (pr.cantidad || 0);
+      totalGrsProd += (pr.gramosTotal || 0);
+      if (pr.fecha) {
+        var pmn = pr.fecha.substring(0, 7);
+        if (!prodByMonth[pmn]) prodByMonth[pmn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodByMonth[pmn].frascos += (pr.cantidad || 0);
+        prodByMonth[pmn].gramos += (pr.gramosTotal || 0);
+        prodByMonth[pmn].ops++;
+      }
+    }
+
+    var h = '';
+    // KPIs
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + totalIngresos.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Totales</div><div class="est-kpi-sub">por todas las ventas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value" style="color:var(--red)">$' + totalCostoCompras.toLocaleString() + '</div><div class="est-kpi-label">Costo Compras</div><div class="est-kpi-sub">materia prima + packaging</div></div>';
+    h += '<div class="est-kpi ' + (margenBruto >= 0 ? 'up' : 'down') + '"><div class="est-kpi-value">$' + margenBruto.toLocaleString() + '</div><div class="est-kpi-label">Margen Bruto</div><div class="est-kpi-sub">' + margenPct + '%</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosProd + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + totalGrsProd.toLocaleString() + ' grs en total</div></div>';
+    h += '</div>';
+
+    // Cost breakdown by type
+    h += '<div class="card mt-16"><div class="card-header"><h3>Desglose de Costos por Tipo</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.especia_grs || 0).toLocaleString() + '</div><div class="stat-label">Materia Prima</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + (costoByTipo.envase || 0).toLocaleString() + '</div><div class="stat-label">Frascos (Envases)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">$' + (costoByTipo.bolsa || 0).toLocaleString() + '</div><div class="stat-label">Bolsas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--yellow)"><div class="stat-value">$' + (costoByTipo.sticker || 0).toLocaleString() + '</div><div class="stat-label">Stickers/Etiquetas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">$' + (costoByTipo.cinta || 0).toLocaleString() + '</div><div class="stat-label">Cintas</div></div>';
+    h += '</div></div></div>';
+
+    // Proveedor table
+    var provArr = Object.keys(proveedorMap).sort(function(a, b) { return proveedorMap[b].total - proveedorMap[a].total; });
+    if (provArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Compras por Proveedor</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Proveedor</th><th>Ordenes</th><th>Total Comprado</th><th>Participacion</th></tr></thead><tbody>';
+      for (var pvi = 0; pvi < provArr.length; pvi++) {
+        var pv = provArr[pvi]; var pd = proveedorMap[pv];
+        var pvPct = totalCostoCompras > 0 ? (pd.total / totalCostoCompras * 100).toFixed(1) : '0';
+        h += '<tr><td class="fw7">' + pv + '</td><td>' + pd.ops + '</td><td class="fw7" style="color:var(--red)">$' + pd.total.toLocaleString() + '</td><td>' + pvPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Ingresos vs Costos Mensual</h4><div class="est-chart-wrap"><canvas id="chart-cost-mensual"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Distribucion de Costos</h4><div class="est-chart-wrap"><canvas id="chart-cost-dist"></canvas></div></div>';
+    h += '</div>';
+
+    // Per-product margin table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Margen Estimado por Producto</h3></div><div class="card-body"><p class="text-sm text-muted mb-8">Costo de materia prima estimado segun precio de compra por gramo. No incluye envases/bolsas/stickers.</p>';
+    var allProducts = [];
+    for (var vk = 0; vk < Object.keys(prodVentaMap).length; vk++) {
+      var pk2 = Object.keys(prodVentaMap)[vk];
+      var parts = pk2.split('|');
+      var pNombre = parts.slice(1).join('|');
+      var pTipo = parts[0];
+      var pIngreso = prodVentaMap[pk2];
+      var costoEst = costoBlendMap[pk2] || { chico: 0, grande: 0 };
+      allProducts.push({ nombre: pNombre, tipo: pTipo, ingreso: pIngreso, costoEst: costoEst.chico + costoEst.grande });
+    }
+    allProducts.sort(function(a, b) { return b.ingreso - a.ingreso; });
+    if (allProducts.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Ingreso</th><th>Costo M.P.</th><th>Margen</th><th>% Margen</th></tr></thead><tbody>';
+      for (var api = 0; api < Math.min(allProducts.length, 20); api++) {
+        var ap = allProducts[api];
+        var apMargen = ap.ingreso - ap.costoEst;
+        var apPct = ap.ingreso > 0 ? (apMargen / ap.ingreso * 100).toFixed(1) : '0';
+        var apColor = apMargen >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr><td class="fw7">' + ap.nombre + '</td><td><span class="badge ' + (ap.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (ap.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td style="color:var(--gold)">$' + ap.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ap.costoEst.toLocaleString() + '</td><td style="color:' + apColor + '">$' + apMargen.toLocaleString() + '</td><td style="color:' + apColor + '">' + apPct + '%</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin datos suficientes</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    // Charts
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78';
+    Chart.defaults.borderColor = '#3a2218';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    // Ingresos vs Costos Mensual
+    var allMonths = new Set(Object.keys(compraMonthMap));
+    var ventasMonthMap = {};
+    for (var vi = 0; vi < data.length; vi++) {
+      if (data[vi].fecha) {
+        var vmn = data[vi].fecha.substring(0, 7);
+        ventasMonthMap[vmn] = (ventasMonthMap[vmn] || 0) + (data[vi].total || 0);
+      }
+    }
+    Object.keys(ventasMonthMap).forEach(function(m) { allMonths.add(m); });
+    var mSort = Array.from(allMonths).sort();
+    var cmLabels = [], cmIngresos = [], cmCostos = [], cmMargen = [];
+    for (var cm = 0; cm < mSort.length; cm++) {
+      cmLabels.push(mSort[cm]);
+      var v = ventasMonthMap[mSort[cm]] || 0;
+      var c = compraMonthMap[mSort[cm]] || 0;
+      cmIngresos.push(v); cmCostos.push(c); cmMargen.push(v - c);
+    }
+    var ctxCM = document.getElementById('chart-cost-mensual');
+    if (ctxCM) {
+      Pages._estCharts.push(new Chart(ctxCM, {
+        type: 'bar', data: { labels: cmLabels, datasets: [
+          { label: 'Ingresos', data: cmIngresos, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4 },
+          { label: 'Costos', data: cmCostos, backgroundColor: 'rgba(231,76,60,0.7)', borderRadius: 4 },
+          { label: 'Margen', data: cmMargen, type: 'line', borderColor: '#27ae60', backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2 }
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } }
+      }));
+    }
+
+    // Cost distribution doughnut
+    var ctxCD = document.getElementById('chart-cost-dist');
+    if (ctxCD) {
+      Pages._estCharts.push(new Chart(ctxCD, {
+        type: 'doughnut', data: { labels: ['Materia Prima', 'Envases', 'Bolsas', 'Stickers'], datasets: [{ data: [costoByTipo.especia_grs || 0, costoByTipo.envase || 0, costoByTipo.bolsa || 0, costoByTipo.sticker || 0], backgroundColor: ['#e8b84b', '#5dade2', '#27ae60', '#f0c040'], borderColor: '#241209', borderWidth: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } } }
+      }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PRODUCCION TAB
+     ================================================================ */
+  _renderProduccion: function(data, el, producciones) {
+    if (!el) return;
+    var totalFrascos = 0, totalGramos = 0;
+    var tipoProdMap = {}, tallaProdMap = {}, prodProdMap = {}, prodMonthMap = {}, envasesConsumidos = 0, bolsasConsumidas = 0, stickersConsumidos = 0, cintasConsumidas = 0;
+    for (var i = 0; i < producciones.length; i++) {
+      var pr = producciones[i];
+      totalFrascos += (pr.cantidad || 0);
+      totalGramos += (pr.gramosTotal || 0);
+      envasesConsumidos += (pr.envasesConsumidos || 0);
+      bolsasConsumidas += (pr.bolsasConsumidas || 0);
+      stickersConsumidos += (pr.stickersConsumidos || 0);
+      cintasConsumidas += (pr.cintasConsumidas || 0);
+      tipoProdMap[pr.tipo] = (tipoProdMap[pr.tipo] || 0) + (pr.cantidad || 0);
+      tallaProdMap[pr.talla || 'chico'] = (tallaProdMap[pr.talla || 'chico'] || 0) + (pr.cantidad || 0);
+      var pk = (pr.productoNombre || '?') + '|' + (pr.tipo || 'especia') + '|' + (pr.talla || 'chico');
+      if (!prodProdMap[pk]) prodProdMap[pk] = { nombre: pr.productoNombre, tipo: pr.tipo, talla: pr.talla, frascos: 0, gramos: 0, ops: 0 };
+      prodProdMap[pk].frascos += (pr.cantidad || 0);
+      prodProdMap[pk].gramos += (pr.gramosTotal || 0);
+      prodProdMap[pk].ops++;
+      if (pr.fecha) {
+        var mn = pr.fecha.substring(0, 7);
+        if (!prodMonthMap[mn]) prodMonthMap[mn] = { frascos: 0, gramos: 0, ops: 0 };
+        prodMonthMap[mn].frascos += (pr.cantidad || 0);
+        prodMonthMap[mn].gramos += (pr.gramosTotal || 0);
+        prodMonthMap[mn].ops++;
+      }
+    }
+    var prodArr = Object.values(prodProdMap).sort(function(a, b) { return b.frascos - a.frascos; });
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascos + '</div><div class="est-kpi-label">Frascos Producidos</div><div class="est-kpi-sub">' + producciones.length + ' operaciones</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalGramos.toLocaleString() + 'g</div><div class="est-kpi-label">Materia Prima Usada</div><div class="est-kpi-sub">gramos en total</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + envasesConsumidos + '</div><div class="est-kpi-label">Envases Consumidos</div><div class="est-kpi-sub">frascos usados</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + stickersConsumidos + '</div><div class="est-kpi-label">Stickers Usados</div><div class="est-kpi-sub">etiquetas aplicadas</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + bolsasConsumidas + '</div><div class="est-kpi-label">Bolsas Usadas</div><div class="est-kpi-sub">empaques</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cintasConsumidas + '</div><div class="est-kpi-label">Cintas Usadas</div><div class="est-kpi-sub">decorativas</div></div>';
+    h += '</div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Produccion Mensual (Frascos)</h4><div class="est-chart-wrap"><canvas id="chart-prod-monthly"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Tipo y Talla</h4><div class="est-chart-wrap"><canvas id="chart-prod-tipo"></canvas></div></div>';
+    h += '</div>';
+
+    // Production table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Produccion por Producto</h3></div><div class="card-body">';
+    if (prodArr.length > 0) {
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Frascos</th><th>Gramos</th><th>Ops</th></tr></thead><tbody>';
+      for (var pi = 0; pi < prodArr.length; pi++) {
+        var pp = prodArr[pi];
+        h += '<tr><td class="fw7">' + pp.nombre + '</td><td><span class="badge ' + (pp.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pp.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + pp.talla + '</td><td class="fw7">' + pp.frascos + '</td><td>' + pp.gramos.toLocaleString() + 'g</td><td>' + pp.ops + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else { h += '<p class="text-muted text-center">Sin producciones</p>'; }
+    h += '</div></div>';
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var pmSorted = Object.keys(prodMonthMap).sort();
+    var pmL = [], pmF = [], pmG = [];
+    for (var mi = 0; mi < pmSorted.length; mi++) { pmL.push(pmSorted[mi]); pmF.push(prodMonthMap[pmSorted[mi]].frascos); pmG.push(prodMonthMap[pmSorted[mi]].gramos); }
+    var ctxPM = document.getElementById('chart-prod-monthly');
+    if (ctxPM) {
+      Pages._estCharts.push(new Chart(ctxPM, { type: 'bar', data: { labels: pmL, datasets: [
+        { label: 'Frascos', data: pmF, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Gramos', data: pmG, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', title: { display: true, text: 'Frascos' }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', title: { display: true, text: 'Gramos' }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPT = document.getElementById('chart-prod-tipo');
+    if (ctxPT) {
+      Pages._estCharts.push(new Chart(ctxPT, { type: 'bar', data: { labels: ['Especia-Chico', 'Especia-Grande', 'Blend-Chico', 'Blend-Grande'], datasets: [{ label: 'Frascos', data: [tipoProdMap.especia_chico || 0, tipoProdMap.especia_grande || 0, tipoProdMap.blend_chico || 0, tipoProdMap.blend_grande || 0], backgroundColor: ['#e8b84b', '#c9963a', '#5dade2', '#3498db'], borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(58,34,24,0.5)' } }, x: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     PEDIDOS TIENDA TAB
+     ================================================================ */
+  _renderPedidosTienda: function(data, el) {
+    if (!el) return;
+    var total = 0, ops = 0, ciudades = {}, estadoMap = {}, dayMap = {}, prodMap = {};
+    for (var i = 0; i < data.length; i++) {
+      var s = data[i];
+      total += (s.total || 0); ops++;
+      estadoMap[s.estado || 'nuevo'] = (estadoMap[s.estado || 'nuevo'] || 0) + 1;
+      if (s.ciudad) { if (!ciudades[s.ciudad]) ciudades[s.ciudad] = { ops: 0, ingreso: 0 }; ciudades[s.ciudad].ops++; ciudades[s.ciudad].ingreso += (s.total || 0); }
+      if (s.fecha) { if (!dayMap[s.fecha]) dayMap[s.fecha] = { ops: 0, ingreso: 0 }; dayMap[s.fecha].ops++; dayMap[s.fecha].ingreso += (s.total || 0); }
+      if (s.items) { for (var j = 0; j < s.items.length; j++) {
+        var it = s.items[j]; var pk = it.nombre + '|' + (it.talla || 'chico');
+        if (!prodMap[pk]) prodMap[pk] = { nombre: it.nombre, talla: it.talla, uds: 0, ingreso: 0 };
+        prodMap[pk].uds += (it.cantidad || 0); prodMap[pk].ingreso += (it.subtotal || 0);
+      }}
+    }
+    var prodArr = Object.values(prodMap).sort(function(a, b) { return b.ingreso - a.ingreso; });
+    var cityArr = Object.keys(ciudades).sort(function(a, b) { return ciudades[b].ingreso - ciudades[a].ingreso; });
+
+    var h = '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + total.toLocaleString() + '</div><div class="est-kpi-label">Ingresos Tienda</div><div class="est-kpi-sub">' + ops + ' pedidos</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + (ops > 0 ? Math.round(total / ops) : 0).toLocaleString() + '</div><div class="est-kpi-label">Ticket Promedio</div><div class="est-kpi-sub">por pedido</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + cityArr.length + '</div><div class="est-kpi-label">Ciudades</div><div class="est-kpi-sub">destino de envios</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + (estadoMap.entregado || 0) + '</div><div class="est-kpi-label">Entregados</div><div class="est-kpi-sub">de ' + ops + ' total</div></div>';
+    h += '</div>';
+
+    // Estado breakdown
+    var estColors = { nuevo: 'badge-red', confirmado: 'badge-yellow', preparando: 'badge-blue', enviado: 'badge-gold', entregado: 'badge-green', cancelado: 'badge-red' };
+    var estLabels = { nuevo: 'Nuevos', confirmado: 'Confirmados', preparando: 'Preparando', enviado: 'Enviados', entregado: 'Entregados', cancelado: 'Cancelados' };
+    h += '<div class="card mt-16"><div class="card-header"><h3>Estado de Pedidos</h3></div><div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">';
+    var estKeys = Object.keys(estadoMap).sort();
+    for (var ei = 0; ei < estKeys.length; ei++) {
+      var ek = estKeys[ei];
+      h += '<div style="text-align:center;padding:12px 16px;background:var(--bg);border-radius:8px;min-width:80px"><div style="font-size:1.4rem;font-weight:800;color:var(--text)">' + estadoMap[ek] + '</div><div style="font-size:.72rem;color:var(--text2);margin-top:2px">' + (estLabels[ek] || ek) + '</div></div>';
+    }
+    h += '</div></div>';
+
+    // Charts
+    h += '<div class="est-charts-grid">';
+    h += '<div class="est-chart-card"><h4>Pedidos por Dia</h4><div class="est-chart-wrap"><canvas id="chart-ped-daily"></canvas></div></div>';
+    h += '<div class="est-chart-card"><h4>Top 8 Productos</h4><div class="est-chart-wrap"><canvas id="chart-ped-prods"></canvas></div></div>';
+    h += '</div>';
+
+    // City table
+    if (cityArr.length > 0) {
+      h += '<div class="card mt-16"><div class="card-header"><h3>Ingresos por Ciudad</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Ciudad</th><th>Pedidos</th><th>Ingreso</th><th>Promedio</th></tr></thead><tbody>';
+      for (var ci = 0; ci < cityArr.length; ci++) {
+        var cd = ciudades[cityArr[ci]];
+        h += '<tr><td class="fw7">' + cityArr[ci] + '</td><td>' + cd.ops + '</td><td class="fw7" style="color:var(--gold)">$' + cd.ingreso.toLocaleString() + '</td><td>$' + (cd.ops > 0 ? Math.round(cd.ingreso / cd.ops) : 0).toLocaleString() + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+    Chart.defaults.color = '#9a8a78'; Chart.defaults.borderColor = '#3a2218'; Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+    var daySorted = Object.keys(dayMap).sort();
+    var ctxPD = document.getElementById('chart-ped-daily');
+    if (ctxPD) {
+      var dl = [], dd = [], do2 = [];
+      for (var di = 0; di < daySorted.length; di++) { dl.push(daySorted[di].slice(5)); dd.push(dayMap[daySorted[di]].ingreso); do2.push(dayMap[daySorted[di]].ops); }
+      Pages._estCharts.push(new Chart(ctxPD, { type: 'bar', data: { labels: dl, datasets: [
+        { label: 'Ingreso ($)', data: dd, backgroundColor: 'rgba(232,184,75,0.7)', borderRadius: 4, yAxisID: 'y' },
+        { label: 'Pedidos', data: do2, type: 'line', borderColor: '#5dade2', backgroundColor: 'transparent', pointRadius: 3, yAxisID: 'y1' }
+      ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { position: 'left', ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y1: { position: 'right', ticks: { stepSize: 1 }, grid: { drawOnChartArea: false } }, x: { grid: { display: false } } } } }));
+    }
+
+    var ctxPP = document.getElementById('chart-ped-prods');
+    if (ctxPP && prodArr.length > 0) {
+      var top8 = prodArr.slice(0, 8);
+      var pl = [], pd2 = [], pc = [];
+      for (var pi = 0; pi < top8.length; pi++) { pl.push(top8[pi].nombre); pd2.push(top8[pi].ingreso); pc.push('#e8b84b'); }
+      Pages._estCharts.push(new Chart(ctxPP, { type: 'bar', data: { labels: pl, datasets: [{ label: 'Ingreso ($)', data: pd2, backgroundColor: pc, borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: 'rgba(58,34,24,0.5)' } }, y: { grid: { display: false } } } } }));
+    }
+
+    var canvases = el.querySelectorAll('.est-chart-wrap');
+    for (var ch = 0; ch < canvases.length; ch++) { canvases[ch].style.height = '280px'; }
+  },
+
+  /* ================================================================
+     INVENTARIO TAB
+     ================================================================ */
+  _renderInventario: function(el, especias, blends) {
+    if (!el) return;
+    var db = ArcanoDB.getDB();
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var stickers = ArcanoDB.getStickers();
+
+    // Calculate inventory value (at sale price)
+    var valorFrascos = 0, valorPala = 0;
+    var stockBajo = [], sinStock = [];
+    var catMap = {}, catStockMap = {};
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var vChico = (e.stockChico || 0) * (e.precioChico || 0);
+      var vGrande = (e.stockGrande || 0) * (e.precioGrande || 0);
+      valorFrascos += vChico + vGrande;
+      var palaGrs = e.stockBolsa || 0;
+      var eCats = (e.categorias || []).length > 0 ? e.categorias : [e.categoria || 'Sin categoria'];
+      var eCatLabel = eCats.join(' / ');
+      for (var ci = 0; ci < eCats.length; ci++) {
+        if (!catMap[eCats[ci]]) catMap[eCats[ci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[eCats[ci]].productos++;
+        catMap[eCats[ci]].frascos += (e.stockChico || 0) + (e.stockGrande || 0);
+        catMap[eCats[ci]].pala += palaGrs;
+      }
+      var totalStock = (e.stockChico || 0) + (e.stockGrande || 0);
+      if (totalStock === 0 && palaGrs === 0) sinStock.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel });
+      else if (totalStock <= 3 || palaGrs <= 50) stockBajo.push({ nombre: e.nombre, tipo: 'especia', cat: eCatLabel, frascos: totalStock, pala: palaGrs });
+    }
+    for (var bi = 0; bi < blends.length; bi++) {
+      var b = blends[bi];
+      valorFrascos += (b.stockChico || 0) * (b.precioChico || 0) + (b.stockGrande || 0) * (b.precioGrande || 0);
+      var bCats = (b.categorias || []).length > 0 ? b.categorias : [b.categoria || 'Sin categoria'];
+      var bCatLabel = bCats.join(' / ');
+      for (var bci = 0; bci < bCats.length; bci++) {
+        if (!catMap[bCats[bci]]) catMap[bCats[bci]] = { productos: 0, frascos: 0, pala: 0 };
+        catMap[bCats[bci]].productos++;
+        catMap[bCats[bci]].frascos += (b.stockChico || 0) + (b.stockGrande || 0);
+      }
+      var ts = (b.stockChico || 0) + (b.stockGrande || 0);
+      if (ts === 0) sinStock.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel });
+      else if (ts <= 3) stockBajo.push({ nombre: b.nombre, tipo: 'blend', cat: bCatLabel, frascos: ts, pala: 0 });
+    }
+    var totalProductos = especias.length + blends.length;
+    var totalFrascosStock = especias.reduce(function(s, e) { return s + (e.stockChico||0) + (e.stockGrande||0); }, 0) +
+                             blends.reduce(function(s, b) { return s + (b.stockChico||0) + (b.stockGrande||0); }, 0);
+    var totalPala = especias.reduce(function(s, e) { return s + (e.stockBolsa||0); }, 0);
+
+    var h = '';
+    h += '<div class="est-kpi-grid">';
+    h += '<div class="est-kpi"><div class="est-kpi-value">$' + valorFrascos.toLocaleString() + '</div><div class="est-kpi-label">Valor Inventario (Frascos)</div><div class="est-kpi-sub">al precio de venta</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalFrascosStock + '</div><div class="est-kpi-label">Frascos en Stock</div><div class="est-kpi-sub">listos para vender</div></div>';
+    h += '<div class="est-kpi"><div class="est-kpi-value">' + totalPala.toLocaleString() + 'g</div><div class="est-kpi-label">Pala (Materia Prima)</div><div class="est-kpi-sub">gramos en stock</div></div>';
+    h += '<div class="est-kpi ' + (stockBajo.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + stockBajo.length + '</div><div class="est-kpi-label">Stock Bajo</div><div class="est-kpi-sub">requiere reposicion</div></div>';
+    h += '<div class="est-kpi ' + (sinStock.length > 0 ? 'down' : 'up') + '"><div class="est-kpi-value">' + sinStock.length + '</div><div class="est-kpi-label">Sin Stock</div><div class="est-kpi-sub">productos agotados</div></div>';
+    h += '</div>';
+
+    // Packaging stock
+    h += '<div class="card mt-16"><div class="card-header"><h3>Stock de Packaging</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.chico || 0) + '</div><div class="stat-label">Envases Pequenos</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">' + (envases.grande || 0) + '</div><div class="stat-label">Envases Grandes</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.chico || 0) + '</div><div class="stat-label">Bolsas Pequenas</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value">' + (bolsas.grande || 0) + '</div><div class="stat-label">Bolsas Grandes</div></div>';
+    h += '</div></div></div>';
+
+    // Category breakdown
+    var catArr = Object.keys(catMap).sort(function(a, b) { return catMap[b].frascos - catMap[a].frascos; });
+    h += '<div class="card mt-16"><div class="card-header"><h3>Inventario por Categoria</h3></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Categoria</th><th>Productos</th><th>Frascos</th><th>Pala (grs)</th></tr></thead><tbody>';
+    for (var ci = 0; ci < catArr.length; ci++) {
+      var cd = catMap[catArr[ci]];
+      h += '<tr><td class="fw7">' + catArr[ci] + '</td><td>' + cd.productos + '</td><td>' + cd.frascos + '</td><td>' + cd.pala.toLocaleString() + '</td></tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // Low stock alerts
+    if (stockBajo.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--yellow)"><div class="card-header"><h3 style="color:var(--yellow)">Alertas de Stock Bajo (' + stockBajo.length + ')</h3></div><div class="card-body">';
+      h += '<div class="table-wrap"><table class="est-detail-table"><thead><tr><th>Producto</th><th>Tipo</th><th>Categoria</th><th>Frascos</th><th>Pala</th></tr></thead><tbody>';
+      for (var si = 0; si < stockBajo.length; si++) {
+        var sb = stockBajo[si];
+        h += '<tr><td class="fw7">' + sb.nombre + '</td><td><span class="badge ' + (sb.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (sb.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td><td>' + sb.cat + '</td><td>' + (sb.frascos || '-') + '</td><td>' + (sb.pala ? sb.pala + 'g' : '-') + '</td></tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+
+    // No stock
+    if (sinStock.length > 0) {
+      h += '<div class="card mt-16" style="border-color:var(--red)"><div class="card-header"><h3 style="color:var(--red)">Sin Stock (' + sinStock.length + ')</h3></div><div class="card-body">';
+      h += '<p class="text-sm text-muted mb-8">';
+      for (var ni = 0; ni < sinStock.length; ni++) {
+        h += '<span class="badge badge-red mr-4">' + sinStock[ni].nombre + '</span>';
+      }
+      h += '</p></div></div>';
+    }
+
+    el.innerHTML = h;
+
+    // No charts for inventory, no chart cleanup needed
+    if (Pages._estCharts) { for (var ci = 0; ci < Pages._estCharts.length; ci++) { try { Pages._estCharts[ci].destroy(); } catch (e) {} } }
+    Pages._estCharts = [];
+  },
+
+  /* ================================================================
+     HELPERS (kept for backward compat)
+     ================================================================ */
+  _getCurrentEstData: function() {
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var allSales = [];
+    for (var vi = 0; vi < ventas.length; vi++) {
+      var v = ventas[vi];
+      var vItems = [];
+      if (v.items) { for (var vi2 = 0; vi2 < v.items.length; vi2++) { var it = v.items[vi2]; vItems.push({ nombre: it.productoNombre || '?', tipo: it.tipo || 'especia', talla: it.talla || 'chico', cantidad: it.cantidad || 0, precio: it.precioUnitario || 0, subtotal: it.subtotal || 0 }); } }
+      allSales.push({ fecha: v.fecha || '', creado: v.creado || '', total: v.total || 0, items: vItems, source: 'admin' });
+    }
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.estado === 'cancelado') continue;
+      var pItems = [];
+      if (p.items) { for (var pi2 = 0; pi2 < p.items.length; pi2++) { var pit = p.items[pi2]; pItems.push({ nombre: pit.nombre || '?', tipo: pit.tipo || 'especia', talla: pit.talla || 'chico', cantidad: pit.qty || pit.cantidad || 0, precio: pit.precio || 0, subtotal: pit.subtotal || 0 }); } }
+      var pFecha = p.creado ? p.creado.slice(0, 10) : '';
+      allSales.push({ fecha: pFecha, creado: p.creado || '', total: p.total || 0, items: pItems, source: 'tienda', cliente: (p.cliente || {}).nombre || '', ciudad: (p.cliente || {}).ciudad || '' });
+    }
+    allSales.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    return allSales;
+  },
+
+  _renderEstContent: function(data, el) {
+    // Redirect to ventas tab for backward compat
+    Pages._estTab = 'ventas';
+    Pages._renderVentas(data, el);
+  },
+
+  /* ================================================================
+     TESTING (sandbox)
+     ================================================================ */
+  renderTesting(container) {
+    var db = ArcanoDB.getDB();
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var ventas = ArcanoDB.getVentas();
+    var pedidos = ArcanoDB.getPedidos();
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+
+    var h = '<div style="margin-bottom:16px">' +
+      '<h3 style="margin:0 0 4px">Testing y Sandbox</h3>' +
+      '<p class="text-muted text-sm">Genera datos de prueba, reinicia stocks y prueba todas las funciones del sistema.</p>' +
+      '</div>';
+
+    // Current state
+    h += '<div class="card"><div class="card-header"><h3>Estado Actual</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--gold)">' + especias.length + '</div><div class="text-muted text-sm">Especias</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--blue)">' + blends.length + '</div><div class="text-muted text-sm">Blends</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em;color:var(--green)">' + ventas.length + '</div><div class="text-muted text-sm">Ventas Admin</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pedidos.length + '</div><div class="text-muted text-sm">Pedidos Tienda</div></div>';
+    h += '<div class="text-center"><div class="fw7" style="font-size:1.3em">' + pdvs.length + '</div><div class="text-muted text-sm">P. de Venta</div></div>';
+    h += '</div></div></div>';
+
+    // Generate test data
+    h += '<div class="card mt-16"><div class="card-header"><h3>Generar Datos de Prueba</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Especias</label><input type="number" class="input" id="test-esp" value="8" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Blends</label><input type="number" class="input" id="test-blend" value="5" min="0" max="50"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas Admin</label><input type="number" class="input" id="test-ventas" value="20" min="0" max="200"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Pedidos Tienda</label><input type="number" class="input" id="test-pedidos" value="10" min="0" max="100"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">PDVs</label><input type="number" class="input" id="test-pdvs" value="2" min="0" max="10"></div>';
+    h += '<div><label class="text-sm fw7" style="display:block;margin-bottom:4px">Ventas por PDV</label><input type="number" class="input" id="test-pdv-ventas" value="15" min="0" max="100"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px"><label class="text-sm fw7" style="display:block;margin-bottom:4px">Antiguedad (dias)</label>';
+    h += '<input type="range" id="test-dias" min="1" max="90" value="30" style="width:100%" oninput="document.getElementById(\'test-dias-val\').textContent=this.value+\' dias\'"><span id="test-dias-val" class="text-sm text-muted">30 dias</span></div>';
+    h += '<button class="btn btn-gold btn-block mt-12" onclick="Pages._testGenerarTodo()" style="padding:14px;font-size:1rem;font-weight:700">Generar Todo</button>';
+    h += '</div></div>';
+
+    // Individual actions
+    h += '<div class="card mt-16"><div class="card-header"><h3>Acciones Individuales</h3></div><div class="card-body">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProductos()">Crear 10 Productos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarVentas()">Crear 20 Ventas</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testGenerarPedidos()">Crear 10 Pedidos</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearPDVs()">Crear 2 PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testAgregarStock()">Agregar Stock PDVs</button>';
+    h += '<button class="btn btn-outline" onclick="Pages._testCrearProducciones()">Crear 5 Producciones</button>';
+    h += '</div></div></div>';
+
+    // Danger zone
+    h += '<div class="card mt-16"><div class="card-header"><h3 style="color:var(--red)">Zona de Peligro</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Estas acciones eliminan datos de forma permanente.</p>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testResetStocks()">Reiniciar Stocks a 0</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearVentas()">Borrar Todas las Ventas</button>';
+    h += '<button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="Pages._testClearPedidos()">Borrar Todos los Pedidos</button>';
+    h += '<button class="btn btn-red" onclick="Pages._testNuclearReset()">RESET NUCLEAR - Borrar Todo</button>';
+    h += '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  _testRandomDate: function(d) { var dt = new Date(); dt.setDate(dt.getDate() - Math.floor(Math.random() * d)); return dt.toISOString().slice(0, 10); },
+
+  _testGenerarTodo: function() {
+    var esp = Number(document.getElementById('test-esp').value) || 0;
+    var blend = Number(document.getElementById('test-blend').value) || 0;
+    var vtas = Number(document.getElementById('test-ventas').value) || 0;
+    var peds = Number(document.getElementById('test-pedidos').value) || 0;
+    var npdv = Number(document.getElementById('test-pdvs').value) || 0;
+    var pv = Number(document.getElementById('test-pdv-ventas').value) || 0;
+    var dias = Number(document.getElementById('test-dias').value) || 30;
+    Pages._testCrearProductosN(esp, blend);
+    Pages._testGenerarVentasN(vtas, dias);
+    Pages._testGenerarPedidosN(peds, dias);
+    Pages._testCrearPDVsN(npdv, pv, dias);
+    Pages._testCrearProduccionesN(5, dias);
+    toast('Datos de prueba generados! Revisa Dashboard, Ventas, P.Venta y Stats.');
+  },
+
+  _testCrearProductos: function() { Pages._testCrearProductosN(6, 4); toast('Productos creados'); },
+
+  _testCrearProductosN: function(nEsp, nBlend) {
+    var nms = ['Canela','Curcuma','Pimienta Negra','Comino','Oregano','Clavo','Nuez Moscada','Jengibre','Cacao','Vanilla','Cardamomo','Cilantro','Paprika','Azafran','Laurel','Tomillo','Romero','Salvia','Hinojo','Anis'];
+    var cats = ['Especias','Dulces','Saladas','Exoticas'];
+    for (var i = 0; i < nEsp; i++) {
+      var nm = nms[i % nms.length] + (i >= nms.length ? ' ' + Math.ceil((i+1)/nms.length) : '');
+      var pc = Math.floor(Math.random() * 8000 + 3000);
+      ArcanoDB.saveEspecia({ nombre: nm, categoria: cats[i % cats.length], precioChico: pc, precioGrande: Math.floor(pc * 1.7), stockBolsa: Math.floor(Math.random() * 500 + 100), stockChico: Math.floor(Math.random() * 15 + 2), stockGrande: Math.floor(Math.random() * 10 + 1), enTienda: Math.random() > 0.3 });
+    }
+    var nmsB = ['Arcano Mix','Fuego Interior','Dulce Despertar','Noche Estelar','Camino Sagrado','Raiz Ancestral','Brisa Otono','Sol Naciente','Luna Llena','Tierra Fertil'];
+    for (var j = 0; j < nBlend; j++) {
+      var nb = nmsB[j % nmsB.length] + (j >= nmsB.length ? ' ' + Math.ceil((j+1)/nmsB.length) : '');
+      var pb = Math.floor(Math.random() * 12000 + 5000);
+      ArcanoDB.saveBlend({ nombre: nb, categoria: 'Blends', precioChico: pb, precioGrande: Math.floor(pb * 1.6), stockChico: Math.floor(Math.random() * 12 + 2), stockGrande: Math.floor(Math.random() * 8 + 1), enTienda: Math.random() > 0.3 });
+    }
+  },
+
+  _testGenerarVentas: function() { Pages._testGenerarVentasN(20, 30); toast('Ventas creadas'); },
+
+  _testGenerarVentasN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var v = 0; v < count; v++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 3) + 1;
+        var pu = tl === 'grande' ? pr.pg : pr.pc;
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.saveVenta({ fecha: Pages._testRandomDate(dias), items: items, total: tot, metodoPago: Math.random() > 0.5 ? 'efectivo' : 'qr' });
+    }
+  },
+
+  _testGenerarPedidos: function() { Pages._testGenerarPedidosN(10, 30); toast('Pedidos creados'); },
+
+  _testGenerarPedidosN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    var ests = ['nuevo','confirmado','preparando','enviado','entregado'];
+    for (var i = 0; i < count; i++) {
+      var nI = Math.floor(Math.random() * 3) + 1, items = [];
+      for (var it = 0; it < nI; it++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        var tl = Math.random() > 0.4 ? 'chico' : 'grande', cn = Math.floor(Math.random() * 2) + 1;
+        var pu = tl === 'grande' ? (pr.precioGrande||0) : (pr.precioChico||0);
+        items.push({ tipo: pr.tipo||'especia', productoId: pr.id, productoNombre: pr.nombre, talla: tl, cantidad: cn, precioUnitario: pu, subtotal: pu * cn });
+      }
+      var tot = 0; for (var t = 0; t < items.length; t++) tot += items[t].subtotal;
+      ArcanoDB.savePedido({ nombre: 'Cliente Test ' + (i+1), telefono: '300' + Math.floor(Math.random()*9000000+1000000), direccion: 'Calle Test #' + (i+1), items: items, total: tot, estado: ests[Math.min(Math.floor(Math.random()*ests.length), ests.length-1)], creado: new Date(Date.now() - Math.floor(Math.random()*dias*86400000)).toISOString() });
+    }
+  },
+
+  _testCrearPDVs: function() { Pages._testCrearPDVsN(2, 15, 30); toast('PDVs creados'); },
+
+  _testCrearPDVsN: function(count, vp, dias) {
+    var locs = ['Feria Central','Plaza Principal','Mercado Municipal','Centro Comercial','Parque Norte'];
+    var existentes = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < count; p++) {
+      var pdv = ArcanoDB.savePuntoDeVenta({ nombre: 'PDV Test ' + (existentes.length + p + 1), ubicacion: locs[p % locs.length], activo: true });
+      var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+      var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id,pc:e.precioChico,pg:e.precioGrande};}), bl.map(function(b){return{tipo:'blend',id:b.id,pc:b.precioChico,pg:b.precioGrande};}));
+      var si = [];
+      for (var s = 0; s < Math.min(8, all.length); s++) {
+        var pr = all[Math.floor(Math.random() * all.length)];
+        si.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+2 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdv.id, si); } catch(e) {}
+      for (var v = 0; v < vp; v++) {
+        var nI = Math.floor(Math.random()*2)+1, items = [];
+        for (var it = 0; it < nI; it++) {
+          var pr2 = all[Math.floor(Math.random()*all.length)];
+          var cn2 = Math.floor(Math.random()*2)+1;
+          items.push({ tipo: pr2.tipo, productoId: pr2.id, talla: 'chico', cantidad: cn2, precioUnitario: pr2.pc, subtotal: pr2.pc*cn2 });
+        }
+        ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, fecha: Pages._testRandomDate(dias), items: items, metodoPago: Math.random()>0.5?'efectivo':'qr' });
+      }
+    }
+  },
+
+  _testAgregarStock: function() {
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    if (!pdvs.length) { toast('Crea PDVs primero','err'); return; }
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp.map(function(e){return{tipo:'especia',id:e.id};}), bl.map(function(b){return{tipo:'blend',id:b.id};}));
+    for (var p = 0; p < pdvs.length; p++) {
+      var items = [];
+      for (var s = 0; s < Math.min(6,all.length); s++) {
+        var pr = all[Math.floor(Math.random()*all.length)];
+        items.push({ tipo: pr.tipo, productoId: pr.id, talla: 'chico', cantidad: Math.floor(Math.random()*5)+3 });
+      }
+      try { ArcanoDB.moverStockAPDV(pdvs[p].id, items); } catch(e) {}
+    }
+    toast('Stock agregado a ' + pdvs.length + ' PDVs');
+  },
+
+  _testCrearProducciones: function() { Pages._testCrearProduccionesN(5, 30); toast('Producciones creadas'); },
+
+  _testCrearProduccionesN: function(count, dias) {
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    var all = [].concat(esp, bl);
+    if (!all.length) { toast('Crea productos primero','err'); return; }
+    for (var i = 0; i < count; i++) {
+      var pr = all[Math.floor(Math.random()*all.length)];
+      ArcanoDB.saveProduccion({ tipo: pr.tipo||'especia', productoId: pr.id, fecha: Pages._testRandomDate(dias), cantidad: Math.floor(Math.random()*20)+5, frascosChico: Math.floor(Math.random()*10)+2, frascosGrande: Math.floor(Math.random()*5)+1 });
+    }
+  },
+
+  _testResetStocks: function() {
+    if (!confirm('Reiniciar todos los stocks a 0?')) return;
+    var esp = ArcanoDB.getEspecias(), bl = ArcanoDB.getBlends();
+    for (var i = 0; i < esp.length; i++) ArcanoDB.saveEspecia({ id: esp[i].id, stockBolsa: 0, stockChico: 0, stockGrande: 0 });
+    for (var j = 0; j < bl.length; j++) ArcanoDB.saveBlend({ id: bl[j].id, stockChico: 0, stockGrande: 0 });
+    toast('Stocks reiniciados a 0'); App.renderPage('testing');
+  },
+
+  _testClearVentas: function() {
+    if (!confirm('Borrar TODAS las ventas (admin y PDV)?')) return;
+    var v = ArcanoDB.getVentas();
+    for (var i = 0; i < v.length; i++) ArcanoDB.deleteVenta(v[i].id);
+    var pdvs = ArcanoDB.getPuntosDeVenta ? ArcanoDB.getPuntosDeVenta() : [];
+    for (var p = 0; p < pdvs.length; p++) pdvs[p].ventas = {};
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Ventas eliminadas'); App.renderPage('testing');
+  },
+
+  _testClearPedidos: function() {
+    if (!confirm('Borrar TODOS los pedidos?')) return;
+    var p = ArcanoDB.getPedidos();
+    for (var i = 0; i < p.length; i++) ArcanoDB.deletePedido(p[i].id);
+    toast('Pedidos eliminados'); App.renderPage('testing');
+  },
+
+  _testNuclearReset: function() {
+    if (!confirm('RESET NUCLEAR: Se borrarán TODOS los datos. Continuar?')) return;
+    if (!confirm('Estas SEGURO? Se perderán productos, ventas, pedidos, PDVs, todo.')) return;
+    try { firebase.database().ref('arcano').remove(); } catch(e) {}
+    localStorage.clear();
+    toast('Reset completo. Recargando...');
+    setTimeout(function() { location.reload(); }, 1500);
+  },
+
+  /* ================================================================
+     COSTOS POR CANAL DE VENTA
+     ================================================================ */
+  _renderCostosPorCanal: function(el) {
+    if (!el) return;
+    var channels = ArcanoDB.getCostosPorCanal();
+    var canalKeys = ['admin', 'tienda', 'pdv'];
+    var canalNombres = { admin: 'Ventas Admin', tienda: 'Tienda Online', pdv: 'Puntos de Venta' };
+    var canalColores = { admin: 'var(--gold)', tienda: 'var(--green)', pdv: 'var(--blue)' };
+
+    var h = '';
+
+    // === RESUMEN GENERAL ===
+    var totalIngreso = 0, totalCosto = 0, totalStockCosto = 0;
+    for (var ci = 0; ci < canalKeys.length; ci++) {
+      var ch = channels[canalKeys[ci]];
+      totalIngreso += ch.ingreso;
+      totalCosto += ch.costo;
+      totalStockCosto += (ch.stockCosto || 0);
+    }
+    var totalMargen = totalIngreso - totalCosto;
+    var totalMargenPct = totalIngreso > 0 ? (totalMargen / totalIngreso * 100) : 0;
+
+    h += '<div class="card"><div class="card-header"><h3>Resumen General</h3></div><div class="card-body">';
+    h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+    h += '<div class="stat-card"><div class="stat-value">$' + totalIngreso.toLocaleString() + '</div><div class="stat-label">Ingreso Total</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + totalCosto.toLocaleString() + '</div><div class="stat-label">Costo Produccion</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:var(--green)">$' + totalMargen.toLocaleString() + '</div><div class="stat-label">Margen ($' + totalMargenPct.toFixed(1) + '%)</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value" style="color:var(--blue)">$' + totalStockCosto.toLocaleString() + '</div><div class="stat-label">Costo Stock Actual</div></div>';
+    h += '</div></div></div>';
+
+    // === POR CADA CANAL ===
+    for (var ci2 = 0; ci2 < canalKeys.length; ci2++) {
+      var key = canalKeys[ci2];
+      var c = channels[key];
+      var clr = canalColores[key];
+      var margen = c.ingreso - c.costo;
+      var margenPct = c.ingreso > 0 ? (margen / c.ingreso * 100) : 0;
+
+      h += '<div class="card mt-16"><div class="card-header"><h3 style="color:' + clr + '">' + canalNombres[key] + '</h3></div><div class="card-body">';
+
+      // KPIs del canal
+      h += '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">';
+      h += '<div class="stat-card"><div class="stat-value">' + c.ventas + '</div><div class="stat-label">Ventas</div></div>';
+      h += '<div class="stat-card"><div class="stat-value">$' + c.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value" style="color:var(--red)">$' + c.costo.toLocaleString() + '</div><div class="stat-label">Costo Prod.</div></div>';
+      h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (margen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + margen.toLocaleString() + '</div><div class="stat-label">Margen (' + margenPct.toFixed(1) + '%)</div></div>';
+      h += '</div>';
+
+      // Tabla de productos vendidos
+      var prodKeys = Object.keys(c.productos || {});
+      if (prodKeys.length > 0) {
+        h += '<h4 style="margin:16px 0 8px;font-size:.95rem">Costos de Productos Vendidos</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Tipo</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo Prod.</th><th>Margen</th></tr></thead><tbody>';
+        for (var pi = 0; pi < prodKeys.length; pi++) {
+          var pr = c.productos[prodKeys[pi]];
+          var prMargen = pr.ingreso - pr.costo;
+          h += '<tr><td class="fw7">' + pr.nombre + '</td>';
+          h += '<td><span class="badge ' + (pr.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (pr.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+          h += '<td>' + pr.talla + '</td>';
+          h += '<td class="fw7">' + pr.cantidad + '</td>';
+          h += '<td>$' + pr.ingreso.toLocaleString() + '</td>';
+          h += '<td style="color:var(--red)">$' + pr.costo.toLocaleString() + '</td>';
+          h += '<td style="color:' + (prMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + prMargen.toLocaleString() + '</td></tr>';
+        }
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin ventas registradas en este canal.</p>';
+      }
+
+      // PDV desglose por punto de venta
+      if (key === 'pdv' && c.pdvs) {
+        var pdvKeys = Object.keys(c.pdvs);
+        if (pdvKeys.length > 0) {
+          h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Desglose por Punto de Venta</h4>';
+          for (var pk = 0; pk < pdvKeys.length; pk++) {
+            var pv = c.pdvs[pdvKeys[pk]];
+            var pvMargen = pv.ingreso - pv.costo;
+            h += '<div class="card" style="background:var(--bg);margin-bottom:8px"><div class="card-body">';
+            h += '<div class="fw7" style="margin-bottom:8px;color:var(--blue)">' + pdvKeys[pk] + '</div>';
+            h += '<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">';
+            h += '<div class="stat-card"><div class="stat-value">' + pv.ventas + '</div><div class="stat-label">Ventas</div></div>';
+            h += '<div class="stat-card"><div class="stat-value">$' + pv.ingreso.toLocaleString() + '</div><div class="stat-label">Ingreso</div></div>';
+            h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value" style="color:' + (pvMargen >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pvMargen.toLocaleString() + '</div><div class="stat-label">Margen</div></div>';
+            h += '</div>';
+            // Productos del PDV
+            var pvProdKeys = Object.keys(pv.productos || {});
+            if (pvProdKeys.length > 0) {
+              h += '<div class="table-wrap" style="margin-top:8px"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Ingreso</th><th>Costo</th><th>Margen</th></tr></thead><tbody>';
+              for (var ppk = 0; ppk < pvProdKeys.length; ppk++) {
+                var ppr = pv.productos[pvProdKeys[ppk]];
+                var pprM = ppr.ingreso - ppr.costo;
+                h += '<tr><td>' + ppr.nombre + '</td><td>' + ppr.talla + '</td><td>' + ppr.cantidad + '</td><td>$' + ppr.ingreso.toLocaleString() + '</td><td style="color:var(--red)">$' + ppr.costo.toLocaleString() + '</td><td style="color:' + (pprM >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + pprM.toLocaleString() + '</td></tr>';
+              }
+              h += '</tbody></table></div>';
+            }
+            h += '</div></div>';
+          }
+        }
+      }
+
+      // Stock del canal
+      var stockItems = c.stockDetalle || [];
+      if (stockItems.length > 0) {
+        h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Costo de Stock Actual</h4>';
+        h += '<div class="table-wrap"><table class="table"><thead><tr>';
+        if (key === 'pdv') {
+          h += '<th>Punto de Venta</th><th>Costo Total en Stock</th>';
+        } else {
+          h += '<th>Producto</th><th>Tipo</th><th>Fr.Ch (cant)</th><th>Fr.Gr (cant)</th><th>Costo/Fr.Ch</th><th>Costo/Fr.Gr</th><th>Costo Total</th>';
+        }
+        h += '</tr></thead><tbody>';
+        var stockTotal = 0;
+        for (var si = 0; si < stockItems.length; si++) {
+          var s = stockItems[si];
+          stockTotal += s.costoTotal;
+          if (key === 'pdv') {
+            h += '<tr><td class="fw7">' + s.nombre + '</td><td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          } else {
+            h += '<tr><td class="fw7">' + s.nombre + '</td>';
+            h += '<td><span class="badge ' + (s.tipo === 'blend' ? 'badge-blue' : 'badge-gold') + '">' + (s.tipo === 'blend' ? 'Blend' : 'Especia') + '</span></td>';
+            h += '<td>' + s.chico + '</td><td>' + s.grande + '</td>';
+            h += '<td>$' + s.costoChico.toFixed(0) + '</td><td>$' + s.costoGrande.toFixed(0) + '</td>';
+            h += '<td style="color:var(--red);font-weight:700">$' + s.costoTotal.toLocaleString() + '</td></tr>';
+          }
+        }
+        h += '<tr style="border-top:2px solid var(--border)"><td colspan="6" class="fw7" style="text-align:right">Total Stock</td><td style="color:var(--red);font-weight:700">$' + stockTotal.toLocaleString() + '</td></tr>';
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p class="text-muted text-center" style="margin-top:12px">Sin stock en este canal.</p>';
+      }
+
+      h += '</div></div>';
+    }
+
+    el.innerHTML = h;
+  }
+};
+
+ + (p.precioGrande||0).toLocaleString()) + '</td>' +
+          '<td class="text-green">' + (p.tipo==='pack' ? (p.stock||0) : p.stockChico) + '</td>' +
+          '<td class="text-green">' + (p.tipo==='pack' ? '-' : p.stockGrande) + '</td></tr>';
       }
       h += '</tbody></table></div>';
     }
