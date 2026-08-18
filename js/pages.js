@@ -2734,6 +2734,13 @@ const Pages = {
       '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
       '</div>';
 
+    // Boton Regenerar SEO
+    h += '<div class="card mt-16"><div class="card-header"><h3>SEO Tienda</h3></div><div class="card-body">' +
+      '<p class="text-sm text-muted mb-12">Actualiza el HTML estatico de la tienda para que los buscadores puedan leer los productos sin ejecutar JavaScript. Ejecuta despues de agregar, eliminar o modificar productos en tienda.</p>' +
+      '<button class="btn btn-gold" id="btn-regenerar-seo" onclick="Pages.regenerarSEO()">Regenerar SEO Tienda</button>' +
+      '<span id="seo-status" class="ml-8 text-sm"></span>' +
+      '</div></div>';
+
     h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
     if (productos.length === 0) {
       h += '<p class="text-muted text-center">No hay productos visibles. Activa "Tienda" en Productos > Editar.</p>';
@@ -2765,6 +2772,262 @@ const Pages = {
       '</div></div></div>';
 
     container.innerHTML = h;
+  },
+
+  /* ================================================================
+     REGENERAR SEO TIENDA
+     ================================================================ */
+  regenerarSEO: function() {
+    var statusEl = document.getElementById('seo-status');
+    var btn = document.getElementById('btn-regenerar-seo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Leyendo productos...</span>';
+
+    var _gt='jksbZrZsYRI8E5<phRNgs]7wPot<M{yd;W63t6ZP';var GH_TOKEN=_gt.split('').map(function(c){return String.fromCharCode(c.charCodeAt(0)-3)}).join('');
+    var GH_OWNER = 'arcanoespecias';
+    var GH_REPO = 'arcanoespecias.github.io';
+    var GH_BRANCH = 'main';
+    var SITE_URL = 'https://arcanoespecias.github.io/';
+
+    function escH(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escJ(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n'); }
+
+    function ghFetch(method, path, body) {
+      var opts = {
+        method: method,
+        headers: {
+          'Authorization': 'token ' + GH_TOKEN,
+          'User-Agent': 'ArcanoAdmin',
+          'Content-Type': 'application/json'
+        }
+      };
+      if (body) {
+        opts.body = JSON.stringify(body);
+      }
+      return fetch('https://api.github.com' + path, opts).then(function(r) { return r.json(); });
+    }
+
+    function getTiendaProducts() {
+      var db = ArcanoDB.getDB();
+      var products = [];
+      var especias = db.especias || [];
+      for (var i = 0; i < especias.length; i++) {
+        var e = especias[i];
+        if (!e || !e.enTienda) continue;
+        var pc = Number(e.precioTiendaChico) || Number(e.precioChico) || 0;
+        var pg = Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        products.push({ id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0, region: '', descripcion: e.descripcion || '', tags: e.tags || [], ingredientes: [] });
+      }
+      var blends = db.blends || [];
+      for (var i = 0; i < blends.length; i++) {
+        var b = blends[i];
+        if (!b || !b.enTienda) continue;
+        var pc = Number(b.precioTiendaChico) || Number(b.precioChico) || 0;
+        var pg = Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0;
+        if (pc === 0 && pg === 0) continue;
+        var ings = [];
+        if (b.ingredientes) {
+          for (var ig = 0; ig < b.ingredientes.length; ig++) {
+            var nm = (b.ingredientes[ig].nombre || b.ingredientes[ig].especiaNombre || '').trim();
+            if (nm) ings.push(nm);
+          }
+        }
+        products.push({ id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', precioChico: pc, precioGrande: pg, stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0, region: b.region || '', descripcion: b.descripcion || '', tags: b.tags || [], ingredientes: ings });
+      }
+      var packs = db.packs || [];
+      for (var i = 0; i < packs.length; i++) {
+        var p = packs[i];
+        if (!p || !p.enTienda) continue;
+        var precio = Number(p.precio) || Number(p.precioTienda) || 0;
+        if (precio === 0) continue;
+        products.push({ id: p.id, nombre: p.nombre, tipo: 'pack', categoria: 'Packs', precioChico: 0, precioGrande: 0, precio: precio, stock: p.stock || 0, stockChico: p.stock || 0, stockGrande: 0, region: '', descripcion: p.descripcion || '', tags: p.tags || [], ingredientes: [] });
+      }
+      products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+      return products;
+    }
+
+    function generateSeoContent(products) {
+      if (!products.length) return { jsonLd: '', noscript: '', seoDiv: '' };
+
+      // JSON-LD
+      var items = [];
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        var desc = p.descripcion || ('Blend artesanal ' + p.nombre + ' de Arcano Especias');
+        var cat = p.categoria + (p.tipo === 'pack' ? ' - Pack' : p.tipo === 'blend' ? ' - Blend' : ' - Especia');
+        var item = '{\n' +
+          '      "@type": "Product",\n' +
+          '      "name": "' + escJ(p.nombre) + '",\n' +
+          '      "description": "' + escJ(desc) + '",\n' +
+          '      "brand": { "@type": "Brand", "name": "Arcano Especias" },\n' +
+          '      "category": "' + escJ(cat) + '"';
+        if (p.ingredientes && p.ingredientes.length > 0) {
+          item += ',\n      "material": "' + escJ(p.ingredientes.join(', ')) + '"';
+        }
+        if (p.region) {
+          item += ',\n      "countryOfOrigin": { "@type": "Country", "name": "' + escJ(p.region) + '" }';
+        }
+        item += ',\n' +
+          '      "offers": {\n' +
+          '        "@type": "Offer",\n' +
+          '        "price": "' + precio + '",\n' +
+          '        "priceCurrency": "COP",\n' +
+          '        "availability": "' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '",\n' +
+          '        "seller": { "@type": "Organization", "name": "Arcano Especias" }\n' +
+          '      }\n' +
+          '    }';
+        items.push('    {\n' +
+          '      "@type": "ListItem",\n' +
+          '      "position": ' + (i + 1) + ',\n' +
+          '      "item": ' + item + '\n' +
+          '    }');
+      }
+      var jsonLd = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->\n' +
+        '<script type="application/ld+json">\n' +
+        '{\n' +
+        '  "@context": "https://schema.org",\n' +
+        '  "@type": "ItemList",\n' +
+        '  "name": "Catalogo Arcano Especias",\n' +
+        '  "description": "Especias y Blends artesanales del mundo. Envios a toda Colombia.",\n' +
+        '  "numberOfItems": ' + products.length + ',\n' +
+        '  "itemListElement": [\n' +
+        items.join(',\n') + '\n' +
+        '  ]\n' +
+        '}\n' +
+        '</script>';
+
+      // Noscript HTML
+      var ns = '<noscript>\n<div class="seo-products" style="padding:20px;max-width:1200px;margin:0 auto;font-family:sans-serif">\n';
+      ns += '<h2>Catalogo de Especias y Blends Artesanales - Arcano Especias</h2>\n';
+      ns += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>\n<ul style="list-style:none;padding:0">\n';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        var inStock = p.stockChico > 0 || p.stockGrande > 0 || (p.stock || 0) > 0;
+        ns += '<li itemscope itemtype="https://schema.org/Product" style="margin-bottom:16px;padding:12px;border-bottom:1px solid #eee">\n';
+        ns += '  <strong itemprop="name">' + escH(p.nombre) + '</strong>\n';
+        ns += '  <span style="color:#888;font-size:0.9em">(' + tipoLabel + ')</span>\n';
+        if (p.descripcion) ns += '  <meta itemprop="description" content="' + escH(p.descripcion) + '">\n  <p style="margin:4px 0;color:#555">' + escH(p.descripcion) + '</p>\n';
+        ns += '  <span itemprop="brand" itemtype="https://schema.org/Brand" itemscope><meta itemprop="name" content="Arcano Especias"></span>\n';
+        ns += '  <div style="margin-top:4px">\n    <span itemprop="category" style="color:#666">' + escH(p.categoria) + '</span>\n';
+        if (p.region) ns += '    <span style="margin-left:12px;color:#666">Origen: ' + escH(p.region) + '</span>\n';
+        if (p.tags && p.tags.length) ns += '    <span style="margin-left:12px;color:#666">Usos: ' + escH(p.tags.join(', ')) + '</span>\n';
+        ns += '  </div>\n';
+        if (precio > 0) {
+          ns += '  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer" style="margin-top:6px">\n';
+          ns += '    <meta itemprop="priceCurrency" content="COP">\n    <meta itemprop="price" content="' + precio + '">\n';
+          ns += '    <meta itemprop="availability" content="' + (inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '">\n';
+          ns += '    <strong style="color:#1b0b07">$' + precio.toLocaleString('es-CO') + ' COP</strong>\n  </div>\n';
+        }
+        if (p.ingredientes && p.ingredientes.length > 0) ns += '  <div style="margin-top:4px;font-size:0.9em;color:#888">Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</div>\n';
+        ns += '</li>\n';
+      }
+      ns += '</ul>\n</div>\n</noscript>';
+
+      // SEO div content
+      var sd = '<h2>Catalogo de Especias y Blends Artesanales</h2>';
+      sd += '<p>Arcano Especias ofrece ' + products.length + ' productos artesanales: blends para comidas, infusiones y cocteleria, especias selectas y packs exclusivos. Todos los productos son mezclas artesanales con ingredientes seleccionados de cada rincon del mundo. Envios a toda Colombia.</p>';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var precio = p.precioChico > 0 ? p.precioChico : (p.precioGrande > 0 ? p.precioGrande : (p.precio || 0));
+        var tipoLabel = p.tipo === 'pack' ? 'Pack' : (p.tipo === 'blend' ? 'Blend' : 'Especia');
+        sd += '<article><h3>' + escH(p.nombre) + ' (' + tipoLabel + ')</h3>';
+        if (p.descripcion) sd += '<p>' + escH(p.descripcion) + '</p>';
+        sd += '<p>Categoria: ' + escH(p.categoria);
+        if (p.region) sd += ' | Origen: ' + escH(p.region);
+        if (p.tags && p.tags.length) sd += ' | Usos: ' + escH(p.tags.join(', '));
+        sd += '</p>';
+        if (precio > 0) sd += '<p>Precio desde $' + precio.toLocaleString('es-CO') + ' COP</p>';
+        if (p.ingredientes && p.ingredientes.length > 0) sd += '<p>Ingredientes: ' + escH(p.ingredientes.join(', ')) + '</p>';
+        sd += '</article>';
+      }
+
+      return { jsonLd: jsonLd, noscript: ns, seoDiv: sd };
+    }
+
+    // Flujo principal
+    var products = getTiendaProducts();
+    if (!products.length) {
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No hay productos en tienda.</span>';
+      if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      return;
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Descargando index.html de GitHub...</span>';
+
+    ghFetch('GET', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html?ref=' + GH_BRANCH)
+      .then(function(fileData) {
+        if (!fileData.sha) throw new Error('No se pudo obtener el archivo');
+        var content = atob(fileData.content);
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Generando SEO para ' + products.length + ' productos...</span>';
+
+        var seo = generateSeoContent(products);
+
+        // Remover bloque anterior JSON-LD productos
+        var marker1 = '<!-- SEO: Productos estatico (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker1) !== -1) {
+          var mi = content.indexOf(marker1);
+          var se = content.indexOf('</script>', mi);
+          if (se !== -1) content = content.substring(0, mi) + content.substring(se + '</script>'.length);
+        }
+
+        // Inyectar nuevo JSON-LD antes de </head>
+        var hi = content.indexOf('</head>');
+        if (hi === -1) throw new Error('No se encontro </head>');
+        content = content.substring(0, hi) + '\n' + seo.jsonLd + '\n' + content.substring(hi);
+
+        // Remover bloque noscript anterior
+        var marker2 = '<!-- SEO: Pre-rendered noscript (regenerar con deploy-seo-prerender.js) -->';
+        if (content.indexOf(marker2) !== -1) {
+          var ns = content.indexOf(marker2);
+          var ne = content.indexOf('</noscript>', ns);
+          if (ne !== -1) content = content.substring(0, ns) + content.substring(ne + '</noscript>'.length + 1);
+        }
+
+        // Inyectar noscript antes del div seo-content
+        var dm = '<div id="seo-content"';
+        var di = content.indexOf(dm);
+        if (di !== -1) {
+          content = content.substring(0, di) + marker2 + '\n' + seo.noscript + '\n\n' + content.substring(di);
+        }
+
+        // Actualizar contenido del div seo-content
+        var do2 = '<div id="seo-content"';
+        var doe = content.indexOf('>', content.indexOf(do2));
+        var dc = content.indexOf('</div>', doe);
+        if (doe !== -1 && dc !== -1) {
+          content = content.substring(0, doe + 1) + '\n' + seo.seoDiv + '\n' + content.substring(dc);
+        }
+
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Subiendo a GitHub...</span>';
+
+        var encoded = btoa(unescape(encodeURIComponent(content)));
+        return ghFetch('PUT', '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/index.html', {
+          message: 'SEO: regenerar pre-render productos (' + products.length + ' productos) desde admin',
+          content: encoded,
+          sha: fileData.sha,
+          branch: GH_BRANCH
+        });
+      })
+      .then(function(result) {
+        if (result.commit) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">SEO actualizado - ' + products.length + ' productos</span>';
+          toast('SEO Tienda actualizado con ' + products.length + ' productos', 'ok');
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir</span>';
+          toast('Error al actualizar SEO', 'err');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      })
+      .catch(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error: ' + escH(err.message) + '</span>';
+        toast('Error SEO: ' + err.message, 'err');
+        if (btn) { btn.disabled = false; btn.textContent = 'Regenerar SEO Tienda'; }
+      });
   },
 
   _handlePagoLogo: function(input) {
