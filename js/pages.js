@@ -4014,21 +4014,29 @@ const Pages = {
   },
 
   _loadRecetasAdmin: function() {
-    var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
-    ref.once('value', function(snap) {
-      var data = snap.val();
-      var recetas = [];
-      if (data) {
-        var keys = Object.keys(data);
-        for (var i = 0; i < keys.length; i++) {
-          var r = data[keys[i]];
-          r._key = keys[i];
-          recetas.push(r);
+    try {
+      var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+      ref.once('value', function(snap) {
+        var data = snap.val();
+        var recetas = [];
+        if (data) {
+          var keys = Object.keys(data);
+          for (var i = 0; i < keys.length; i++) {
+            var r = data[keys[i]];
+            r._key = keys[i];
+            recetas.push(r);
+          }
         }
-      }
-      recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
-      Pages._renderRecetasList(recetas);
-    });
+        recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+        Pages._renderRecetasList(recetas);
+      }).catch(function(err) {
+        var listEl = document.getElementById('ra-list');
+        if (listEl) listEl.innerHTML = '<p class="text-center text-muted">Error al cargar recetas: ' + (err.message || err) + '</p>';
+      });
+    } catch(e) {
+      var listEl = document.getElementById('ra-list');
+      if (listEl) listEl.innerHTML = '<p class="text-center text-muted">Error al cargar recetas.</p>';
+    }
   },
 
   _renderRecetasList: function(recetas) {
@@ -4109,6 +4117,7 @@ const Pages = {
       : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
 
     // Load existing recipes to avoid repetition
+    try {
     firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
       var data = snap.val();
       var existingTitles = [];
@@ -4197,12 +4206,18 @@ const Pages = {
             catch(je) { if (je.message && je.message.indexOf('Error ') === 0) throw je; throw new Error('Error ' + res.status + ': ' + txt.slice(0, 120)); }
           });
         }
+        var ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (ct.indexOf('application/json') === -1) {
+          return res.text().then(function(t) { throw new Error('La API no respondio JSON. Verifica tu conexion.'); });
+        }
         return res.json();
       })
       .then(function(data) {
+        if (!data.choices || !data.choices[0]) throw new Error('Respuesta inesperada de la API');
         var content = data.choices[0].message.content.trim();
         content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-        var receta = JSON.parse(content);
+        var receta;
+        try { receta = JSON.parse(content); } catch(pe) { throw new Error('La IA no devolvio un JSON valido: ' + content.slice(0, 100)); }
 
         if (!receta.titulo) throw new Error('La receta no tiene titulo');
         if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
@@ -4217,23 +4232,38 @@ const Pages = {
 
         receta.fecha = new Date().toISOString().slice(0, 10);
         if (!receta.categoria) receta.categoria = categoria;
-        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
-          if (err) {
-            status.textContent = 'Error al guardar: ' + (err.message || err);
-          } else {
-            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
-            Pages._loadRecetasAdmin();
-          }
+        try {
+          firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+            if (err) {
+              status.textContent = 'Error al guardar en Firebase: ' + (err.message || err);
+            } else {
+              status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
+              Pages._loadRecetasAdmin();
+            }
+            btn.disabled = false;
+            btn.textContent = 'Generar Receta con IA';
+          });
+        } catch(fe) {
+          status.innerHTML = '<span style="color:var(--green)">Receta generada (no se guardo en la nube): ' + receta.titulo + '</span>';
           btn.disabled = false;
           btn.textContent = 'Generar Receta con IA';
-        });
+        }
       })
       .catch(function(err) {
         status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
         btn.disabled = false;
         btn.textContent = 'Generar Receta con IA';
       });
+    }).catch(function(err) {
+      status.innerHTML = '<span style="color:var(--red)">Error al cargar recetas existentes: ' + (err.message || err) + '</span>';
+      btn.disabled = false;
+      btn.textContent = 'Generar Receta con IA';
     });
+    } catch(e) {
+      status.innerHTML = '<span style="color:var(--red)">Error: ' + (e.message || e) + '</span>';
+      btn.disabled = false;
+      btn.textContent = 'Generar Receta con IA';
+    }
   },
 
   /* ================================================================
