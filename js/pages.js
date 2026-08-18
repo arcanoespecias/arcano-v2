@@ -3954,7 +3954,7 @@ const Pages = {
       '<div class="card-body">' +
         '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Qwen 3.6 27B</b> (opensource).</p>' +
         '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
-        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,102,66,82,53,85,103,72,55,107,86,107,78,108,75,83,108,75,116,88,97,87,71,100,121,98,51,70,89,54,53,65,109,116,75,112,86,97,99,50,80,89,90,111,86,70,90,99,66,75,81,98,121];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,56,82,122,68,54,70,119,67,80,51,112,52,109,89,122,109,120,87,52,48,87,71,100,121,98,51,70,89,89,51,51,118,71,118,85,97,109,51,56,70,79,81,121,72,85,119,101,65,68,79,112,56];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
         '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
         '</div>' +
         '<div class="g2">' +
