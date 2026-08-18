@@ -183,11 +183,14 @@ var PDV = {
         var tipo = parts[0];
         var prodId = Number(parts[1]);
         var talla = parts[2];
-        var producto = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
+        var producto;
+        if (tipo === 'pack') { producto = (ArcanoDB.getPacks ? ArcanoDB.getPacks() : []).find(function(x){return x.id===prodId;}); }
+        else { producto = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId); }
         var nombre = producto ? producto.nombre : '?';
+        var badgeClass = tipo === 'pack' ? 'badge-green' : (tipo === 'especia' ? 'badge-gold' : 'badge-blue');
         h += '<tr><td class="fw7">' + this.esc(nombre) + '</td>' +
-          '<td><span class="badge ' + (tipo === 'especia' ? 'badge-gold' : 'badge-blue') + '">' + tipo + '</span></td>' +
-          '<td>' + talla + '</td>' +
+          '<td><span class="badge ' + badgeClass + '">' + tipo + '</span></td>' +
+          '<td>' + (talla === '-' ? 'Pack' : talla) + '</td>' +
           '<td class="fw7">' + stock[k] + '</td></tr>';
       }
       h += '</tbody></table></div>';
@@ -230,6 +233,20 @@ var PDV = {
           '<input type="number" class="input" style="width:60px" min="0" max="' + (b.stockGrande || 0) + '" placeholder="0" data-tipo="blend" data-id="' + b.id + '" data-talla="grande"></div>';
       }
     }
+    // Packs
+    var packs = ArcanoDB.getPacks ? ArcanoDB.getPacks() : [];
+    if (packs.length > 0) {
+      h += '<p class="fw7" style="margin:12px 0 4px">Packs</p>';
+      for (var pk = 0; pk < packs.length; pk++) {
+        var p = packs[pk];
+        var pStk = p.stock || 0;
+        if (pStk <= 0) continue;
+        h += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0">' +
+          '<span style="flex:1;font-size:0.85em">' + this.esc(p.nombre) + '</span>' +
+          '<span class="text-muted text-sm">Stock:' + pStk + '</span>' +
+          '<input type="number" class="input" style="width:60px" min="0" max="' + pStk + '" placeholder="0" data-tipo="pack" data-id="' + p.id + '" data-talla="-"></div>';
+      }
+    }
     h += '</div>';
     h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
       '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>' +
@@ -270,10 +287,12 @@ var PDV = {
       var k = keys[i];
       var parts = k.split('_');
       var tipo = parts[0], prodId = Number(parts[1]), talla = parts[2];
-      var producto = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
+      var producto;
+      if (tipo === 'pack') { producto = (ArcanoDB.getPacks ? ArcanoDB.getPacks() : []).find(function(x){return x.id===prodId;}); }
+      else { producto = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId); }
       var nombre = producto ? producto.nombre : '?';
       h += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0">' +
-        '<span style="flex:1;font-size:0.85em">' + this.esc(nombre) + ' (' + talla + ')</span>' +
+        '<span style="flex:1;font-size:0.85em">' + this.esc(nombre) + ' (' + (talla === '-' ? 'Pack' : talla) + ')</span>' +
         '<span class="text-muted text-sm">En PDV: ' + stock[k] + '</span>' +
         '<input type="number" class="input" style="width:70px" min="0" max="' + stock[k] + '" placeholder="0" data-key="' + k + '" data-tipo="' + tipo + '" data-id="' + prodId + '" data-talla="' + talla + '"></div>';
     }
@@ -401,6 +420,12 @@ var PDV = {
       var keyGr2 = 'blend_' + b.id + '_grande';
       if ((stock[keyCh2] || 0) > 0) products.push({ tipo: 'blend', id: b.id, nombre: b.nombre, talla: 'chico', stock: stock[keyCh2], precio: b.precioChico || 0 });
       if ((stock[keyGr2] || 0) > 0) products.push({ tipo: 'blend', id: b.id, nombre: b.nombre, talla: 'grande', stock: stock[keyGr2], precio: b.precioGrande || 0 });
+    }
+    var pdvPacks = ArcanoDB.getPacks ? ArcanoDB.getPacks() : [];
+    for (var pp = 0; pp < pdvPacks.length; pp++) {
+      var ppk = pdvPacks[pp];
+      var keyPk = 'pack_' + ppk.id + '_-';
+      if ((stock[keyPk] || 0) > 0) products.push({ tipo: 'pack', id: ppk.id, nombre: ppk.nombre, talla: '-', stock: stock[keyPk], precio: ppk.precio || 0 });
     }
     for (var p = 0; p < products.length; p++) {
       var pr = products[p];
@@ -731,13 +756,16 @@ var PDV = {
       var sk = stockKeys[s];
       var parts = sk.split('_');
       var tipo = parts[0], prodId = Number(parts[1]), talla = parts[2];
-      var prod = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId);
-      var precio = prod ? (talla === 'grande' ? prod.precioGrande : prod.precioChico) || 0 : 0;
+      var prod;
+      if (tipo === 'pack') { prod = (ArcanoDB.getPacks ? ArcanoDB.getPacks() : []).find(function(x){return x.id===prodId;}); }
+      else { prod = tipo === 'especia' ? ArcanoDB.getEspecia(prodId) : ArcanoDB.getBlend(prodId); }
+      var precio = prod ? (tipo === 'pack' ? (prod.precio || 0) : (talla === 'grande' ? prod.precioGrande : prod.precioChico) || 0) : 0;
       var valor = precio * stock[sk];
       stockValor += valor;
+      var badgeClass = tipo === 'pack' ? 'badge-green' : (tipo === 'especia' ? 'badge-gold' : 'badge-blue');
       h += '<tr><td class="fw7">' + this.esc(prod ? prod.nombre : '?') + '</td>' +
-        '<td><span class="badge ' + (tipo === 'especia' ? 'badge-gold' : 'badge-blue') + '">' + tipo + '</span></td>' +
-        '<td>' + talla + '</td><td>' + stock[sk] + '</td>' +
+        '<td><span class="badge ' + badgeClass + '">' + tipo + '</span></td>' +
+        '<td>' + (talla === '-' ? 'Pack' : talla) + '</td><td>' + stock[sk] + '</td>' +
         '<td>$' + precio.toLocaleString() + '</td><td class="fw7">$' + valor.toLocaleString() + '</td></tr>';
     }
     h += '</tbody></table></div>';
