@@ -4002,16 +4002,7 @@ const Pages = {
           if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">sincronizada</span>';
           Pages._groqKeyLoaded = true;
         } else {
-          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube</span>';
-          var inp2 = document.getElementById('ra-groq-key');
-          if (inp2 && inp2.value.trim()) {
-            firebase.database().ref('arcano/config/groqKey').set(inp2.value.trim(), function(err) {
-              if (!err) {
-                if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
-                Pages._groqKeyLoaded = true;
-              }
-            });
-          }
+          if (statusEl) statusEl.innerHTML = ' <span style="color:var(--yellow)">no guardada en la nube, haz clic en Guardar</span>';
         }
       }).catch(function() {
         var statusEl = document.getElementById('ra-key-status');
@@ -4224,7 +4215,12 @@ const Pages = {
         })
       })
       .then(function(res) {
-        if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
+        if (!res.ok) {
+          return res.text().then(function(txt) {
+            try { var e = JSON.parse(txt); throw new Error((e.error && e.error.message) || 'Error ' + res.status); }
+            catch(je) { if (je.message && je.message.indexOf('Error ') === 0) throw je; throw new Error('Error ' + res.status + ': ' + txt.slice(0, 120)); }
+          });
+        }
         return res.json();
       })
       .then(function(data) {
