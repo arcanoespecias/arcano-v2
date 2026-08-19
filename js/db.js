@@ -1121,6 +1121,13 @@ function toggleTienda(tipo, id) {
   _notify('update', colMap[tipo] || tipo, id);
 }
 
+function toggleEnBlend(especiaId) {
+  if (!_db.especias[especiaId]) return;
+  _db.especias[especiaId].enBlend = !_db.especias[especiaId].enBlend;
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'especias', especiaId);
+}
+
 /* ==================== EXCEL IMPORT ==================== */
 
 /** Find especia by name with flexible matching (exact, prefix, contains, word overlap) */
@@ -1912,6 +1919,7 @@ window.ArcanoDB = {
   importFromExcelData: importFromExcelData,
   getTiendaProductos: getTiendaProductos,
   toggleTienda: toggleTienda,
+  toggleEnBlend: toggleEnBlend,
   getProductTags: getProductTags, getTagsForCategoria: getTagsForCategoria,
   addProductTag: addProductTag, removeProductTag: removeProductTag,
   compressImage: compressImage,
