@@ -2608,6 +2608,17 @@ const Pages = {
       var it = p.items[i];
       var tallaLabel = it.talla === 'grande' ? 'Grande' : 'Pequeno';
       h += '<tr><td class="fw7">' + (it.nombre || '?') + '</td><td>' + tallaLabel + '</td><td>' + (it.qty || 0) + '</td><td>$' + (it.precio || 0).toLocaleString() + '</td><td class="fw7">$' + (it.subtotal || 0).toLocaleString() + '</td></tr>';
+      if (it.tipo === 'custom-blend' && it.customBlend) {
+        var cb = it.customBlend;
+        h += '<tr><td colspan="5" style="padding:4px 12px 8px 32px;border-bottom:1px solid var(--border)">';
+        h += '<div style="font-size:0.75rem;color:var(--gold);font-weight:700;margin-bottom:4px">Blend: ' + (cb.nombre || 'Personalizado') + '</div>';
+        if (cb.especias) {
+          for (var bi = 0; bi < cb.especias.length; bi++) {
+            h += '<span style="display:inline-block;padding:2px 8px;margin:2px;background:var(--bg);border:1px solid var(--border);border-radius:12px;font-size:0.7rem;color:var(--text)">' + cb.especias[bi].nombre + ' ' + cb.especias[bi].porcentaje + '%</span>';
+          }
+        }
+        h += '</td></tr>';
+      }
     }
     h += '</tbody></table></div>';
     h += '<div style="text-align:right;margin-top:12px;font-size:1.2rem" class="fw7">Total: $' + (p.total || 0).toLocaleString() + '</div>';
@@ -2772,6 +2783,91 @@ const Pages = {
           (cfg.logoPago ? '<img src="' + cfg.logoPago + '" class="img-preview" id="img-preview-pago"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePagoLogo()">Quitar</button>' : '') +
           '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-pago\').click()"><span>+ Formas de Pago</span></div></div>' +
       '</div></div></div>';
+
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
+     TU BLEND ADMIN
+     ================================================================ */
+  renderTuBlend: function(container) {
+    var especias = ArcanoDB.getEspecias();
+    var pedidos = ArcanoDB.getPedidos();
+
+    // Collect custom blend items from pedidos
+    var blendVentas = [];
+    var totalBlendIngreso = 0;
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var ped = pedidos[pi];
+      var items = ped.items || [];
+      for (var ii = 0; ii < items.length; ii++) {
+        if (items[ii].tipo === 'custom-blend') {
+          blendVentas.push({ pedido: ped, item: items[ii] });
+          totalBlendIngreso += (items[ii].precio || 0) * (items[ii].qty || 1);
+        }
+      }
+    }
+
+    var h = '<div class="page-actions"></div>';
+
+    // KPIs
+    h += '<div class="stats-grid">';
+    h += '<div class="stat-card"><div class="stat-value">' + especias.length + '</div><div class="stat-label">Total Especias</div></div>';
+    var enBlendCount = 0;
+    for (var ec = 0; ec < especias.length; ec++) { if (especias[ec].enBlend !== false && (especias[ec].stockBolsa || 0) > 0) enBlendCount++; }
+    h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value text-green">' + enBlendCount + '</div><div class="stat-label">Disponibles para Blend</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value">' + blendVentas.length + '</div><div class="stat-label">Ventas Tu Blend</div></div>';
+    h += '<div class="stat-card" style="border-left-color:var(--blue)"><div class="stat-value">$' + totalBlendIngreso.toLocaleString() + '</div><div class="stat-label">Ingreso Total</div></div>';
+    h += '</div>';
+
+    // Especias config table
+    h += '<div class="card mt-16"><div class="card-header"><h3>Especias en Tu Blend</h3><p class="text-xs text-muted">Activa/desactiva especias y revisa el stock de pala. Solo las activas con pala > 0g aparecen en la tienda.</p></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Especia</th><th>Pala (stock)</th><th>En Blend</th><th>Fr. Chico</th><th>Fr. Grande</th></tr></thead><tbody>';
+    for (var i = 0; i < especias.length; i++) {
+      var e = especias[i];
+      var palaOk = (e.stockBolsa || 0) > 0;
+      var isEnBlend = e.enBlend !== false;
+      var available = isEnBlend && palaOk;
+      h += '<tr>';
+      h += '<td class="fw7">' + (e.nombre || '?') + '</td>';
+      h += '<td><span class="' + (palaOk ? 'text-green' : 'text-red fw7') + '">' + (e.stockBolsa || 0) + 'g</span></td>';
+      h += '<td><button class="btn btn-sm ' + (isEnBlend ? 'btn-green' : 'btn-outline') + '" onclick="ArcanoDB.toggleEnBlend(' + e.id + ');App.renderPage(\'tublend\')">' + (isEnBlend ? 'ON' : 'OFF') + '</button></td>';
+      h += '<td><span class="' + ((e.stockChico||0)<=3?'text-red fw7':'') + '">' + (e.stockChico||0) + '</span></td>';
+      h += '<td><span class="' + ((e.stockGrande||0)<=3?'text-red fw7':'') + '">' + (e.stockGrande||0) + '</span></td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // Ventas Tu Blend
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Ventas Tu Blend</h3></div><div class="card-body">';
+    if (blendVentas.length === 0) {
+      h += '<p class="text-muted text-center">Sin ventas de blends personalizados.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Cliente</th><th>Blend</th><th>Talla</th><th>Detalle</th><th>Precio</th></tr></thead><tbody>';
+      for (var v = 0; v < blendVentas.length; v++) {
+        var bv = blendVentas[v];
+        var cl = bv.pedido.cliente || {};
+        var cb = bv.item.customBlend || {};
+        var fecha = bv.pedido.creado ? bv.pedido.creado.slice(0, 10) : '';
+        var tallaL = bv.item.talla === 'grande' ? 'Grande' : 'Pequeno';
+        var detailParts = [];
+        if (cb.especias) {
+          for (var di = 0; di < cb.especias.length; di++) {
+            detailParts.push(cb.especias[di].nombre + ' ' + cb.especias[di].porcentaje + '%');
+          }
+        }
+        h += '<tr>';
+        h += '<td>' + fecha + '</td>';
+        h += '<td class="fw7">' + (cl.nombre || '?') + '</td>';
+        h += '<td>' + (cb.nombre || 'Blend') + '</td>';
+        h += '<td>' + tallaL + '</td>';
+        h += '<td class="text-xs" style="max-width:200px">' + detailParts.join(', ') + '</td>';
+        h += '<td class="text-gold fw7">$' + (bv.item.precio || 0).toLocaleString() + '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
 
     container.innerHTML = h;
   },
