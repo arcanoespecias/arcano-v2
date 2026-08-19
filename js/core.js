@@ -179,7 +179,7 @@ const App = {
               '<span class="nav-icon">📋</span><span class="nav-label">Stock</span></a>' +
             '<a class="nav-item" data-page="tienda" onclick="App.navigate(\'tienda\')">' +
               '<span class="nav-icon">🛒</span><span class="nav-label">Tienda</span></a>' +
-            '<a class="nav-item" data-page="tublend" onclick="App.navigate('tublend')">' +
+            '<a class="nav-item" data-page="tublend" onclick="App.navigate(\'tublend\')">' +
               '<span class="nav-icon">⚗</span><span class="nav-label">Tu Blend</span></a>' +
             '<a class="nav-item" data-page="recetas" onclick="App.navigate(\'recetas\')">' +
               '<span class="nav-icon">🍳</span><span class="nav-label">Recetas IA</span></a>' +
