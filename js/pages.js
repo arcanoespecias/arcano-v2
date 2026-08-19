@@ -4097,24 +4097,42 @@ const Pages = {
     btn.textContent = 'Generando...';
     status.textContent = 'Cargando productos y recetas existentes...';
 
-    // Build rich product context and load existing recipes, then generate
-    var productos = ArcanoDB.getTiendaProductos();
+    // Build compact product context (only matching category)
+    var allProductos = ArcanoDB.getTiendaProductos();
     var productLines = [];
-    for (var i = 0; i < productos.length; i++) {
-      var p = productos[i];
-      var line = '  - ' + p.nombre + ' [' + p.tipo + ', categorias: ' + (p.categorias || [p.categoria]).join('/') + ']';
-      if (p.uso) line += ' (uso sugerido: ' + p.uso + ')';
+    var catMap = { 'Comida': ['Comidas'], 'Infusiones': ['Infusiones'], 'Cocteleria': ['Cocteleria'] };
+    var catsOk = catMap[categoria] || ['Comidas'];
+    for (var i = 0; i < allProductos.length; i++) {
+      var p = allProductos[i];
+      var pCats = (p.categorias || [p.categoria] || []).map(function(c){return c.toLowerCase();});
+      var match = false;
+      for (var ci = 0; ci < catsOk.length; ci++) { if (pCats.indexOf(catsOk[ci].toLowerCase()) !== -1) { match = true; break; } }
+      if (!match) continue;
+      var line = '- ' + p.nombre;
+      if (p.uso) line += ' (' + p.uso + ')';
       productLines.push(line);
     }
-    var productContext = productLines.length > 0 ? productLines.join('\n') : '  - No hay productos en tienda aun';
+    // Also add up to 10 products from other categories as available
+    var otherLines = [];
+    for (var i = 0; i < allProductos.length && otherLines.length < 10; i++) {
+      var p = allProductos[i];
+      var pCats = (p.categorias || [p.categoria] || []).map(function(c){return c.toLowerCase();});
+      var match = false;
+      for (var ci = 0; ci < catsOk.length; ci++) { if (pCats.indexOf(catsOk[ci].toLowerCase()) !== -1) { match = true; break; } }
+      if (match) continue;
+      otherLines.push('- ' + p.nombre);
+    }
+    var productContext = productLines.join('\n');
+    if (otherLines.length > 0) productContext += '\nOtros disponibles: ' + otherLines.join(', ');
+    if (!productContext) productContext = '- No hay productos en esta categoria';
 
     var langInstr = idioma === 'en'
-      ? 'Respond ONLY in English. All fields (titulo, descripcion, ingredientes, pasos) must be in English.'
-      : 'Responde SOLO en espanol. Todos los campos (titulo, descripcion, ingredientes, pasos) deben estar en espanol.';
+      ? 'Respond ONLY in English.'
+      : 'Responde SOLO en espanol.';
 
     var temaInstr = tema
-      ? 'El tema especifico es: ' + tema + '. La receta debe girar alrededor de este tema.'
-      : 'Elige un tema creativo y apetitoso quecombine bien con la categoria.';
+      ? 'Tema: ' + tema + '.'
+      : 'Elige un tema creativo.';
 
     // Load existing recipes to avoid repetition
     try {
@@ -4135,51 +4153,24 @@ const Pages = {
 
       var existingBlock = '';
       if (existingTitles.length > 0) {
-        existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir temas, platos ni titulos similares):\n';
-        existingBlock += existingTitles.join('\n');
-        existingBlock += '\n\nTotal recetas existentes por categoria:\n';
-        var catKeys2 = Object.keys(existingByCategory);
-        for (var c = 0; c < catKeys2.length; c++) {
-          var catName = catKeys2[c];
-          var catCount = existingByCategory[catName].length;
-          if (catCount > 0) existingBlock += '- ' + catName + ': ' + catCount + ' recetas\n';
-        }
-        existingBlock += '\nREGLA IMPORTANTE: No repitas ninguno de estos titulos ni crees recetas con tematicas similares. Cada receta debe ser unica.';
+        var recentTitles = existingTitles.slice(-30);
+        existingBlock = '\nRecetas existentes (NO repetir): ' + recentTitles.join(', ');
       }
 
       var systemPrompt =
-        'Eres un chef creativo y experto en especias de la marca artesanal Arcano Especias. ' +
-        'Tu trabajo es crear recetas UNICAS, variadas y deliciosas que resalten los sabores de los productos disponibles.\n\n' +
-        'CATALOGO DE PRODUCTOS DISPONIBLES:\n' + productContext + '\n\n' +
-        'REGLAS OBLIGATORIAS:\n' +
-        '1. Usa al menos UN producto del catalogo en cada receta. Prioriza productos cuya etiqueta de uso o categoria coincida con el tipo de receta.\n' +
-        '2. La etiqueta "uso" de cada blend indica su mejor aplicacion (ej: "Para adobos y marinadas", "Para gin tonicas", "Para postres y bakery"). Debes respetar esa orientacion.\n' +
-        '3. La "categoria" del producto indica si es para Comidas, Infusiones o Cocteleria. Usa productos de la categoria que corresponda al tipo de receta.\n' +
-        '4. IMPORTANTE: Menciona el nombre EXACTO del producto Arcano tal como aparece en el catalogo dentro de los ingredientes y pasos. Esto permite que se enlace automaticamente en la tienda.\n' +
-        '5. Cada receta debe ser ORIGINAL y DIFERENTE a cualquier otra existente. Varia la tecnica culinaria, los ingredientes base, las cocinas del mundo y los estilos.\n' +
-        '6. Para recetas de Comida: alterna entre platos de diferentes culturas (mexicana, india, tailandesa, mediterranea, peruana, libanesa, etiope, japonesa, colombiana, marroqui, etc.), tecnicas (hornear, grillar, saltear, guisar, marinar, fermentar, ahumar, confitar) y tipos (soups, currys, tacos, bowls, tartares, adobos, salsas, breads, postres, ceviches, empanadas, arepas).\n' +
-        '7. Para Infusiones: alterna entre tesis relajantes, digestivos, energizantes, blend de temporada, golden milk, chai, infusiones con frutas, con flores, con especias raras, toddies calientes, cold brew de especias.\n' +
-        '8. Para Cocteleria: alterna entre cocteles con diferentes bases (gin, ron, vodka, whisky, mezcal, tequila, vino, cava, sake), estilos (sour, fizz, mocktail, punch, old fashioned, spritz, julep, colada) y tecnicas (muddling, infusion, flame, dry shake, fat wash, clarification).\n' +
-        '9. Los ingredientes deben ser realisticos y faciles de conseguir. Incluye cantidades precisas en cada ingrediente.\n' +
-        '10. Los pasos deben ser claros, concisos y en orden logico. Cada paso debe describir una accion concreta.\n' +
-        '11. NUNCA repitas titulos, temas o enfoques de recetas ya existentes.\n' +
-        '12. El campo "productos_usados" debe listar SOLO los nombres exactos de productos Arcano usados en la receta (tal como aparecen en el catalogo).\n\n' +
-        langInstr;
+        'Eres chef de Arcano Especias. Crea recetas unicas usando los productos del catalogo.\n' +
+        'PRODUCTOS:\n' + productContext + '\n\n' +
+        'REGLAS:\n' +
+        '1. Usa al menos UN producto del catalogo (nombre EXACTO).\n' +
+        '2. Ingredientes con cantidades precisas (5-12). Pasos claros (5-8).\n' +
+        '3. Receta ORIGINAL, diferente a las existentes.\n' +
+        '4. "productos_usados" solo nombres exactos del catalogo.\n' +
+        '5. La descripcion del uso de cada producto indica su mejor aplicacion.\n' + langInstr + '\n' +
+        'Responde SOLO con JSON, sin texto ni markdown antes/despues.';
 
       var userPrompt =
-        'Genera UNA receta de categoria "' + categoria + '". ' + temaInstr + '\n\n' +
-        existingBlock + '\n\n' +
-        'Responde EXCLUSIVAMENTE con un JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura exacta:\n' +
-        '{"titulo": "...", "descripcion": "... (2-3 oraciones que despierten apetito)", "categoria": "' + categoria + '", ' +
-        '"dificultad": "Facil" o "Media" o "Dificil", ' +
-        '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
-        '"productos_usados": ["Nombre Exacto del Producto 1"], ' +
-        '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto Arcano", "200g de proteina principal", ...], ' +
-        '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
-        '"imagen_prompt": "descripcion visual del plato terminado para generar una imagen (en ingles, 1 oracion)"}\n\n' +
-        'RECUERDA: De 5 a 12 ingredientes, de 5 a 8 pasos. La receta DEBE ser diferente a todas las existentes. ' +
-        'Piensa en una tecnica, ingrediente principal o cocina del mundo que no hayas usado antes. ' +
-        'Los nombres en "productos_usados" deben coincidir EXACTAMENTE con el catalogo.';
+        'Genera UNA receta de "' + categoria + '". ' + temaInstr + existingBlock + '\n\n' +
+        'JSON exacto: {"titulo":"...","descripcion":"...","categoria":"' + categoria + '","dificultad":"Facil/Media/Dificil","tiempo":"...","porciones":"...","productos_usados":["..."],"ingredientes":["..."],"pasos":["..."],"imagen_prompt":"..."}';
 
       status.textContent = 'Consultando Qwen 3.6 27B via Groq...';
 
@@ -4192,7 +4183,7 @@ const Pages = {
         body: JSON.stringify({
           model: 'qwen/qwen3.6-27b',
           temperature: 0.9,
-          max_tokens: 8000,
+          max_tokens: 4000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
