@@ -3936,17 +3936,22 @@ const Pages = {
   },
 
   /* ================================================================
-     RECETAS IA  (Transformers.js — modelo local en el navegador)
-     ================================================================ */
-  _recipeModel: null,
-  _recipeModelLoading: false,
+   RECETAS IA  (Google Gemini — API gratuita desde el navegador)
+   ================================================================ */
   renderRecetasAdmin(container) {
     var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
+    var savedKey = localStorage.getItem('arcano_gemini_key') || '';
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Generar Receta con IA</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Modelo <b>Qwen 1.5</b> en tu navegador. Sin API key. ' +
-        (window._recipeModel ? '<span style="color:var(--green)">Modelo cargado</span>.' : 'Primera vez descarga ~350MB (luego se cachea).') + '</p>' +
+        '<div class="form-group"><label>API Key de Gemini (gratis)</label>' +
+        '<div class="input-group">' +
+          '<input type="password" class="input" id="ra-groq-key" placeholder="AIza... (obtenla gratis en aistudio.google.com)" value="' + savedKey.replace(/"/g, '&quot;') + '">' +
+          '<button class="btn btn-dark" onclick="Pages._saveGroqKey()">Guardar</button>' +
+          '<span id="ra-key-status">' + (savedKey ? ' <span style="color:var(--green)">guardada</span>' : '') + '</span>' +
+        '</div>' +
+        '<p class="text-sm text-muted mt-4">Obtene tu clave gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (no requiere tarjeta). Modelo: <b>Gemini 2.0 Flash</b>.</p>' +
+        '</div>' +
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
           '<select class="input" id="ra-categoria">';
@@ -3975,7 +3980,15 @@ const Pages = {
     Pages._loadRecetasAdmin();
   },
 
-  _saveGroqKey: function() {},
+  _saveGroqKey: function() {
+    var inp = document.getElementById('ra-groq-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    var statusEl = document.getElementById('ra-key-status');
+    if (!key) { if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>'; return; }
+    localStorage.setItem('arcano_gemini_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+  },
 
   _loadRecetasAdmin: function() {
     try {
@@ -4039,17 +4052,24 @@ const Pages = {
   },
 
   generarReceta: function() {
+    var keyInput = document.getElementById('ra-groq-key');
     var catSelect = document.getElementById('ra-categoria');
     var temaInput = document.getElementById('ra-tema');
     var idiomaSelect = document.getElementById('ra-idioma');
     var btn = document.getElementById('ra-gen-btn');
     var status = document.getElementById('ra-gen-status');
+
+    var apiKey = keyInput.value.trim();
     var categoria = catSelect.value;
     var tema = temaInput.value.trim();
     var idioma = idiomaSelect.value;
+
+    if (!apiKey) { alert('Ingresa tu API Key de Gemini. Obtenla gratis en aistudio.google.com/apikey'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_gemini_key', apiKey);
+
     btn.disabled = true;
     btn.textContent = 'Generando...';
-    status.textContent = 'Preparando...';
+    status.textContent = 'Cargando productos y recetas existentes...';
 
     var allProductos = ArcanoDB.getTiendaProductos();
     var productLines = [];
@@ -4077,98 +4097,109 @@ const Pages = {
     var productContext = productLines.join('\n');
     if (otherLines.length > 0) productContext += '\nOtros: ' + otherLines.join(', ');
     if (!productContext) productContext = '- Sin productos';
-    var langInstr = idioma === 'en' ? 'Respond ONLY in English.' : 'Responde SOLO en espanol.';
-    var temaInstr = tema ? 'Tema: ' + tema + '.' : 'Elige un tema creativo.';
-    var systemPrompt = 'Eres chef de Arcano Especias. Genera recetas en JSON.\nCATALOGO:\n' + productContext + '\n\nReglas: usa 1+ producto del catalogo (nombre exacto), 5-12 ingredientes, 5-8 pasos. ' + langInstr + '\nJSON: titulo, descripcion, categoria, dificultad, tiempo, porciones, productos_usados, ingredientes, pasos, imagen_prompt.';
-    var userPrompt = 'Crea una receta de ' + categoria + '. ' + temaInstr + ' Solo JSON.';
-    var fullPrompt = '<|im_start|>system\n' + systemPrompt + '<|im_end|>\n<|im_start|>user\n' + userPrompt + '<|im_end|>\n<|im_start|>assistant\n';
+
+    var langInstr = idioma === 'en'
+      ? 'Respond ONLY in English. All fields must be in English.'
+      : 'Responde SOLO en espanol. Todos los campos deben estar en espanol.';
+
+    var temaInstr = tema
+      ? 'Tema especifico: ' + tema + '. La receta debe girar alrededor de este tema.'
+      : 'Elige un tema creativo y apetitoso que combine bien con la categoria.';
 
     try {
-    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
-      var data = snap.val();
-      var existingTitles = [];
-      if (data) { var keys = Object.keys(data); for (var i = 0; i < keys.length; i++) { var r = data[keys[i]]; if (r.titulo) existingTitles.push(r.titulo); } }
-      if (existingTitles.length > 0) fullPrompt += ' (NO repitas: ' + existingTitles.slice(-20).join(', ') + ')';
+      firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+        var data = snap.val();
+        var existingTitles = [];
+        if (data) { var keys = Object.keys(data); for (var i = 0; i < keys.length; i++) { var r = data[keys[i]]; if (r.titulo) existingTitles.push(r.titulo); } }
 
-      var doGenerate = function(generator) {
-        status.textContent = 'Generando (10-30 seg)...';
-        generator(fullPrompt, { max_new_tokens: 1500, temperature: 0.8 }).then(function(result) {
-          var raw = typeof result === 'string' ? result : (result[0] && result[0].generated_text ? result[0].generated_text : JSON.stringify(result));
-          var jsonStr = raw;
-          var js = raw.lastIndexOf('{');
-          var je = raw.lastIndexOf('}');
-          if (js !== -1 && je > js) jsonStr = raw.substring(js, je + 1);
+        var existingBlock = '';
+        if (existingTitles.length > 0) {
+          existingBlock = '\n\nRECETAS YA EXISTENTES (NO repetir): ' + existingTitles.slice(-20).join(', ');
+        }
+
+        var prompt =
+          'Eres un chef creativo experto en especias de la marca Arcano Especias.\n\n' +
+          'CATALOGO DE PRODUCTOS:\n' + productContext + '\n\n' +
+          'REGLAS:\n' +
+          '1. Usa al menos UN producto del catalogo (nombre exacto).\n' +
+          '2. Si el producto tiene "uso sugerido", respeta esa orientacion.\n' +
+          '3. ' + langInstr + '\n' +
+          '4. 5 a 12 ingredientes con cantidades precisas.\n' +
+          '5. 5 a 8 pasos claros y en orden.\n' +
+          '6.productos_usados debe listar SOLO nombres exactos del catalogo.\n' +
+          '7. La receta debe ser ORIGINAL, diferente a las existentes.' +
+          existingBlock + '\n\n' +
+          'Crea una receta de ' + categoria + '. ' + temaInstr + '\n\n' +
+          'Responde SOLO con JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura:\n' +
+          '{"titulo": "...", "descripcion": "... (2-3 oraciones)", "categoria": "' + categoria + '", ' +
+          '"dificultad": "Facil" o "Media" o "Dificil", ' +
+          '"tiempo": "... (ej: 30 min)", "porciones": "... (ej: 4 porciones)", ' +
+          '"productos_usados": ["Nombre Exacto del Producto"], ' +
+          '"ingredientes": ["1 cucharadita de Nombre Exacto del Producto", "200g de proteina", ...], ' +
+          '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
+          '"imagen_prompt": "descripcion visual del plato (en ingles, 1 oracion)"}';
+
+        status.textContent = 'Consultando Gemini 2.0 Flash...';
+
+        var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
+
+        fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+          })
+        })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(e) {
+            throw new Error((e.error && e.error.message) || 'Error ' + res.status);
+          });
+          return res.json();
+        })
+        .then(function(data) {
+          var text = data.candidates[0].content.parts[0].text.trim();
+          var jsonStr = text;
+          var js = jsonStr.indexOf('{');
+          var je = jsonStr.lastIndexOf('}');
+          if (js !== -1 && je > js) jsonStr = jsonStr.substring(js, je + 1);
           var receta;
           try { receta = JSON.parse(jsonStr); } catch(pe) {
-            try { receta = JSON.parse(jsonStr.replace(/'/g, '"')); } catch(pe2) { throw new Error('JSON invalido: ' + jsonStr.slice(0, 80)); }
+            try { receta = JSON.parse(jsonStr.replace(/'/g, '"')); } catch(pe2) {
+              throw new Error('La IA no devolvio un JSON valido: ' + jsonStr.slice(0, 100));
+            }
           }
-          if (!receta.titulo) throw new Error('Sin titulo');
-          if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser array');
-          if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser array');
+          if (!receta.titulo) throw new Error('La receta no tiene titulo');
+          if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+          if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
           receta.fecha = new Date().toISOString().slice(0, 10);
           if (!receta.categoria) receta.categoria = categoria;
           try {
             firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
-              if (err) { status.textContent = 'Generada pero no guardada en nube.'; }
+              if (err) { status.textContent = 'Generada pero error al guardar: ' + (err.message || err); }
               else { status.innerHTML = '<span style="color:var(--green)">Guardada: ' + receta.titulo + '</span>'; Pages._loadRecetasAdmin(); }
               btn.disabled = false; btn.textContent = 'Generar Receta con IA';
             });
           } catch(fe) {
-            status.innerHTML = '<span style="color:var(--green)">Generada (sin nube): ' + receta.titulo + '</span>';
+            status.innerHTML = '<span style="color:var(--green)">Generada (sin guardar en nube): ' + receta.titulo + '</span>';
             btn.disabled = false; btn.textContent = 'Generar Receta con IA';
           }
-        }).catch(function(err) {
+        })
+        .catch(function(err) {
           status.innerHTML = '<span style="color:var(--red)">Error: ' + (err.message || err) + '</span>';
           btn.disabled = false; btn.textContent = 'Generar Receta con IA';
         });
-      };
-
-      if (Pages._recipeModel) { doGenerate(Pages._recipeModel); }
-      else if (Pages._recipeModelLoading) { status.textContent = 'Modelo ya cargando...'; btn.disabled = false; btn.textContent = 'Generar Receta con IA'; }
-      else {
-        Pages._recipeModelLoading = true;
-        var loadModel = function() {
-          status.textContent = 'Cargando modelo (primera vez ~350MB)...';
-          window.transformers.pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
-            dtype: 'q4',
-            progress_callback: function(prog) {
-              if (prog.status === 'progress' && prog.loaded && prog.total) {
-                var pct = Math.round(prog.loaded / prog.total * 100);
-                status.textContent = 'Descargando: ' + pct + '% (' + Math.round(prog.loaded/1048576) + 'MB)';
-              }
-            }
-          }).then(function(pipe) {
-            Pages._recipeModel = pipe; Pages._recipeModelLoading = false; doGenerate(pipe);
-          }).catch(function(err) {
-            Pages._recipeModelLoading = false;
-            status.innerHTML = '<span style="color:var(--red)">Error modelo: ' + (err.message||err) + '</span>';
-            btn.disabled = false; btn.textContent = 'Generar Receta con IA';
-          });
-        };
-        if (window.transformers) { loadModel(); }
-        else {
-          status.textContent = 'Cargando motor de IA...';
-          var s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
-          s.onload = loadModel;
-          s.onerror = function() {
-            Pages._recipeModelLoading = false;
-            status.innerHTML = '<span style="color:var(--red)">Error al cargar motor. Verifica conexion.</span>';
-            btn.disabled = false; btn.textContent = 'Generar Receta con IA';
-          };
-          document.head.appendChild(s);
-        }
-      }
-    }).catch(function(err) {
-      status.innerHTML = '<span style="color:var(--red)">Error recetas: ' + (err.message || err) + '</span>';
-      btn.disabled = false; btn.textContent = 'Generar Receta con IA';
-    });
+      }).catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error al cargar recetas: ' + (err.message || err) + '</span>';
+        btn.disabled = false; btn.textContent = 'Generar Receta con IA';
+      });
     } catch(e) {
       status.innerHTML = '<span style="color:var(--red)">Error: ' + (e.message || e) + '</span>';
       btn.disabled = false; btn.textContent = 'Generar Receta con IA';
     }
   },
-  /* ================================================================
+
+/* ================================================================
      ESTADISTICAS DE VENTAS (Chart.js)
      ================================================================ */
   _estPeriod: null,
