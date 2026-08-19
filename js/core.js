@@ -179,6 +179,8 @@ const App = {
               '<span class="nav-icon">📋</span><span class="nav-label">Stock</span></a>' +
             '<a class="nav-item" data-page="tienda" onclick="App.navigate(\'tienda\')">' +
               '<span class="nav-icon">🛒</span><span class="nav-label">Tienda</span></a>' +
+            '<a class="nav-item" data-page="tublend" onclick="App.navigate('tublend')">' +
+              '<span class="nav-icon">⚗</span><span class="nav-label">Tu Blend</span></a>' +
             '<a class="nav-item" data-page="recetas" onclick="App.navigate(\'recetas\')">' +
               '<span class="nav-icon">🍳</span><span class="nav-label">Recetas IA</span></a>' +
             '<a class="nav-item" data-page="estadisticas" onclick="App.navigate(\'estadisticas\')">' +
@@ -225,7 +227,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
+      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -276,6 +278,7 @@ const App = {
         case 'pedidos': Pages.renderPedidos(container); break;
         case 'stock': Pages.renderStock(container); break;
         case 'tienda': Pages.renderTiendaAdmin(container); break;
+        case 'tublend': Pages.renderTuBlend(container); break;
         case 'recetas': Pages.renderRecetasAdmin(container); break;
         case 'estadisticas': Pages.renderEstadisticas(container); break;
         case 'usuarios': Pages.renderUsuarios(container); break;
