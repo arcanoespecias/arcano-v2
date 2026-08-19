@@ -3950,7 +3950,7 @@ const Pages = {
           '<button class="btn btn-dark" onclick="Pages._saveGroqKey()">Guardar</button>' +
           '<span id="ra-key-status">' + (savedKey ? ' <span style="color:var(--green)">guardada</span>' : '') + '</span>' +
         '</div>' +
-        '<p class="text-sm text-muted mt-4">Obtene tu clave gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (no requiere tarjeta). Modelo: <b>Gemini 2.0 Flash</b>.</p>' +
+        '<p class="text-sm text-muted mt-4">Obtene tu clave gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (no requiere tarjeta). Modelo: <b>Gemini 3.6 Flash</b>.</p>' +
         '</div>' +
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
@@ -4139,9 +4139,9 @@ const Pages = {
           '"pasos": ["Paso 1: ...", "Paso 2: ...", ...], ' +
           '"imagen_prompt": "descripcion visual del plato (en ingles, 1 oracion)"}';
 
-        status.textContent = 'Consultando Gemini 2.0 Flash...';
+        status.textContent = 'Consultando Gemini 3.6 Flash...';
 
-        var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
+        var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=' + apiKey;
 
         fetch(geminiUrl, {
           method: 'POST',
