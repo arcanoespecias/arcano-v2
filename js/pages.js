@@ -4192,7 +4192,8 @@ const Pages = {
         body: JSON.stringify({
           model: 'qwen/qwen3.6-27b',
           temperature: 0.9,
-          max_tokens: 2000,
+          max_tokens: 8000,
+          reasoning: { effort: 'none' },
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
