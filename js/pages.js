@@ -3936,7 +3936,7 @@ const Pages = {
   },
 
   /* ================================================================
-     RECETAS IA  (Groq API — Mixtral 8x7B)
+     RECETAS IA  (Groq API — Llama 3.3 70B)
      ================================================================ */
   _groqKeyLoaded: false,
   renderRecetasAdmin(container) {
@@ -3952,9 +3952,9 @@ const Pages = {
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Mixtral 8x7B</b>.</p>' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b>.</p>' +
         '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
-        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,56,82,122,68,54,70,119,67,80,51,112,52,109,89,122,109,120,87,52,48,87,71,100,121,98,51,70,89,89,51,51,118,71,118,85,97,109,51,56,70,79,81,121,72,85,119,101,65,68,79,112,56];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
+        '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,72,115,51,120,108,99,107,56,81,99,55,66,66,120,80,115,117,103,53,83,87,71,100,121,98,51,70,89,116,53,90,77,85,49,77,54,50,88,57,72,49,81,119,108,100,116,83,55,76,107,89,68];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
         '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
         '</div>' +
         '<div class="g2">' +
@@ -4178,7 +4178,7 @@ const Pages = {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'mixtral-8x7b-32768',
+          model: 'llama-3.3-70b-versatile',
           temperature: 0.8,
           max_tokens: 3000,
           messages: [
