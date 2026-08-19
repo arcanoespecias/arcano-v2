@@ -3936,7 +3936,7 @@ const Pages = {
   },
 
   /* ================================================================
-     RECETAS IA  (Groq API — modelo opensource Qwen 3.6 27B)
+     RECETAS IA  (Groq API — Mixtral 8x7B)
      ================================================================ */
   _groqKeyLoaded: false,
   renderRecetasAdmin(container) {
@@ -3952,7 +3952,7 @@ const Pages = {
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Qwen 3.6 27B</b> (opensource).</p>' +
+        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Mixtral 8x7B</b>.</p>' +
         '<div class="form-group"><label>Groq API Key <span id="ra-key-status" class="text-xs text-muted"></span></label>' +
         '<div style="display:flex;gap:8px"><input type="password" class="input" id="ra-groq-key" value="' + (savedKey || (function(){var c=[103,115,107,95,56,82,122,68,54,70,119,67,80,51,112,52,109,89,122,109,120,87,52,48,87,71,100,121,98,51,70,89,89,51,51,118,71,118,85,97,109,51,56,70,79,81,121,72,85,119,101,65,68,79,112,56];var s='';for(var i=0;i<c.length;i++)s+=String.fromCharCode(c[i]);return s;})()) + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
         '<button class="btn btn-outline" onclick="Pages._saveGroqKey(true)" style="white-space:nowrap">Guardar</button></div>' +
@@ -4158,21 +4158,18 @@ const Pages = {
       }
 
       var systemPrompt =
-        'Eres chef de Arcano Especias. Crea recetas unicas usando los productos del catalogo.\n' +
-        'PRODUCTOS:\n' + productContext + '\n\n' +
-        'REGLAS:\n' +
-        '1. Usa al menos UN producto del catalogo (nombre EXACTO).\n' +
-        '2. Ingredientes con cantidades precisas (5-12). Pasos claros (5-8).\n' +
-        '3. Receta ORIGINAL, diferente a las existentes.\n' +
-        '4. "productos_usados" solo nombres exactos del catalogo.\n' +
-        '5. La descripcion del uso de cada producto indica su mejor aplicacion.\n' + langInstr + '\n' +
-        'Responde SOLO con JSON, sin texto ni markdown antes/despues.';
+        'Eres un chef creativo de Arcano Especias. Generas recetas deliciosas en JSON puro, sin texto adicional.\n\n' +
+        'CATALOGO:\n' + productContext + '\n\n' +
+        'Reglas: usa al menos 1 producto del catalogo con su nombre exacto, 5-12 ingredientes con cantidades, 5-8 pasos claros, receta unica. ' +
+        langInstr + '\n\n' +
+        'Campos del JSON: titulo, descripcion (2-3 oraciones), categoria, dificultad (Facil/Media/Dificil), tiempo, porciones, productos_usados (array de nombres del catalogo), ingredientes (array), pasos (array), imagen_prompt (1 oracion en ingles del plato terminado).';
 
       var userPrompt =
-        'Genera UNA receta de "' + categoria + '". ' + temaInstr + existingBlock + '\n\n' +
-        'JSON exacto: {"titulo":"...","descripcion":"...","categoria":"' + categoria + '","dificultad":"Facil/Media/Dificil","tiempo":"...","porciones":"...","productos_usados":["..."],"ingredientes":["..."],"pasos":["..."],"imagen_prompt":"..."}';
+        'Crea una receta de ' + categoria + '. ' + temaInstr +
+        (existingBlock ? existingBlock + '. ' : '') +
+        'Responde unicamente con el objeto JSON, nada mas.';
 
-      status.textContent = 'Consultando Qwen 3.6 27B via Groq...';
+      status.textContent = 'Generando receta con IA...';
 
       fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -4181,9 +4178,9 @@ const Pages = {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'qwen/qwen3.6-27b',
-          temperature: 0.9,
-          max_tokens: 4000,
+          model: 'mixtral-8x7b-32768',
+          temperature: 0.8,
+          max_tokens: 3000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -4206,7 +4203,7 @@ const Pages = {
       .then(function(data) {
         if (!data.choices || !data.choices[0]) throw new Error('Respuesta inesperada de la API');
         var raw = data.choices[0].message.content.trim();
-        // Qwen 3.6 incluye razonamiento antes del JSON. Extraer solo el JSON.
+        // Extraer JSON de la respuesta (manejar markdown o texto extra)
         var jsonStr = raw;
         var jsonStart = raw.indexOf('{');
         var jsonEnd = raw.lastIndexOf('}');
@@ -4215,7 +4212,11 @@ const Pages = {
         }
         jsonStr = jsonStr.replace(/^\s*```json?\s*/i, '').replace(/\s*```\s*$/, '');
         var receta;
-        try { receta = JSON.parse(jsonStr); } catch(pe) { throw new Error('La IA no devolvio un JSON valido: ' + jsonStr.slice(0, 100)); }
+        try { receta = JSON.parse(jsonStr); } catch(pe) {
+          // Intentar reparar JSON comun (comillas simples por dobles)
+          var fixed = jsonStr.replace(/'/g, '"');
+          try { receta = JSON.parse(fixed); } catch(pe2) { throw new Error('JSON invalido: ' + jsonStr.slice(0, 80)); }
+        }
 
         if (!receta.titulo) throw new Error('La receta no tiene titulo');
         if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
