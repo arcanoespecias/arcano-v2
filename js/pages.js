@@ -3977,6 +3977,67 @@ const Pages = {
 
   _saveGroqKey: function() {},
 
+  _loadRecetasAdmin: function() {
+    try {
+      var ref = firebase.database().ref('arcano/db/recetas').orderByChild('fecha');
+      ref.once('value', function(snap) {
+        var data = snap.val();
+        var recetas = [];
+        if (data) {
+          var keys = Object.keys(data);
+          for (var i = 0; i < keys.length; i++) {
+            var r = data[keys[i]];
+            r._key = keys[i];
+            recetas.push(r);
+          }
+        }
+        recetas.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+        Pages._renderRecetasList(recetas);
+      });
+    } catch(e) {
+      var listEl = document.getElementById('ra-list');
+      if (listEl) listEl.innerHTML = '<p class="text-center text-muted">Error al cargar recetas.</p>';
+    }
+  },
+
+  _renderRecetasList: function(recetas) {
+    var countEl = document.getElementById('ra-count');
+    var listEl = document.getElementById('ra-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = recetas.length;
+    if (recetas.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < recetas.length; i++) {
+      var r = recetas[i];
+      var prodsUsados = '';
+      if (r.productos_usados && r.productos_usados.length) {
+        prodsUsados = r.productos_usados.join(', ');
+      }
+      var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
+      h += '<tr>' +
+        '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
+        '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
+        '<td>' + (r.tiempo || '-') + '</td>' +
+        '<td class="text-sm">' + (prodsUsados || '-') + '</td>' +
+        '<td class="text-sm text-muted">' + (r.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarReceta(\'' + r._key + '\')">X</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarReceta: function(key) {
+    if (!confirm('Eliminar esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
   generarReceta: function() {
     var catSelect = document.getElementById('ra-categoria');
     var temaInput = document.getElementById('ra-tema');
