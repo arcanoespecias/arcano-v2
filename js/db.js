@@ -1973,5 +1973,6 @@ window.ArcanoDB = {
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
   saveNow: saveNow,
-  writeField: writeField
+  writeField: writeField,
+  getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC
 };
