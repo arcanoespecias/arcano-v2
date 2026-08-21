@@ -5477,3 +5477,43 @@ const Pages = {
     el.innerHTML = h;
   }
 };
+/* ==================== GRANDES CLIENTES ==================== */
+Pages.renderGrandesClientes = function(el) {
+  var list = ArcanoDB.getGrandesClientes();
+  var nuevos = 0;
+  for (var i = 0; i < list.length; i++) { if (list[i].estado === 'nuevo') nuevos++; }
+  // Update nav badge
+  var navBadge = document.getElementById('nav-grandesClientes');
+  if (navBadge) {
+    var existing = navBadge.querySelector('.nav-badge');
+    if (existing) existing.remove();
+    if (nuevos > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      badge.textContent = nuevos;
+      navBadge.appendChild(badge);
+    }
+  }
+  var h = '<div class="page-header"><h2>Grandes Clientes</h2>';
+  if (nuevos > 0) h += '<span class="badge badge-red" style="font-size:0.9rem">' + nuevos + ' nuevos</span>';
+  h += '</div>';
+  if (list.length === 0) { h += '<p class="empty-msg">Sin solicitudes de grandes clientes</p>'; el.innerHTML = h; return; }
+  h += '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Telefono</th><th>Empresa</th><th>Estado</th><th></th></tr></thead><tbody>';
+  for (var j = 0; j < list.length; j++) {
+    var g = list[j];
+    var estadoColor = g.estado === 'nuevo' ? 'var(--red)' : (g.estado === 'contactado' ? 'var(--gold)' : 'var(--green)');
+    var estadoBg = g.estado === 'nuevo' ? 'rgba(220,50,50,0.1)' : (g.estado === 'contactado' ? 'rgba(196,148,58,0.1)' : 'rgba(50,150,50,0.1)');
+    var fecha = g.creado ? new Date(g.creado).toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'numeric'}) : '-';
+    h += '<tr><td style="white-space:nowrap">' + fecha + '</td><td><strong>' + esc(g.nombre || '') + '</strong></td><td>' + esc(g.telefono || '') + '</td><td>' + esc(g.empresa || '-') + '</td>';
+    h += '<td><span style="display:inline-block;padding:2px 10px;border-radius:100px;font-size:0.75rem;font-weight:600;background:' + estadoBg + ';color:' + estadoColor + '">' + esc(g.estado || 'nuevo') + '</span></td>';
+    h += '<td style="white-space:nowrap">';
+    if (g.estado === 'nuevo') h += '<button class="btn btn-ghost btn-sm" onclick="ArcanoDB.updateGCEstado(\'' + g._key + '\',\'contactado\');App.renderPage(\'grandesClientes\')">Contactado</button> ';
+    if (g.estado === 'contactado') h += '<button class="btn btn-ghost btn-sm" onclick="ArcanoDB.updateGCEstado(\'' + g._key + '\',\'cerrado\');App.renderPage(\'grandesClientes\')">Cerrado</button> ';
+    if (g.estado !== 'descartado') h += '<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="ArcanoDB.updateGCEstado(\'' + g._key + '\',\'descartado\');App.renderPage(\'grandesClientes\')">Descartar</button>';
+    if (g.estado === 'descartado') h += '<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="ArcanoDB.deleteGC(\'' + g._key + '\');App.renderPage(\'grandesClientes\')">Eliminar</button>';
+    h += '</td></tr>';
+  }
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+};
+
