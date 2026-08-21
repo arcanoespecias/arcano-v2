@@ -2808,7 +2808,22 @@ const Pages = {
       }
     }
 
+    var db = ArcanoDB.getDB();
+    var config = db.tiendaConfig || {};
+    var pbc = config.precioBlendChico || 0;
+    var pbg = config.precioBlendGrande || 0;
+
     var h = '<div class="page-actions"></div>';
+
+    // Precios configurables
+    h += '<div class="card"><div class="card-header"><h3>Precios del Frasco</h3><p class="text-xs text-muted">Configura el precio del frasco para Tu Blend personalizado.</p></div><div class="card-body">';
+    h += '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end">';
+    h += '<div><label style="display:block;font-size:.78rem;color:var(--text-muted);margin-bottom:4px">Frasco Pequeno ($)</label><input type="number" id="blend-precio-chico" value="' + pbc + '" style="width:140px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.95rem">';
+    h += '</div>';
+    h += '<div><label style="display:block;font-size:.78rem;color:var(--text-muted);margin-bottom:4px">Frasco Grande ($)</label><input type="number" id="blend-precio-grande" value="' + pbg + '" style="width:140px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.95rem">';
+    h += '</div>';
+    h += '<button class="btn btn-gold" onclick="_saveBlendPrecios()">Guardar Precios</button>';
+    h += '</div></div></div>';
 
     // KPIs
     h += '<div class="stats-grid">';
@@ -5516,4 +5531,12 @@ Pages.renderGrandesClientes = function(el) {
   h += '</tbody></table></div>';
   el.innerHTML = h;
 };
+
+function _saveBlendPrecios() {
+  var chico = parseInt(document.getElementById('blend-precio-chico').value, 10) || 0;
+  var grande = parseInt(document.getElementById('blend-precio-grande').value, 10) || 0;
+  writeField('tiendaConfig/precioBlendChico', chico);
+  writeField('tiendaConfig/precioBlendGrande', grande);
+  toast('Precios de Tu Blend guardados');
+}
 
