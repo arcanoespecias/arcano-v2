@@ -127,6 +127,10 @@ var _pedidos = [];           // in-memory list of orders from tienda
 var _pedidosRef = null;      // Firebase ref for arcano/db/pedidos
 var _pedidosListeners = [];  // callbacks when new pedido arrives
 
+/* === Grandes Clientes (path arcano/db/grandesClientes) === */
+var _grandesClientes = [];
+var _gcRef = null;
+
 /* === Costos de insumos (separate from _db to avoid sync overwrites) === */
 var _costosRef = null;
 var _costosInsumos = null;
@@ -140,6 +144,7 @@ function _initFirebase() {
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
+    _gcRef = _firebaseDb.ref('arcano/db/grandesClientes');
     _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
@@ -217,6 +222,7 @@ function initDB() {
       _ready = true;
       _startFirebaseListener();
       _startPedidosListener();
+      _startGrandesClientesListener();
       _startCostosListener();
       resolve();
       return;
@@ -240,6 +246,7 @@ function initDB() {
         _cacheLocal();
         _startFirebaseListener();
         _startPedidosListener();
+        _startGrandesClientesListener();
         _startCostosListener();
         resolve();
       }).catch(function() {
@@ -339,6 +346,39 @@ function getPedidosCount(estado) {
   var c = 0;
   for (var i = 0; i < _pedidos.length; i++) { if (_pedidos[i].estado === estado) c++; }
   return c;
+}
+
+/* === Grandes Clientes === */
+function _startGrandesClientesListener() {
+  if (!_gcRef) return;
+  _gcRef.on('value', function(snap) {
+    var data = snap.val();
+    _grandesClientes = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var g = data[keys[i]];
+        if (g && typeof g === 'object') {
+          g._key = keys[i];
+          _grandesClientes.push(g);
+        }
+      }
+    }
+    _grandesClientes.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+  });
+}
+
+function getGrandesClientes() { return _grandesClientes.slice(); }
+
+function updateGCEstado(key, estado) {
+  if (!_gcRef) return;
+  _gcRef.child(key + '/estado').set(estado);
+}
+
+function deleteGC(key) {
+  if (!_gcRef) return;
+  _gcRef.child(key).remove();
 }
 
 function updatePedidoEstado(pedidoKey, nuevoEstado) {
