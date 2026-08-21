@@ -147,6 +147,32 @@ const App = {
     // Initial badge update after a short delay to let pedidos load
     setTimeout(_updatePedidosBadge, 2000);
 
+    // Grandes Clientes badge listener + audio notification
+    var _lastGCNuevoCount = -1;
+    function _updateGCBadge(gcs, isNew) {
+      var count = ArcanoDB.getGCCount('nuevo');
+      var badge = document.getElementById('gc-badge');
+      if (badge) {
+        if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+      }
+      // Audio + visual alert when a NEW GC message arrives
+      if (isNew && _lastGCNuevoCount >= 0) {
+        _playNotifSound();
+        var origTitle = document.title;
+        var flashCount = 0;
+        var flashInterval = setInterval(function() {
+          document.title = flashCount % 2 === 0 ? '\u{1F4E7} Nuevo Gran Cliente!' : origTitle;
+          flashCount++;
+          if (flashCount >= 10) { clearInterval(flashInterval); document.title = origTitle; }
+        }, 800);
+        App.renderPage(App.currentPage);
+      }
+      _lastGCNuevoCount = count;
+    }
+    ArcanoDB.onGCChange(_updateGCBadge);
+    setTimeout(function() { _updateGCBadge(ArcanoDB.getGrandesClientes(), false); }, 2500);
+
     this.renderShell(user);
     this.renderPage('dashboard');
   },
@@ -190,7 +216,7 @@ const App = {
             '<a class="nav-item" data-page="puntosdeventa" onclick="App.navigate(\'puntosdeventa\')">' +
               '<span class="nav-icon">🏪</span><span class="nav-label">P. Venta</span></a>' +
             '<a class="nav-item" data-page="grandesClientes" onclick="App.navigate(\'grandesClientes\')">' +
-              '<span class="nav-icon">🏢</span><span class="nav-label">Grandes Clientes</span></a>' +
+              '<span class="nav-icon">🏢</span><span class="nav-label">Grandes Clientes</span><span class="nav-badge" id="gc-badge" style="display:none"></span></a>' +
             '<div style="border-top:1px solid var(--border);margin:8px 12px"></div>' +
             '<a class="nav-item" data-page="testing" onclick="App.navigate(\'testing\')">' +
               '<span class="nav-icon">🧪</span><span class="nav-label">Testing</span></a>' +
