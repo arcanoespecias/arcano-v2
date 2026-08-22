@@ -209,6 +209,8 @@ const App = {
               '<span class="nav-icon">⚗</span><span class="nav-label">Tu Blend</span></a>' +
             '<a class="nav-item" data-page="recetas" onclick="App.navigate(\'recetas\')">' +
               '<span class="nav-icon">🍳</span><span class="nav-label">Recetas IA</span></a>' +
+            '<a class="nav-item" data-page="blog" onclick="App.navigate(\'blog\')"' +
+              '<span class="nav-icon">📝</span><span class="nav-label">Blog IA</span></a>' +
             '<a class="nav-item" data-page="estadisticas" onclick="App.navigate(\'estadisticas\')">' +
               '<span class="nav-icon">📊</span><span class="nav-label">Estadisticas</span></a>' +
             '<a class="nav-item" data-page="usuarios" onclick="App.navigate(\'usuarios\')">' +
@@ -255,7 +257,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes'
+      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     this.renderPage(page);
@@ -308,6 +310,7 @@ const App = {
         case 'tienda': Pages.renderTiendaAdmin(container); break;
         case 'tublend': Pages.renderTuBlend(container); break;
         case 'recetas': Pages.renderRecetasAdmin(container); break;
+        case 'blog': Pages.renderBlogAdmin(container); break;
         case 'estadisticas': Pages.renderEstadisticas(container); break;
         case 'usuarios': Pages.renderUsuarios(container); break;
         case 'testing': Pages.renderTesting(container); break;
