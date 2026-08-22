@@ -4310,6 +4310,273 @@ const Pages = {
     }
   },
 
+  renderBlogAdmin(container) {
+    var categorias = ['Historias', 'Beneficios', 'Investigaciones', 'Curiosidades', 'Origenes'];
+    var savedKey = localStorage.getItem('arcano_gemini_key') || '';
+    var h = '<div class="card mb-16">' +
+      '<div class="card-header"><h3>Generar Articulo de Blog con IA</h3></div>' +
+      '<div class="card-body">' +
+        '<div class="form-group"><label>API Key de Gemini (gratis)</label>' +
+        '<div class="input-group">' +
+          '<input type="password" class="input" id="ba-gemini-key" placeholder="AIza... (obtenla gratis en aistudio.google.com)" value="' + savedKey.replace(/"/g, '&quot;') + '">' +
+          '<button class="btn btn-dark" onclick="Pages._saveBlogKey()">Guardar</button>' +
+          '<span id="ba-key-status">' + (savedKey ? ' <span style="color:var(--green)">guardada</span>' : '') + '</span>' +
+        '</div>' +
+        '<p class="text-sm text-muted mt-4">Obtene tu clave gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (no requiere tarjeta). Modelo: <b>Gemini 3.6 Flash</b>.</p>' +
+        '</div>' +
+        '<div class="g2">' +
+          '<div class="form-group"><label>Categoria</label>' +
+          '<select class="input" id="ba-categoria">';
+    for (var c = 0; c < categorias.length; c++) {
+      h += '<option value="' + categorias[c] + '">' + categorias[c] + '</option>';
+    }
+    h += '</select></div>' +
+          '<div class="form-group"><label>Tema (opcional)</label>' +
+          '<input type="text" class="input" id="ba-tema" placeholder="Ej: la ruta de la canela...">' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-gold" id="ba-gen-btn" onclick="Pages.generarArticulo()">Generar Articulo</button>' +
+        '<span id="ba-gen-status" class="text-sm text-muted ml-12"></span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card" id="ba-preview-card" style="display:none">' +
+      '<div class="card-header"><h3>Vista Previa</h3></div>' +
+      '<div class="card-body" id="ba-preview"></div>' +
+      '<div class="card-footer" id="ba-preview-actions"></div>' +
+    '</div>' +
+    '<div class="card">' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3></div>' +
+      '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
+    '</div>';
+    container.innerHTML = h;
+    Pages._loadBlogAdmin();
+  },
+
+  _saveBlogKey: function() {
+    var inp = document.getElementById('ba-gemini-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    var statusEl = document.getElementById('ba-key-status');
+    if (!key) { if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>'; return; }
+    localStorage.setItem('arcano_gemini_key', key);
+    if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+  },
+
+  _loadBlogAdmin: function() {
+    try {
+      var ref = firebase.database().ref('arcano/db/blog').orderByChild('fecha');
+      ref.once('value', function(snap) {
+        var data = snap.val();
+        var articulos = [];
+        if (data) {
+          var keys = Object.keys(data);
+          for (var i = 0; i < keys.length; i++) {
+            var a = data[keys[i]];
+            a._key = keys[i];
+            articulos.push(a);
+          }
+        }
+        articulos.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+        Pages._renderBlogList(articulos);
+      });
+    } catch(e) {
+      var listEl = document.getElementById('ba-list');
+      if (listEl) listEl.innerHTML = '<p class="text-center text-muted">Error al cargar articulos.</p>';
+    }
+  },
+
+  _renderBlogList: function(articulos) {
+    var countEl = document.getElementById('ba-count');
+    var listEl = document.getElementById('ba-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = articulos.length;
+    if (articulos.length === 0) {
+      listEl.innerHTML = '<p class="text-center text-muted">No hay articulos. Genera el primero con el boton de arriba.</p>';
+      return;
+    }
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Categoria</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < articulos.length; i++) {
+      var a = articulos[i];
+      h += '<tr>' +
+        '<td class="fw7">' + (a.titulo || 'Sin titulo') + '</td>' +
+        '<td><span class="badge badge-gold">' + (a.categoria || '') + '</span></td>' +
+        '<td class="text-sm text-muted">' + (a.fecha || '') + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarArticulo(\'' + a._key + '\')">X</button></td>' +
+        '</tr>';
+    }
+    h += '</tbody></table></div>';
+    listEl.innerHTML = h;
+  },
+
+  borrarArticulo: function(key) {
+    if (!confirm('Eliminar este articulo?')) return;
+    firebase.database().ref('arcano/db/blog/' + key).remove(function() {
+      Pages._loadBlogAdmin();
+    });
+  },
+
+  generarArticulo: function() {
+    var keyInput = document.getElementById('ba-gemini-key');
+    var catSelect = document.getElementById('ba-categoria');
+    var temaInput = document.getElementById('ba-tema');
+    var btn = document.getElementById('ba-gen-btn');
+    var status = document.getElementById('ba-gen-status');
+
+    var apiKey = keyInput.value.trim();
+    var categoria = catSelect.value;
+    var tema = temaInput.value.trim();
+
+    if (!apiKey) { alert('Ingresa tu API Key de Gemini. Obtenla gratis en aistudio.google.com/apikey'); keyInput.focus(); return; }
+    localStorage.setItem('arcano_gemini_key', apiKey);
+
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    status.textContent = 'Cargando productos y articulos existentes...';
+
+    var allProductos = ArcanoDB.getTiendaProductos();
+    var productLines = [];
+    for (var i = 0; i < allProductos.length; i++) {
+      var p = allProductos[i];
+      var line = '- ' + p.nombre;
+      if (p.uso) line += ' (' + p.uso + ')';
+      productLines.push(line);
+    }
+    var productContext = productLines.join('\n');
+    if (!productContext) productContext = '- Sin productos';
+
+    var temaInstr = tema
+      ? 'Tema especifico: ' + tema + '. El articulo debe girar alrededor de este tema.'
+      : 'Elige un tema creativo e interesante relacionado con la categoria y los productos.';
+
+    try {
+      firebase.database().ref('arcano/db/blog').once('value', function(snap) {
+        var data = snap.val();
+        var existingTitles = [];
+        if (data) { var keys = Object.keys(data); for (var i = 0; i < keys.length; i++) { var a = data[keys[i]]; if (a.titulo) existingTitles.push(a.titulo); } }
+
+        var existingBlock = '';
+        if (existingTitles.length > 0) {
+          existingBlock = '\n\nARTICULOS YA EXISTENTES (NO repetir temas): ' + existingTitles.slice(-20).join(', ');
+        }
+
+        var prompt =
+          'Eres un redactor creativo experto en especias y blends de la marca Arcano Especias. Escribe en espanol.\n\n' +
+          'CATALOGO DE PRODUCTOS:\n' + productContext + '\n\n' +
+          'REGLAS:\n' +
+          '1. Menciona al menos UN producto del catalogo (nombre exacto) de forma natural en el articulo.\n' +
+          '2. El contenido debe ser informativo, entretenido y relevante para amantes de las especias.\n' +
+          '3. Usa etiquetas HTML semanticas: <p> para parrafos, <h2> y <h3> para subtitulos, <ul><li> para listas, <blockquote> para citas destacadas.\n' +
+          '4. El articulo debe tener entre 400 y 800 palabras.\n' +
+          '5. El articulo debe ser ORIGINAL, diferente a los existentes.' +
+          existingBlock + '\n\n' +
+          'Escribe un articulo de blog categoria "' + categoria + '". ' + temaInstr + '\n\n' +
+          'Responde SOLO con JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura:\n' +
+          '{"titulo": "...", "subtitulo": "... (1-2 oraciones)", "categoria": "' + categoria + '", ' +
+          '"contenido": "<p>HTML content here</p>", ' +
+          '"imagen_prompt": "visual description for AI image generation (in english, 1 sentence)"}';
+
+        status.textContent = 'Consultando Gemini 3.6 Flash...';
+
+        var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=' + apiKey;
+
+        fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+          })
+        })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(e) {
+            throw new Error((e.error && e.error.message) || 'Error ' + res.status);
+          });
+          return res.json();
+        })
+        .then(function(data) {
+          var text = data.candidates[0].content.parts[0].text.trim();
+          var jsonStr = text;
+          var js = jsonStr.indexOf('{');
+          var je = jsonStr.lastIndexOf('}');
+          if (js !== -1 && je > js) jsonStr = jsonStr.substring(js, je + 1);
+          var articulo;
+          try { articulo = JSON.parse(jsonStr); } catch(pe) {
+            try { articulo = JSON.parse(jsonStr.replace(/'/g, '"')); } catch(pe2) {
+              throw new Error('La IA no devolvio un JSON valido: ' + jsonStr.slice(0, 100));
+            }
+          }
+          if (!articulo.titulo) throw new Error('El articulo no tiene titulo');
+          if (!articulo.contenido) throw new Error('El articulo no tiene contenido');
+          Pages._showBlogPreview(articulo, categoria);
+          status.innerHTML = '<span style="color:var(--green)">Articulo generado. Revisa y publica.</span>';
+          btn.disabled = false;
+          btn.textContent = 'Generar Articulo';
+        })
+        .catch(function(err) {
+          status.innerHTML = '<span style="color:var(--red)">Error: ' + (err.message || err) + '</span>';
+          btn.disabled = false;
+          btn.textContent = 'Generar Articulo';
+        });
+      }).catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error al cargar articulos: ' + (err.message || err) + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'Generar Articulo';
+      });
+    } catch(e) {
+      status.innerHTML = '<span style="color:var(--red)">Error: ' + (e.message || e) + '</span>';
+      btn.disabled = false;
+      btn.textContent = 'Generar Articulo';
+    }
+  },
+
+  _showBlogPreview: function(articulo, categoria) {
+    var previewCard = document.getElementById('ba-preview-card');
+    var previewEl = document.getElementById('ba-preview');
+    var actionsEl = document.getElementById('ba-preview-actions');
+    if (!previewCard || !previewEl || !actionsEl) return;
+    Pages._blogDraft = articulo;
+    var h = '<h2 style="margin-bottom:4px">' + (articulo.titulo || '') + '</h2>' +
+      '<p class="text-sm text-muted" style="margin-bottom:16px">' + (articulo.subtitulo || '') + '</p>' +
+      '<div style="max-height:400px;overflow-y:auto;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">' +
+      (articulo.contenido || '') +
+      '</div>' +
+      (articulo.imagen_prompt ? '<p class="text-xs text-muted mt-8">Imagen prompt: ' + articulo.imagen_prompt + '</p>' : '');
+    previewEl.innerHTML = h;
+    actionsEl.innerHTML = '<button class="btn btn-gold" onclick="Pages.publicarArticulo()">Publicar</button>' +
+      '<button class="btn btn-outline ml-8" onclick="Pages.descartarArticulo()">Descartar</button>';
+    previewCard.style.display = 'block';
+    previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  publicarArticulo: function() {
+    var articulo = Pages._blogDraft;
+    if (!articulo) return;
+    articulo.fecha = new Date().toISOString().slice(0, 10);
+    var status = document.getElementById('ba-gen-status');
+    try {
+      firebase.database().ref('arcano/db/blog').push(articulo, function(err) {
+        if (err) {
+          if (status) status.innerHTML = '<span style="color:var(--red)">Error al guardar: ' + (err.message || err) + '</span>';
+        } else {
+          if (status) status.innerHTML = '<span style="color:var(--green)">Publicado: ' + (articulo.titulo || '') + '</span>';
+          Pages._loadBlogAdmin();
+        }
+        Pages.descartarArticulo();
+      });
+    } catch(fe) {
+      if (status) status.innerHTML = '<span style="color:var(--green)">Generado (sin guardar en nube): ' + (articulo.titulo || '') + '</span>';
+      Pages.descartarArticulo();
+    }
+  },
+
+  descartarArticulo: function() {
+    Pages._blogDraft = null;
+    var previewCard = document.getElementById('ba-preview-card');
+    if (previewCard) previewCard.style.display = 'none';
+  },
+
+  _blogDraft: null,
+
 /* ================================================================
      ESTADISTICAS DE VENTAS (Chart.js)
      ================================================================ */
