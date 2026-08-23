@@ -4596,7 +4596,7 @@ const Pages = {
   },
 
   _generarImagenBlog: function(apiKey, prompt, callback) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=' + apiKey;
     var imgPrompt = 'Generate a single blog header image for a premium spice shop. ' + (prompt || 'A vibrant arrangement of exotic spices and herbs in rustic bowls, warm lighting, food photography') + '. Style: warm rich colors, food photography aesthetic, no text no letters no words no watermarks in the image.';
     fetch(url, {
       method: 'POST',
