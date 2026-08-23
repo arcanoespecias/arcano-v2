@@ -4595,15 +4595,15 @@ const Pages = {
     if (previewCard) previewCard.style.display = 'none';
   },
 
-    _generarImagenBlog: function(apiKey, prompt, callback) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=' + apiKey;
+      _generarImagenBlog: function(apiKey, prompt, callback) {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey;
     var imgPrompt = 'Generate a single blog header image for a premium spice shop. ' + (prompt || 'A vibrant arrangement of exotic spices and herbs in rustic bowls, warm lighting, food photography') + '. Style: warm rich colors, food photography aesthetic, no text no letters no words no watermarks in the image.';
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        instances: [{ prompt: imgPrompt }],
-        parameters: { sampleCount: 1, aspectRatio: '16:9' }
+        contents: [{ parts: [{ text: imgPrompt }] }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       })
     })
     .then(function(res) {
@@ -4613,9 +4613,12 @@ const Pages = {
     .then(function(data) {
       var imageData = null;
       try {
-        var preds = data.predictions;
-        if (preds && preds.length > 0 && preds[0].bytesBase64Encoded) {
-          imageData = 'data:' + (preds[0].mimeType || 'image/jpeg') + ';base64,' + preds[0].bytesBase64Encoded;
+        var parts = data.candidates[0].content.parts;
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].inlineData && parts[i].inlineData.data) {
+            imageData = 'data:' + parts[i].inlineData.mimeType + ';base64,' + parts[i].inlineData.data;
+            break;
+          }
         }
       } catch(e) {}
       if (!imageData) throw new Error('La IA no genero imagen');
@@ -4623,6 +4626,7 @@ const Pages = {
     })
     .catch(function(err) { callback(err); });
   },
+
 
   _overlayLogoOnImage: function(imageDataUrl, callback) {
     var img = new Image();
