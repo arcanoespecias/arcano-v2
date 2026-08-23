@@ -4510,7 +4510,9 @@ const Pages = {
           Pages._showBlogPreview(articulo, categoria);
           status.innerHTML = '<span style="color:var(--green)">Articulo generado. Revisa y publica.</span>';
           btn.disabled = false;
-          function() { count++; return fixed; }(function(err) {
+          btn.textContent = 'Generar Articulo';
+        })
+        .catch(function(err) {
           status.innerHTML = '<span style="color:var(--red)">Error: ' + (err.message || err) + '</span>';
           btn.disabled = false;
           btn.textContent = 'Generar Articulo';
