@@ -4529,16 +4529,16 @@ const Pages = {
     btn.textContent = 'Generando...';
     status.textContent = 'Cargando productos y articulos existentes...';
 
-    var allProductos = ArcanoDB.getTiendaProductos();
-    var productLines = [];
-    for (var i = 0; i < allProductos.length; i++) {
-      var p = allProductos[i];
-      var line = '- [ID:' + p.id + '] ' + p.nombre;
-      if (p.uso) line += ' (' + p.uso + ')';
-      productLines.push(line);
+    var allBlends = ArcanoDB.getBlends();
+    var blendLines = [];
+    for (var i = 0; i < allBlends.length; i++) {
+      var b = allBlends[i];
+      var line = '- [ID:' + b.id + '] ' + b.nombre;
+      if (b.descripcion) line += ' - ' + b.descripcion;
+      blendLines.push(line);
     }
-    var productContext = productLines.join('\n');
-    if (!productContext) productContext = '- Sin productos';
+    var productContext = blendLines.join('\n');
+    if (!productContext) productContext = '- Sin blends';
 
     var temaInstr = tema
       ? 'Tema especifico: ' + tema + '. El articulo debe girar alrededor de este tema.'
@@ -4557,13 +4557,14 @@ const Pages = {
 
         var prompt =
           'Eres un redactor creativo experto en especias y blends de la marca Arcano Especias. Escribe en espanol.\n\n' +
-          'CATALOGO DE PRODUCTOS:\n' + productContext + '\n\n' +
-          'REGLAS:\n' +
-          '1. Menciona al menos UN producto del catalogo (nombre exacto) de forma natural en el articulo. Convierte cada mencion de producto en un enlace clickable usando este formato EXACTO: <a href="#" onclick="openDetail(NUMERO_ID_AQUI);return false">Nombre del Producto</a> donde NUMERO_ID_AQUI es el numero ID del producto que aparece en el catalogo como [ID:123]. El enlace debe usar el nombre exacto del producto como texto visible.\n' +
-          '2. El contenido debe ser informativo, entretenido y relevante para amantes de las especias.\n' +
-          '3. Usa etiquetas HTML semanticas: <p> para parrafos, <h2> y <h3> para subtitulos, <ul><li> para listas, <blockquote> para citas destacadas.\n' +
-          '4. El articulo debe tener entre 400 y 800 palabras.\n' +
-          '5. El articulo debe ser ORIGINAL, diferente a los existentes.' +
+          'BLENDS DISPONIBLES EN TIENDA (usa SOLO estos nombres exactos):\n' + productContext + '\n\n' +
+          'REGLAS OBLIGATORIAS:\n' +
+          '1. EL PRIMER PARRAFO del articulo debe mencionar al menos UN blend del catalogo de arriba, usando su nombre EXACTO. El blend debe estar relacionado con el tema del articulo de forma natural y creativa. Por ejemplo: si el tema es pimienta, podes relacionarlo con Chai Imperial; si hablas de una ciudad o region, menciona un blend de esa zona (ej: Bangkok Curry para Tailandia, Garam Masala Clasico para India, Mediterranean Citrus para el Mediterraneo, etc). El articulo SIEMPRE debe conectar el tema con algun blend de la tienda.\n' +
+          '2. Cada vez que menciones un blend, convierte el nombre en un enlace clickable usando este formato EXACTO: <a href="#" onclick="openDetail(NUMERO_ID);return false">Nombre Exacto del Blend</a> donde NUMERO_ID es el numero ID del blend que aparece en el catalogo como [ID:123]. El texto visible del enlace debe ser el nombre EXACTO del blend.\n' +
+          '3. El contenido debe ser informativo, entretenido y relevante para amantes de las especias.\n' +
+          '4. Usa etiquetas HTML semanticas: <p> para parrafos, <h2> y <h3> para subtitulos, <ul><li> para listas, <blockquote> para citas destacadas.\n' +
+          '5. El articulo debe tener entre 400 y 800 palabras.\n' +
+          '6. El articulo debe ser ORIGINAL, diferente a los existentes. NO menciones especias sueltas como productos, solo BLENDS.' +
           existingBlock + '\n\n' +
           'Escribe un articulo de blog categoria "' + categoria + '". ' + temaInstr + '\n\n' +
           'Responde SOLO con JSON valido (sin markdown, sin backticks, sin texto antes o despues) con esta estructura:\n' +
