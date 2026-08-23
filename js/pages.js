@@ -4437,7 +4437,7 @@ const Pages = {
     var productLines = [];
     for (var i = 0; i < allProductos.length; i++) {
       var p = allProductos[i];
-      var line = '- ' + p.nombre;
+      var line = '- [ID:' + p.id + '] ' + p.nombre;
       if (p.uso) line += ' (' + p.uso + ')';
       productLines.push(line);
     }
@@ -4463,7 +4463,7 @@ const Pages = {
           'Eres un redactor creativo experto en especias y blends de la marca Arcano Especias. Escribe en espanol.\n\n' +
           'CATALOGO DE PRODUCTOS:\n' + productContext + '\n\n' +
           'REGLAS:\n' +
-          '1. Menciona al menos UN producto del catalogo (nombre exacto) de forma natural en el articulo.\n' +
+          '1. Menciona al menos UN producto del catalogo (nombre exacto) de forma natural en el articulo. Convierte cada mencion de producto en un enlace clickable usando este formato EXACTO: <a href="#" onclick="openDetail(NUMERO_ID_AQUI);return false">Nombre del Producto</a> donde NUMERO_ID_AQUI es el numero ID del producto que aparece en el catalogo como [ID:123]. El enlace debe usar el nombre exacto del producto como texto visible.\n' +
           '2. El contenido debe ser informativo, entretenido y relevante para amantes de las especias.\n' +
           '3. Usa etiquetas HTML semanticas: <p> para parrafos, <h2> y <h3> para subtitulos, <ul><li> para listas, <blockquote> para citas destacadas.\n' +
           '4. El articulo debe tener entre 400 y 800 palabras.\n' +
