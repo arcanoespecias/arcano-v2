@@ -4347,7 +4347,8 @@ const Pages = {
     '<div class="card">' +
       '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links de Blends</button></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
-    '</div>';
+    '</div>' +
+    '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
     container.innerHTML = h;
     Pages._loadBlogAdmin();
   },
@@ -4394,11 +4395,21 @@ const Pages = {
       listEl.innerHTML = '<p class="text-center text-muted">No hay articulos. Genera el primero con el boton de arriba.</p>';
       return;
     }
-    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Categoria</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Img</th><th>Categoria</th><th>Fecha</th><th></th></tr></thead><tbody>';
     for (var i = 0; i < articulos.length; i++) {
       var a = articulos[i];
+      var imgCell;
+      if (a.imagen_url) {
+        imgCell = '<div style="display:flex;align-items:center;gap:4px">' +
+          '<img src="' + a.imagen_url + '" style="width:48px;height:32px;object-fit:cover;border-radius:4px" onclick="Pages.uploadBlogImage(\'' + a._key + '\')" title="Cambiar imagen">' +
+          '<button class="btn btn-sm" style="padding:2px 6px;font-size:0.7rem;color:var(--red)" onclick="Pages.removeBlogImage(\'' + a._key + '\')" title="Quitar imagen">x</button>' +
+          '</div>';
+      } else {
+        imgCell = '<button class="btn btn-sm btn-outline" onclick="Pages.uploadBlogImage(\'' + a._key + '\')">+ Img</button>';
+      }
       h += '<tr>' +
         '<td class="fw7">' + (a.titulo || 'Sin titulo') + '</td>' +
+        '<td>' + imgCell + '</td>' +
         '<td><span class="badge badge-gold">' + (a.categoria || '') + '</span></td>' +
         '<td class="text-sm text-muted">' + (a.fecha || '') + '</td>' +
         '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarArticulo(\'' + a._key + '\')">X</button></td>' +
@@ -4501,6 +4512,37 @@ const Pages = {
       }
 
       processPost(0);
+    });
+  },
+
+  uploadBlogImage: function(key) {
+    Pages._blogImgTarget = key;
+    var inp = document.getElementById('ba-img-input');
+    if (inp) inp.click();
+  },
+
+  _onBlogImageSelect: function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('La imagen no debe superar 2MB. Recomendado: 1200x630 px JPG.'); return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var dataUrl = ev.target.result;
+      var key = Pages._blogImgTarget;
+      if (!key) return;
+      firebase.database().ref('arcano/db/blog/' + key).update({imagen_url: dataUrl}, function(err) {
+        if (err) { alert('Error al guardar: ' + (err.message || err)); }
+        else { Pages._loadBlogAdmin(); }
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  },
+
+  removeBlogImage: function(key) {
+    if (!confirm('Quitar imagen destacada?')) return;
+    firebase.database().ref('arcano/db/blog/' + key).update({imagen_url: null}, function() {
+      Pages._loadBlogAdmin();
     });
   },
 
