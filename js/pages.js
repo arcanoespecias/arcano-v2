@@ -4345,7 +4345,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links de Blends</button></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>';
     container.innerHTML = h;
@@ -4406,6 +4406,102 @@ const Pages = {
     }
     h += '</tbody></table></div>';
     listEl.innerHTML = h;
+  },
+
+  fixBlogLinks: function() {
+    var statusEl = document.getElementById('ba-gen-status');
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Corrigiendo links en articulos...</span>';
+
+    var blends = ArcanoDB.getBlends();
+    var blendList = blends.slice().sort(function(a, b) { return b.nombre.length - a.nombre.length; });
+
+    var blendPatterns = [];
+    for (var i = 0; i < blendList.length; i++) {
+      var name = blendList[i].nombre;
+      var escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      blendPatterns.push({
+        name: name,
+        id: blendList[i].id,
+        regex: new RegExp('(^|[^a-zA-Z\u00E1-\u00FA\u00C1-\u00DA\u00F1\u00D1\u00FC\u00DC])' + escaped + '($|[^a-zA-Z\u00E1-\u00FA\u00C1-\u00DA\u00F1\u00D1\u00FC\u00DC])', 'gi')
+      });
+    }
+
+    var LINK_STYLE = 'style="color:var(--gold);text-decoration:underline;font-weight:600"';
+    var REMOVE_RE = /<a\s[^>]*onclick\s*=\s*"[^"]*openDetail\(\d+\)[^"]*"[^>]*>([^<]*)<\/a>/gi;
+    var SPLIT_RE = /(<[^>]+>)/;
+
+    firebase.database().ref('arcano/db/blog').once('value', function(snap) {
+      var data = snap.val();
+      if (!data) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">No hay articulos.</span>'; return; }
+
+      var keys = Object.keys(data);
+      var updated = 0;
+      var total = keys.length;
+
+      function processPost(idx) {
+        if (idx >= total) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Listo! ' + updated + ' de ' + total + ' articulos actualizados.</span>';
+          Pages._loadBlogAdmin();
+          return;
+        }
+
+        var key = keys[idx];
+        var post = data[key];
+        var contenido = post.contenido || '';
+
+        contenido = contenido.replace(REMOVE_RE, '$1');
+
+        var parts = contenido.split(SPLIT_RE);
+        for (var p = 0; p < parts.length; p++) {
+          if (parts[p].charAt(0) === '<') continue;
+          var text = parts[p];
+          var allMatches = [];
+          for (var b = 0; b < blendPatterns.length; b++) {
+            var bp = blendPatterns[b];
+            bp.regex.lastIndex = 0;
+            var m;
+            while ((m = bp.regex.exec(text)) !== null) {
+              var bStart = m.index + m[1].length;
+              var bEnd = bStart + bp.name.length;
+              allMatches.push({s: bStart, e: bEnd, id: bp.id, name: bp.name, bBefore: m[1], bAfter: m[2]});
+              if (m.index === bp.regex.lastIndex) bp.regex.lastIndex++;
+            }
+          }
+          allMatches.sort(function(a, b) { return a.s - b.s || (b.e - b.s) - (a.e - a.s); });
+          var filtered = [];
+          for (var mi = 0; mi < allMatches.length; mi++) {
+            var cur = allMatches[mi];
+            var overlap = false;
+            for (var fi = 0; fi < filtered.length; fi++) {
+              if (cur.s < filtered[fi].e && cur.e > filtered[fi].s) {
+                overlap = true;
+                if ((cur.e - cur.s) > (filtered[fi].e - filtered[fi].s)) filtered[fi] = cur;
+                break;
+              }
+            }
+            if (!overlap) filtered.push(cur);
+          }
+          for (var fi = filtered.length - 1; fi >= 0; fi--) {
+            var f = filtered[fi];
+            var linkHtml = '<a href="#" onclick="openDetail(' + f.id + ');return false" ' + LINK_STYLE + '>' + f.name + '</a>';
+            text = text.substring(0, f.s) + linkHtml + text.substring(f.e);
+          }
+          parts[p] = text;
+        }
+        contenido = parts.join('');
+
+        if (contenido !== (post.contenido || '')) {
+          firebase.database().ref('arcano/db/blog/' + key).update({contenido: contenido}, function(err) {
+            if (!err) updated++;
+            processPost(idx + 1);
+          });
+        } else {
+          processPost(idx + 1);
+        }
+      }
+
+      processPost(0);
+    });
   },
 
   borrarArticulo: function(key) {
