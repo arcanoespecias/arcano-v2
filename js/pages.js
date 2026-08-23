@@ -4507,30 +4507,10 @@ const Pages = {
           }
           if (!articulo.titulo) throw new Error('El articulo no tiene titulo');
           if (!articulo.contenido) throw new Error('El articulo no tiene contenido');
-          // Show text preview, then generate image
           Pages._showBlogPreview(articulo, categoria);
-          status.innerHTML = '<span style="color:var(--green)">Articulo generado. Generando imagen...</span>';
-          Pages._generarImagenBlog(apiKey, articulo.imagen_prompt, function(err, imgDataUrl) {
-            if (err) {
-              status.innerHTML += '<br><span style="color:var(--orange)">Imagen no generada: ' + (err.message || err) + '</span>';
-              btn.disabled = false;
-              btn.textContent = 'Generar Articulo';
-              return;
-            }
-            status.innerHTML = '<span style="color:var(--green)">Articulo generado. Aplicando logo...</span>';
-            Pages._overlayLogoOnImage(imgDataUrl, function(err2, finalImg) {
-              var imgToUpload = err2 ? imgDataUrl : finalImg;
-              status.innerHTML = '<span style="color:var(--green)">Articulo generado. Subiendo imagen...</span>';
-              Pages._uploadBlogImage(imgToUpload, articulo.titulo, function(err3, url) {
-                articulo.imagen_url = err3 ? imgDataUrl : url;
-                Pages._showBlogPreview(articulo, categoria);
-                status.innerHTML = '<span style="color:var(--green)">Articulo e imagen listos. Revisa y publica.</span>';
-                btn.disabled = false;
-                btn.textContent = 'Generar Articulo';
-              });
-            });
-          });;
-        })
+          status.innerHTML = '<span style="color:var(--green)">Articulo generado. Revisa y publica.</span>';
+          btn.disabled = false;
+          btn.textContent = 'Generar Articulo';
         .catch(function(err) {
           status.innerHTML = '<span style="color:var(--red)">Error: ' + (err.message || err) + '</span>';
           btn.disabled = false;
@@ -4595,103 +4575,7 @@ const Pages = {
     if (previewCard) previewCard.style.display = 'none';
   },
 
-      _generarImagenBlog: function(apiKey, prompt, callback) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey;
-    var imgPrompt = 'Generate a single blog header image for a premium spice shop. ' + (prompt || 'A vibrant arrangement of exotic spices and herbs in rustic bowls, warm lighting, food photography') + '. Style: warm rich colors, food photography aesthetic, no text no letters no words no watermarks in the image.';
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: imgPrompt }] }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
-      })
-    })
-    .then(function(res) {
-      if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
-      return res.json();
-    })
-    .then(function(data) {
-      var imageData = null;
-      try {
-        var parts = data.candidates[0].content.parts;
-        for (var i = 0; i < parts.length; i++) {
-          if (parts[i].inlineData && parts[i].inlineData.data) {
-            imageData = 'data:' + parts[i].inlineData.mimeType + ';base64,' + parts[i].inlineData.data;
-            break;
-          }
-        }
-      } catch(e) {}
-      if (!imageData) throw new Error('La IA no genero imagen');
-      callback(null, imageData);
-    })
-    .catch(function(err) { callback(err); });
-  },
-
-
-  _overlayLogoOnImage: function(imageDataUrl, callback) {
-    var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var w = img.naturalWidth;
-      var h = img.naturalHeight;
-      if (w > 1200) { h = Math.floor(h * 1200 / w); w = 1200; }
-      canvas.width = w;
-      canvas.height = h;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      var logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.onload = function() {
-        var logoW = Math.floor(w * 0.12);
-        var margin = Math.floor(logoW * 0.5);
-        var logoH = Math.floor(logoW * (logo.naturalHeight / logo.naturalWidth));
-        ctx.globalAlpha = 0.7;
-        ctx.drawImage(logo, w - logoW - margin, h - logoH - margin, logoW, logoH);
-        ctx.globalAlpha = 1.0;
-        callback(null, canvas.toDataURL('image/jpeg', 0.85));
-      };
-      logo.onerror = function() { callback(null, imageDataUrl); };
-      logo.src = 'https://arcanoespecias.github.io/icons/logo.png';
-    };
-    img.onerror = function() { callback(new Error('Error cargando imagen generada')); };
-    img.src = imageDataUrl;
-  },
-
-  _uploadBlogImage: function(dataUrl, titulo, callback) {
-    var token = localStorage.getItem('arcano_gh_token');
-    if (!token) { callback(new Error('No hay token GitHub configurado')); return; }
-    var base64 = dataUrl.split(',')[1];
-    var slug = titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').substring(0, 40);
-    var filename = slug + '.jpg';
-    var path = 'blog/' + filename;
-    var ghUrl = 'https://api.github.com/repos/arcanoespecias/arcanoespecias.github.io/contents/' + path;
-    fetch(ghUrl, { headers: { 'Authorization': 'token ' + token, 'User-Agent': 'arcano-admin' } })
-    .then(function(res) {
-      if (res.status === 404) return null;
-      return res.json();
-    })
-    .then(function(existing) {
-      var body = JSON.stringify({
-        message: 'blog image: ' + titulo,
-        content: base64,
-        sha: existing ? existing.sha : null
-      });
-      return fetch(ghUrl, {
-        method: 'PUT',
-        headers: { 'Authorization': 'token ' + token, 'User-Agent': 'arcano-admin', 'Content-Type': 'application/json' },
-        body: body
-      });
-    })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      var url = (data.content && data.content.download_url) ? data.content.download_url : (data.download_url || null);
-      if (!url) throw new Error('No se obtuvo URL');
-      callback(null, url);
-    })
-    .catch(function(err) { callback(err); });
-  },
-
-  _blogDraft: null,
+      _blogDraft: null,
 
 /* ================================================================
      ESTADISTICAS DE VENTAS (Chart.js)
