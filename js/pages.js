@@ -4784,7 +4784,7 @@ const Pages = {
      WEB ANALYTICS TAB (GA4)
      ================================================================ */
   _ga4Charts: [],
-  _ga4Url: 'https://script.google.com/macros/s/AKfycbx_sjhYXt0X6ofb9qRzFGI4NKn8BOEoibA1WbItQcDoeBF1GLQ1CzODIx8O-lIAF8uc/exec',
+  _ga4Url: 'https://script.google.com/macros/s/AKfycbzcL0tHUI1DcAGeLx1_hkA6AF3vrXLXbdT8BGLLh_TF2zmTFw2tp_-BJUwh3j8Q9QlZRA/exec',
   _ga4Days: 30,
 
   _renderWebAnalytics: function(el) {
