@@ -4827,11 +4827,11 @@ const Pages = {
       if (s) s.remove();
       var loading = document.getElementById('ga4-loading');
       if (loading) loading.style.display = 'none';
-      if (!resp || !resp.success) {
-        el.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c"><p>Error: ' + ((resp && resp.error) || 'Desconocido') + '</p><p style="font-size:0.85rem;margin-top:8px;color:var(--text-sec)">Verifica que el Apps Script este deployado correctamente.</p></div>';
+      if (!resp || resp.error) {
+        el.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c"><p>Error: ' + ((resp && resp.message) || 'Desconocido') + '</p><p style="font-size:0.85rem;margin-top:8px;color:var(--text-sec)">Verifica que el Apps Script este deployado correctamente.</p></div>';
         return;
       }
-      var d = resp.data;
+      var d = resp;
       Pages._renderGa4KPIs(d.overview || {}, d.daily || []);
       document.getElementById('ga4-kpis').style.display = '';
       document.getElementById('ga4-charts').style.display = '';
