@@ -4815,12 +4815,20 @@ const Pages = {
     h += '</div>';
     el.innerHTML = h;
 
-    var url = Pages._ga4Url + '?mode=all&days=' + Pages._ga4Days + '&t=' + Date.now();
-    fetch(url).then(function(r) { return r.json(); }).then(function(resp) {
+    var url = Pages._ga4Url + '?mode=all&days=' + Pages._ga4Days + '&t=' + Date.now() + '&callback=_ga4Jsonp';
+    var timeoutId = setTimeout(function() {
+      var loading = document.getElementById('ga4-loading');
+      if (loading) loading.innerHTML = '<p style="color:#e74c3c">Tiempo de espera agotado. Reintenta.</p>';
+    }, 15000);
+    window._ga4Jsonp = function(resp) {
+      clearTimeout(timeoutId);
+      delete window._ga4Jsonp;
+      var s = document.getElementById('_ga4_script');
+      if (s) s.remove();
       var loading = document.getElementById('ga4-loading');
       if (loading) loading.style.display = 'none';
-      if (!resp.success) {
-        el.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c"><p>Error: ' + (resp.error || 'Desconocido') + '</p><p style="font-size:0.85rem;margin-top:8px;color:var(--text-sec)">Verifica que el Apps Script este deployado correctamente.</p></div>';
+      if (!resp || !resp.success) {
+        el.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c"><p>Error: ' + ((resp && resp.error) || 'Desconocido') + '</p><p style="font-size:0.85rem;margin-top:8px;color:var(--text-sec)">Verifica que el Apps Script este deployado correctamente.</p></div>';
         return;
       }
       var d = resp.data;
@@ -4830,10 +4838,17 @@ const Pages = {
       Pages._renderGa4DailyChart(d.daily || []);
       Pages._renderGa4TrafficChart(d.traffic || []);
       Pages._renderGa4PagesChart(d.pages || []);
-    }).catch(function(err) {
+    };
+    var script = document.createElement('script');
+    script.id = '_ga4_script';
+    script.src = url;
+    script.onerror = function() {
+      clearTimeout(timeoutId);
+      delete window._ga4Jsonp;
       var loading = document.getElementById('ga4-loading');
-      if (loading) loading.innerHTML = '<p style="color:#e74c3c">Error de conexion: ' + err.message + '</p>';
-    });
+      if (loading) loading.innerHTML = '<p style="color:#e74c3c">Error de conexion. Verifica el Apps Script.</p>';
+    };
+    document.head.appendChild(script);
   },
 
   _renderGa4KPIs: function(ov, daily) {
