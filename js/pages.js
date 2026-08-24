@@ -4434,11 +4434,11 @@ const Pages = {
         imgCell = '<button class="btn btn-sm btn-outline" onclick="Pages.uploadBlogImage(\'' + a._key + '\')">+ Img</button>';
       }
       h += '<tr>' +
-        '<td class="fw7">' + (a.titulo || 'Sin titulo') + '</td>' +
+        '<td class="fw7"><a href="#" onclick="Pages.editarArticulo(\'' + a._key + '\');return false" style="color:inherit;text-decoration:none" title="Editar">' + (a.titulo || 'Sin titulo') + '</a></td>' +
         '<td>' + imgCell + '</td>' +
         '<td><span class="badge badge-gold">' + (a.categoria || '') + '</span></td>' +
         '<td class="text-sm text-muted">' + (a.fecha || '') + '</td>' +
-        '<td><button class="btn btn-sm btn-red" onclick="Pages.borrarArticulo(\'' + a._key + '\')">X</button></td>' +
+        '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="Pages.editarArticulo(\'' + a._key + '\')" title="Editar">✎</button> <button class="btn btn-sm btn-red" onclick="Pages.borrarArticulo(\'' + a._key + '\')" title="Eliminar">X</button></td>' +
         '</tr>';
     }
     h += '</tbody></table></div>';
@@ -4729,6 +4729,78 @@ const Pages = {
       '<button class="btn btn-outline ml-8" onclick="Pages.descartarArticulo()">Descartar</button>';
     previewCard.style.display = 'block';
     previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  editarArticulo: function(key) {
+    firebase.database().ref('arcano/db/blog/' + key).once('value', function(snap) {
+      var a = snap.val();
+      if (!a) { alert('Articulo no encontrado'); return; }
+      Pages._blogEditKey = key;
+      var categorias = ['Historias', 'Beneficios', 'Investigaciones', 'Curiosidades', 'Origenes'];
+      var previewCard = document.getElementById('ba-preview-card');
+      var previewEl = document.getElementById('ba-preview');
+      var actionsEl = document.getElementById('ba-preview-actions');
+      if (!previewCard || !previewEl || !actionsEl) return;
+      var catOpts = '';
+      for (var c = 0; c < categorias.length; c++) {
+        catOpts += '<option value="' + categorias[c] + '"' + (a.categoria === categorias[c] ? ' selected' : '') + '>' + categorias[c] + '</option>';
+      }
+      var h = '<div class="form-group"><label>Titulo</label>' +
+        '<input type="text" class="input" id="be-titulo" value="' + (a.titulo || '').replace(/"/g, '&quot;') + '"></div>' +
+        '<div class="form-group"><label>Subtitulo</label>' +
+        '<input type="text" class="input" id="be-subtitulo" value="' + (a.subtitulo || '').replace(/"/g, '&quot;') + '"></div>' +
+        '<div class="form-group"><label>Categoria</label>' +
+        '<select class="input" id="be-categoria">' + catOpts + '</select></div>' +
+        '<div class="form-group"><label>Contenido (HTML)</label>' +
+        '<textarea class="input" id="be-contenido" rows="16" style="font-family:monospace;font-size:0.85rem">' + (a.contenido || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea></div>' +
+        '<div style="max-height:300px;overflow-y:auto;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);margin-top:8px" id="be-live-preview"></div>';
+      previewEl.innerHTML = h;
+      actionsEl.innerHTML = '<button class="btn btn-gold" onclick="Pages.guardarEdicionArticulo()">Guardar Cambios</button>' +
+        '<button class="btn btn-outline ml-8" onclick="Pages.descartarArticulo()">Cancelar</button>' +
+        '<span id="be-status" class="text-sm text-muted ml-12"></span>';
+      previewCard.style.display = 'block';
+      previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var liveEl = document.getElementById('be-live-preview');
+      var contenidoInput = document.getElementById('be-contenido');
+      function updatePreview() {
+        if (liveEl && contenidoInput) liveEl.innerHTML = contenidoInput.value.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      }
+      if (contenidoInput) {
+        contenidoInput.addEventListener('input', updatePreview);
+        updatePreview();
+      }
+    });
+  },
+
+  guardarEdicionArticulo: function() {
+    var key = Pages._blogEditKey;
+    if (!key) return;
+    var titulo = document.getElementById('be-titulo');
+    var subtitulo = document.getElementById('be-subtitulo');
+    var categoria = document.getElementById('be-categoria');
+    var contenido = document.getElementById('be-contenido');
+    var statusEl = document.getElementById('be-status');
+    if (!titulo || !contenido) return;
+    var t = titulo.value.trim();
+    if (!t) { alert('El titulo no puede estar vacio'); titulo.focus(); return; }
+    var updates = {
+      titulo: t,
+      subtitulo: subtitulo ? subtitulo.value.trim() : '',
+      categoria: categoria ? categoria.value : '',
+      contenido: contenido.value
+    };
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Guardando...</span>';
+    firebase.database().ref('arcano/db/blog/' + key).update(updates, function(err) {
+      if (err) {
+        alert('Error al guardar: ' + (err.message || err));
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Guardado</span>';
+        Pages._blogEditKey = null;
+        Pages.descartarArticulo();
+        Pages._loadBlogAdmin();
+      }
+    });
   },
 
   publicarArticulo: function() {
