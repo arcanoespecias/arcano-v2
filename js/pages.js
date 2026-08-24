@@ -4759,6 +4759,7 @@ const Pages = {
     h += '<button class="est-tab' + (Pages._estTab === 'pedidos' ? ' active' : '') + '" onclick="Pages._estTab=\'pedidos\';App.renderPage(\'estadisticas\')">Pedidos Tienda</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'inventario' ? ' active' : '') + '" onclick="Pages._estTab=\'inventario\';App.renderPage(\'estadisticas\')">Inventario</button>';
     h += '<button class="est-tab' + (Pages._estTab === 'canales' ? ' active' : '') + '" onclick="Pages._estTab=\'canales\';App.renderPage(\'estadisticas\')">Costos por Canal</button>';
+    h += '<button class="est-tab' + (Pages._estTab === 'web' ? ' active' : '') + '" onclick="Pages._estTab=\'web\';App.renderPage(\'estadisticas\')">Web Analytics</button>';
     h += '</div>';
     h += '<div id="est-content"></div>';
     container.innerHTML = h;
@@ -4776,6 +4777,165 @@ const Pages = {
     else if (Pages._estTab === 'pedidos') Pages._renderPedidosTienda(data, container.querySelector('#est-content'));
     else if (Pages._estTab === 'inventario') Pages._renderInventario(container.querySelector('#est-content'), especias, blends);
     else if (Pages._estTab === 'canales') Pages._renderCostosPorCanal(container.querySelector('#est-content'));
+    else if (Pages._estTab === 'web') Pages._renderWebAnalytics(container.querySelector('#est-content'));
+  },
+
+  /* ================================================================
+     WEB ANALYTICS TAB (GA4)
+     ================================================================ */
+  _ga4Charts: [],
+  _ga4Url: 'https://script.google.com/macros/s/AKfycbx94dNkJHSD8yVyjnYESB-QA7DaoF58-2IjEIiXvqAYhKkchD8wTdOMkFCgRgiBH7oK/exec',
+  _ga4Days: 30,
+
+  _renderWebAnalytics: function(el) {
+    if (!el) return;
+    var self = this;
+    // Destroy previous charts
+    if (Pages._ga4Charts) { for (var _gi = 0; _gi < Pages._ga4Charts.length; _gi++) { try { Pages._ga4Charts[_gi].destroy(); } catch(e) {} } }
+    Pages._ga4Charts = [];
+
+    var h = '';
+    h += '<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">';
+    h += '<h3 style="margin:0;font-size:1.1rem">Analitica Web (GA4)</h3>';
+    h += '<select id="ga4-days" onchange="Pages._ga4Days=parseInt(this.value);Pages._renderWebAnalytics(document.querySelector(\'#est-content\'))" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.85rem">';
+    h += '<option value="7"' + (Pages._ga4Days === 7 ? ' selected' : '') + '>Ultimos 7 dias</option>';
+    h += '<option value="14"' + (Pages._ga4Days === 14 ? ' selected' : '') + '>Ultimos 14 dias</option>';
+    h += '<option value="30"' + (Pages._ga4Days === 30 ? ' selected' : '') + '>Ultimos 30 dias</option>';
+    h += '<option value="90"' + (Pages._ga4Days === 90 ? ' selected' : '') + '>Ultimos 90 dias</option>';
+    h += '</select>';
+    h += '</div>';
+    h += '<div id="ga4-loading" style="text-align:center;padding:40px;color:var(--text-sec)"><div class="loader"></div><p style="margin-top:12px">Cargando datos de Google Analytics...</p></div>';
+    h += '<div id="ga4-kpis" style="display:none"></div>';
+    h += '<div id="ga4-charts" style="display:none">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">';
+    h += '<div class="card" style="padding:16px"><h4 style="margin:0 0 12px;font-size:0.9rem">Sesiones por dia</h4><canvas id="ga4-daily-chart" height="220"></canvas></div>';
+    h += '<div class="card" style="padding:16px"><h4 style="margin:0 0 12px;font-size:0.9rem">Fuentes de trafico</h4><canvas id="ga4-traffic-chart" height="220"></canvas></div>';
+    h += '</div>';
+    h += '<div class="card" style="padding:16px;margin-bottom:20px"><h4 style="margin:0 0 12px;font-size:0.9rem">Paginas mas visitadas</h4><canvas id="ga4-pages-chart" height="250"></canvas></div>';
+    h += '</div>';
+    el.innerHTML = h;
+
+    var url = Pages._ga4Url + '?mode=all&days=' + Pages._ga4Days + '&t=' + Date.now();
+    fetch(url).then(function(r) { return r.json(); }).then(function(resp) {
+      var loading = document.getElementById('ga4-loading');
+      if (loading) loading.style.display = 'none';
+      if (!resp.success) {
+        el.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c"><p>Error: ' + (resp.error || 'Desconocido') + '</p><p style="font-size:0.85rem;margin-top:8px;color:var(--text-sec)">Verifica que el Apps Script este deployado correctamente.</p></div>';
+        return;
+      }
+      var d = resp.data;
+      Pages._renderGa4KPIs(d.overview || {}, d.daily || []);
+      document.getElementById('ga4-kpis').style.display = '';
+      document.getElementById('ga4-charts').style.display = '';
+      Pages._renderGa4DailyChart(d.daily || []);
+      Pages._renderGa4TrafficChart(d.traffic || []);
+      Pages._renderGa4PagesChart(d.pages || []);
+    }).catch(function(err) {
+      var loading = document.getElementById('ga4-loading');
+      if (loading) loading.innerHTML = '<p style="color:#e74c3c">Error de conexion: ' + err.message + '</p>';
+    });
+  },
+
+  _renderGa4KPIs: function(ov, daily) {
+    var el = document.getElementById('ga4-kpis');
+    if (!el) return;
+    var convRate = ov.sessions > 0 ? ((ov.purchases || 0) / ov.sessions * 100) : 0;
+    var avgSec = ov.avgDuration || 0;
+    var mins = Math.floor(avgSec / 60);
+    var secs = Math.round(avgSec % 60);
+    var avgStr = mins > 0 ? (mins + 'm ' + secs + 's') : (secs + 's');
+
+    var kpis = [
+      {label: 'Sesiones', value: (ov.sessions || 0).toLocaleString(), color: '#4A90D9'},
+      {label: 'Usuarios', value: (ov.users || 0).toLocaleString(), color: '#7B68EE'},
+      {label: 'Nuevos usuarios', value: (ov.newUsers || 0).toLocaleString(), color: '#2ECC71'},
+      {label: 'P. vistas', value: (ov.pageViews || 0).toLocaleString(), color: '#F39C12'},
+      {label: 'Tiempo prom.', value: avgStr, color: '#E74C3C'},
+      {label: 'Engagement', value: ((ov.engagementRate || 0) * 100).toFixed(1) + '%', color: '#1ABC9C'},
+      {label: 'Compras', value: (ov.purchases || 0).toLocaleString(), color: '#9B59B6'},
+      {label: 'Conversion', value: convRate.toFixed(2) + '%', color: '#E67E22'}
+    ];
+
+    var h = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px">';
+    for (var i = 0; i < kpis.length; i++) {
+      var k = kpis[i];
+      h += '<div class="card" style="padding:16px;border-left:4px solid ' + k.color + '">';
+      h += '<div style="font-size:0.78rem;color:var(--text-sec);margin-bottom:4px">' + k.label + '</div>';
+      h += '<div style="font-size:1.4rem;font-weight:700;color:var(--text)">' + k.value + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    el.innerHTML = h;
+  },
+
+  _renderGa4DailyChart: function(daily) {
+    var canvas = document.getElementById('ga4-daily-chart');
+    if (!canvas || daily.length === 0) return;
+    var labels = [], sessions = [], users = [];
+    for (var i = 0; i < daily.length; i++) {
+      var d = daily[i].date || '';
+      labels.push(d.substring(5)); // MM-DD
+      sessions.push(daily[i].sessions);
+      users.push(daily[i].users);
+    }
+    var chart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {label: 'Sesiones', data: sessions, borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.1)', fill: true, tension: 0.3, pointRadius: 2},
+          {label: 'Usuarios', data: users, borderColor: '#7B68EE', backgroundColor: 'rgba(123,104,238,0.05)', fill: true, tension: 0.3, pointRadius: 2}
+        ]
+      },
+      options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 12, font: {size: 11}}}}, scales: {x: {ticks: {font: {size: 10}, maxTicksLimit: 10}}, y: {beginAtZero: true, ticks: {font: {size: 10}}}}}
+    });
+    Pages._ga4Charts.push(chart);
+  },
+
+  _renderGa4TrafficChart: function(traffic) {
+    var canvas = document.getElementById('ga4-traffic-chart');
+    if (!canvas || traffic.length === 0) return;
+    var channelLabels = {Organic: 'Organico', Direct: 'Directo', Social: 'Redes Sociales', Paid: 'Pago', Referral: 'Referidos', Email: 'Email'};
+    var labels = [], data = [], colors = ['#4A90D9','#2ECC71','#E74C3C','#F39C12','#9B59B6','#1ABC9C','#E67E22','#3498DB'];
+    for (var i = 0; i < traffic.length; i++) {
+      labels.push(channelLabels[traffic[i].channel] || traffic[i].channel);
+      data.push(traffic[i].sessions);
+    }
+    var chart = new Chart(canvas, {
+      type: 'doughnut',
+      data: {labels: labels, datasets: [{data: data, backgroundColor: colors.slice(0, data.length), borderWidth: 0}]},
+      options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 12, font: {size: 11}, padding: 12}}}, cutout: '55%'}
+    });
+    Pages._ga4Charts.push(chart);
+  },
+
+  _renderGa4PagesChart: function(pages) {
+    var canvas = document.getElementById('ga4-pages-chart');
+    if (!canvas || pages.length === 0) return;
+    var top = pages.slice(0, 10);
+    var labels = [], views = [], durations = [];
+    for (var i = 0; i < top.length; i++) {
+      var title = top[i].title || top[i].path;
+      if (title.length > 35) title = title.substring(0, 35) + '...';
+      labels.push(title);
+      views.push(top[i].views);
+      var dur = top[i].avgDuration || 0;
+      var m = Math.floor(dur / 60);
+      var s = Math.round(dur % 60);
+      durations.push(m + ':' + (s < 10 ? '0' : '') + s);
+    }
+    var chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {label: 'Vistas', data: views, backgroundColor: 'rgba(74,144,217,0.7)', borderRadius: 4},
+          {label: 'Tiempo prom. (mm:ss)', data: durations.map(function(d) { var p = d.split(':'); return parseInt(p[0]) * 60 + parseInt(p[1]); }), backgroundColor: 'rgba(231,76,60,0.5)', borderRadius: 4}
+        ]
+      },
+      options: {responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: {legend: {position: 'bottom', labels: {boxWidth: 12, font: {size: 11}}}}, scales: {x: {beginAtZero: true, ticks: {font: {size: 10}}}, y: {ticks: {font: {size: 10}}}}}
+    });
+    Pages._ga4Charts.push(chart);
   },
 
   /* ================================================================
