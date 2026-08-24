@@ -89,6 +89,7 @@ function _ensureStructure() {
     'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
     'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
   };
+  if (!_db.usoOptions) _db.usoOptions = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
   if (!_db.tiendaConfig) _db.tiendaConfig = { logoPago: '' };
   _cleanNulls();
   return true;
@@ -106,6 +107,7 @@ function _emptyDB() {
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
       'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
     },
+    usoOptions: ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'],
     usuarios: { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
   };
 }
@@ -1387,6 +1389,39 @@ function removeProductTag(cat, tagName) {
   return true;
 }
 
+/* ==================== USO OPTIONS ==================== */
+
+function getUsoOptions() {
+  _ensureStructure();
+  return _db.usoOptions || [];
+}
+
+function addUsoOption(optionName) {
+  _ensureStructure();
+  optionName = (optionName || '').trim();
+  if (!optionName) return false;
+  if (!_db.usoOptions) _db.usoOptions = [];
+  for (var i = 0; i < _db.usoOptions.length; i++) {
+    if (_db.usoOptions[i].toLowerCase() === optionName.toLowerCase()) return false;
+  }
+  _db.usoOptions.push(optionName);
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
+function removeUsoOption(optionName) {
+  _ensureStructure();
+  if (!_db.usoOptions) return false;
+  var idx = -1;
+  for (var i = 0; i < _db.usoOptions.length; i++) {
+    if (_db.usoOptions[i] === optionName) { idx = i; break; }
+  }
+  if (idx < 0) return false;
+  _db.usoOptions.splice(idx, 1);
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
 /* ==================== IMAGE HELPER ==================== */
 
 function compressImage(file, maxW, quality, cb) {
@@ -1985,6 +2020,7 @@ window.ArcanoDB = {
   toggleEnBlend: toggleEnBlend,
   getProductTags: getProductTags, getTagsForCategoria: getTagsForCategoria,
   addProductTag: addProductTag, removeProductTag: removeProductTag,
+  getUsoOptions: getUsoOptions, addUsoOption: addUsoOption, removeUsoOption: removeUsoOption,
   compressImage: compressImage,
   DB_KEY: DB_KEY, FB_PATH: FB_PATH,
   getPuntosDeVenta: getPuntosDeVenta, getPuntoDeVenta: getPuntoDeVenta,
