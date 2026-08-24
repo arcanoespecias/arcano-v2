@@ -534,7 +534,7 @@ const Pages = {
         '</div></div>' +
         '<div class="form-group"><label>Etiquetas de uso</label><div id="tag-area-esp">' + Pages.buildTagSelectorHtml(isEdit && (esp.categorias || []).length ? esp.categorias[0] : 'Comidas', isEdit ? (esp.tags || []) : []) + '</div></div>' +
         '<div class="form-group"><label>Descripcion (opcional)</label><textarea class="input" id="f-esp-desc" rows="2" placeholder="Breve descripcion del producto para la tienda...">' + (isEdit ? (esp.descripcion||'') : '') + '</textarea></div>' +
-        '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><input type="text" class="input" id="f-esp-uso" value="' + (isEdit ? (esp.uso||'') : '') + '" placeholder="Ej: Carnes, Arroces, Sopas"></div>' +
+        '<div class="form-group"><label>Uso / Preparaciones (opcional)</label><div id="uso-area-esp">' + Pages.buildUsoSelectorHtml(isEdit ? (esp.uso||'') : '') + '</div></div>' +
         (isEdit ? '<p class="text-xs text-muted mt-8">Stock: ' + (esp.stockBolsa||0) + 'g pala, ' + (esp.stockChico||0) + ' fr pequeño, ' + (esp.stockGrande||0) + ' fr grande</p>' : '') +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
@@ -560,7 +560,7 @@ const Pages = {
         precioTiendaGrande: Number(document.getElementById('f-esp-tg').value) || 0,
         imagen: previewEl ? previewEl.src : '',
         descripcion: (document.getElementById('f-esp-desc') || {}).value ? document.getElementById('f-esp-desc').value.trim() : '',
-        uso: (document.getElementById('f-esp-uso') || {}).value ? document.getElementById('f-esp-uso').value.trim() : '',
+        uso: Pages.getSelectedUsos(),
         tags: Pages.getSelectedTags()
       };
       if (isEdit) {
@@ -613,7 +613,7 @@ const Pages = {
         '</div></div>' +
           '<div class="form-group"><label>Region (opcional)</label><input type="text" class="input" id="f-bl-region" value="' + (isEdit ? (bl.region||'') : '') + '" placeholder="Ej: India"></div>' +
         '</div>' +
-        '<div class="form-group"><label>Uso (opcional)</label><input type="text" class="input" id="f-bl-uso" value="' + (isEdit ? (bl.uso||'') : '') + '" placeholder="Ej: Carnes, Currys"></div>' +
+        '<div class="form-group"><label>Uso (opcional)</label><div id="uso-area-bl">' + Pages.buildUsoSelectorHtml(isEdit ? (bl.uso||'') : '') + '</div></div>' +
         '<div class="card" style="border-color:var(--gold)"><div class="card-header"><h3>Precios de Venta</h3></div><div class="card-body">' +
         '<div class="g2"><div class="form-group"><label>Precio Pequeño ($)</label><input type="number" class="input" id="f-bl-pc" value="' + (isEdit ? bl.precioChico : '') + '" placeholder="Ej: 8000" min="0"></div>' +
         '<div class="form-group"><label>Precio Grande ($)</label><input type="number" class="input" id="f-bl-pg" value="' + (isEdit ? bl.precioGrande : '') + '" placeholder="Ej: 18000" min="0"></div></div>' +
@@ -689,7 +689,7 @@ const Pages = {
         nombre: nombre,
         categorias: Pages._getCheckedCats('bl'),
         region: (document.getElementById('f-bl-region') || {}).value ? document.getElementById('f-bl-region').value.trim() : '',
-        uso: (document.getElementById('f-bl-uso') || {}).value ? document.getElementById('f-bl-uso').value.trim() : '',
+        uso: Pages.getSelectedUsos(),
         precioChico: Number(document.getElementById('f-bl-pc').value) || 0,
         precioGrande: Number(document.getElementById('f-bl-pg').value) || 0,
         ingredientes: ingredientes,
@@ -3457,23 +3457,23 @@ const Pages = {
     var costos = ArcanoDB.getCostosInsumos();
 
     // === Sheet ESPECIAS ===
-    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda']];
+    var espRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Bolsa (g)', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Uso']];
     for (var i = 0; i < especias.length; i++) {
       var e = especias[i];
-      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No']);
+      espRows.push([e.id, e.nombre, e.descripcion || '', e.categoria || '', e.precioChico || 0, e.precioGrande || 0, e.stockBolsa || 0, e.stockChico || 0, e.stockGrande || 0, e.enTienda ? 'Si' : 'No', e.uso || '']);
     }
     var espSheet = XLSX.utils.aoa_to_sheet(espRows);
-    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
+    espSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 25 }];
 
     // === Sheet BLENDS ===
-    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
+    var blRows = [['ID', 'Nombre', 'Descripcion', 'Categoria', 'Precio Chico', 'Precio Grande', 'Stock Chico (uds)', 'Stock Grande (uds)', 'En Tienda', 'Uso', 'Especia', 'Grs/Chico', 'Grs/Grande', 'Costo Ingr. ($/g)', 'Subcosto Chico', 'Subcosto Grande']];
     var _expEspMap = {};
     for (var _ex = 0; _ex < especias.length; _ex++) _expEspMap[especias[_ex].id] = especias[_ex].nombre;
     for (var j = 0; j < blends.length; j++) {
       var b = blends[j];
       var ings = b.ingredientes || [];
       if (ings.length === 0) {
-        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', '', '', '', '', '', '']);
+        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', b.uso || '', '', '', '', '', '', '']);
       } else {
         for (var k = 0; k < ings.length; k++) {
           var ing = ings[k];
@@ -3490,6 +3490,7 @@ const Pages = {
             k === 0 ? (b.stockChico || 0) : '',
             k === 0 ? (b.stockGrande || 0) : '',
             k === 0 ? (b.enTienda ? 'Si' : 'No') : '',
+            k === 0 ? (b.uso || '') : '',
             ing.especiaNombre || _expEspMap[ing.especiaId] || '',
             gc,
             gg,
@@ -3501,7 +3502,7 @@ const Pages = {
       }
     }
     var blSheet = XLSX.utils.aoa_to_sheet(blRows);
-    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+    blSheet['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
 
     // === Sheet COSTOS ===
     var costRows = [['Campo', 'Valor']];
@@ -3949,6 +3950,31 @@ const Pages = {
     if (!confirm('Eliminar usuario?')) return;
     ArcanoDB.deleteUsuario(id);
     App.renderPage('usuarios');
+  },
+
+  /* ================================================================
+     USO SELECTOR HELPER
+     ================================================================ */
+  buildUsoSelectorHtml(selectedUsos) {
+    var opciones = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
+    var sel = selectedUsos || '';
+    var selArr = typeof sel === 'string' ? sel.split(', ') : (sel || []);
+    var h = '<div class="tag-selector" id="uso-selector">';
+    for (var i = 0; i < opciones.length; i++) {
+      var checked = selArr.indexOf(opciones[i]) >= 0 ? ' checked' : '';
+      h += '<label class="tag-chip"><input type="checkbox" value="' + opciones[i] + '"' + checked + '><span>' + opciones[i] + '</span></label>';
+    }
+    h += '</div>';
+    return h;
+  },
+
+  getSelectedUsos() {
+    var cbs = document.querySelectorAll('#uso-selector input[type=checkbox]');
+    var usos = [];
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].checked) usos.push(cbs[i].value);
+    }
+    return usos.join(', ');
   },
 
   /* ================================================================
@@ -6121,4 +6147,5 @@ function _saveBlendPrecios() {
   writeField('tiendaConfig/precioBlendGrande', grande);
   toast('Precios de Tu Blend guardados');
 }
+
 
