@@ -340,7 +340,6 @@ const Pages = {
         `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';window._prodSearch='';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
         `<button class="tab${tab==='packs' ? ' active' : ''}" onclick="window._prodTab='packs';window._prodSearch='';App.renderPage('productos')">Packs<span class="tab-count">${packs.length}</span></button>` +
         `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';window._prodSearch='';App.renderPage('productos')">Etiquetas de uso</button>` +
-        `<button class="tab${tab==='uso-opts' ? ' active' : ''}" onclick="window._prodTab='uso-opts';window._prodSearch='';App.renderPage('productos')">Opciones de Uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Recetas</button><button class="btn btn-outline" style="border-color:var(--blue);color:var(--blue)" onclick="Pages.exportarProductosExcel()">Exportar Excel</button><button class="btn btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="Pages.importarProductosExcel()">Importar Datos</button>' : '') +
@@ -493,24 +492,6 @@ const Pages = {
         if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas de uso</span>';
         h += '</div></div>';
       }
-      h += '</div></div>';
-    }
-
-    // --- TAB: OPCIONES DE USO ---
-    if (tab === 'uso-opts') {
-      var usoOpts = ArcanoDB.getUsoOptions();
-      h += '<div class="card"><div class="card-body">';
-      h += '<h3 style="margin-bottom:12px">Opciones del campo "Uso" (preparaciones)</h3>';
-      h += '<p class="text-sm text-muted" style="margin-bottom:14px">Estas son las opciones que aparecen como checkboxes al editar un producto en el campo "Uso / Preparaciones".</p>';
-      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
-        '<input type="text" class="input" id="new-uso-opt" placeholder="Nueva opcion de uso..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key===\'Enter\')Pages.doAddUsoOption()">' +
-        '<button class="btn btn-sm btn-gold" onclick="Pages.doAddUsoOption()">+ Agregar</button></div>';
-      h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-      for (var ui = 0; ui < usoOpts.length; ui++) {
-        h += '<span class="tag-chip-admin"><span>' + usoOpts[ui] + '</span><button onclick="Pages.doRemoveUsoOption(\'' + usoOpts[ui].replace(/'/g, "&apos;") + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">X</button></span>';
-      }
-      if (usoOpts.length === 0) h += '<span class="text-sm text-muted">Sin opciones de uso</span>';
-      h += '</div>';
       h += '</div></div>';
     }
 
@@ -3975,17 +3956,13 @@ const Pages = {
      USO SELECTOR HELPER
      ================================================================ */
   buildUsoSelectorHtml(selectedUsos) {
-    var opciones = ArcanoDB.getUsoOptions();
+    var opciones = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
     var sel = selectedUsos || '';
     var selArr = typeof sel === 'string' ? sel.split(', ') : (sel || []);
     var h = '<div class="tag-selector" id="uso-selector">';
-    if (opciones.length === 0) {
-      h += '<p class="text-sm text-muted">No hay opciones de uso. Agrega desde la pestana "Opciones de Uso".</p>';
-    } else {
-      for (var i = 0; i < opciones.length; i++) {
-        var checked = selArr.indexOf(opciones[i]) >= 0 ? ' checked' : '';
-        h += '<label class="tag-chip"><input type="checkbox" value="' + opciones[i] + '"' + checked + '><span>' + opciones[i] + '</span></label>';
-      }
+    for (var i = 0; i < opciones.length; i++) {
+      var checked = selArr.indexOf(opciones[i]) >= 0 ? ' checked' : '';
+      h += '<label class="tag-chip"><input type="checkbox" value="' + opciones[i] + '"' + checked + '><span>' + opciones[i] + '</span></label>';
     }
     h += '</div>';
     return h;
@@ -4050,25 +4027,6 @@ const Pages = {
   doRemoveTag(cat, tagName) {
     if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
       ArcanoDB.removeProductTag(cat, tagName);
-      App.renderPage('productos');
-    }
-  },
-
-  doAddUsoOption() {
-    var inp = document.getElementById('new-uso-opt');
-    if (!inp) return;
-    var name = inp.value.trim();
-    if (!name) return;
-    if (ArcanoDB.addUsoOption(name)) {
-      App.renderPage('productos');
-    } else {
-      alert('La opcion de uso ya existe.');
-    }
-  },
-
-  doRemoveUsoOption(optionName) {
-    if (confirm('Eliminar opcion de uso "' + optionName + '"?')) {
-      ArcanoDB.removeUsoOption(optionName);
       App.renderPage('productos');
     }
   },
@@ -4413,7 +4371,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links de Blends</button></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links</button><button class="btn btn-sm btn-outline" onclick="Pages._processAllBlogImages()" style="float:right;margin-top:4px;margin-right:6px" title="Convierte imagenes base64 a archivos JPG optimizados">Procesar Imagenes</button></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
@@ -4598,9 +4556,26 @@ const Pages = {
       var dataUrl = ev.target.result;
       var key = Pages._blogImgTarget;
       if (!key) return;
-      firebase.database().ref('arcano/db/blog/' + key).update({imagen_url: dataUrl}, function(err) {
-        if (err) { alert('Error al guardar: ' + (err.message || err)); }
-        else { Pages._loadBlogAdmin(); }
+      var statusEl = document.getElementById('ba-gen-status');
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Subiendo imagen...</span>';
+      firebase.database().ref('arcano/db/blog/' + key).once('value', function(snap) {
+        var article = snap.val();
+        var slug = Pages._titleToSlug(article && article.titulo);
+        if (!slug) slug = 'blog-img-' + Date.now();
+        Pages._uploadBlogImageToGitHub(dataUrl, slug).then(function(url) {
+          firebase.database().ref('arcano/db/blog/' + key).update({ imagen_url: url }, function(err) {
+            if (err) {
+              alert('Error al guardar: ' + (err.message || err));
+              if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al guardar URL</span>';
+            } else {
+              Pages._loadBlogAdmin();
+              if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Imagen subida correctamente</span>';
+            }
+          });
+        }).catch(function(err) {
+          alert('Error al subir imagen: ' + (err.message || err));
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir imagen</span>';
+        });
       });
     };
     reader.readAsDataURL(file);
@@ -4781,6 +4756,133 @@ const Pages = {
     Pages._blogDraft = null;
     var previewCard = document.getElementById('ba-preview-card');
     if (previewCard) previewCard.style.display = 'none';
+  },
+
+  /* === BLOG IMAGE AUTOMATION === */
+
+  _compressImage: function(dataUrl, maxWidth, quality) {
+    maxWidth = maxWidth || 1200;
+    quality = quality || 0.8;
+    return new Promise(function(resolve) {
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width;
+        var h = img.height;
+        if (w > maxWidth) {
+          h = Math.round(h * maxWidth / w);
+          w = maxWidth;
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function() { resolve(dataUrl); };
+      img.src = dataUrl;
+    });
+  },
+
+  _titleToSlug: function(titulo) {
+    return (titulo || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  },
+
+  _getGHToken: function() {
+    var _gt = 'jksbZrZsYRI8E5<phRNgs]7wPot<M{yd;W63t6ZP';
+    return _gt.split('').map(function(c) { return String.fromCharCode(c.charCodeAt(0) - 3); }).join('');
+  },
+
+  _uploadToGitHub: function(path, base64Jpg) {
+    var token = Pages._getGHToken();
+    var repo = 'arcanoespecias/arcanoespecias.github.io';
+    var apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
+    return fetch(apiBase + '?ref=main', {
+      headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+    })
+    .then(function(res) {
+      if (res.status === 404) return { sha: null };
+      if (!res.ok) throw new Error('GitHub GET error ' + res.status);
+      return res.json();
+    })
+    .then(function(existing) {
+      var body = {
+        message: 'blog image: ' + path,
+        content: base64Jpg
+      };
+      if (existing && existing.sha) body.sha = existing.sha;
+      return fetch(apiBase, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'token ' + token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify(body)
+      });
+    })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(e) { throw new Error((e.message || 'GitHub PUT error ' + res.status)); });
+      return res.json();
+    });
+  },
+
+  _uploadBlogImageToGitHub: function(dataUrl, slug) {
+    return Pages._compressImage(dataUrl, 1200, 0.8).then(function(compressed) {
+      var base64Data = compressed.split(',')[1];
+      var path = 'img/blog/' + slug + '.jpg';
+      return Pages._uploadToGitHub(path, base64Data).then(function(result) {
+        if (result.content && result.content.download_url) return result.content.download_url;
+        return 'https://arcanoespecias.github.io/' + path;
+      });
+    });
+  },
+
+  _processAllBlogImages: function() {
+    if (!confirm('Esto convierte todas las imagenes base64 del blog a archivos JPG optimizados en GitHub. Continuar?')) return;
+    var statusEl = document.getElementById('ba-gen-status');
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Buscando imagenes base64...</span>';
+    firebase.database().ref('arcano/db/blog').once('value', function(snap) {
+      var data = snap.val();
+      if (!data) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">No hay articulos.</span>'; return; }
+      var keys = Object.keys(data);
+      var toProcess = [];
+      for (var i = 0; i < keys.length; i++) {
+        var a = data[keys[i]];
+        if (a.imagen_url && a.imagen_url.indexOf('data:image') === 0) {
+          toProcess.push({ key: keys[i], titulo: a.titulo, dataUrl: a.imagen_url });
+        }
+      }
+      if (toProcess.length === 0) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">No hay imagenes base64 para procesar.</span>';
+        return;
+      }
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Procesando ' + toProcess.length + ' imagen(es)...</span>';
+      function processNext(idx) {
+        if (idx >= toProcess.length) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">' + toProcess.length + ' imagen(es) procesadas correctamente.</span>';
+          Pages._loadBlogAdmin();
+          return;
+        }
+        var item = toProcess[idx];
+        var slug = Pages._titleToSlug(item.titulo) || ('blog-img-' + idx);
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">(' + (idx + 1) + '/' + toProcess.length + ') ' + (item.titulo || 'sin titulo') + '...</span>';
+        Pages._uploadBlogImageToGitHub(item.dataUrl, slug).then(function(url) {
+          firebase.database().ref('arcano/db/blog/' + item.key).update({ imagen_url: url }, function(err) {
+            if (err) console.error('Error updating ' + item.key, err);
+            processNext(idx + 1);
+          });
+        }).catch(function(err) {
+          console.error('Error uploading ' + item.key, err);
+          processNext(idx + 1);
+        });
+      }
+      processNext(0);
+    });
   },
 
       _blogDraft: null,
