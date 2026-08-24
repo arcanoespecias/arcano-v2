@@ -340,6 +340,7 @@ const Pages = {
         `<button class="tab${tab==='blends' ? ' active' : ''}" onclick="window._prodTab='blends';window._prodSearch='';App.renderPage('productos')">Blends<span class="tab-count">${blends.length}</span></button>` +
         `<button class="tab${tab==='packs' ? ' active' : ''}" onclick="window._prodTab='packs';window._prodSearch='';App.renderPage('productos')">Packs<span class="tab-count">${packs.length}</span></button>` +
         `<button class="tab${tab==='uso' ? ' active' : ''}" onclick="window._prodTab='uso';window._prodSearch='';App.renderPage('productos')">Etiquetas de uso</button>` +
+        `<button class="tab${tab==='uso-opts' ? ' active' : ''}" onclick="window._prodTab='uso-opts';window._prodSearch='';App.renderPage('productos')">Opciones de Uso</button>` +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (tab==='especias' ? '<button class="btn btn-gold" onclick="Pages.formEspecia()">+ Especia</button><button class="btn btn-outline" style="border-color:var(--green);color:var(--green)" onclick="Pages.formImportarExcel()">Importar Recetas</button><button class="btn btn-outline" style="border-color:var(--blue);color:var(--blue)" onclick="Pages.exportarProductosExcel()">Exportar Excel</button><button class="btn btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="Pages.importarProductosExcel()">Importar Datos</button>' : '') +
@@ -492,6 +493,24 @@ const Pages = {
         if (tags.length === 0) h += '<span class="text-sm text-muted">Sin etiquetas de uso</span>';
         h += '</div></div>';
       }
+      h += '</div></div>';
+    }
+
+    // --- TAB: OPCIONES DE USO ---
+    if (tab === 'uso-opts') {
+      var usoOpts = ArcanoDB.getUsoOptions();
+      h += '<div class="card"><div class="card-body">';
+      h += '<h3 style="margin-bottom:12px">Opciones del campo "Uso" (preparaciones)</h3>';
+      h += '<p class="text-sm text-muted" style="margin-bottom:14px">Estas son las opciones que aparecen como checkboxes al editar un producto en el campo "Uso / Preparaciones".</p>';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+        '<input type="text" class="input" id="new-uso-opt" placeholder="Nueva opcion de uso..." style="flex:1;padding:6px 10px;font-size:.85rem" onkeydown="if(event.key===\'Enter\')Pages.doAddUsoOption()">' +
+        '<button class="btn btn-sm btn-gold" onclick="Pages.doAddUsoOption()">+ Agregar</button></div>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (var ui = 0; ui < usoOpts.length; ui++) {
+        h += '<span class="tag-chip-admin"><span>' + usoOpts[ui] + '</span><button onclick="Pages.doRemoveUsoOption(\'' + usoOpts[ui].replace(/'/g, "&apos;") + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1rem;padding:0 2px">X</button></span>';
+      }
+      if (usoOpts.length === 0) h += '<span class="text-sm text-muted">Sin opciones de uso</span>';
+      h += '</div>';
       h += '</div></div>';
     }
 
@@ -3956,13 +3975,17 @@ const Pages = {
      USO SELECTOR HELPER
      ================================================================ */
   buildUsoSelectorHtml(selectedUsos) {
-    var opciones = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
+    var opciones = ArcanoDB.getUsoOptions();
     var sel = selectedUsos || '';
     var selArr = typeof sel === 'string' ? sel.split(', ') : (sel || []);
     var h = '<div class="tag-selector" id="uso-selector">';
-    for (var i = 0; i < opciones.length; i++) {
-      var checked = selArr.indexOf(opciones[i]) >= 0 ? ' checked' : '';
-      h += '<label class="tag-chip"><input type="checkbox" value="' + opciones[i] + '"' + checked + '><span>' + opciones[i] + '</span></label>';
+    if (opciones.length === 0) {
+      h += '<p class="text-sm text-muted">No hay opciones de uso. Agrega desde la pestana "Opciones de Uso".</p>';
+    } else {
+      for (var i = 0; i < opciones.length; i++) {
+        var checked = selArr.indexOf(opciones[i]) >= 0 ? ' checked' : '';
+        h += '<label class="tag-chip"><input type="checkbox" value="' + opciones[i] + '"' + checked + '><span>' + opciones[i] + '</span></label>';
+      }
     }
     h += '</div>';
     return h;
@@ -4027,6 +4050,25 @@ const Pages = {
   doRemoveTag(cat, tagName) {
     if (confirm('Eliminar etiqueta de uso "' + tagName + '"? Se quitara de los productos que la tengan.')) {
       ArcanoDB.removeProductTag(cat, tagName);
+      App.renderPage('productos');
+    }
+  },
+
+  doAddUsoOption() {
+    var inp = document.getElementById('new-uso-opt');
+    if (!inp) return;
+    var name = inp.value.trim();
+    if (!name) return;
+    if (ArcanoDB.addUsoOption(name)) {
+      App.renderPage('productos');
+    } else {
+      alert('La opcion de uso ya existe.');
+    }
+  },
+
+  doRemoveUsoOption(optionName) {
+    if (confirm('Eliminar opcion de uso "' + optionName + '"?')) {
+      ArcanoDB.removeUsoOption(optionName);
       App.renderPage('productos');
     }
   },
