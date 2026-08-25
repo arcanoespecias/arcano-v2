@@ -4373,7 +4373,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links</button><button class="btn btn-sm btn-outline" onclick="Pages._processAllBlogImages()" style="float:right;margin-top:4px;margin-right:6px" title="Convierte imagenes base64 a archivos JPG optimizados">Procesar Imagenes</button></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links</button><button class="btn btn-sm btn-outline" onclick="Pages._regenerateAllBlogSEO()" style="float:right;margin-top:4px;margin-right:6px" title="Regenera paginas HTML estaticas para SEO">Regenerar SEO</button><button class="btn btn-sm btn-outline" onclick="Pages._processAllBlogImages()" style="float:right;margin-top:4px;margin-right:6px" title="Convierte imagenes base64 a archivos JPG optimizados">Procesar Imagenes</button></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
@@ -4818,6 +4818,7 @@ const Pages = {
         Pages._blogEditKey = null;
         Pages.descartarArticulo();
         Pages._loadBlogAdmin();
+        Pages._publishBlogSEO(updates);
       }
     });
   },
@@ -4834,6 +4835,7 @@ const Pages = {
         } else {
           if (status) status.innerHTML = '<span style="color:var(--green)">Publicado: ' + (articulo.titulo || '') + '</span>';
           Pages._loadBlogAdmin();
+          Pages._publishBlogSEO(articulo);
         }
         Pages.descartarArticulo();
       });
@@ -4973,6 +4975,56 @@ const Pages = {
         });
       }
       processNext(0);
+    });
+  },
+
+  _publishBlogSEO: function(post) {
+    var slug = Pages._titleToSlug(post.titulo);
+    if (!slug) return;
+    var BASE = 'https://arcanoespecias.github.io';
+    var descripcion = post.subtitulo || post.titulo || '';
+    var url = BASE + '/blog/' + slug + '.html';
+    var imagen = post.imagen_url || BASE + '/icons/logo.png';
+    if (imagen.indexOf('data:') === 0) imagen = BASE + '/icons/logo.png';
+    var fecha = post.fecha || new Date().toISOString().slice(0, 10);
+    var contenido = post.contenido || '';
+    contenido = contenido.replace(/src="data:image[^"]*"/g, 'src="' + BASE + '/icons/logo.png"');
+    var titulo = post.titulo || 'Articulo';
+    var esc = function(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var schema = '{"@context":"https://schema.org","@type":"Article","headline":' + JSON.stringify(titulo) + ',"description":' + JSON.stringify(descripcion) + ',"image":' + JSON.stringify(imagen) + ',"datePublished":' + JSON.stringify(fecha) + ',"author":{"@type":"Organization","name":"Arcano Especias"},"publisher":{"@type":"Organization","name":"Arcano Especias","logo":{"@type":"ImageObject","url":' + JSON.stringify(BASE + '/icons/logo.png') + '}},"mainEntityOfPage":' + JSON.stringify(url) + '}';
+    var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>' + esc(titulo) + ' \u2014 Arcano Especias</title>\n<meta name="description" content="' + esc(descripcion) + '">\n<link rel="canonical" href="' + url + '">\n<meta property="og:type" content="article">\n<meta property="og:title" content="' + esc(titulo) + '">\n<meta property="og:description" content="' + esc(descripcion) + '">\n<meta property="og:url" content="' + url + '">\n<meta property="og:image" content="' + imagen + '">\n<meta property="og:locale" content="es_CO">\n<meta property="og:site_name" content="Arcano Especias">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:title" content="' + esc(titulo) + '">\n<meta name="twitter:description" content="' + esc(descripcion) + '">\n<meta name="twitter:image" content="' + imagen + '">\n<script type="application/ld+json">' + schema + '<\/script>\n<style>body{margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#1b0b07;color:#f0e6d3;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:20px 16px}a{color:#c9a84c;text-decoration:none}a:hover{text-decoration:underline}h1{font-size:1.8rem;color:#c9a84c;margin-bottom:8px;line-height:1.3}.meta{color:#a08b6e;font-size:.85rem;margin-bottom:24px}.back{display:inline-block;margin-bottom:24px;padding:8px 16px;border:1px solid #c9a84c;border-radius:6px;color:#c9a84c;font-size:.85rem}.back:hover{background:#c9a84c;color:#1b0b07;text-decoration:none}img.hero{width:100%;border-radius:8px;margin-bottom:24px;max-height:400px;object-fit:cover}.content p{margin-bottom:16px}.content h2{color:#c9a84c;margin-top:32px;margin-bottom:12px}.content h3{color:#d4b86a;margin-top:24px;margin-bottom:8px}.content ul,.content ol{margin-bottom:16px;padding-left:24px}.content blockquote{border-left:3px solid #c9a84c;padding-left:16px;color:#a08b6e;margin:16px 0}.content a{color:#e8c95a}.footer{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #2d1a10;color:#6b5a42;font-size:.8rem}</style>\n</head>\n<body>\n<div class="container">\n<a href="' + BASE + '/" class="back">&larr; Volver a la tienda</a>\n<h1>' + esc(titulo) + '</h1>\n<div class="meta">' + esc(post.categoria || '') + ' &middot; ' + fecha + '</div>\n' + (imagen && imagen.indexOf('data:') !== 0 ? '<img class="hero" src="' + imagen + '" alt="' + esc(titulo) + '" loading="lazy">' : '') + '\n<div class="content">' + contenido + '</div>\n<div class="footer">Arcano Especias &mdash; Especias y Blends artesanales del mundo</div>\n</div>\n</body>\n</html>';
+    var path = 'blog/' + slug + '.html';
+    var base64 = btoa(unescape(encodeURIComponent(html)));
+    Pages._uploadToGitHub(path, base64).then(function() {
+      console.log('Blog SEO page published:', path);
+    }).catch(function(err) {
+      console.error('Blog SEO page failed:', err);
+    });
+  },
+
+  _regenerateAllBlogSEO: function() {
+    if (!confirm('Regenerar todas las paginas SEO del blog y el sitemap?')) return;
+    var statusEl = document.getElementById('ba-gen-status');
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Regenerando paginas SEO...</span>';
+    firebase.database().ref('arcano/db/blog').once('value', function(snap) {
+      var data = snap.val();
+      if (!data) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">No hay articulos.</span>'; return; }
+      var keys = Object.keys(data);
+      var posts = [];
+      for (var i = 0; i < keys.length; i++) {
+        posts.push(data[keys[i]]);
+      }
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Publicando ' + posts.length + ' paginas...</span>';
+      function next(idx) {
+        if (idx >= posts.length) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">' + posts.length + ' paginas SEO regeneradas.</span>';
+          return;
+        }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">(' + (idx + 1) + '/' + posts.length + ') ' + (posts[idx].titulo || '') + '</span>';
+        Pages._publishBlogSEO(posts[idx]);
+        setTimeout(function() { next(idx + 1); }, 1500);
+      }
+      next(0);
     });
   },
 
