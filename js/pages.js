@@ -3831,6 +3831,7 @@ const Pages = {
                       nombre: bU.nombre,
                       descripcion: bU.descripcion,
                       categoria: bU.categoria,
+                      uso: bU.uso || matchBl.uso || '',
                       precioChico: bU.precioChico,
                       precioGrande: bU.precioGrande,
                       enTienda: bU.enTienda,
