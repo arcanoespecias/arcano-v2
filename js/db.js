@@ -174,6 +174,25 @@ function _saveToFirebase() {
   }, 500);
 }
 
+function _saveToFirebaseNow(callback) {
+  if (!_firebaseRef) { if (callback) callback(null); return; }
+  clearTimeout(_saveTimer);
+  _localDirty = true;
+  try {
+    var safetyTimer = setTimeout(function() { _localDirty = false; if (callback) callback(new Error('Firebase save timeout')); }, 10000);
+    _firebaseRef.update(_db, function(error) {
+      clearTimeout(safetyTimer);
+      _localDirty = false;
+      if (callback) callback(error);
+      else if (error) console.error('[DB] Firebase save error:', error);
+    });
+  } catch (e) {
+    _localDirty = false;
+    if (callback) callback(e);
+    else console.error('[DB] Firebase save error:', e);
+  }
+}
+
 function writeField(path, value) {
   if (!_firebaseRef) return;
   try {
@@ -190,15 +209,25 @@ function saveNow() {
     if (!_firebaseRef) { resolve(false); return; }
     clearTimeout(_saveTimer);
     _localDirty = true;
+    var resolved = false;
+    var safetyTimer = setTimeout(function() {
+      if (!resolved) { resolved = true; _localDirty = false; console.warn('[DB] saveNow timeout - resolving false'); resolve(false); }
+    }, 10000);
     try {
       _firebaseRef.update(_db, function(error) {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(safetyTimer);
         _localDirty = false;
         if (error) { console.error('[DB] Firebase save error:', error); resolve(false); }
         else resolve(true);
       });
     } catch (e) {
-      console.error('[DB] Firebase save error:', e);
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(safetyTimer);
       _localDirty = false;
+      console.error('[DB] Firebase save error:', e);
       resolve(false);
     }
   });
