@@ -3815,7 +3815,7 @@ const Pages = {
                     precioChico: bU.precioChico,
                     precioGrande: bU.precioGrande,
                     enTienda: bU.enTienda,
-                    ingredientes: resolvedIngs
+                    ingredientes: resolvedIngs.length > 0 ? resolvedIngs : (existingBl.ingredientes || [])
                   });
                 } else {
                   var allBlends = ArcanoDB.getBlends();
@@ -3832,7 +3832,7 @@ const Pages = {
                       precioChico: bU.precioChico,
                       precioGrande: bU.precioGrande,
                       enTienda: bU.enTienda,
-                      ingredientes: resolvedIngs
+                      ingredientes: resolvedIngs.length > 0 ? resolvedIngs : (matchBl.ingredientes || [])
                     });
                   } else {
                     savedBl = ArcanoDB.saveBlend({
