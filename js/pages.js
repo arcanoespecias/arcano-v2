@@ -3793,16 +3793,18 @@ const Pages = {
                     resolvedIngs.push({
                       especiaId: espObj.id,
                       especiaNombre: espObj.nombre,
-                      gramos: ing.gramos
+                      gramosChico: Number(ing.gramosChico) || 0,
+                      gramosGrande: Number(ing.gramosGrande) || 0,
+                      gramosReceta: Number(ing.gramosChico) || 0
                     });
                   }
                 }
                 // Calculate gramosTotal
                 var grsTotal = 0;
-                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramos;
+                for (var gi = 0; gi < resolvedIngs.length; gi++) grsTotal += resolvedIngs[gi].gramosReceta;
                 for (var gi2 = 0; gi2 < resolvedIngs.length; gi2++) {
                   resolvedIngs[gi2].gramosTotal = grsTotal;
-                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramos / grsTotal) * 100) : 0;
+                  resolvedIngs[gi2].pct = grsTotal > 0 ? Math.round((resolvedIngs[gi2].gramosReceta / grsTotal) * 100) : 0;
                 }
 
                 var existingBl = bU.id ? ArcanoDB.getBlend(bU.id) : null;
@@ -3863,15 +3865,26 @@ const Pages = {
                 ArcanoDB.saveCostosInsumos(newCostos);
               }
 
-              previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
-                '<p class="text-green fw7 mb-8">Importacion completada</p>' +
-                '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
-                  '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
-                '</div>' +
-                '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
-              '</div></div>';
-              footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
+              // Force immediate save to Firebase and wait for confirmation
+              btn.textContent = 'Guardando en Firebase...';
+              ArcanoDB.saveNow().then(function(ok) {
+                if (ok) {
+                  previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                    '<p class="text-green fw7 mb-8">Importacion completada y guardada</p>' +
+                    '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">' +
+                      '<div class="stat-card"><div class="stat-value" style="color:var(--green)">' + espOk + '</div><div class="stat-label">Especias Procesadas</div></div>' +
+                      '<div class="stat-card"><div class="stat-value" style="color:var(--blue)">' + blOk + '</div><div class="stat-label">Blends Procesados</div></div>' +
+                    '</div>' +
+                    '<p class="text-sm text-muted mt-12">Los productos nuevos fueron creados y los existentes actualizados. Los stocks no se modificaron.</p>' +
+                  '</div></div>';
+                } else {
+                  previewDiv.innerHTML = '<div class="card"><div class="card-body">' +
+                    '<p class="text-red fw7 mb-8">Error al guardar en Firebase</p>' +
+                    '<p class="text-sm text-muted">Los datos se procesaron pero no se pudieron guardar. Intenta de nuevo o verifica tu conexion.</p>' +
+                  '</div></div>';
+                }
+                footerDiv.innerHTML = '<button class="btn btn-gold" onclick="this.closest(\'.modal-overlay\').remove();App.renderPage(\'productos\')">Cerrar</button>';
+              });
 
             } catch (err) {
               previewDiv.innerHTML += '<p class="text-red mt-8">Error: ' + err.message + '</p>';
