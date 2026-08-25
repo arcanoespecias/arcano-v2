@@ -4114,6 +4114,7 @@ const Pages = {
       '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>';
     container.innerHTML = h;
+    Pages._loadGeminiKey('ra-groq-key', 'ra-key-status');
     Pages._loadRecetasAdmin();
   },
 
@@ -4124,6 +4125,7 @@ const Pages = {
     var statusEl = document.getElementById('ra-key-status');
     if (!key) { if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>'; return; }
     localStorage.setItem('arcano_gemini_key', key);
+    firebase.database().ref('arcano/db/config/gemini_key').set(key);
     if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
   },
 
@@ -4376,6 +4378,7 @@ const Pages = {
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
     container.innerHTML = h;
+    Pages._loadGeminiKey('ba-gemini-key', 'ba-key-status');
     Pages._loadBlogAdmin();
   },
 
@@ -4386,7 +4389,23 @@ const Pages = {
     var statusEl = document.getElementById('ba-key-status');
     if (!key) { if (statusEl) statusEl.innerHTML = ' <span style="color:var(--red)">vacia</span>'; return; }
     localStorage.setItem('arcano_gemini_key', key);
+    firebase.database().ref('arcano/db/config/gemini_key').set(key);
     if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+  },
+
+  _loadGeminiKey: function(inputId, statusId) {
+    var inp = document.getElementById(inputId);
+    var statusEl = document.getElementById(statusId);
+    var localKey = localStorage.getItem('arcano_gemini_key') || '';
+    if (inp && localKey) inp.value = localKey;
+    firebase.database().ref('arcano/db/config/gemini_key').once('value', function(snap) {
+      var fbKey = snap.val();
+      if (fbKey) {
+        localStorage.setItem('arcano_gemini_key', fbKey);
+        if (inp) inp.value = fbKey;
+        if (statusEl) statusEl.innerHTML = ' <span style="color:var(--green)">guardada</span>';
+      }
+    });
   },
 
   _loadBlogAdmin: function() {
