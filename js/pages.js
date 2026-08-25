@@ -3635,14 +3635,15 @@ const Pages = {
                   precioChico: Number(row[4]) || 0,
                   precioGrande: Number(row[5]) || 0,
                   enTienda: String(row[8] || '').toLowerCase() === 'si',
+                  uso: String(row[9] || '').trim(),
                   ingredientes: []
                 };
               }
-              if (currentBlId && row[9]) {
+              if (currentBlId && row[10]) {
                 blUpdates[currentBlId].ingredientes.push({
-                  especiaNombre: String(row[9] || '').trim(),
-                  gramosChico: Number(row[10]) || 0,
-                  gramosGrande: Number(row[11]) || 0
+                  especiaNombre: String(row[10] || '').trim(),
+                  gramosChico: Number(row[11]) || 0,
+                  gramosGrande: Number(row[12]) || 0
                 });
               }
             }
@@ -3812,6 +3813,7 @@ const Pages = {
                     nombre: bU.nombre || existingBl.nombre,
                     descripcion: bU.descripcion || existingBl.descripcion || '',
                     categoria: bU.categoria || existingBl.categoria,
+                    uso: bU.uso || existingBl.uso || '',
                     precioChico: bU.precioChico,
                     precioGrande: bU.precioGrande,
                     enTienda: bU.enTienda,
