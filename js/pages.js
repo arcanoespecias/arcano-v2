@@ -2748,13 +2748,6 @@ const Pages = {
       '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
       '</div>';
 
-    // Boton Regenerar SEO
-    h += '<div class="card mt-16"><div class="card-header"><h3>SEO Tienda</h3></div><div class="card-body">' +
-      '<p class="text-sm text-muted mb-12">Actualiza el HTML estatico de la tienda para que los buscadores puedan leer los productos sin ejecutar JavaScript. Ejecuta despues de agregar, eliminar o modificar productos en tienda.</p>' +
-      '<button class="btn btn-gold" id="btn-regenerar-seo" onclick="Pages.regenerarSEO()">Regenerar SEO Tienda</button>' +
-      '<span id="seo-status" class="ml-8 text-sm"></span>' +
-      '</div></div>';
-
     h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
     if (productos.length === 0) {
       h += '<p class="text-muted text-center">No hay productos visibles. Activa "Tienda" en Productos > Editar.</p>';
@@ -4407,7 +4400,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links</button><button class="btn btn-sm btn-outline" onclick="Pages._regenerateAllBlogSEO()" style="float:right;margin-top:4px;margin-right:6px" title="Regenera paginas HTML estaticas para SEO">Regenerar SEO</button><button class="btn btn-sm btn-outline" onclick="Pages._processAllBlogImages()" style="float:right;margin-top:4px;margin-right:6px" title="Convierte imagenes base64 a archivos JPG optimizados">Procesar Imagenes</button></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px"></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
