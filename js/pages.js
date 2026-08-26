@@ -4921,7 +4921,7 @@ const Pages = {
     var token = Pages._getGHToken();
     var repo = 'arcanoespecias/arcanoespecias.github.io';
     var apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
-    return fetch(apiBase + '?ref=main', {
+    return fetch(apiBase + '?ref=main&_t=' + Date.now(), {
       headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
     })
     .then(function(res) {
