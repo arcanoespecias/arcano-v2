@@ -4400,7 +4400,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px"></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
