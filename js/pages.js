@@ -3532,7 +3532,7 @@ const Pages = {
       for (var ii = 0; ii < blIngs.length; ii++) {
         var bing = blIngs[ii];
         var cGr = (costos.especias && costos.especias[bing.especiaId]) || 0;
-        costoTotal += cGr * (bing.gramos || 0);
+        costoTotal += cGr * (bing.gramosChico || 0);
       }
       resRows.push([bl.nombre, Math.round(costoTotal), blIngs.length > 0 ? blIngs[0].gramosTotal : 0, Math.round(costoTotal) || '', '']);
     }
