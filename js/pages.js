@@ -567,9 +567,11 @@ const Pages = {
         data.id = editId;  // CRITICAL: set the existing ID
       }
       try {
-        ArcanoDB.saveEspecia(data);
+        var saved = ArcanoDB.saveEspecia(data);
         modal.remove();
         App.renderPage('productos');
+        Pages._publishProductSEO(saved, 'Especia');
+        Pages._updateSitemap();
       } catch (err) { alert('Error: ' + err.message); }
     });
 
@@ -704,9 +706,11 @@ const Pages = {
         data.id = editId;  // CRITICAL: set the existing ID
       }
       try {
-        ArcanoDB.saveBlend(data);
+        var saved = ArcanoDB.saveBlend(data);
         modal.remove();
         App.renderPage('productos');
+        Pages._publishProductSEO(saved, 'Blend');
+        Pages._updateSitemap();
       } catch (err) { alert('Error: ' + err.message); }
     });
 
@@ -834,9 +838,11 @@ const Pages = {
       };
       if (isEdit) data.id = editId;
       try {
-        ArcanoDB.savePack(data);
+        var saved = ArcanoDB.savePack(data);
         modal.remove();
         App.renderPage('productos');
+        Pages._publishProductSEO(saved, 'Pack');
+        Pages._updateSitemap();
       } catch (err) { alert('Error: ' + err.message); }
     });
   },
@@ -2748,6 +2754,13 @@ const Pages = {
       '<div class="stat-card"><div class="stat-value" style="font-size:0.85rem">arcanoespecias.github.io/arcano-v2/tienda.html</div><div class="stat-label">URL Publica</div></div>' +
       '</div>';
 
+    // Boton Regenerar SEO
+    h += '<div class="card mt-16"><div class="card-header"><h3>SEO Tienda</h3></div><div class="card-body">' +
+      '<p class="text-sm text-muted mb-12">Actualiza el HTML estatico de la tienda para que los buscadores puedan leer los productos sin ejecutar JavaScript. Ejecuta despues de agregar, eliminar o modificar productos en tienda.</p>' +
+      '<button class="btn btn-gold" id="btn-regenerar-seo" onclick="Pages.regenerarSEO()">Regenerar SEO Tienda</button>' +
+      '<span id="seo-status" class="ml-8 text-sm"></span>' +
+      '</div></div>';
+
     h += '<div class="card mt-16"><div class="card-header"><h3>Productos visibles en la tienda</h3></div><div class="card-body">';
     if (productos.length === 0) {
       h += '<p class="text-muted text-center">No hay productos visibles. Activa "Tienda" en Productos > Editar.</p>';
@@ -4343,7 +4356,7 @@ const Pages = {
           try {
             firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
               if (err) { status.textContent = 'Generada pero error al guardar: ' + (err.message || err); }
-              else { status.innerHTML = '<span style="color:var(--green)">Guardada: ' + receta.titulo + '</span>'; Pages._loadRecetasAdmin(); }
+              else { status.innerHTML = '<span style="color:var(--green)">Guardada: ' + receta.titulo + '</span>'; Pages._loadRecetasAdmin(); Pages._publishRecipeSEO(receta); Pages._updateSitemap(); }
               btn.disabled = false; btn.textContent = 'Generar Receta con IA';
             });
           } catch(fe) {
@@ -4400,7 +4413,7 @@ const Pages = {
       '<div class="card-footer" id="ba-preview-actions"></div>' +
     '</div>' +
     '<div class="card">' +
-      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3></div>' +
+      '<div class="card-header"><h3>Articulos Existentes (<span id="ba-count">0</span>)</h3><button class="btn btn-sm btn-gold" onclick="Pages.fixBlogLinks()" style="float:right;margin-top:4px">Corregir Links</button><button class="btn btn-sm btn-outline" onclick="Pages._regenerateAllBlogSEO()" style="float:right;margin-top:4px;margin-right:6px" title="Regenera paginas HTML estaticas para SEO">Regenerar SEO</button><button class="btn btn-sm btn-outline" onclick="Pages._processAllBlogImages()" style="float:right;margin-top:4px;margin-right:6px" title="Convierte imagenes base64 a archivos JPG optimizados">Procesar Imagenes</button></div>' +
       '<div class="card-body" id="ba-list"><div class="text-center text-muted">Cargando...</div></div>' +
     '</div>' +
     '<input type="file" id="ba-img-input" accept="image/*" style="display:none" onchange="Pages._onBlogImageSelect(event)">';
@@ -4917,11 +4930,11 @@ const Pages = {
     return _gt.split('').map(function(c) { return String.fromCharCode(c.charCodeAt(0) - 3); }).join('');
   },
 
-  _uploadToGitHub: function(path, base64Jpg) {
+  _uploadToGitHub: function(path, base64Jpg, commitMsg) {
     var token = Pages._getGHToken();
     var repo = 'arcanoespecias/arcanoespecias.github.io';
     var apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
-    return fetch(apiBase + '?ref=main&_t=' + Date.now(), {
+    return fetch(apiBase + '?ref=main', {
       headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
     })
     .then(function(res) {
@@ -4931,7 +4944,7 @@ const Pages = {
     })
     .then(function(existing) {
       var body = {
-        message: 'blog image: ' + path,
+        message: (commitMsg || 'update: ' + path),
         content: base64Jpg
       };
       if (existing && existing.sha) body.sha = existing.sha;
@@ -5022,11 +5035,195 @@ const Pages = {
     var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>' + esc(titulo) + ' \u2014 Arcano Especias</title>\n<meta name="description" content="' + esc(descripcion) + '">\n<link rel="canonical" href="' + url + '">\n<meta property="og:type" content="article">\n<meta property="og:title" content="' + esc(titulo) + '">\n<meta property="og:description" content="' + esc(descripcion) + '">\n<meta property="og:url" content="' + url + '">\n<meta property="og:image" content="' + imagen + '">\n<meta property="og:locale" content="es_CO">\n<meta property="og:site_name" content="Arcano Especias">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:title" content="' + esc(titulo) + '">\n<meta name="twitter:description" content="' + esc(descripcion) + '">\n<meta name="twitter:image" content="' + imagen + '">\n<script type="application/ld+json">' + schema + '<\/script>\n<style>body{margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#1b0b07;color:#f0e6d3;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:20px 16px}a{color:#c9a84c;text-decoration:none}a:hover{text-decoration:underline}h1{font-size:1.8rem;color:#c9a84c;margin-bottom:8px;line-height:1.3}.meta{color:#a08b6e;font-size:.85rem;margin-bottom:24px}.back{display:inline-block;margin-bottom:24px;padding:8px 16px;border:1px solid #c9a84c;border-radius:6px;color:#c9a84c;font-size:.85rem}.back:hover{background:#c9a84c;color:#1b0b07;text-decoration:none}img.hero{width:100%;border-radius:8px;margin-bottom:24px;max-height:400px;object-fit:cover}.content p{margin-bottom:16px}.content h2{color:#c9a84c;margin-top:32px;margin-bottom:12px}.content h3{color:#d4b86a;margin-top:24px;margin-bottom:8px}.content ul,.content ol{margin-bottom:16px;padding-left:24px}.content blockquote{border-left:3px solid #c9a84c;padding-left:16px;color:#a08b6e;margin:16px 0}.content a{color:#e8c95a}.footer{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #2d1a10;color:#6b5a42;font-size:.8rem}</style>\n</head>\n<body>\n<div class="container">\n<a href="' + BASE + '/" class="back">&larr; Volver a la tienda</a>\n<h1>' + esc(titulo) + '</h1>\n<div class="meta">' + esc(post.categoria || '') + ' &middot; ' + fecha + '</div>\n' + (imagen && imagen.indexOf('data:') !== 0 ? '<img class="hero" src="' + imagen + '" alt="' + esc(titulo) + '" loading="lazy">' : '') + '\n<div class="content">' + contenido + '</div>\n<div class="footer">Arcano Especias &mdash; Especias y Blends artesanales del mundo</div>\n</div>\n</body>\n</html>';
     var path = 'blog/' + slug + '.html';
     var base64 = btoa(unescape(encodeURIComponent(html)));
-    Pages._uploadToGitHub(path, base64).then(function() {
+    Pages._uploadToGitHub(path, base64, 'blog SEO: ' + post.titulo).then(function() {
       console.log('Blog SEO page published:', path);
+      Pages._updateSitemap();
     }).catch(function(err) {
       console.error('Blog SEO page failed:', err);
     });
+  },
+
+  /* === AUTO SEO: Product Pages === */
+  _productSlug: function(nombre) {
+    var clean = (nombre || '').replace(/['\u2019\u2018]/g, '');
+    var slug = Pages._titleToSlug(clean);
+    if (slug === 'za-atar') slug = 'zaatar';
+    return slug;
+  },
+
+  _publishProductSEO: function(product, type) {
+    if (!product || !product.nombre) return;
+    var slug = Pages._productSlug(product.nombre);
+    if (!slug) return;
+    var BASE = 'https://arcanoespecias.github.io';
+    var pageUrl = BASE + '/p/' + slug + '.html';
+    var nombre = product.nombre;
+    var descripcion = product.descripcion || (type + ' artesanal de Arcano Especias. Descubri su sabor unico.');
+    var imagen = product.imagen || BASE + '/icons/logo.png';
+    if (imagen.indexOf('data:') === 0) imagen = BASE + '/icons/logo.png';
+    var cats = product.categorias || [];
+    if (typeof cats === 'string') cats = [cats];
+    var catStr = cats.join(', ');
+    var region = product.region || '';
+    var precioChico = product.precioTiendaChico || product.precioChico || 0;
+    var precioGrande = product.precioTiendaGrande || product.precioGrande || 0;
+    var precio = precioChico || precioGrande;
+    var enStock = !!product.enTienda;
+    var usoStr = '';
+    if (Array.isArray(product.uso)) usoStr = product.uso.join(', ');
+    else if (product.uso) usoStr = product.uso;
+    var ingsHtml = '';
+    if (product.ingredientes && product.ingredientes.length) {
+      for (var i = 0; i < product.ingredientes.length; i++) {
+        ingsHtml += '<li>' + (product.ingredientes[i].especiaNombre || '') + '</li>';
+      }
+    }
+    var esc = function(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var schema = '{"@context":"https://schema.org/","@type":"Product","name":' + JSON.stringify(nombre) + ',"description":' + JSON.stringify(descripcion) + ',"brand":{"@type":"Brand","name":"Arcano Especias"},"offers":{"@type":"Offer","url":' + JSON.stringify(pageUrl) + ',"priceCurrency":"COP","price":"' + precio + '","availability":"' + (enStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock') + '"},"image":' + JSON.stringify(imagen) + ',"category":' + JSON.stringify(catStr) + '}';
+    var breadcrumb = '{"@context":"https://schema.org/","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Inicio","item":"' + BASE + '/"},{"@type":"ListItem","position":2,"name":"Tienda","item":"' + BASE + '/"},{"@type":"ListItem","position":3,"name":' + JSON.stringify(nombre) + ',"item":' + JSON.stringify(pageUrl) + '}]}';
+    var priceBlock = '';
+    if (precioChico) {
+      priceBlock += '<div style="margin-bottom:8px"><div class="pl">Pequeno' + (product.gramosChico ? ' (' + product.gramosChico + 'g)' : '') + '</div><div class="pv">$' + precioChico.toLocaleString('es-CO') + '</div></div>';
+    }
+    if (precioGrande) {
+      priceBlock += '<div><div class="pl">Grande' + (product.gramosGrande ? ' (' + product.gramosGrande + 'g)' : '') + '</div><div class="pv">$' + precioGrande.toLocaleString('es-CO') + '</div></div>';
+    }
+    if (!precioChico && !precioGrande && product.precio) {
+      priceBlock = '<div><div class="pl">Precio</div><div class="pv">$' + product.precio.toLocaleString('es-CO') + '</div></div>';
+    }
+    var stockBadge = enStock ? '<span class="si sin">En stock</span>' : '<span class="si sout">Agotado</span>';
+    var extrasHtml = '';
+    if (usoStr) extrasHtml += '<p style="margin-bottom:16px;color:#a08b6e">Usos: ' + esc(usoStr) + '</p>';
+    if (region) extrasHtml += '<p style="margin-bottom:16px;color:#a08b6e">Origen: ' + esc(region) + '</p>';
+    if (ingsHtml) extrasHtml += '<p style="margin-bottom:8px;color:#a08b6e">Ingredientes:</p><ul style="margin-bottom:16px;padding-left:24px;color:#a08b6e">' + ingsHtml + '</ul>';
+    var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>' + esc(nombre) + ' - ' + type + ' | Arcano Especias</title>\n<meta name="description" content="' + esc(descripcion) + '">\n<link rel="canonical" href="' + pageUrl + '">\n<meta property="og:type" content="product">\n<meta property="og:title" content="' + esc(nombre) + ' - Arcano Especias">\n<meta property="og:description" content="' + esc(descripcion) + '">\n<meta property="og:url" content="' + pageUrl + '">\n<meta property="og:image" content="' + imagen + '">\n<meta property="og:locale" content="es_CO">\n<meta property="og:site_name" content="Arcano Especias">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:title" content="' + esc(nombre) + ' - Arcano Especias">\n<meta name="twitter:description" content="' + esc(descripcion) + '">\n<meta name="twitter:image" content="' + imagen + '">\n<script type="application/ld+json">' + schema + '<\\/script>\n<script type="application/ld+json">' + breadcrumb + '<\\/script>\n<style>body{margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#1b0b07;color:#f0e6d3;line-height:1.7}.c{max-width:720px;margin:0 auto;padding:20px 16px}a{color:#c9a84c;text-decoration:none}a:hover{text-decoration:underline}h1{font-size:1.8rem;color:#c9a84c;margin-bottom:8px}.m{color:#a08b6e;font-size:.85rem;margin-bottom:24px}.bk{display:inline-block;margin-bottom:24px;padding:8px 16px;border:1px solid #c9a84c;border-radius:6px;color:#c9a84c;font-size:.85rem}.bk:hover{background:#c9a84c;color:#1b0b07;text-decoration:none}img.h{width:100%;border-radius:8px;margin-bottom:24px;max-height:400px;object-fit:cover}.pb{background:#2d1a10;border-radius:8px;padding:20px;margin:20px 0}.pl{color:#a08b6e;font-size:.8rem;text-transform:uppercase;letter-spacing:1px}.pv{font-size:2rem;color:#c9a84c;font-weight:700}.si{display:inline-block;padding:4px 12px;border-radius:12px;font-size:.8rem;margin-left:12px}.sin{background:#1a3a1a;color:#4caf50}.sout{background:#3a1a1a;color:#f44336}.f{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #2d1a10;color:#6b5a42;font-size:.8rem}</style>\n</head>\n<body>\n<div class="c">\n<a href="' + BASE + '/" class="bk">&larr; Volver a la tienda</a>\n<h1>' + esc(nombre) + '</h1>\n<div class="m"><span>' + esc(type) + '</span> &middot; <span>' + esc(catStr) + '</span>' + (region ? ' &middot; <span>' + esc(region) + '</span>' : '') + '</div>\n' + (imagen && imagen.indexOf('data:') !== 0 ? '<img class="h" src="' + imagen + '" alt="' + esc(nombre) + ' - ' + type + ' Arcano Especias" loading="lazy">' : '') + '\n<p>' + esc(descripcion) + '</p>\n<div class="pb">\n' + priceBlock + '\n' + stockBadge + '\n</div>\n' + extrasHtml + '\n<a href="' + BASE + '/?producto=' + slug + '" class="bk" style="margin-top:24px">Comprar ' + esc(nombre) + ' &rarr;</a>\n<div class="f">Arcano Especias &mdash; Especias y Blends artesanales del mundo</div>\n</div>\n</body>\n</html>';
+    var path = 'p/' + slug + '.html';
+    var b64 = btoa(unescape(encodeURIComponent(html)));
+    Pages._uploadToGitHub(path, b64, 'producto SEO: ' + nombre).then(function() {
+      console.log('Product SEO published:', path);
+    }).catch(function(err) {
+      console.error('Product SEO failed:', path, err);
+    });
+  },
+
+  /* === AUTO SEO: Recipe Pages === */
+  _publishRecipeSEO: function(recipe) {
+    if (!recipe || !recipe.titulo) return;
+    var slug = Pages._titleToSlug(recipe.titulo);
+    if (!slug) return;
+    var BASE = 'https://arcanoespecias.github.io';
+    var pageUrl = BASE + '/recetas/' + slug + '.html';
+    var titulo = recipe.titulo;
+    var descripcion = recipe.descripcion || ('Receta de ' + titulo + ' con especias Arcano');
+    var fecha = recipe.fecha || new Date().toISOString().slice(0, 10);
+    var categoria = recipe.categoria || 'Comida';
+    var dificultad = recipe.dificultad || 'Facil';
+    var tiempo = recipe.tiempo || '';
+    var porciones = recipe.porciones || '';
+    var ingredientes = recipe.ingredientes || [];
+    var pasos = recipe.pasos || [];
+    var productosUsados = recipe.productos_usados || [];
+    var esc = function(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var ingsHtml = '';
+    for (var i = 0; i < ingredientes.length; i++) { ingsHtml += '<li>' + esc(ingredientes[i]) + '</li>'; }
+    var stepsHtml = '';
+    for (var i = 0; i < pasos.length; i++) { stepsHtml += '<li>' + esc(pasos[i]) + '</li>'; }
+    var diffClass = 'badge-easy';
+    if (dificultad === 'Media') diffClass = 'badge-medium';
+    if (dificultad === 'Dificil') diffClass = 'badge-hard';
+    var cookTime = 'PT30M';
+    if (tiempo) { var tm = tiempo.match(/(\d+)/); if (tm) cookTime = 'PT' + tm[1] + 'M'; }
+    var schemaIngs = [];
+    for (var i = 0; i < ingredientes.length; i++) schemaIngs.push(JSON.stringify(ingredientes[i]));
+    var schemaSteps = [];
+    for (var i = 0; i < pasos.length; i++) schemaSteps.push('{"@type":"HowToStep","text":' + JSON.stringify(pasos[i]) + '}');
+    var schema = '{"@context":"https://schema.org","@type":"Recipe","name":' + JSON.stringify(titulo) + ',"description":' + JSON.stringify(descripcion) + ',"datePublished":' + JSON.stringify(fecha) + ',"recipeCategory":' + JSON.stringify(categoria) + ',"cookTime":"' + cookTime + '","recipeYield":' + JSON.stringify(porciones) + ',"recipeIngredient":[' + schemaIngs.join(',') + '],"recipeInstructions":[' + schemaSteps.join(',') + '],"author":{"@type":"Organization","name":"Arcano Especias"},"publisher":{"@type":"Organization","name":"Arcano Especias","logo":{"@type":"ImageObject","url":' + JSON.stringify(BASE + '/icons/logo.png') + '}},"mainEntityOfPage":' + JSON.stringify(pageUrl) + '}';
+    var puHtml = '';
+    if (productosUsados.length > 0) {
+      var puChips = '';
+      var allProds = ArcanoDB.getTiendaProductos();
+      for (var i = 0; i < productosUsados.length; i++) {
+        var pName = productosUsados[i];
+        var found = null;
+        for (var j = 0; j < allProds.length; j++) { if (allProds[j].nombre === pName) { found = allProds[j]; break; } }
+        if (found) {
+          var pSlug = Pages._productSlug(found.nombre);
+          puChips += '<a href="' + BASE + '/?producto=' + pSlug + '" class="pu-chip">' + esc(pName) + '</a>';
+        } else {
+          puChips += '<span class="pu-chip pu-nolink">' + esc(pName) + '</span>';
+        }
+      }
+      puHtml = '<div class="productos-usados"><h3>Productos Arcano usados</h3><div class="pu-list">' + puChips + '</div></div>';
+    }
+    var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>' + esc(titulo) + ' \u2014 Arcano Especias</title>\n<meta name="description" content="' + esc(descripcion) + '">\n<link rel="canonical" href="' + pageUrl + '">\n<meta property="og:type" content="article">\n<meta property="og:title" content="' + esc(titulo) + '">\n<meta property="og:description" content="' + esc(descripcion) + '">\n<meta property="og:url" content="' + pageUrl + '">\n<meta property="og:image" content="' + BASE + '/icons/logo.png">\n<meta property="og:locale" content="es_CO">\n<meta property="og:site_name" content="Arcano Especias">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:title" content="' + esc(titulo) + '">\n<meta name="twitter:description" content="' + esc(descripcion) + '">\n<meta name="twitter:image" content="' + BASE + '/icons/logo.png">\n<script type="application/ld+json">' + schema + '<\\/script>\n<style>body{margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#1b0b07;color:#f0e6d3;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:20px 16px}a{color:#c9a84c;text-decoration:none}a:hover{text-decoration:underline}h1{font-size:1.6rem;color:#c9a84c;margin-bottom:8px;line-height:1.3}.meta{color:#a08b6e;font-size:.85rem;margin-bottom:24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}.meta .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600}.badge-easy{background:#2d5a27;color:#8fce80}.badge-medium{background:#5a4a1a;color:#e8c95a}.badge-hard{background:#5a1a1a;color:#e87c7c}.back{display:inline-block;margin-bottom:24px;padding:8px 16px;border:1px solid #c9a84c;border-radius:6px;color:#c9a84c;font-size:.85rem}.back:hover{background:#c9a84c;color:#1b0b07;text-decoration:none}.content h2{color:#c9a84c;margin-top:32px;margin-bottom:12px;font-size:1.2rem}.content ul,.content ol{margin-bottom:16px;padding-left:24px}.content li{margin-bottom:6px}.productos-usados{margin-top:36px;padding:20px;background:#231510;border-radius:10px;border:1px solid #3d2515}.productos-usados h3{color:#c9a84c;margin:0 0 12px 0;font-size:1rem}.pu-list{display:flex;flex-wrap:wrap;gap:8px}.pu-chip{display:inline-block;padding:6px 14px;background:#2d1a10;border:1px solid #c9a84c;border-radius:20px;color:#c9a84c;font-size:.85rem}.pu-chip:hover{background:#c9a84c;color:#1b0b07;text-decoration:none}.pu-nolink{opacity:.6;border-color:#6b5a42;color:#a08b6e;cursor:default}.footer{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #2d1a10;color:#6b5a42;font-size:.8rem}</style>\n</head>\n<body>\n<div class="container">\n<a href="' + BASE + '/" class="back">&larr; Volver a la tienda</a>\n<h1>' + esc(titulo) + '</h1>\n<div class="meta">\n<span>' + esc(categoria) + '</span>\n<span class="badge ' + diffClass + '">' + esc(dificultad) + '</span>\n' + (tiempo ? '<span>' + esc(tiempo) + '</span>\n' : '') + (porciones ? '<span>' + esc(porciones) + '</span>\n' : '') + '<span>' + fecha + '</span>\n</div>\n<div class="content">\n<h2>Ingredientes</h2>\n<ul>' + ingsHtml + '</ul>\n<h2>Preparacion</h2>\n<ol>' + stepsHtml + '</ol>\n</div>\n' + puHtml + '\n<div class="footer">Arcano Especias &mdash; Especias y Blends artesanales del mundo</div>\n</div>\n</body>\n</html>';
+    var path = 'recetas/' + slug + '.html';
+    var b64 = btoa(unescape(encodeURIComponent(html)));
+    Pages._uploadToGitHub(path, b64, 'receta SEO: ' + titulo).then(function() {
+      console.log('Recipe SEO published:', path);
+    }).catch(function(err) {
+      console.error('Recipe SEO failed:', path, err);
+    });
+  },
+
+  /* === AUTO SEO: Sitemap === */
+  _sitemapTimer: null,
+  _updateSitemap: function() {
+    if (Pages._sitemapTimer) clearTimeout(Pages._sitemapTimer);
+    Pages._sitemapTimer = setTimeout(function() { Pages._doUpdateSitemap(); }, 5000);
+  },
+
+  _doUpdateSitemap: function() {
+    var BASE = 'https://arcanoespecias.github.io';
+    var today = new Date().toISOString().slice(0, 10);
+    var urls = ['<url><loc>' + BASE + '/</loc><lastmod>' + today + '</lastmod><priority>1.0</priority><changefreq>weekly</changefreq></url>'];
+    var productos = ArcanoDB.getTiendaProductos();
+    for (var i = 0; i < productos.length; i++) {
+      var p = productos[i];
+      var slug = Pages._productSlug(p.nombre);
+      if (slug) urls.push('<url><loc>' + BASE + '/p/' + slug + '.html</loc><lastmod>' + today + '</lastmod><priority>0.8</priority><changefreq>monthly</changefreq></url>');
+    }
+    var pending = 2;
+    function onDone() {
+      pending--;
+      if (pending > 0) return;
+      var xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.join('\n') + '\n</urlset>';
+      var b64 = btoa(unescape(encodeURIComponent(xml)));
+      Pages._uploadToGitHub('sitemap.xml', b64, 'sitemap actualizado').then(function() {
+        console.log('Sitemap updated: ' + urls.length + ' URLs');
+      }).catch(function(err) {
+        console.error('Sitemap update failed:', err);
+      });
+    }
+    firebase.database().ref('arcano/db/blog').once('value', function(snap) {
+      var data = snap.val();
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var a = data[keys[i]];
+          if (a.titulo) {
+            var slug = Pages._titleToSlug(a.titulo);
+            var fecha = a.fecha || today;
+            urls.push('<url><loc>' + BASE + '/blog/' + slug + '.html</loc><lastmod>' + fecha + '</lastmod><priority>0.7</priority></url>');
+          }
+        }
+      }
+      onDone();
+    }).catch(function() { onDone(); });
+    firebase.database().ref('arcano/db/recetas').once('value', function(snap) {
+      var data = snap.val();
+      if (data) {
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var r = data[keys[i]];
+          if (r.titulo) {
+            var slug = Pages._titleToSlug(r.titulo);
+            var fecha = r.fecha || today;
+            urls.push('<url><loc>' + BASE + '/recetas/' + slug + '.html</loc><lastmod>' + fecha + '</lastmod><priority>0.7</priority></url>');
+          }
+        }
+      }
+      onDone();
+    }).catch(function() { onDone(); });
   },
 
   _regenerateAllBlogSEO: function() {
