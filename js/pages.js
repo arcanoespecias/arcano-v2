@@ -3473,7 +3473,7 @@ const Pages = {
       var b = blends[j];
       var ings = b.ingredientes || [];
       if (ings.length === 0) {
-        blRows.push([b.id, b.nombre, b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', b.uso || '', '', '', '', '', '', '']);
+        blRows.push([b.id, b.nombre, b.descripcion || '', b.categoria || '', b.precioChico || 0, b.precioGrande || 0, b.stockChico || 0, b.stockGrande || 0, b.enTienda ? 'Si' : 'No', b.uso || '', '', '', '', '', '', '']);
       } else {
         for (var k = 0; k < ings.length; k++) {
           var ing = ings[k];
@@ -3592,9 +3592,15 @@ const Pages = {
           var data = new Uint8Array(e.target.result);
           var wb = XLSX.read(data, { type: 'array' });
 
-          // Parse ESPECIAS
+          // Parse ESPECIAS (try 'Especias' then case-insensitive fallback)
           var espUpdates = [];
-          var espSheet = wb.Sheets['Especias'];
+          var espSheet = wb.Sheets['Especias'] || wb.Sheets['ESPECIAS'] || wb.Sheets['especias'];
+          if (!espSheet) {
+            var sNamesE = Object.keys(wb.Sheets);
+            for (var sei = 0; sei < sNamesE.length; sei++) {
+              if (sNamesE[sei].toLowerCase() === 'especias') { espSheet = wb.Sheets[sNamesE[sei]]; break; }
+            }
+          }
           if (espSheet) {
             var espData = XLSX.utils.sheet_to_json(espSheet, { header: 1 });
             for (var i = 1; i < espData.length; i++) {
@@ -3616,9 +3622,15 @@ const Pages = {
             }
           }
 
-          // Parse BLENDS
+          // Parse BLENDS (try 'Blends' then case-insensitive fallback)
           var blUpdates = {};
-          var blSheet = wb.Sheets['Blends'];
+          var blSheet = wb.Sheets['Blends'] || wb.Sheets['BLENDS'] || wb.Sheets['blends'];
+          if (!blSheet) {
+            var sNames = Object.keys(wb.Sheets);
+            for (var si = 0; si < sNames.length; si++) {
+              if (sNames[si].toLowerCase() === 'blends') { blSheet = wb.Sheets[sNames[si]]; break; }
+            }
+          }
           if (blSheet) {
             var blData = XLSX.utils.sheet_to_json(blSheet, { header: 1 });
             var currentBlId = null;
@@ -3649,10 +3661,16 @@ const Pages = {
             }
           }
 
-          // Parse COSTOS
+          // Parse COSTOS (try 'Costos' then case-insensitive fallback)
           var costoUpdates = {};
           var costoEspUpdates = {};
-          var costSheet = wb.Sheets['Costos'];
+          var costSheet = wb.Sheets['Costos'] || wb.Sheets['COSTOS'] || wb.Sheets['costos'];
+          if (!costSheet) {
+            var sNamesC = Object.keys(wb.Sheets);
+            for (var sci = 0; sci < sNamesC.length; sci++) {
+              if (sNamesC[sci].toLowerCase() === 'costos') { costSheet = wb.Sheets[sNamesC[sci]]; break; }
+            }
+          }
           if (costSheet) {
             var costData = XLSX.utils.sheet_to_json(costSheet, { header: 1 });
             for (var k = 0; k < costData.length; k++) {
