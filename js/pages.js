@@ -4152,7 +4152,8 @@ const Pages = {
     h += '<div class="card">' +
       '<div class="card-header"><h3>Recetas Existentes (<span id="ra-count">0</span>)</h3></div>' +
       '<div class="card-body" id="ra-list"><div class="text-center text-muted">Cargando...</div></div>' +
-    '</div>';
+    '</div>' +
+    '<input type="file" id="ra-img-input" accept="image/*" style="display:none" onchange="Pages._onRecetaImageSelect(event)">';
     container.innerHTML = h;
     Pages._loadGeminiKey('ra-groq-key', 'ra-key-status');
     Pages._loadRecetasAdmin();
@@ -4201,7 +4202,7 @@ const Pages = {
       listEl.innerHTML = '<p class="text-center text-muted">No hay recetas. Genera la primera con el boton de arriba.</p>';
       return;
     }
-    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
+    var h = '<div class="table-wrap"><table class="table"><thead><tr><th>Titulo</th><th>Img</th><th>Cat.</th><th>Dificultad</th><th>Tiempo</th><th>Productos</th><th>Fecha</th><th></th></tr></thead><tbody>';
     for (var i = 0; i < recetas.length; i++) {
       var r = recetas[i];
       var prodsUsados = '';
@@ -4209,8 +4210,19 @@ const Pages = {
         prodsUsados = r.productos_usados.join(', ');
       }
       var diffColor = r.dificultad === 'Facil' ? 'text-green' : (r.dificultad === 'Dificil' ? 'text-red' : 'text-yellow');
+      // Celda de imagen: thumbnail si existe, o boton "+ Img" si no
+      var imgCell;
+      if (r.imagen_url) {
+        imgCell = '<div style="display:flex;align-items:center;gap:4px">' +
+          '<img src="' + r.imagen_url + '" style="width:48px;height:32px;object-fit:cover;border-radius:4px" onclick="Pages.uploadRecetaImage(\'' + r._key + '\')" title="Cambiar imagen">' +
+          '<button class="btn btn-sm" style="padding:2px 6px;font-size:0.7rem;color:var(--red)" onclick="Pages.removeRecetaImage(\'' + r._key + '\')" title="Quitar imagen">x</button>' +
+          '</div>';
+      } else {
+        imgCell = '<button class="btn btn-sm btn-outline" onclick="Pages.uploadRecetaImage(\'' + r._key + '\')" title="Agregar imagen">+ Img</button>';
+      }
       h += '<tr>' +
         '<td class="fw7">' + (r.titulo || 'Sin titulo') + '</td>' +
+        '<td>' + imgCell + '</td>' +
         '<td><span class="badge badge-gold">' + (r.categoria || '') + '</span></td>' +
         '<td class="' + diffColor + ' fw7">' + (r.dificultad || '-') + '</td>' +
         '<td>' + (r.tiempo || '-') + '</td>' +
@@ -4227,6 +4239,166 @@ const Pages = {
     if (!confirm('Eliminar esta receta?')) return;
     firebase.database().ref('arcano/db/recetas/' + key).remove(function() {
       Pages._loadRecetasAdmin();
+    });
+  },
+
+  /* ===== IMAGENES DE RECETAS =====
+     - uploadRecetaImage(key): abre modal para elegir (IA o subir archivo)
+     - _onRecetaImageSelect: cuando se selecciona archivo, lo sube
+     - removeRecetaImage(key): quita la imagen
+     - _generarImagenReceta: genera con Gemini Imagen y sube
+     - _uploadRecetaImageToGitHub: compresion + upload (análogo a Blog) */
+
+  _recetaImgTarget: null,
+
+  uploadRecetaImage: function(key) {
+    // Modal con 2 opciones: generar con IA o subir archivo
+    firebase.database().ref('arcano/db/recetas/' + key).once('value', function(snap) {
+      var r = snap.val();
+      if (!r) return;
+      var currentImg = r.imagen_url
+        ? '<div style="margin-bottom:12px;text-align:center"><img src="' + r.imagen_url + '" style="max-width:100%;max-height:200px;border-radius:8px"></div>'
+        : '<p class="text-muted text-sm" style="margin-bottom:12px">Esta receta no tiene imagen.</p>';
+      var body =
+        currentImg +
+        '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+          '<button class="btn btn-gold" onclick="Pages._generarImagenReceta(\'' + key + '\', null, null, null);closeModal()">' +
+            '<span style="margin-right:6px">✨</span>Generar con IA' +
+          '</button>' +
+          '<button class="btn btn-outline" onclick="Pages._pickRecetaImageFile(\'' + key + '\');closeModal()">' +
+            '<span style="margin-right:6px">📤</span>Subir archivo' +
+          '</button>' +
+        '</div>' +
+        '<p class="text-muted text-sm" style="margin-top:12px;text-align:center">La opcion IA usa el prompt que genero Gemini al crear la receta. Si no existe, se creara uno nuevo automaticamente.</p>';
+      openModal('Imagen de: ' + (r.titulo || 'Receta'), body);
+    });
+  },
+
+  _pickRecetaImageFile: function(key) {
+    Pages._recetaImgTarget = key;
+    var inp = document.getElementById('ra-img-input');
+    if (inp) inp.click();
+  },
+
+  _onRecetaImageSelect: function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no debe superar 5MB. Recomendado: 1200x800 px JPG.'); return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var dataUrl = ev.target.result;
+      var key = Pages._recetaImgTarget;
+      if (!key) return;
+      var statusEl = document.getElementById('ra-gen-status');
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Subiendo imagen...</span>';
+      firebase.database().ref('arcano/db/recetas/' + key).once('value', function(snap) {
+        var r = snap.val();
+        var slug = Pages._titleToSlug(r && r.titulo) || ('receta-img-' + Date.now());
+        Pages._uploadRecetaImageToGitHub(dataUrl, slug).then(function(url) {
+          firebase.database().ref('arcano/db/recetas/' + key).update({ imagen_url: url }, function(err) {
+            if (err) {
+              alert('Error al guardar: ' + (err.message || err));
+              if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al guardar URL</span>';
+            } else {
+              Pages._loadRecetasAdmin();
+              if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Imagen actualizada</span>';
+              // Re-publicar SEO con la nueva imagen
+              if (r) { r.imagen_url = url; Pages._publishRecipeSEO(r); }
+            }
+          });
+        }).catch(function(err) {
+          alert('Error al subir imagen: ' + (err.message || err));
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error al subir imagen</span>';
+        });
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  },
+
+  removeRecetaImage: function(key) {
+    if (!confirm('Quitar la imagen de esta receta?')) return;
+    firebase.database().ref('arcano/db/recetas/' + key).update({ imagen_url: null }, function() {
+      Pages._loadRecetasAdmin();
+    });
+  },
+
+  _generarImagenReceta: function(key, recetaOpt, apiKeyOpt, statusElOpt) {
+    // Genera una imagen con Gemini (Imagen 3 / gemini-2.5-flash-image-preview) y la sube a GitHub
+    var apiKey = apiKeyOpt || (localStorage.getItem('arcano_gemini_key') || '').trim();
+    var statusEl = statusElOpt || document.getElementById('ra-gen-status');
+    if (!apiKey) {
+      alert('Falta la API Key de Gemini para generar la imagen.');
+      return;
+    }
+    firebase.database().ref('arcano/db/recetas/' + key).once('value', function(snap) {
+      var r = recetaOpt || snap.val();
+      if (!r) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Receta no encontrada</span>'; return; }
+      // Si la receta no trae prompt, lo construimos a partir de titulo + descripcion + ingredientes
+      var prompt = r.imagen_prompt;
+      if (!prompt) {
+        var ingredientes = (r.ingredientes || []).slice(0, 5).join(', ');
+        prompt = 'Professional food photography of ' + (r.titulo || 'a delicious dish') + ': ' +
+                 (r.descripcion || '') + ' Main ingredients: ' + ingredientes + '. ' +
+                 'Appetizing, natural lighting, top-down angle, rustic wooden table, vibrant colors, high resolution, no text, no watermark.';
+      } else {
+        prompt = 'Professional food photography: ' + prompt + ' Appetizing, natural lighting, top-down angle, rustic wooden table, vibrant colors, high resolution, no text, no watermark.';
+      }
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Generando imagen con IA...</span>';
+      // Modelo de generacion de imagenes de Gemini (gemini-2.5-flash-image-preview aka Nano Banana)
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=' + apiKey;
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['IMAGE'] }
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(e) {
+          throw new Error((e.error && e.error.message) || ('Error ' + res.status));
+        });
+        return res.json();
+      })
+      .then(function(data) {
+        var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+        var imgData = null;
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].inlineData && parts[i].inlineData.data) { imgData = parts[i].inlineData.data; break; }
+          if (parts[i].inline_data && parts[i].inline_data.data) { imgData = parts[i].inline_data.data; break; }
+        }
+        if (!imgData) throw new Error('La IA no devolvio una imagen');
+        var dataUrl = 'data:image/png;base64,' + imgData;
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Imagen generada. Subiendo a GitHub...</span>';
+        var slug = Pages._titleToSlug(r.titulo) || ('receta-img-' + Date.now());
+        return Pages._uploadRecetaImageToGitHub(dataUrl, slug).then(function(url) {
+          return firebase.database().ref('arcano/db/recetas/' + key).update({ imagen_url: url }).then(function() {
+            return url;
+          });
+        }).then(function(url) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Imagen generada y guardada ✓</span>';
+          Pages._loadRecetasAdmin();
+          // Re-publicar SEO con la nueva imagen
+          r.imagen_url = url;
+          Pages._publishRecipeSEO(r);
+        });
+      })
+      .catch(function(err) {
+        console.error('[Recetas] Error generando imagen:', err);
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error imagen: ' + (err.message || err) + '</span>';
+      });
+    });
+  },
+
+  _uploadRecetaImageToGitHub: function(dataUrl, slug) {
+    return Pages._compressImage(dataUrl, 1200, 0.85).then(function(compressed) {
+      var base64Data = compressed.split(',')[1];
+      var path = 'img/recetas/' + slug + '.jpg';
+      return Pages._uploadToGitHub(path, base64Data).then(function(result) {
+        if (result.content && result.content.download_url) return result.content.download_url;
+        return 'https://arcanoespecias.github.io/' + path;
+      });
     });
   },
 
@@ -4356,7 +4528,20 @@ const Pages = {
           try {
             firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
               if (err) { status.textContent = 'Generada pero error al guardar: ' + (err.message || err); }
-              else { status.innerHTML = '<span style="color:var(--green)">Guardada: ' + receta.titulo + '</span>'; Pages._loadRecetasAdmin(); Pages._publishRecipeSEO(receta); Pages._updateSitemap(); }
+              else {
+                status.innerHTML = '<span style="color:var(--green)">Guardada: ' + receta.titulo + '. Generando imagen...</span>';
+                Pages._loadRecetasAdmin();
+                Pages._publishRecipeSEO(receta);
+                Pages._updateSitemap();
+                // Generar imagen automaticamente con el prompt que devolvio la IA
+                firebase.database().ref('arcano/db/recetas').orderByChild('titulo').equalTo(receta.titulo).limitToLast(1).once('value', function(snap) {
+                  var data = snap.val();
+                  if (data) {
+                    var newKey = Object.keys(data)[0];
+                    Pages._generarImagenReceta(newKey, receta, apiKey, status);
+                  }
+                });
+              }
               btn.disabled = false; btn.textContent = 'Generar Receta con IA';
             });
           } catch(fe) {
