@@ -170,9 +170,10 @@ const App = {
             '<button class="btn btn-sm btn-outline" onclick="App.logout()">Salir</button>' +
           '</div>' +
         '</aside>' +
+        '<div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeMobileSidebar()"></div>' +
         '<main class="main-content">' +
           '<header class="top-bar">' +
-            '<button class="btn btn-ghost" onclick="App.toggleSidebar()">☰</button>' +
+            '<button class="btn btn-ghost" id="menu-toggle-btn" onclick="App.toggleSidebar()" aria-label="Abrir menu">☰</button>' +
             '<h2 class="page-title" id="page-title">Dashboard</h2>' +
             '<div class="top-bar-actions">' +
               '<span class="sync-indicator" id="sync-indicator" title="Conectado a Firebase">● Firebase</span>' +
@@ -195,12 +196,42 @@ const App = {
       produccion: 'Produccion', ventas: 'Ventas', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', recetas: 'Recetas IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
+    // Cierra el drawer lateral en mobile al cambiar de pagina
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      this.closeMobileSidebar();
+    }
     this.renderPage(page);
   },
 
-  toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-    document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+  toggleSidebar(force) {
+    // En mobile usamos mobile-open (overlay drawer), en desktop sidebar-closed (colapso a 60px).
+    var isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile) {
+      var sidebar = document.getElementById('sidebar');
+      if (!sidebar) return;
+      var overlay = document.getElementById('sidebar-overlay');
+      if (typeof force === 'boolean') {
+        sidebar.classList.toggle('mobile-open', force);
+        if (overlay) overlay.classList.toggle('visible', force);
+        this.sidebarOpen = force;
+      } else {
+        var willOpen = !sidebar.classList.contains('mobile-open');
+        sidebar.classList.toggle('mobile-open', willOpen);
+        if (overlay) overlay.classList.toggle('visible', willOpen);
+        this.sidebarOpen = willOpen;
+      }
+    } else {
+      this.sidebarOpen = typeof force === 'boolean' ? force : !this.sidebarOpen;
+      document.querySelector('.app-layout').classList.toggle('sidebar-closed', !this.sidebarOpen);
+    }
+  },
+
+  closeMobileSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('visible');
+    this.sidebarOpen = false;
   },
 
   logout() {

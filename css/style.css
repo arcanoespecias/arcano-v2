@@ -343,15 +343,35 @@ select.input { cursor: pointer; }
 }
 
 /* ---------- Responsive sidebar ---------- */
+/* Overlay que cubre el contenido cuando el drawer esta abierto en mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 450;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.sidebar-overlay.visible {
+  display: block;
+  opacity: 1;
+}
+@media (min-width: 769px) {
+  .sidebar-overlay { display: none !important; }
+}
+
 @media (max-width: 768px) {
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 500;
     width: var(--sidebar-w) !important;
     transform: translateX(-100%);
     transition: transform var(--transition);
+    box-shadow: 2px 0 12px rgba(0,0,0,0.4);
   }
   .sidebar.mobile-open { transform: translateX(0); }
-  .sidebar-closed .sidebar { transform: translateX(-100%); }
+  /* En mobile, sidebar-closed no debe colapsar a 60px: simplemente esta oculto */
+  .sidebar-closed .sidebar { width: var(--sidebar-w) !important; transform: translateX(-100%); }
+  .sidebar-closed .sidebar.mobile-open { transform: translateX(0); }
 }
 
 /* ==================== ETIQUETAS ==================== */

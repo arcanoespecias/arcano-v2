@@ -2440,6 +2440,9 @@ const Pages = {
      ================================================================ */
   renderRecetasAdmin(container) {
     var savedKey = localStorage.getItem('arcano_groq_key') || '';
+    var savedProvider = localStorage.getItem('arcano_receta_provider') || 'groq';
+    var savedTogetherKey = localStorage.getItem('arcano_together_key') || '';
+    var savedOpenrouterKey = localStorage.getItem('arcano_openrouter_key') || '';
     var categorias = ['Comida', 'Infusiones', 'Cocteleria'];
 
     // Build list of available products for context
@@ -2448,13 +2451,36 @@ const Pages = {
     for (var i = 0; i < productos.length; i++) productNames.push(productos[i].nombre);
     var productsContext = productNames.length > 0 ? productNames.join(', ') : 'No hay productos disponibles';
 
+    var providerHelp = {
+      groq: 'Gratis en <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">console.groq.com</a>. Fallback automatico: Llama 3.3 70B, Llama 3.1 8B, Gemma 2 9B.',
+      together: 'En <a href="https://api.together.xyz/settings/api-keys" target="_blank" style="color:var(--gold)">api.together.xyz</a>. $0.88/M tokens. Usa Llama 3.3 70B Turbo.',
+      openrouter: 'En <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--gold)">openrouter.ai</a>. Varias opciones gratis (DeepSeek, Llama).'
+    };
+
     var h = '<div class="card mb-16">' +
       '<div class="card-header"><h3>Configuracion</h3></div>' +
       '<div class="card-body">' +
-        '<p class="text-sm text-muted mb-12">Usa <a href="https://console.groq.com/keys" target="_blank" style="color:var(--gold)">Groq Console</a> para obtener tu API key gratis. Modelo: <b>Llama 3.3 70B</b> (opensource).</p>' +
-        '<div class="form-group"><label>Groq API Key</label>' +
+        '<p class="text-sm text-muted mb-12">Si un modelo se cae, se prueba el siguiente automaticamente. No deberia volver a salir "model does not exist".</p>' +
+
+        '<div class="form-group"><label>Proveedor de IA</label>' +
+        '<select class="input" id="ra-provider" onchange="Pages._onProviderChange()">' +
+          '<option value="groq"' + (savedProvider === 'groq' ? ' selected' : '') + '>Groq (gratis, rapido)</option>' +
+          '<option value="together"' + (savedProvider === 'together' ? ' selected' : '') + '>Together AI (pago, muy estable)</option>' +
+          '<option value="openrouter"' + (savedProvider === 'openrouter' ? ' selected' : '') + '>OpenRouter (multi-modelo)</option>' +
+        '</select></div>' +
+
+        '<div class="form-group" id="ra-key-groq" style="' + (savedProvider === 'groq' ? '' : 'display:none') + '"><label>Groq API Key</label>' +
         '<input type="password" class="input" id="ra-groq-key" value="' + savedKey + '" placeholder="gsk_xxxx..." onblur="Pages._saveGroqKey()">' +
-        '</div>' +
+        '<p class="text-sm text-muted mt-4">' + providerHelp.groq + '</p></div>' +
+
+        '<div class="form-group" id="ra-key-together" style="' + (savedProvider === 'together' ? '' : 'display:none') + '"><label>Together AI API Key</label>' +
+        '<input type="password" class="input" id="ra-together-key" value="' + savedTogetherKey + '" placeholder="xxxxxxxxxxxxxxxx..." onblur="Pages._saveTogetherKey()">' +
+        '<p class="text-sm text-muted mt-4">' + providerHelp.together + '</p></div>' +
+
+        '<div class="form-group" id="ra-key-openrouter" style="' + (savedProvider === 'openrouter' ? '' : 'display:none') + '"><label>OpenRouter API Key</label>' +
+        '<input type="password" class="input" id="ra-openrouter-key" value="' + savedOpenrouterKey + '" placeholder="sk-or-v1-xxxxx..." onblur="Pages._saveOpenrouterKey()">' +
+        '<p class="text-sm text-muted mt-4">' + providerHelp.openrouter + '</p></div>' +
+
         '<div class="g2">' +
           '<div class="form-group"><label>Categoria</label>' +
           '<select class="input" id="ra-categoria">';
@@ -2497,6 +2523,22 @@ const Pages = {
           localStorage.setItem('arcano_groq_key', fbKey);
         }
       }).catch(function() {});
+      firebase.database().ref('arcano/config/togetherKey').once('value').then(function(snap) {
+        var fbKey = snap.val();
+        if (fbKey) {
+          var inp = document.getElementById('ra-together-key');
+          if (inp) inp.value = fbKey;
+          localStorage.setItem('arcano_together_key', fbKey);
+        }
+      }).catch(function() {});
+      firebase.database().ref('arcano/config/openrouterKey').once('value').then(function(snap) {
+        var fbKey = snap.val();
+        if (fbKey) {
+          var inp = document.getElementById('ra-openrouter-key');
+          if (inp) inp.value = fbKey;
+          localStorage.setItem('arcano_openrouter_key', fbKey);
+        }
+      }).catch(function() {});
     } catch(e) {}
   },
 
@@ -2508,6 +2550,37 @@ const Pages = {
       localStorage.setItem('arcano_groq_key', key);
       try { firebase.database().ref('arcano/config/groqKey').set(key); } catch(e) {}
     }
+  },
+
+  _saveTogetherKey: function() {
+    var inp = document.getElementById('ra-together-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    if (key) {
+      localStorage.setItem('arcano_together_key', key);
+      try { firebase.database().ref('arcano/config/togetherKey').set(key); } catch(e) {}
+    }
+  },
+
+  _saveOpenrouterKey: function() {
+    var inp = document.getElementById('ra-openrouter-key');
+    if (!inp) return;
+    var key = inp.value.trim();
+    if (key) {
+      localStorage.setItem('arcano_openrouter_key', key);
+      try { firebase.database().ref('arcano/config/openrouterKey').set(key); } catch(e) {}
+    }
+  },
+
+  _onProviderChange: function() {
+    var sel = document.getElementById('ra-provider');
+    if (!sel) return;
+    var provider = sel.value;
+    localStorage.setItem('arcano_receta_provider', provider);
+    ['groq', 'together', 'openrouter'].forEach(function(p) {
+      var el = document.getElementById('ra-key-' + p);
+      if (el) el.style.display = (p === provider) ? '' : 'none';
+    });
   },
 
   _loadRecetasAdmin: function() {
@@ -2559,22 +2632,108 @@ const Pages = {
     });
   },
 
+  // Catálogo de proveedores con fallback chain. Cada entrada: {label, endpoint, models[], headers(apiKey)}
+  _PROVIDER_CONFIG: {
+    groq: {
+      label: 'Groq',
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'gemma2-9b-it', 'mistral-saba-instruct']
+    },
+    together: {
+      label: 'Together AI',
+      endpoint: 'https://api.together.xyz/v1/chat/completions',
+      models: ['meta-llama/Llama-3.3-70B-Instruct-Turbo', 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', 'Qwen/Qwen2.5-7B-Instruct-Turbo']
+    },
+    openrouter: {
+      label: 'OpenRouter',
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      models: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemini-flash-1.5', 'deepseek/deepseek-chat:free']
+    }
+  },
+
+  _llamarLLM: function(provider, apiKey, model, systemPrompt, userPrompt) {
+    var cfg = Pages._PROVIDER_CONFIG[provider];
+    if (!cfg) return Promise.reject(new Error('Proveedor desconocido: ' + provider));
+
+    var headers = {
+      'Authorization': 'Bearer ' + apiKey,
+      'Content-Type': 'application/json'
+    };
+    if (provider === 'openrouter') {
+      headers['X-Title'] = 'Arcano Especias Admin';
+      headers['HTTP-Referer'] = window.location.origin;
+    }
+
+    return fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: model,
+        temperature: 0.8,
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    }).then(function(res) {
+      if (!res.ok) {
+        return res.json().then(function(e) {
+          var msg = (e && e.error && e.error.message) || ('HTTP ' + res.status);
+          var err = new Error(msg);
+          err._httpStatus = res.status;
+          err._providerError = true;
+          throw err;
+        });
+      }
+      return res.json();
+    }).then(function(data) {
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Respuesta sin choices');
+      }
+      var content = data.choices[0].message.content.trim();
+      content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
+      var receta = JSON.parse(content);
+      if (!receta.titulo) throw new Error('La receta no tiene titulo');
+      if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
+      if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
+      return { receta: receta, model: model, provider: cfg.label };
+    });
+  },
+
   generarReceta: function() {
-    var keyInput = document.getElementById('ra-groq-key');
     var catSelect = document.getElementById('ra-categoria');
     var temaInput = document.getElementById('ra-tema');
     var idiomaSelect = document.getElementById('ra-idioma');
+    var providerSel = document.getElementById('ra-provider');
     var btn = document.getElementById('ra-gen-btn');
     var status = document.getElementById('ra-gen-status');
 
-    var apiKey = keyInput.value.trim();
+    var provider = providerSel ? providerSel.value : 'groq';
+    var apiKeyInput = document.getElementById('ra-' + (provider === 'groq' ? 'groq' : provider === 'together' ? 'together' : 'openrouter') + '-key');
+    var apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
     var categoria = catSelect.value;
     var tema = temaInput.value.trim();
     var idioma = idiomaSelect.value;
 
-    if (!apiKey) { alert('Ingresa tu Groq API Key'); keyInput.focus(); return; }
-    localStorage.setItem('arcano_groq_key', apiKey);
-    try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
+    if (!apiKey) {
+      alert('Ingresa tu API Key para el proveedor seleccionado (' + Pages._PROVIDER_CONFIG[provider].label + ')');
+      apiKeyInput.focus();
+      return;
+    }
+
+    // Persistir la key segun proveedor
+    if (provider === 'groq') {
+      localStorage.setItem('arcano_groq_key', apiKey);
+      try { firebase.database().ref('arcano/config/groqKey').set(apiKey); } catch(e) {}
+    } else if (provider === 'together') {
+      localStorage.setItem('arcano_together_key', apiKey);
+      try { firebase.database().ref('arcano/config/togetherKey').set(apiKey); } catch(e) {}
+    } else if (provider === 'openrouter') {
+      localStorage.setItem('arcano_openrouter_key', apiKey);
+      try { firebase.database().ref('arcano/config/openrouterKey').set(apiKey); } catch(e) {}
+    }
 
     // Build product context
     var productos = ArcanoDB.getTiendaProductos();
@@ -2607,60 +2766,58 @@ const Pages = {
       'La receta debe ser practica, deliciosa y usar especias de forma creativa. ' +
       'Entre 4 y 8 ingredientes, entre 4 y 6 pasos.';
 
+    var cfg = Pages._PROVIDER_CONFIG[provider];
+    var models = cfg.models.slice();
+    var providerLabel = cfg.label;
+
     btn.disabled = true;
     btn.textContent = 'Generando...';
-    status.textContent = 'Consultando Llama 3.3 70B via Groq...';
+    status.textContent = 'Probando ' + providerLabel + ' / ' + models[0] + '...';
 
-    fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.8,
-        max_tokens: 1024,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ]
+    // Fallback chain: prueba cada modelo del proveedor en secuencia
+    function intentarCon(modelIndex) {
+      if (modelIndex >= models.length) {
+        throw new Error('Todos los modelos de ' + providerLabel + ' fallaron. Verifica tu API key o prueba otro proveedor en el selector.');
+      }
+      var model = models[modelIndex];
+      status.textContent = providerLabel + ' → ' + model + ' (intento ' + (modelIndex + 1) + '/' + models.length + ')';
+      return Pages._llamarLLM(provider, apiKey, model, systemPrompt, userPrompt)
+        .catch(function(err) {
+          // Si es error de parseo del JSON, NO reintentamos (el modelo contesto mal, no se cayo)
+          if (err._providerError) {
+            console.warn('[Recetas] Modelo fallido:', model, err.message, '→ probando siguiente...');
+            return intentarCon(modelIndex + 1);
+          }
+          // Error de parseo u otro: relanzar tal cual
+          throw err;
+        });
+    }
+
+    intentarCon(0)
+      .then(function(result) {
+        var receta = result.receta;
+        receta.fecha = new Date().toISOString().slice(0, 10);
+        if (!receta.categoria) receta.categoria = categoria;
+        receta._modelo = result.model;
+        receta._proveedor = result.provider;
+
+        firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
+          if (err) {
+            status.innerHTML = '<span style="color:var(--red)">Error al guardar: ' + (err.message || err) + '</span>';
+          } else {
+            status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span> <span class="text-muted text-sm">(' + result.provider + ' / ' + result.model + ')</span>';
+            Pages._loadRecetasAdmin();
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generar Receta con IA';
+        });
       })
-    })
-    .then(function(res) {
-      if (!res.ok) return res.json().then(function(e) { throw new Error((e.error && e.error.message) || 'Error ' + res.status); });
-      return res.json();
-    })
-    .then(function(data) {
-      var content = data.choices[0].message.content.trim();
-      // Strip markdown code blocks if present
-      content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-      var receta = JSON.parse(content);
-
-      // Validate structure
-      if (!receta.titulo) throw new Error('La receta no tiene titulo');
-      if (!Array.isArray(receta.ingredientes)) throw new Error('ingredientes debe ser un array');
-      if (!Array.isArray(receta.pasos)) throw new Error('pasos debe ser un array');
-
-      // Save to Firebase
-      receta.fecha = new Date().toISOString().slice(0, 10);
-      if (!receta.categoria) receta.categoria = categoria;
-      firebase.database().ref('arcano/db/recetas').push(receta, function(err) {
-        if (err) {
-          status.textContent = 'Error al guardar: ' + (err.message || err);
-        } else {
-          status.innerHTML = '<span style="color:var(--green)">Receta guardada: ' + receta.titulo + '</span>';
-          Pages._loadRecetasAdmin();
-        }
+      .catch(function(err) {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>' +
+          '<br><span class="text-sm text-muted">Sugerencia: prueba otro proveedor en el selector de arriba. Si el problema persiste, verifica tu API key y que la cuenta tenga credito.</span>';
         btn.disabled = false;
         btn.textContent = 'Generar Receta con IA';
       });
-    })
-    .catch(function(err) {
-      status.innerHTML = '<span style="color:var(--red)">Error: ' + err.message + '</span>';
-      btn.disabled = false;
-      btn.textContent = 'Generar Receta con IA';
-    });
   },
 
   /* ================================================================
