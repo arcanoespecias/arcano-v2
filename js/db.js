@@ -1046,6 +1046,18 @@ function deleteVenta(id) {
 }
 
 /* ==================== AUTH ==================== */
+/*
+ * Sesion persistente con localStorage (NO sessionStorage).
+ * En mobile, sessionStorage se borra al cambiar de app/pestana o
+ * cuando el navegador libera memoria en background, lo que cierra
+ * la sesion del admin inesperadamente. localStorage persiste hasta
+ * logout explicito.
+ *
+ * Expiracion: 30 dias desde el ultimo login. Si pasa mas tiempo,
+ * se exige re-login. Resetable al volver a loguearse.
+ */
+var SESSION_KEY = DB_KEY + '_session';
+var SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
 
 function authenticateUser(pin) {
   var users = _db.usuarios || {};
@@ -1053,8 +1065,19 @@ function authenticateUser(pin) {
   for (var i = 0; i < keys.length; i++) {
     var u = users[keys[i]];
     if (u && u.pin === pin && u.activo !== false) {
-      var session = { id: u.id, nombre: u.nombre, rol: u.rol };
-      sessionStorage.setItem(DB_KEY + '_session', JSON.stringify(session));
+      var now = Date.now();
+      var session = {
+        id: u.id,
+        nombre: u.nombre,
+        rol: u.rol,
+        issuedAt: now,
+        expiresAt: now + SESSION_TTL_MS
+      };
+      try {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        // Limpiar sesion vieja de sessionStorage si existia (migracion)
+        sessionStorage.removeItem(SESSION_KEY);
+      } catch (e) { console.warn('[Auth] No se pudo persistir sesion:', e); }
       return session;
     }
   }
@@ -1062,9 +1085,42 @@ function authenticateUser(pin) {
 }
 
 function getCurrentUser() {
-  try { var r = sessionStorage.getItem(DB_KEY + '_session'); return r ? JSON.parse(r) : null; } catch (e) { return null; }
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) {
+      // Migracion: si existe en sessionStorage (version anterior), moverla a localStorage
+      raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) {
+        try {
+          var migrated = JSON.parse(raw);
+          if (migrated && migrated.id) {
+            var now = Date.now();
+            migrated.issuedAt = migrated.issuedAt || now;
+            migrated.expiresAt = migrated.expiresAt || (now + SESSION_TTL_MS);
+            localStorage.setItem(SESSION_KEY, JSON.stringify(migrated));
+            sessionStorage.removeItem(SESSION_KEY);
+            return migrated;
+          }
+        } catch (e2) {}
+      }
+      return null;
+    }
+    var session = JSON.parse(raw);
+    if (!session || !session.id) return null;
+    // Verificar expiracion
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      console.info('[Auth] Sesion expirada, elimininando.');
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch (e) { return null; }
 }
-function logoutUser() { sessionStorage.removeItem(DB_KEY + '_session'); }
+
+function logoutUser() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+  try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
 
 function getUsuarios() {
   return _filterValid(Object.values(_db.usuarios || {}));
