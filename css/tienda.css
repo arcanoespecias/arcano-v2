@@ -194,16 +194,6 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 .social-link { width: 36px; height: 36px; border-radius: 50%; background: #241209; border: 1px solid #3a2218; display: flex; align-items: center; justify-content: center; color: #9a8a78; transition: all .2s; text-decoration: none; }
 .social-link:hover { background: rgba(200,150,58,.15); color: var(--gold); border-color: var(--gold); }
 .social-link svg { width: 18px; height: 18px; fill: currentColor; }
-.sidebar-crypto {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 14px 20px 18px;
-  border-top: 1px solid #3a2218;
-}
-.sidebar-crypto .crypto-icon { width: 22px; height: 22px; flex-shrink: 0; }
-.sidebar-crypto span {
-  font-size: .68rem; font-weight: 600; color: #f7a23a;
-  text-align: center; line-height: 1.3; letter-spacing: .01em;
-}
 .sidebar-empty { text-align: center; padding: 40px 16px; color: #9a8a78; font-size: .85rem; }
 .recipe-share-btn { width: 100%; margin-top: 12px; padding: 8px; border-radius: 6px; border: 1px solid #3a2218; background: rgba(200,150,58,.1); color: var(--gold); font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .2s; }
 .recipe-share-btn:hover { background: rgba(200,150,58,.25); border-color: var(--gold); }
