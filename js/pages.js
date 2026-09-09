@@ -7084,3 +7084,246 @@ Pages._deleteCliente = function(key) {
 };
 
 
+
+/* ==================== PROMOCIONES (admin CRUD) ==================== */
+Pages.renderPromociones = function(el) {
+  var promos = ArcanoDB.getPromociones();
+  var activas = ArcanoDB.getPromocionesActivas();
+
+  var h = '<div class="page-header"><h2>Promociones</h2>';
+  h += '<button class="btn btn-gold" onclick="Pages._editarPromocion(null)">+ Nueva promoción</button>';
+  h += '</div>';
+
+  // KPIs
+  h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">';
+  h += '<div class="stat-card"><div class="stat-value text-gold">' + promos.length + '</div><div class="stat-label">Total</div></div>';
+  h += '<div class="stat-card"><div class="stat-value text-green">' + activas.length + '</div><div class="stat-label">Activas vigentes</div></div>';
+  var destacadas = promos.filter(function(p) { return p.destacada && p.activa !== false; }).length;
+  h += '<div class="stat-card"><div class="stat-value text-yellow">' + destacadas + '</div><div class="stat-label">Destacadas</div></div>';
+  var inactivas = promos.filter(function(p) { return p.activa === false; }).length;
+  h += '<div class="stat-card"><div class="stat-value text-muted">' + inactivas + '</div><div class="stat-label">Inactivas</div></div>';
+  h += '</div>';
+
+  if (promos.length === 0) {
+    h += '<div class="card mt-16"><div class="card-body"><p class="text-center text-muted">No hay promociones. Crea la primera con el botón de arriba.</p></div></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="card mt-16"><div class="card-header"><h3>Todas las promociones</h3></div><div class="card-body">';
+  h += '<div class="table-wrap"><table class="table"><thead><tr><th>Título</th><th>Tipo</th><th>Valor</th><th>Código</th><th>Vigencia</th><th>Estado</th><th></th></tr></thead><tbody>';
+  for (var i = 0; i < promos.length; i++) {
+    var p = promos[i];
+    var tipoLabel = { porcentaje: '% Off', monto: '$ Off', envio: 'Envío gratis', producto: 'Producto gratis' }[p.tipo] || p.tipo;
+    var valorTxt = '';
+    if (p.tipo === 'porcentaje') valorTxt = p.valor + '%';
+    else if (p.tipo === 'monto') valorTxt = '$' + (p.valor || 0).toLocaleString();
+    else valorTxt = '—';
+    var vigencia = '';
+    if (p.fechaInicio || p.fechaFin) {
+      var fi = p.fechaInicio ? new Date(p.fechaInicio).toLocaleDateString('es-CO', {day:'2-digit',month:'short'}) : '—';
+      var ff = p.fechaFin ? new Date(p.fechaFin).toLocaleDateString('es-CO', {day:'2-digit',month:'short'}) : '—';
+      vigencia = fi + ' → ' + ff;
+    } else {
+      vigencia = 'Sin límite';
+    }
+    var activaAhora = p.activa !== false && (!p.fechaFin || new Date(p.fechaFin).getTime() > Date.now()) && (!p.fechaInicio || new Date(p.fechaInicio).getTime() < Date.now());
+    var estadoCls = activaAhora ? 'text-green' : 'text-muted';
+    var estadoTxt = activaAhora ? 'Vigente' : (p.activa === false ? 'Inactiva' : 'Vencida');
+    h += '<tr>' +
+      '<td class="fw7">' + esc(p.titulo || 'Sin título') + (p.destacada ? ' ⭐' : '') + '</td>' +
+      '<td>' + tipoLabel + '</td>' +
+      '<td>' + valorTxt + '</td>' +
+      '<td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;color:var(--gold)">' + esc(p.codigo || '—') + '</code></td>' +
+      '<td class="text-sm text-muted">' + vigencia + '</td>' +
+      '<td><span class="' + estadoCls + ' fw7">' + estadoTxt + '</span></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages._editarPromocion(\'' + p._key + '\')">Editar</button> ' +
+        '<button class="btn btn-sm ' + (p.activa === false ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._togglePromocion(\'' + p._key + '\')" title="' + (p.activa === false ? 'Activar' : 'Pausar') + '">' + (p.activa === false ? '▶' : '⏸') + '</button> ' +
+        '<button class="btn btn-sm btn-red" onclick="Pages._deletePromocion(\'' + p._key + '\')">X</button>' +
+      '</td>' +
+    '</tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '</div></div>';
+  el.innerHTML = h;
+};
+
+Pages._editarPromocion = function(key) {
+  var promos = ArcanoDB.getPromociones();
+  var promo = null;
+  if (key) {
+    for (var i = 0; i < promos.length; i++) { if (promos[i]._key === key) { promo = promos[i]; break; } }
+  }
+  var p = promo || {};
+  var body =
+    '<div class="form-group"><label>Título</label>' +
+      '<input class="input" id="pm-titulo" value="' + esc(p.titulo || '') + '" placeholder="Ej: 10% off en tu primera compra"></div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Tipo de descuento</label>' +
+        '<select class="input" id="pm-tipo">' +
+          '<option value="porcentaje"' + (p.tipo === 'porcentaje' ? ' selected' : '') + '>Porcentaje (%)</option>' +
+          '<option value="monto"' + (p.tipo === 'monto' ? ' selected' : '') + '>Monto fijo ($)</option>' +
+          '<option value="envio"' + (p.tipo === 'envio' ? ' selected' : '') + '>Envío gratis</option>' +
+          '<option value="producto"' + (p.tipo === 'producto' ? ' selected' : '') + '>Producto gratis</option>' +
+        '</select></div>' +
+      '<div class="form-group"><label>Valor</label>' +
+        '<input class="input" id="pm-valor" type="number" value="' + (p.valor || '') + '" placeholder="Ej: 10 (porcentaje) o 5000 (monto)"></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Código promocional (opcional)</label>' +
+      '<input class="input" id="pm-codigo" value="' + esc(p.codigo || '') + '" placeholder="Ej: BIENVENIDA10 (sin espacios)"></div>' +
+    '<div class="form-group"><label>Descripción (opcional)</label>' +
+      '<textarea class="input" id="pm-descripcion" placeholder="Detalles de la promo...">' + esc(p.descripcion || '') + '</textarea></div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Vigencia desde (opcional)</label>' +
+        '<input class="input" id="pm-fechainicio" type="date" value="' + (p.fechaInicio ? p.fechaInicio.slice(0,10) : '') + '"></div>' +
+      '<div class="form-group"><label>Vigencia hasta (opcional)</label>' +
+        '<input class="input" id="pm-fechafin" type="date" value="' + (p.fechaFin ? p.fechaFin.slice(0,10) : '') + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+      '<input type="checkbox" id="pm-destacada" ' + (p.destacada ? 'checked' : '') + '> <span>Destacada (se muestra primero)</span></label></div>' +
+    '<div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+      '<input type="checkbox" id="pm-activa" ' + (p.activa !== false ? 'checked' : '') + '> <span>Activa ahora</span></label></div>' +
+    '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-gold" onclick="Pages._guardarPromocion(' + (key ? '\'' + key + '\'' : 'null') + ')">Guardar</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>' +
+    '</div>';
+  openModal(key ? 'Editar promoción' : 'Nueva promoción', body);
+};
+
+Pages._guardarPromocion = function(key) {
+  var titulo = document.getElementById('pm-titulo').value.trim();
+  var tipo = document.getElementById('pm-tipo').value;
+  var valorRaw = document.getElementById('pm-valor').value.trim();
+  var valor = valorRaw ? Number(valorRaw) : 0;
+  var codigo = document.getElementById('pm-codigo').value.trim().toUpperCase().replace(/\s/g, '');
+  var descripcion = document.getElementById('pm-descripcion').value.trim();
+  var fechaInicio = document.getElementById('pm-fechainicio').value;
+  var fechaFin = document.getElementById('pm-fechafin').value;
+  var destacada = document.getElementById('pm-destacada').checked;
+  var activa = document.getElementById('pm-activa').checked;
+  if (!titulo) { alert('El título es obligatorio'); return; }
+  if ((tipo === 'porcentaje' || tipo === 'monto') && valor <= 0) { alert('El valor debe ser mayor a 0'); return; }
+  var data = {
+    titulo: titulo, tipo: tipo, valor: valor, codigo: codigo,
+    descripcion: descripcion, destacada: destacada, activa: activa
+  };
+  if (fechaInicio) data.fechaInicio = fechaInicio + 'T00:00:00';
+  if (fechaFin) data.fechaFin = fechaFin + 'T23:59:59';
+  if (key) data._key = key;
+  ArcanoDB.savePromocion(data);
+  closeModal();
+  toast(key ? 'Promoción actualizada' : 'Promoción creada');
+  App.renderPage('promociones');
+};
+
+Pages._togglePromocion = function(key) {
+  var promos = ArcanoDB.getPromociones();
+  var p = null;
+  for (var i = 0; i < promos.length; i++) { if (promos[i]._key === key) { p = promos[i]; break; } }
+  if (!p) return;
+  ArcanoDB.savePromocion({ _key: key, activa: p.activa === false });
+  App.renderPage('promociones');
+};
+
+Pages._deletePromocion = function(key) {
+  if (!confirm('¿Eliminar esta promoción?')) return;
+  ArcanoDB.deletePromocion(key);
+  App.renderPage('promociones');
+};
+
+/* ==================== CARRITOS (tracking admin) ==================== */
+Pages.renderCarritos = function(el) {
+  var carritos = ArcanoDB.getCarritos();
+  var activos = carritos.filter(function(c) { return c.estado === 'activo'; });
+  var abandonados = carritos.filter(function(c) { return c.estado === 'abandonado'; });
+  var convertidos = carritos.filter(function(c) { return c.estado === 'convertido'; });
+  var vacios = carritos.filter(function(c) { return c.estado === 'vacio'; });
+
+  var h = '<div class="page-header"><h2>Carritos</h2></div>';
+
+  // KPIs
+  h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">';
+  h += '<div class="stat-card"><div class="stat-value text-green">' + activos.length + '</div><div class="stat-label">Activos</div></div>';
+  h += '<div class="stat-card"><div class="stat-value text-yellow">' + abandonados.length + '</div><div class="stat-label">Abandonados</div></div>';
+  h += '<div class="stat-card"><div class="stat-value text-gold">' + convertidos.length + '</div><div class="stat-label">Convertidos</div></div>';
+  h += '<div class="stat-card"><div class="stat-value text-muted">' + vacios.length + '</div><div class="stat-label">Vacíos</div></div>';
+  h += '</div>';
+
+  if (carritos.length === 0) {
+    h += '<div class="card mt-16"><div class="card-body"><p class="text-center text-muted">Todavía no hay carritos registrados. Cuando un cliente agregue productos al carrito en la tienda, aparecerá aquí automáticamente.</p></div></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  // Tabla
+  h += '<div class="card mt-16"><div class="card-header"><h3>Todos los carritos</h3></div><div class="card-body">';
+  h += '<div class="table-wrap"><table class="table"><thead><tr><th>Actualizado</th><th>Cliente</th><th>WhatsApp</th><th>Items</th><th>Cant.</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>';
+  for (var i = 0; i < carritos.length; i++) {
+    var c = carritos[i];
+    var actualizado = c.actualizado ? new Date(c.actualizado).toLocaleString('es-CO', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+    var cliente = c.cliente || {};
+    var nItems = (c.items || []).length;
+    var cant = c.itemCount || 0;
+    var estadoColors = { activo: 'text-green', abandonado: 'text-yellow', convertido: 'text-gold', vacio: 'text-muted' };
+    var estadoLabels = { activo: 'Activo', abandonado: 'Abandonado', convertido: 'Convertido', vacio: 'Vacío' };
+    h += '<tr>' +
+      '<td class="text-sm">' + actualizado + '</td>' +
+      '<td class="fw7">' + esc(cliente.nombre || 'Invitado') + '</td>' +
+      '<td>' + esc(cliente.telefono || '-') + '</td>' +
+      '<td>' + nItems + '</td>' +
+      '<td>' + cant + '</td>' +
+      '<td class="fw7 text-gold">$' + (c.total || 0).toLocaleString() + '</td>' +
+      '<td><span class="' + (estadoColors[c.estado] || 'text-muted') + ' fw7">' + (estadoLabels[c.estado] || c.estado) + '</span></td>' +
+      '<td>' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages._verCarrito(\'' + c._key + '\')">Ver</button> ' +
+        '<button class="btn btn-sm btn-red" onclick="Pages._deleteCarrito(\'' + c._key + '\')">X</button>' +
+      '</td>' +
+    '</tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '</div></div>';
+  el.innerHTML = h;
+};
+
+Pages._verCarrito = function(key) {
+  var carritos = ArcanoDB.getCarritos();
+  var c = null;
+  for (var i = 0; i < carritos.length; i++) { if (carritos[i]._key === key) { c = carritos[i]; break; } }
+  if (!c) { alert('Carrito no encontrado'); return; }
+  var cliente = c.cliente || {};
+  var telNorm = cliente.telefono ? ('57' + cliente.telefono.replace(/\D/g, '').replace(/^57/, '')) : '';
+  var waLink = telNorm ? 'https://wa.me/' + telNorm : '#';
+  var body =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><div class="text-sm text-muted">Cliente</div><b>' + esc(cliente.nombre || 'Invitado') + '</b></div>' +
+      '<div><div class="text-sm text-muted">WhatsApp</div><a href="' + waLink + '" target="_blank" style="color:var(--gold)">' + esc(cliente.telefono || '-') + '</a></div>' +
+      '<div><div class="text-sm text-muted">Creado</div>' + (c.creado ? new Date(c.creado).toLocaleString('es-CO') : '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Última actualización</div>' + (c.actualizado ? new Date(c.actualizado).toLocaleString('es-CO') : '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Estado</div><b>' + esc(c.estado || '?') + '</b></div>' +
+      '<div><div class="text-sm text-muted">Total</div><b class="text-gold">$' + (c.total || 0).toLocaleString() + '</b></div>' +
+    '</div>' +
+    '<h4>Items (' + ((c.items || []).length) + ')</h4>';
+  if (!c.items || c.items.length === 0) {
+    body += '<p class="text-muted">Sin items.</p>';
+  } else {
+    body += '<div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Talla</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>';
+    for (var i = 0; i < c.items.length; i++) {
+      var it = c.items[i];
+      body += '<tr><td class="fw7">' + esc(it.nombre || '?') + '</td><td>' + (it.talla || '-') + '</td><td>' + (it.qty || 0) + '</td><td>$' + (it.precio || 0).toLocaleString() + '</td><td class="fw7">$' + ((it.precio || 0) * (it.qty || 0)).toLocaleString() + '</td></tr>';
+    }
+    body += '</tbody></table></div>';
+    if (telNorm) {
+      body += '<div style="margin-top:14px;display:flex;gap:8px">' +
+        '<a href="' + waLink + '?text=' + encodeURIComponent('Hola ' + (cliente.nombre || '') + '! Vimos que dejaste productos en tu carrito de Arcano Especias. ¿Te ayudamos a completar tu pedido?') + '" target="_blank" class="btn btn-gold">Recuperar por WhatsApp</a>' +
+      '</div>';
+    }
+  }
+  openModal('Detalle de carrito', body);
+};
+
+Pages._deleteCarrito = function(key) {
+  if (!confirm('¿Eliminar este carrito del tracking?')) return;
+  ArcanoDB.deleteCarrito(key);
+  App.renderPage('carritos');
+};

@@ -140,6 +140,16 @@ var _clientes = [];
 var _clientesRef = null;
 var _clientesListeners = [];
 
+/* === Promociones (path arcano/db/promociones) === */
+var _promociones = [];
+var _promocionesRef = null;
+var _promocionesListeners = [];
+
+/* === Carritos tracking (path arcano/db/carritos) === */
+var _carritos = [];
+var _carritosRef = null;
+var _carritosListeners = [];
+
 /* === Costos de insumos (separate from _db to avoid sync overwrites) === */
 var _costosRef = null;
 var _costosInsumos = null;
@@ -155,6 +165,8 @@ function _initFirebase() {
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
     _gcRef = _firebaseDb.ref('arcano/db/grandesClientes');
     _clientesRef = _firebaseDb.ref('arcano/db/clientes');
+    _promocionesRef = _firebaseDb.ref('arcano/db/promociones');
+    _carritosRef = _firebaseDb.ref('arcano/db/carritos');
     _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
@@ -263,6 +275,8 @@ function initDB() {
       _startPedidosListener();
       _startGrandesClientesListener();
       _startClientesListener();
+      _startPromocionesListener();
+      _startCarritosListener();
       _startCostosListener();
       resolve();
       return;
@@ -288,6 +302,8 @@ function initDB() {
         _startPedidosListener();
         _startGrandesClientesListener();
         _startClientesListener();
+        _startPromocionesListener();
+        _startCarritosListener();
         _startCostosListener();
         resolve();
       }).catch(function() {
@@ -493,6 +509,107 @@ function getPedidosByCliente(clienteId) {
   result.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
   return result;
 }
+
+/* === Promociones === */
+function _startPromocionesListener() {
+  if (!_promocionesRef) return;
+  _promocionesRef.on('value', function(snap) {
+    var data = snap.val();
+    _promociones = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var p = data[keys[i]];
+        if (p && typeof p === 'object') {
+          p._key = keys[i];
+          _promociones.push(p);
+        }
+      }
+    }
+    _promociones.sort(function(a, b) {
+      // Activas primero, luego destacadas, luego por creacion desc
+      var aActive = a.activa !== false ? 1 : 0;
+      var bActive = b.activa !== false ? 1 : 0;
+      if (aActive !== bActive) return bActive - aActive;
+      var aDest = a.destacada ? 1 : 0;
+      var bDest = b.destacada ? 1 : 0;
+      if (aDest !== bDest) return bDest - aDest;
+      return (b.creado || '').localeCompare(a.creado || '');
+    });
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+    for (var pl = 0; pl < _promocionesListeners.length; pl++) { try { _promocionesListeners[pl](_promociones); } catch(e) {} }
+  });
+}
+
+function getPromociones() { return _promociones.slice(); }
+
+function getPromocionesActivas() {
+  var now = Date.now();
+  return _promociones.filter(function(p) {
+    if (p.activa === false) return false;
+    if (p.fechaInicio && new Date(p.fechaInicio).getTime() > now) return false;
+    if (p.fechaFin && new Date(p.fechaFin).getTime() < now) return false;
+    return true;
+  });
+}
+
+function savePromocion(data) {
+  if (!_promocionesRef) return;
+  if (!data._key) {
+    data.creado = new Date().toISOString();
+    var newRef = _promocionesRef.push();
+    var clean = Object.assign({}, data);
+    delete clean._key;
+    newRef.set(clean);
+  } else {
+    var key = data._key;
+    var updates = Object.assign({}, data);
+    delete updates._key;
+    _promocionesRef.child(key).update(updates);
+  }
+}
+
+function deletePromocion(key) {
+  if (!_promocionesRef) return;
+  _promocionesRef.child(key).remove();
+}
+
+function onPromocionesChange(fn) { _promocionesListeners.push(fn); }
+
+/* === Carritos === */
+function _startCarritosListener() {
+  if (!_carritosRef) return;
+  _carritosRef.on('value', function(snap) {
+    var data = snap.val();
+    _carritos = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var c = data[keys[i]];
+        if (c && typeof c === 'object') {
+          c._key = keys[i];
+          _carritos.push(c);
+        }
+      }
+    }
+    _carritos.sort(function(a, b) { return (b.actualizado || b.creado || '').localeCompare(a.actualizado || a.creado || ''); });
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+    for (var cl = 0; cl < _carritosListeners.length; cl++) { try { _carritosListeners[cl](_carritos); } catch(e) {} }
+  });
+}
+
+function getCarritos() { return _carritos.slice(); }
+
+function getCarritosByEstado(estado) {
+  return _carritos.filter(function(c) { return c.estado === estado; });
+}
+
+function deleteCarrito(key) {
+  if (!_carritosRef) return;
+  _carritosRef.child(key).remove();
+}
+
+function onCarritosChange(fn) { _carritosListeners.push(fn); }
 
 function updatePedidoEstado(pedidoKey, nuevoEstado) {
   if (!_pedidosRef) return;
@@ -2178,5 +2295,7 @@ window.ArcanoDB = {
   saveNow: saveNow,
   writeField: writeField,
   getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount,
-  getClientes: getClientes, getClientesCount: getClientesCount, onClientesChange: onClientesChange, deleteCliente: deleteCliente, getPedidosByCliente: getPedidosByCliente
+  getClientes: getClientes, getClientesCount: getClientesCount, onClientesChange: onClientesChange, deleteCliente: deleteCliente, getPedidosByCliente: getPedidosByCliente,
+  getPromociones: getPromociones, getPromocionesActivas: getPromocionesActivas, savePromocion: savePromocion, deletePromocion: deletePromocion, onPromocionesChange: onPromocionesChange,
+  getCarritos: getCarritos, getCarritosByEstado: getCarritosByEstado, deleteCarrito: deleteCarrito, onCarritosChange: onCarritosChange
 };
