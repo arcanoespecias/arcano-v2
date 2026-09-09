@@ -103,7 +103,16 @@ const Pages = {
     for (var vi4 = 0; vi4 < ventasMes.length; vi4++) { ingresosMes += (ventasMes[vi4].total || 0); opsMes++; }
 
     var totalCostos = 0;
-    for (var ei = 0; ei < entradas.length; ei++) totalCostos += (Number(entradas[ei].total) || 0);
+    var comprasMes = 0;  // Entradas (compras de insumos) del mes actual
+    var comprasHoy = 0;  // Entradas de hoy
+    for (var ei = 0; ei < entradas.length; ei++) {
+      var ent = entradas[ei];
+      var entTotal = Number(ent.total) || 0;
+      totalCostos += entTotal;
+      var entFecha = ent.fecha || '';
+      if (entFecha === today) comprasHoy += entTotal;
+      if (entFecha && entFecha.startsWith(mes)) comprasMes += entTotal;
+    }
     var margenBruto = totalIngresos - totalCostos;
     var margenPct = totalIngresos > 0 ? (margenBruto / totalIngresos * 100) : 0;
 
@@ -142,6 +151,7 @@ const Pages = {
     h += '<div class="dash-kpi-row">';
     h += '<div class="dash-kpi-card dash-kpi-gold"><div class="dash-kpi-icon">$</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosHoy.toLocaleString() + '</div><div class="dash-kpi-lbl">Ventas Hoy</div></div></div>';
     h += '<div class="dash-kpi-card dash-kpi-blue"><div class="dash-kpi-icon">M</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Ingresos del Mes</div><div class="dash-kpi-sub">' + opsMes + ' operaciones</div></div></div>';
+    h += '<div class="dash-kpi-card dash-kpi-red"><div class="dash-kpi-icon" style="color:var(--red)">C</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:var(--red)">$' + comprasMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Compras del Mes</div><div class="dash-kpi-sub">Insumos adquiridos este mes</div></div></div>';
     var mClr = margenPct >= 0 ? 'var(--green)' : 'var(--red)';
     h += '<div class="dash-kpi-card"><div class="dash-kpi-icon" style="color:var(--green)">%a</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:' + mClr + '">' + margenPct.toFixed(1) + '%</div><div class="dash-kpi-lbl">Margen Bruto</div><div class="dash-kpi-sub">Ingreso $' + totalIngresos.toLocaleString() + ' - Costos $' + totalCostos.toLocaleString() + '</div></div></div>';
     h += '<div class="dash-kpi-card ' + (totalAlertas > 0 ? 'dash-kpi-red' : 'dash-kpi-green') + '"><div class="dash-kpi-icon">!</div><div class="dash-kpi-body"><div class="dash-kpi-val">' + totalAlertas + '</div><div class="dash-kpi-lbl">Alertas de Stock</div><div class="dash-kpi-sub">' + palaBaja.length + ' pala, ' + frascosBajos.length + ' frascos, ' + stickerBajos.length + ' stk</div></div></div>';
@@ -157,9 +167,11 @@ const Pages = {
     h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
     var gastosMes = 0;
     for (var gm = 0; gm < gastos.length; gm++) { if (gastos[gm].fecha && gastos[gm].fecha.startsWith(mes)) gastosMes += (gastos[gm].monto || 0); }
-    var gananciaNeta = ingresosMes - totalCostos - gastosMes;
+    // Ganancia neta del mes = ingresos del mes - compras del mes - gastos del mes
+    // (NO usa totalCostos que es histórico y romperia el calculo mensual)
+    var gananciaNeta = ingresosMes - comprasMes - gastosMes;
     h += '<div class="dash-mini"><div class="dash-mini-val" style="color:var(--red)">$' + gastosMes.toLocaleString() + '</div><div class="dash-mini-lbl">Gastos del Mes</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:' + (gananciaNeta >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + gananciaNeta.toLocaleString() + '</div><div class="dash-mini-lbl">Ganancia Neta</div><div class="dash-mini-sub">ingreso - costos - gastos</div></div>';
+    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:' + (gananciaNeta >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + gananciaNeta.toLocaleString() + '</div><div class="dash-mini-lbl">Ganancia Neta</div><div class="dash-mini-sub">ingresos - compras - gastos</div></div>';
     h += '</div>';
 
     // Canal de venta + Composicion
