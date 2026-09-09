@@ -6933,4 +6933,154 @@ function _saveBlendPrecios() {
   toast('Precios de Tu Blend guardados');
 }
 
+/* ==================== CLIENTES (tienda) ==================== */
+Pages.renderClientes = function(el) {
+  var clientes = ArcanoDB.getClientes();
+  var pedidos = ArcanoDB.getPedidos();
+
+  // Calcular total comprado historico por cliente (sumando pedidos no cancelados)
+  var totalPorCliente = {};
+  for (var pi = 0; pi < pedidos.length; pi++) {
+    var p = pedidos[pi];
+    if (p.clienteId && p.estado !== 'cancelado') {
+      totalPorCliente[p.clienteId] = (totalPorCliente[p.clienteId] || 0) + (p.total || 0);
+    }
+  }
+
+  // KPIs resumen
+  var totalClientes = clientes.length;
+  var nuevosEsteMes = 0;
+  var mes = new Date().toISOString().slice(0, 7);
+  for (var ci = 0; ci < clientes.length; ci++) {
+    if ((clientes[ci].creado || '').startsWith(mes)) nuevosEsteMes++;
+  }
+
+  var h = '<div class="page-header"><h2>Clientes</h2>';
+  h += '<span class="badge badge-gold" style="font-size:0.85rem">' + totalClientes + ' clientes</span>';
+  if (nuevosEsteMes > 0) h += '<span class="badge badge-green" style="font-size:0.85rem;margin-left:8px">' + nuevosEsteMes + ' nuevos este mes</span>';
+  h += '</div>';
+
+  if (totalClientes === 0) {
+    h += '<div class="card"><div class="card-body"><p class="text-center text-muted">Todavía no hay clientes registrados. Cuando un cliente haga su primer pedido en la tienda, se creará automáticamente aquí.</p></div></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  // Input de búsqueda
+  h += '<div class="card mb-16"><div class="card-body">' +
+    '<div class="form-group" style="margin:0"><input class="input" id="clientes-search" placeholder="Buscar por nombre, WhatsApp o email..." oninput="Pages._filterClientesTable(this.value)"></div>' +
+  '</div></div>';
+
+  h += '<div class="card"><div class="card-header"><h3>Lista de Clientes</h3></div>' +
+    '<div class="card-body" id="clientes-list-container">';
+
+  h += Pages._renderClientesTable(clientes, totalPorCliente);
+  h += '</div></div>';
+
+  el.innerHTML = h;
+};
+
+Pages._renderClientesTable = function(clientes, totalPorCliente) {
+  if (!clientes || clientes.length === 0) {
+    return '<p class="text-center text-muted">Sin resultados.</p>';
+  }
+  var h = '<div class="table-wrap"><table class="table"><thead><tr>' +
+    '<th>Nombre</th><th>WhatsApp</th><th>Email</th><th>Ciudad</th>' +
+    '<th>Pedidos</th><th>Total Comprado</th><th>Último Pedido</th><th></th>' +
+    '</tr></thead><tbody>';
+  for (var i = 0; i < clientes.length; i++) {
+    var c = clientes[i];
+    var total = totalPorCliente[c._key] || 0;
+    var ultimoPed = c.ultimoPedido ? new Date(c.ultimoPedido).toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'numeric'}) : '-';
+    var tel = c.telefono || '';
+    var telNorm = c.telNorm || '';
+    var waLink = telNorm ? 'https://wa.me/' + telNorm : '#';
+    h += '<tr class="cliente-row" data-nombre="' + esc((c.nombre || '').toLowerCase()) + '" data-tel="' + esc(tel.toLowerCase()) + '" data-email="' + esc((c.email || '').toLowerCase()) + '">' +
+      '<td class="fw7">' + esc(c.nombre || 'Sin nombre') + '</td>' +
+      '<td><a href="' + waLink + '" target="_blank" style="color:var(--gold)">' + esc(tel) + '</a></td>' +
+      '<td class="text-sm">' + esc(c.email || '-') + '</td>' +
+      '<td>' + esc(c.ciudad || '-') + '</td>' +
+      '<td><span class="badge badge-gold">' + (c.totalPedidos || 0) + '</span></td>' +
+      '<td class="fw7" style="color:var(--green)">$' + total.toLocaleString() + '</td>' +
+      '<td class="text-sm text-muted">' + ultimoPed + '</td>' +
+      '<td>' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages._verHistorialCliente(\'' + c._key + '\')" title="Ver historial">📜</button> ' +
+        '<button class="btn btn-sm btn-red" onclick="Pages._deleteCliente(\'' + c._key + '\')" title="Eliminar">X</button>' +
+      '</td>' +
+      '</tr>';
+  }
+  h += '</tbody></table></div>';
+  return h;
+};
+
+Pages._filterClientesTable = function(q) {
+  q = (q || '').toLowerCase().trim();
+  var rows = document.querySelectorAll('.cliente-row');
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!q) { r.style.display = ''; continue; }
+    var nombre = r.dataset.nombre || '';
+    var tel = r.dataset.tel || '';
+    var email = r.dataset.email || '';
+    if (nombre.indexOf(q) !== -1 || tel.indexOf(q) !== -1 || email.indexOf(q) !== -1) {
+      r.style.display = '';
+    } else {
+      r.style.display = 'none';
+    }
+  }
+};
+
+Pages._verHistorialCliente = function(clienteKey) {
+  var clientes = ArcanoDB.getClientes();
+  var cliente = null;
+  for (var i = 0; i < clientes.length; i++) {
+    if (clientes[i]._key === clienteKey) { cliente = clientes[i]; break; }
+  }
+  if (!cliente) { alert('Cliente no encontrado'); return; }
+  var pedidos = ArcanoDB.getPedidosByCliente(clienteKey);
+  var totalComprado = 0;
+  for (var j = 0; j < pedidos.length; j++) {
+    if (pedidos[j].estado !== 'cancelado') totalComprado += (pedidos[j].total || 0);
+  }
+  var telNorm = cliente.telNorm || '';
+  var waLink = telNorm ? 'https://wa.me/' + telNorm : '#';
+  var body =
+    '<div class="card-hdr"><h3 style="margin:0">' + esc(cliente.nombre || 'Cliente') + '</h3></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><div class="text-sm text-muted">WhatsApp</div><a href="' + waLink + '" target="_blank" style="color:var(--gold)">' + esc(cliente.telefono || '-') + '</a></div>' +
+      '<div><div class="text-sm text-muted">Email</div>' + esc(cliente.email || '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Ciudad</div>' + esc(cliente.ciudad || '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Dirección</div>' + esc(cliente.direccion || '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Total pedidos</div><b>' + (cliente.totalPedidos || 0) + '</b></div>' +
+      '<div><div class="text-sm text-muted">Total comprado</div><b style="color:var(--green)">$' + totalComprado.toLocaleString() + '</b></div>' +
+      '<div><div class="text-sm text-muted">Cliente desde</div>' + (cliente.creado ? new Date(cliente.creado).toLocaleDateString('es-CO') : '-') + '</div>' +
+      '<div><div class="text-sm text-muted">Último pedido</div>' + (cliente.ultimoPedido ? new Date(cliente.ultimoPedido).toLocaleDateString('es-CO') : '-') + '</div>' +
+    '</div>' +
+    '<h4 style="margin:16px 0 8px">Historial de Pedidos (' + pedidos.length + ')</h4>';
+  if (pedidos.length === 0) {
+    body += '<p class="text-muted">No hay pedidos vinculados a este cliente.</p>';
+  } else {
+    body += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Estado</th><th>Items</th><th>Total</th></tr></thead><tbody>';
+    for (var k = 0; k < pedidos.length; k++) {
+      var p = pedidos[k];
+      var fecha = p.creado ? new Date(p.creado).toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+      var estadoColor = p.estado === 'nuevo' ? 'var(--red)' : (p.estado === 'enviado' || p.estado === 'confirmado' || p.estado === 'entregado' ? 'var(--green)' : 'var(--text3)');
+      body += '<tr>' +
+        '<td class="text-sm">' + fecha + '</td>' +
+        '<td><span style="color:' + estadoColor + ';font-weight:600">' + esc(p.estado || 'nuevo') + '</span></td>' +
+        '<td class="text-sm">' + ((p.items || []).length) + ' items</td>' +
+        '<td class="fw7">$' + (p.total || 0).toLocaleString() + '</td>' +
+      '</tr>';
+    }
+    body += '</tbody></table></div>';
+  }
+  openModal('Historial de Cliente', body);
+};
+
+Pages._deleteCliente = function(key) {
+  if (!confirm('¿Eliminar este cliente? Sus pedidos no se borrarán pero quedarán sin cliente vinculado.')) return;
+  ArcanoDB.deleteCliente(key);
+  App.renderPage('clientes');
+};
+
 

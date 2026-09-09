@@ -219,6 +219,8 @@ const App = {
               '<span class="nav-icon">🏪</span><span class="nav-label">P. Venta</span></a>' +
             '<a class="nav-item" data-page="grandesClientes" onclick="App.navigate(\'grandesClientes\')">' +
               '<span class="nav-icon">🏢</span><span class="nav-label">Grandes Clientes</span><span class="nav-badge" id="gc-badge" style="display:none"></span></a>' +
+            '<a class="nav-item" data-page="clientes" onclick="App.navigate(\'clientes\')">' +
+              '<span class="nav-icon">👥</span><span class="nav-label">Clientes</span></a>' +
             '<div style="border-top:1px solid var(--border);margin:8px 12px"></div>' +
             '<a class="nav-item" data-page="testing" onclick="App.navigate(\'testing\')">' +
               '<span class="nav-icon">🧪</span><span class="nav-label">Testing</span></a>' +
@@ -257,7 +259,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes'
+      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     // Cierra el drawer lateral en mobile al cambiar de pagina
@@ -325,6 +327,7 @@ const App = {
         case 'testing': Pages.renderTesting(container); break;
         case 'puntosdeventa': PDV.render(container); break;
         case 'grandesClientes': Pages.renderGrandesClientes(container); break;
+        case 'clientes': Pages.renderClientes(container); break;
         default: container.innerHTML = '<p>Pagina no encontrada</p>';
       }
     } catch (e) {

@@ -135,6 +135,11 @@ var _gcRef = null;
 var _gcListeners = [];
 var _prevGCKeys = {};
 
+/* === Clientes tienda (path arcano/db/clientes) === */
+var _clientes = [];
+var _clientesRef = null;
+var _clientesListeners = [];
+
 /* === Costos de insumos (separate from _db to avoid sync overwrites) === */
 var _costosRef = null;
 var _costosInsumos = null;
@@ -149,6 +154,7 @@ function _initFirebase() {
     _firebaseRef = _firebaseDb.ref(FB_PATH);
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
     _gcRef = _firebaseDb.ref('arcano/db/grandesClientes');
+    _clientesRef = _firebaseDb.ref('arcano/db/clientes');
     _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
@@ -256,6 +262,7 @@ function initDB() {
       _startFirebaseListener();
       _startPedidosListener();
       _startGrandesClientesListener();
+      _startClientesListener();
       _startCostosListener();
       resolve();
       return;
@@ -280,6 +287,7 @@ function initDB() {
         _startFirebaseListener();
         _startPedidosListener();
         _startGrandesClientesListener();
+        _startClientesListener();
         _startCostosListener();
         resolve();
       }).catch(function() {
@@ -433,6 +441,57 @@ function getGCCount(estado) {
     if (_grandesClientes[i].estado === estado) count++;
   }
   return count;
+}
+
+/* === Clientes tienda (path arcano/db/clientes) === */
+function _startClientesListener() {
+  if (!_clientesRef) return;
+  _clientesRef.on('value', function(snap) {
+    var data = snap.val();
+    _clientes = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var c = data[keys[i]];
+        if (c && typeof c === 'object') {
+          c._key = keys[i];
+          _clientes.push(c);
+        }
+      }
+    }
+    // Ordenar por ultimoPedido desc (mas recientes primero)
+    _clientes.sort(function(a, b) {
+      return (b.ultimoPedido || b.creado || '').localeCompare(a.ultimoPedido || a.creado || '');
+    });
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+    for (var cl = 0; cl < _clientesListeners.length; cl++) { try { _clientesListeners[cl](_clientes); } catch(e) {} }
+  });
+}
+
+function getClientes() { return _clientes.slice(); }
+
+function getClientesCount() { return _clientes.length; }
+
+function onClientesChange(fn) { _clientesListeners.push(fn); }
+
+function deleteCliente(key) {
+  if (!_clientesRef) return;
+  _clientesRef.child(key).remove();
+}
+
+/**
+ * Obtiene los pedidos asociados a un cliente por su clienteId.
+ */
+function getPedidosByCliente(clienteId) {
+  if (!clienteId) return [];
+  var result = [];
+  for (var i = 0; i < _pedidos.length; i++) {
+    if (_pedidos[i].clienteId === clienteId) {
+      result.push(_pedidos[i]);
+    }
+  }
+  result.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+  return result;
 }
 
 function updatePedidoEstado(pedidoKey, nuevoEstado) {
@@ -2118,5 +2177,6 @@ window.ArcanoDB = {
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
   saveNow: saveNow,
   writeField: writeField,
-  getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount
+  getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount,
+  getClientes: getClientes, getClientesCount: getClientesCount, onClientesChange: onClientesChange, deleteCliente: deleteCliente, getPedidosByCliente: getPedidosByCliente
 };
