@@ -216,10 +216,15 @@ select.input { cursor: pointer; }
   overflow: hidden;
 }
 .sidebar-closed .sidebar { width: var(--sidebar-closed-w); }
-.sidebar-closed .sidebar .sidebar-brand,
-.sidebar-closed .sidebar .nav-label,
-.sidebar-closed .sidebar .user-info,
-.sidebar-closed .sidebar .sidebar-footer .btn { display: none; }
+/* En desktop, sidebar-closed colapsa a 60px y oculta los textos.
+   En mobile nunca se colapsa (es drawer overlay), asi que estos
+   display:none SOLO aplican en pantallas >= 769px. */
+@media (min-width: 769px) {
+  .sidebar-closed .sidebar .sidebar-brand,
+  .sidebar-closed .sidebar .nav-label,
+  .sidebar-closed .sidebar .user-info,
+  .sidebar-closed .sidebar .sidebar-footer .btn { display: none; }
+}
 
 .sidebar-header {
   padding: 16px; display: flex; align-items: center; gap: 10px;
