@@ -6,7 +6,7 @@
 
    Stock por especia: stockBolsa (grs), stockChico, stockGrande (frascos)
    Stock por blend:   stockChico, stockGrande (frascos)
-   Stock global:      stockEnvases (chico/grande), stockBolsas (chico/grande)
+   Stock global:      stockEnvases (chico/grande), stockBolsas (chico/grande), stockCintas
    Stickers:           por producto, stockChico, stockGrande
    ===================== */
 
@@ -30,7 +30,7 @@ var _saveTimer = null;
 var _listeners = [];
 var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosDeVenta: 1, pdvVentas: 1, packs: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -72,6 +72,7 @@ function _ensureStructure() {
   if (!_db.entradas) _db.entradas = {};
   if (!_db.stickers) _db.stickers = {};
   if (!_db.ajustes) _db.ajustes = {};
+  if (!_db.packs) _db.packs = {};
   // Migration: copy old etiquetas data to stickers
   if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
     _db.stickers = _db.etiquetas;
@@ -79,6 +80,7 @@ function _ensureStructure() {
   delete _db.etiquetas;
   if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
   if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+  if (!_db.stockCintas) _db.stockCintas = 0;
   if (!_db.usuarios) _db.usuarios = {
     admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() }
   };
@@ -87,6 +89,8 @@ function _ensureStructure() {
     'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
     'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
   };
+  if (!_db.usoOptions) _db.usoOptions = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
+  if (!_db.tiendaConfig) _db.tiendaConfig = { logoPago: '' };
   _cleanNulls();
   return true;
 }
@@ -94,14 +98,16 @@ function _ensureStructure() {
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosDeVenta: {}, pdvVentas: {}, packs: {},
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
+    stockCintas: 0,
     productTags: {
       'Comidas': ['Aves', 'Pescados y Mariscos', 'Cerdo', 'Salsas y Aderezos', 'Verduras y Vegetales', 'Granos y Legumbres'],
       'Infusiones': ['Relajante', 'Digestiva', 'Energética', 'Citrica', 'Refrescante', 'Detox', 'Aromatica'],
       'Cocteleria': ['Tropical', 'Citrica', 'Seca', 'Dulce']
     },
+    usoOptions: ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'],
     usuarios: { admin: { id: 'admin', nombre: 'Administrador', pin: '1234', rol: 'admin', activo: true, creado: new Date().toISOString() } }
   };
 }
@@ -123,6 +129,18 @@ var _pedidos = [];           // in-memory list of orders from tienda
 var _pedidosRef = null;      // Firebase ref for arcano/db/pedidos
 var _pedidosListeners = [];  // callbacks when new pedido arrives
 
+/* === Grandes Clientes (path arcano/db/grandesClientes) === */
+var _grandesClientes = [];
+var _gcRef = null;
+var _gcListeners = [];
+var _prevGCKeys = {};
+
+/* === Costos de insumos (separate from _db to avoid sync overwrites) === */
+var _costosRef = null;
+var _costosInsumos = null;
+var _costosReady = false;
+var _costosListeners = [];
+
 function _initFirebase() {
   if (_firebaseDb) return;
   try {
@@ -130,6 +148,8 @@ function _initFirebase() {
     _firebaseDb = firebase.database();
     _firebaseRef = _firebaseDb.ref(FB_PATH);
     _pedidosRef = _firebaseDb.ref('arcano/db/pedidos');
+    _gcRef = _firebaseDb.ref('arcano/db/grandesClientes');
+    _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
   }
@@ -154,6 +174,65 @@ function _saveToFirebase() {
   }, 500);
 }
 
+function _saveToFirebaseNow(callback) {
+  if (!_firebaseRef) { if (callback) callback(null); return; }
+  clearTimeout(_saveTimer);
+  _localDirty = true;
+  try {
+    var safetyTimer = setTimeout(function() { _localDirty = false; if (callback) callback(new Error('Firebase save timeout')); }, 10000);
+    _firebaseRef.update(_db, function(error) {
+      clearTimeout(safetyTimer);
+      _localDirty = false;
+      if (callback) callback(error);
+      else if (error) console.error('[DB] Firebase save error:', error);
+    });
+  } catch (e) {
+    _localDirty = false;
+    if (callback) callback(e);
+    else console.error('[DB] Firebase save error:', e);
+  }
+}
+
+function writeField(path, value) {
+  if (!_firebaseRef) return;
+  try {
+    _firebaseRef.child(path).set(value, function(error) {
+      if (error) console.error('[DB] writeField error:', path, error);
+    });
+  } catch (e) {
+    console.error('[DB] writeField error:', path, e);
+  }
+}
+
+function saveNow() {
+  return new Promise(function(resolve) {
+    if (!_firebaseRef) { resolve(false); return; }
+    clearTimeout(_saveTimer);
+    _localDirty = true;
+    var resolved = false;
+    var safetyTimer = setTimeout(function() {
+      if (!resolved) { resolved = true; _localDirty = false; console.warn('[DB] saveNow timeout - resolving false'); resolve(false); }
+    }, 10000);
+    try {
+      _firebaseRef.update(_db, function(error) {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(safetyTimer);
+        _localDirty = false;
+        if (error) { console.error('[DB] Firebase save error:', error); resolve(false); }
+        else resolve(true);
+      });
+    } catch (e) {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(safetyTimer);
+      _localDirty = false;
+      console.error('[DB] Firebase save error:', e);
+      resolve(false);
+    }
+  });
+}
+
 function _notify(type, col, id) {
   for (var i = 0; i < _listeners.length; i++) {
     try { _listeners[i](type, col, id); } catch (e) {}
@@ -176,6 +255,8 @@ function initDB() {
       _ready = true;
       _startFirebaseListener();
       _startPedidosListener();
+      _startGrandesClientesListener();
+      _startCostosListener();
       resolve();
       return;
     }
@@ -185,7 +266,8 @@ function initDB() {
       _firebaseRef.once('value').then(function(snap) {
         var fbData = snap.val();
         if (fbData && fbData.meta && fbData.meta.version === DB_VERSION && _ensureStructureOn(fbData)) {
-          delete fbData.pedidos;  // pedidos managed separately, not part of admin _db
+          delete fbData.pedidos;
+          delete fbData.costosInsumos;
           _db = fbData;
           _ensureStructure();  // ensure new fields exist on Firebase data
         } else {
@@ -197,6 +279,8 @@ function initDB() {
         _cacheLocal();
         _startFirebaseListener();
         _startPedidosListener();
+        _startGrandesClientesListener();
+        _startCostosListener();
         resolve();
       }).catch(function() {
         _db = _emptyDB();
@@ -233,7 +317,8 @@ function _startFirebaseListener() {
     if (!data || !data.meta || data.meta.version !== DB_VERSION) return;
     // CRITICAL: skip if local save is pending to prevent overwriting unsaved changes
     if (_localDirty) return;
-    delete data.pedidos;  // pedidos managed separately, not part of admin _db
+    delete data.pedidos;
+    delete data.costosInsumos;
     var prevJson = JSON.stringify(_db);
     _db = data;
     _ensureStructure();
@@ -296,9 +381,68 @@ function getPedidosCount(estado) {
   return c;
 }
 
+/* === Grandes Clientes === */
+function _startGrandesClientesListener() {
+  if (!_gcRef) return;
+  _gcRef.on('value', function(snap) {
+    var data = snap.val();
+    _grandesClientes = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var g = data[keys[i]];
+        if (g && typeof g === 'object') {
+          g._key = keys[i];
+          _grandesClientes.push(g);
+        }
+      }
+    }
+    _grandesClientes.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+    // Detect new GC message
+    var currentKeys = {};
+    for (var k = 0; k < _grandesClientes.length; k++) { currentKeys[_grandesClientes[k]._key] = true; }
+    var hasNew = false;
+    var ck = Object.keys(currentKeys);
+    for (var c = 0; c < ck.length; c++) {
+      if (!_prevGCKeys[ck[c]]) { hasNew = true; break; }
+    }
+    _prevGCKeys = currentKeys;
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+    for (var g = 0; g < _gcListeners.length; g++) { try { _gcListeners[g](_grandesClientes, hasNew); } catch(e) {} }
+  });
+}
+
+function getGrandesClientes() { return _grandesClientes.slice(); }
+
+function updateGCEstado(key, estado) {
+  if (!_gcRef) return;
+  _gcRef.child(key + '/estado').set(estado);
+}
+
+function deleteGC(key) {
+  if (!_gcRef) return;
+  _gcRef.child(key).remove();
+}
+
+function onGCChange(fn) { _gcListeners.push(fn); }
+
+function getGCCount(estado) {
+  if (!estado) return _grandesClientes.length;
+  var count = 0;
+  for (var i = 0; i < _grandesClientes.length; i++) {
+    if (_grandesClientes[i].estado === estado) count++;
+  }
+  return count;
+}
+
 function updatePedidoEstado(pedidoKey, nuevoEstado) {
   if (!_pedidosRef) return;
   _pedidosRef.child(pedidoKey + '/estado').set(nuevoEstado);
+}
+
+function updatePedidoField(pedidoKey, field, value) {
+  if (!_pedidosRef) return;
+  _pedidosRef.child(pedidoKey + '/' + field).set(value);
 }
 
 function deletePedido(pedidoKey) {
@@ -347,14 +491,20 @@ function saveEspecia(data) {
   } else {
     var existing = _db.especias[data.id];
     if (existing) {
-      data.stockBolsa = Number(existing.stockBolsa) || 0;
-      data.stockChico = Number(existing.stockChico) || 0;
-      data.stockGrande = Number(existing.stockGrande) || 0;
+      for (var _k in existing) {
+        if (existing.hasOwnProperty(_k) && !data.hasOwnProperty(_k)) {
+          data[_k] = existing[_k];
+        }
+      }
       data.creado = existing.creado;
     }
   }
   data.nombre = (data.nombre || '').trim();
-  data.categoria = data.categoria || 'Comidas';
+  if (Array.isArray(data.categorias) && data.categorias.length > 0) {
+    data.categoria = data.categorias[0];
+  } else {
+    data.categorias = [data.categoria || 'Comidas'];
+  }
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   data.gramosChico = Number(data.gramosChico) || 0;
@@ -363,6 +513,7 @@ function saveEspecia(data) {
   data.stockChico = Number(data.stockChico) || 0;
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.especias[data.id] = data;
+  _getOrCreateSticker(data.nombre);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'especias', data.id);
   return data;
@@ -387,19 +538,27 @@ function saveBlend(data) {
   } else {
     var existing = _db.blends[data.id];
     if (existing) {
-      data.stockChico = Number(existing.stockChico) || 0;
-      data.stockGrande = Number(existing.stockGrande) || 0;
+      for (var _k in existing) {
+        if (existing.hasOwnProperty(_k) && !data.hasOwnProperty(_k)) {
+          data[_k] = existing[_k];
+        }
+      }
       data.creado = existing.creado;
     }
   }
   data.nombre = (data.nombre || '').trim();
-  data.categoria = data.categoria || 'Comidas';
+  if (Array.isArray(data.categorias) && data.categorias.length > 0) {
+    data.categoria = data.categorias[0];
+  } else {
+    data.categorias = [data.categoria || 'Comidas'];
+  }
   data.precioChico = Number(data.precioChico) || 0;
   data.precioGrande = Number(data.precioGrande) || 0;
   data.ingredientes = data.ingredientes || [];
   data.stockChico = Number(data.stockChico) || 0;
   data.stockGrande = Number(data.stockGrande) || 0;
   _db.blends[data.id] = data;
+  _getOrCreateSticker(data.nombre);
   _saveToFirebase(); _cacheLocal();
   _notify(isNew ? 'create' : 'update', 'blends', data.id);
   return data;
@@ -442,7 +601,7 @@ function getProductosConStickers() {
     if (!e || typeof e !== 'object') continue;
     var stk = _findStickerByNombre(e.nombre);
     items.push({
-      id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '',
+      id: e.id, nombre: e.nombre || '', tipo: 'especia', categoria: e.categoria || '', categorias: e.categorias || [e.categoria || 'Comidas'],
       stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
       stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
@@ -453,7 +612,7 @@ function getProductosConStickers() {
     if (!b || typeof b !== 'object') continue;
     var stk = _findStickerByNombre(b.nombre);
     items.push({
-      id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '',
+      id: b.id, nombre: b.nombre || '', tipo: 'blend', categoria: b.categoria || '', categorias: b.categorias || [b.categoria || 'Comidas'],
       stockChico: stk ? (Number(stk.stockChico) || 0) : 0,
       stockGrande: stk ? (Number(stk.stockGrande) || 0) : 0
     });
@@ -480,7 +639,29 @@ function saveEntrada(data) {
       if (tipo === 'especia_grs') {
         // Add grams to especia stockBolsa
         if (item.especiaId && _db.especias[item.especiaId]) {
-          _db.especias[item.especiaId].stockBolsa = (_db.especias[item.especiaId].stockBolsa || 0) + (Number(item.cantidad) || 0);
+          var espObj = _db.especias[item.especiaId];
+          var grsNuevos = Number(item.cantidad) || 0;
+          var costoNuevo = Number(item.costoUnitario) || 0;
+          // Weighted average cost per gram
+          if (grsNuevos > 0 && costoNuevo > 0) {
+            var stockPrevio = espObj.stockBolsa || 0;
+            var costoPrevio = (_costosInsumos && _costosInsumos.especias && _costosInsumos.especias[item.especiaId]) || 0;
+            var nuevoTotalGrs = stockPrevio + grsNuevos;
+            var nuevoCostoProm = 0;
+            if (nuevoTotalGrs > 0) {
+              nuevoCostoProm = (stockPrevio * costoPrevio + grsNuevos * costoNuevo) / nuevoTotalGrs;
+            }
+            if (!_costosInsumos) _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
+            if (!_costosInsumos.especias) _costosInsumos.especias = {};
+            _costosInsumos.especias[item.especiaId] = Math.round(nuevoCostoProm * 1000) / 1000;
+            if (_costosRef) {
+              _costosRef.set(_costosInsumos, function(error) {
+                if (error) console.error('[DB] Costos promedio save error:', error);
+              });
+            }
+            try { localStorage.setItem('arcano_costos', JSON.stringify(_costosInsumos)); } catch (e) {}
+          }
+          espObj.stockBolsa = (espObj.stockBolsa || 0) + grsNuevos;
         }
       } else if (tipo === 'envase') {
         var talla = item.talla || 'chico';
@@ -498,6 +679,9 @@ function saveEntrada(data) {
         var tallaB = item.talla || 'chico';
         if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
         _db.stockBolsas[tallaB] = (_db.stockBolsas[tallaB] || 0) + (Number(item.cantidad) || 0);
+      } else if (tipo === 'cinta') {
+        if (!_db.stockCintas) _db.stockCintas = 0;
+        _db.stockCintas = _db.stockCintas + (Number(item.cantidad) || 0);
       }
     }
   }
@@ -572,12 +756,17 @@ function saveAjuste(data) {
     _db.stockBolsas[t] = nv;
     data.productoNombre = 'Bolsas ' + t;
   } else if (cat === 'sticker') {
-    var stk = _findStickerByNombre(data.productoNombre);
-    if (!stk) throw new Error('Sticker "' + (data.productoNombre||'') + '" no encontrado');
+    var stk = _getOrCreateSticker(data.productoNombre);
     var field = (sub === 'grande') ? 'stockGrande' : 'stockChico';
     var nv = (Number(stk[field]) || 0) + cantidad;
     if (nv < 0) throw new Error('Stock resultante negativo (' + nv + ') para sticker ' + stk.nombre);
     stk[field] = nv;
+  } else if (cat === 'cinta') {
+    if (!_db.stockCintas) _db.stockCintas = 0;
+    var nv = (_db.stockCintas || 0) + cantidad;
+    if (nv < 0) throw new Error('Stock resultante negativo (' + nv + ') para cintas');
+    _db.stockCintas = nv;
+    data.productoNombre = 'Cintas';
   }
 
   data.cantidad = cantidad;
@@ -593,6 +782,51 @@ function deleteAjuste(id) {
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'ajustes', id);
   return true;
+}
+
+/* ==================== GASTOS ==================== */
+
+function getGastos() {
+  return _filterValid(Object.values(_db.gastos || {})).sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''); });
+}
+
+function getGastosCategorias() {
+  if (!_db.gastosCategorias || !Array.isArray(_db.gastosCategorias) || _db.gastosCategorias.length === 0) {
+    return ['Envio', 'Arriendo', 'Servicios', 'Impuestos', 'Marketing', 'Empaque', 'Transporte', 'Otros'];
+  }
+  return _db.gastosCategorias;
+}
+
+function saveGasto(data) {
+  _ensureStructure();
+  if (!_db.gastos) _db.gastos = {};
+  var isNew = !data.id;
+  if (isNew) {
+    data.id = nextId('gastos');
+    data.creado = new Date().toISOString();
+    data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  }
+  data.monto = Number(data.monto) || 0;
+  data.categoria = data.categoria || 'Otros';
+  data.descripcion = data.descripcion || '';
+  _db.gastos[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'gastos', data.id);
+  return data;
+}
+
+function deleteGasto(id) {
+  if (!_db.gastos || !_db.gastos[id]) return false;
+  delete _db.gastos[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'gastos', id);
+  return true;
+}
+
+function saveGastosCategorias(categorias) {
+  _ensureStructure();
+  _db.gastosCategorias = categorias;
+  _saveToFirebase(); _cacheLocal();
 }
 
 /* ==================== PRODUCCION ==================== */
@@ -634,10 +868,17 @@ function producirEspecia(especiaId, talla, cantidad) {
     throw new Error('Bolsas ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockBolsas[talla] || 0));
   }
 
+  // Check & consume cintas
+  if (!_db.stockCintas) _db.stockCintas = 0;
+  if ((_db.stockCintas || 0) < cantidad) {
+    throw new Error('Cintas insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockCintas || 0));
+  }
+
   // All checks passed — consume
   esp.stockBolsa = (esp.stockBolsa || 0) - grsTotal;
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
   _db.stockBolsas[talla] = (_db.stockBolsas[talla] || 0) - cantidad;
+  _db.stockCintas = (_db.stockCintas || 0) - cantidad;
   if (stk) {
     var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
     stk[stkKey] = (stk[stkKey] || 0) - cantidad;
@@ -651,7 +892,7 @@ function producirEspecia(especiaId, talla, cantidad) {
     id: prodId, tipo: 'especia', productoId: especiaId, productoNombre: esp.nombre,
     categoria: esp.categoria || '', talla: talla, cantidad: cantidad,
     gramosPorFrasco: gramosPorFrasco, gramosTotal: grsTotal,
-    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad, cintasConsumidas: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -706,6 +947,12 @@ function producirBlend(blendId, talla, cantidad) {
     throw new Error('Bolsas ' + talla + ' insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockBolsas[talla] || 0));
   }
 
+  // Check & consume cintas
+  if (!_db.stockCintas) _db.stockCintas = 0;
+  if ((_db.stockCintas || 0) < cantidad) {
+    throw new Error('Cintas insuficientes. Necesitas ' + cantidad + ', tienes ' + (_db.stockCintas || 0));
+  }
+
   // All checks passed — consume
   var grsTotalGeneral = 0;
   for (var i = 0; i < detalleIngredientes.length; i++) {
@@ -716,6 +963,7 @@ function producirBlend(blendId, talla, cantidad) {
   }
   _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) - cantidad;
   _db.stockBolsas[talla] = (_db.stockBolsas[talla] || 0) - cantidad;
+  _db.stockCintas = (_db.stockCintas || 0) - cantidad;
   if (stk) {
     var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
     stk[stkKey] = (stk[stkKey] || 0) - cantidad;
@@ -728,7 +976,7 @@ function producirBlend(blendId, talla, cantidad) {
     id: prodId, tipo: 'blend', productoId: blendId, productoNombre: blend.nombre,
     categoria: blend.categoria || '', talla: talla, cantidad: cantidad,
     ingredientes: detalleIngredientes, gramosTotal: grsTotalGeneral,
-    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad,
+    envasesConsumidos: cantidad, stickersConsumidos: cantidad, bolsasConsumidas: cantidad, cintasConsumidas: cantidad,
     fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
   };
   _db.producciones[prodId] = prod;
@@ -908,11 +1156,11 @@ function getTiendaProductos() {
     if (!e || !e.enTienda) continue;
     if ((e.stockChico || 0) <= 0 && (e.stockGrande || 0) <= 0) continue;
     products.push({
-      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas',
+      id: e.id, nombre: e.nombre, tipo: 'especia', categoria: e.categoria || 'Comidas', categorias: e.categorias || [e.categoria || 'Comidas'],
       precioChico: Number(e.precioTiendaChico) || Number(e.precioChico) || 0,
       precioGrande: Number(e.precioTiendaGrande) || Number(e.precioGrande) || 0,
       stockChico: e.stockChico || 0, stockGrande: e.stockGrande || 0,
-      region: '', uso: ''
+      region: '', uso: e.uso || ''
     });
   }
   var blKeys = Object.keys(_db.blends || {});
@@ -921,11 +1169,33 @@ function getTiendaProductos() {
     if (!b || !b.enTienda) continue;
     if ((b.stockChico || 0) <= 0 && (b.stockGrande || 0) <= 0) continue;
     products.push({
-      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas',
+      id: b.id, nombre: b.nombre, tipo: 'blend', categoria: b.categoria || 'Comidas', categorias: b.categorias || [b.categoria || 'Comidas'],
       precioChico: Number(b.precioTiendaChico) || Number(b.precioChico) || 0,
       precioGrande: Number(b.precioTiendaGrande) || Number(b.precioGrande) || 0,
       stockChico: b.stockChico || 0, stockGrande: b.stockGrande || 0,
       region: b.region || '', uso: b.uso || ''
+    });
+  }
+  // Packs
+  var pkKeys = Object.keys(_db.packs || {});
+  for (var i = 0; i < pkKeys.length; i++) {
+    var pk = _db.packs[pkKeys[i]];
+    if (!pk || !pk.enTienda) continue;
+    var blendItems = pk.blendItems || [];
+    var minStock = 999999;
+    for (var j = 0; j < blendItems.length; j++) {
+      var bi2 = blendItems[j];
+      var bl2 = _db.blends[bi2.blendId];
+      if (!bl2) { minStock = 0; break; }
+      var st = bi2.talla === 'grande' ? (bl2.stockGrande || 0) : (bl2.stockChico || 0);
+      if (st < minStock) minStock = st;
+    }
+    if (minStock <= 0) continue;
+    products.push({
+      id: pk.id, nombre: pk.nombre, tipo: 'pack', categoria: 'Packs', categorias: ['Packs'],
+      precioChico: 0, precioGrande: 0, precio: Number(pk.precio) || 0,
+      stockChico: 0, stockGrande: 0, stock: minStock,
+      region: '', uso: pk.descripcion || '', imagen: pk.imagen || ''
     });
   }
   return products.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
@@ -937,9 +1207,19 @@ function toggleTienda(tipo, id) {
     _db.especias[id].enTienda = !_db.especias[id].enTienda;
   } else if (tipo === 'blend' && _db.blends[id]) {
     _db.blends[id].enTienda = !_db.blends[id].enTienda;
+  } else if (tipo === 'pack' && _db.packs[id]) {
+    _db.packs[id].enTienda = !_db.packs[id].enTienda;
   } else return;
   _saveToFirebase(); _cacheLocal();
-  _notify('update', tipo === 'especia' ? 'especias' : 'blends', id);
+  var colMap = { especia: 'especias', blend: 'blends', pack: 'packs' };
+  _notify('update', colMap[tipo] || tipo, id);
+}
+
+function toggleEnBlend(especiaId) {
+  if (!_db.especias[especiaId]) return;
+  _db.especias[especiaId].enBlend = !_db.especias[especiaId].enBlend;
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'especias', especiaId);
 }
 
 /* ==================== EXCEL IMPORT ==================== */
@@ -1138,6 +1418,39 @@ function removeProductTag(cat, tagName) {
   return true;
 }
 
+/* ==================== USO OPTIONS ==================== */
+
+function getUsoOptions() {
+  _ensureStructure();
+  return _db.usoOptions || [];
+}
+
+function addUsoOption(optionName) {
+  _ensureStructure();
+  optionName = (optionName || '').trim();
+  if (!optionName) return false;
+  if (!_db.usoOptions) _db.usoOptions = [];
+  for (var i = 0; i < _db.usoOptions.length; i++) {
+    if (_db.usoOptions[i].toLowerCase() === optionName.toLowerCase()) return false;
+  }
+  _db.usoOptions.push(optionName);
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
+function removeUsoOption(optionName) {
+  _ensureStructure();
+  if (!_db.usoOptions) return false;
+  var idx = -1;
+  for (var i = 0; i < _db.usoOptions.length; i++) {
+    if (_db.usoOptions[i] === optionName) { idx = i; break; }
+  }
+  if (idx < 0) return false;
+  _db.usoOptions.splice(idx, 1);
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
 /* ==================== IMAGE HELPER ==================== */
 
 function compressImage(file, maxW, quality, cb) {
@@ -1161,6 +1474,556 @@ function compressImage(file, maxW, quality, cb) {
   reader.readAsDataURL(file);
 }
 
+/* ==================== PUNTOS DE VENTA ==================== */
+
+function getPuntosDeVenta() {
+  _ensureStructure();
+  return _filterValid(Object.values(_db.puntosDeVenta || {})).sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+}
+
+function getPuntoDeVenta(id) {
+  _ensureStructure();
+  return _db.puntosDeVenta ? _db.puntosDeVenta[id] : null;
+}
+
+function savePuntoDeVenta(data) {
+  _ensureStructure();
+  if (!_db.puntosDeVenta) _db.puntosDeVenta = {};
+  var isNew = !data.id;
+  if (isNew) {
+    data.id = nextId('puntosDeVenta');
+    data.creado = new Date().toISOString();
+    data.stock = data.stock || {};
+  }
+  _db.puntosDeVenta[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'puntosDeVenta', data.id);
+  return data;
+}
+
+function deletePuntoDeVenta(id) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[id] : null;
+  if (!pdv) return false;
+  // Return all stock to main inventory
+  var stock = pdv.stock || {};
+  var keys = Object.keys(stock);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var cant = Number(stock[k]) || 0;
+    if (cant <= 0) continue;
+    var parts = k.split('_');
+    var tipo = parts[0], prodId = Number(parts[1]), talla = parts[2];
+    var producto = tipo === 'blend' ? _db.blends[prodId] : _db.especias[prodId];
+    if (producto) {
+      var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+      producto[frascoKey] = (producto[frascoKey] || 0) + cant;
+    }
+  }
+  delete _db.puntosDeVenta[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'puntosDeVenta', id);
+  return true;
+}
+
+function moverStockAPDV(pdvId, items) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[pdvId] : null;
+  if (!pdv) throw new Error('Punto de venta no encontrado');
+  if (!pdv.stock) pdv.stock = {};
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var producto;
+    if (it.tipo === 'pack') {
+      producto = _db.packs[it.productoId];
+      if (!producto) throw new Error('Pack no encontrado: ' + it.productoId);
+      if ((producto.stock || 0) < it.cantidad) {
+        throw new Error('Stock insuficiente de ' + producto.nombre + ' (pack): tienes ' + (producto.stock || 0) + ', necesitas ' + it.cantidad);
+      }
+    } else {
+      producto = it.tipo === 'blend' ? _db.blends[it.productoId] : _db.especias[it.productoId];
+      if (!producto) throw new Error('Producto no encontrado: ' + it.tipo + ' ' + it.productoId);
+      var frascoKey = it.talla === 'grande' ? 'stockGrande' : 'stockChico';
+      if ((producto[frascoKey] || 0) < it.cantidad) {
+        throw new Error('Stock insuficiente de ' + producto.nombre + ' (' + it.talla + '): tienes ' + (producto[frascoKey] || 0) + ', necesitas ' + it.cantidad);
+      }
+    }
+  }
+  // All checks passed - deduct from main, add to PDV
+  for (var j = 0; j < items.length; j++) {
+    var it2 = items[j];
+    var prod2, fk2, stockKey;
+    if (it2.tipo === 'pack') {
+      var pack2 = _db.packs[it2.productoId];
+      pack2.stock = (pack2.stock || 0) - it2.cantidad;
+      _notify('update', 'packs', it2.productoId);
+      stockKey = 'pack_' + it2.productoId + '_-';
+    } else {
+      prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
+      fk2 = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
+      prod2[fk2] = (prod2[fk2] || 0) - it2.cantidad;
+      stockKey = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
+    }
+    pdv.stock[stockKey] = (pdv.stock[stockKey] || 0) + it2.cantidad;
+  }
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'puntosDeVenta', pdvId);
+}
+
+function devolverStockDePDV(pdvId, items) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[pdvId] : null;
+  if (!pdv) throw new Error('Punto de venta no encontrado');
+  if (!pdv.stock) pdv.stock = {};
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var stockKey = it.tipo + '_' + it.productoId + '_' + it.talla;
+    if ((pdv.stock[stockKey] || 0) < it.cantidad) {
+      throw new Error('Stock insuficiente en PDV para devolver');
+    }
+  }
+  for (var j = 0; j < items.length; j++) {
+    var it2 = items[j];
+    var stockKey2 = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
+    pdv.stock[stockKey2] = (pdv.stock[stockKey2] || 0) - it2.cantidad;
+    var prod2;
+    if (it2.tipo === 'pack') {
+      var pack3 = _db.packs[it2.productoId];
+      pack3.stock = (pack3.stock || 0) + it2.cantidad;
+      _notify('update', 'packs', it2.productoId);
+    } else {
+      prod2 = it2.tipo === 'blend' ? _db.blends[it2.productoId] : _db.especias[it2.productoId];
+      if (prod2) {
+        var fk2 = it2.talla === 'grande' ? 'stockGrande' : 'stockChico';
+        prod2[fk2] = (prod2[fk2] || 0) + it2.cantidad;
+      }
+    }
+  }
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'puntosDeVenta', pdvId);
+}
+
+function getPDVVentas(pdvId) {
+  _ensureStructure();
+  var all = _db.pdvVentas || {};
+  var result = [];
+  var keys = Object.keys(all);
+  for (var i = 0; i < keys.length; i++) {
+    var v = all[keys[i]];
+    if (v.puntoDeVentaId === pdvId) result.push(v);
+  }
+  return result.sort(function(a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+}
+
+function getPDVStats(pdvId) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[pdvId] : null;
+  var ventas = getPDVVentas(pdvId);
+  var stock = (pdv && pdv.stock) || {};
+  var totalIngresos = 0, totalVentas = ventas.length, totalItemsEnStock = 0, productosEnStock = 0;
+  var stockKeys = Object.keys(stock);
+  for (var si = 0; si < stockKeys.length; si++) {
+    var cant = Number(stock[stockKeys[si]]) || 0;
+    if (cant > 0) { totalItemsEnStock += cant; productosEnStock++; }
+  }
+  var productoVentaMap = {};
+  for (var vi = 0; vi < ventas.length; vi++) {
+    var v = ventas[vi];
+    totalIngresos += (v.total || 0);
+    var vItems = v.items || [];
+    for (var vj = 0; vj < vItems.length; vj++) {
+      var vIt = vItems[vj];
+      var prod = vIt.tipo === 'blend' ? _db.blends[vIt.productoId] : _db.especias[vIt.productoId];
+      var nombre = prod ? prod.nombre : '?';
+      if (!productoVentaMap[nombre]) productoVentaMap[nombre] = { cantidad: 0, monto: 0 };
+      productoVentaMap[nombre].cantidad += (vIt.cantidad || 0);
+      productoVentaMap[nombre].monto += (vIt.subtotal || (vIt.precioUnitario || 0) * (vIt.cantidad || 0));
+    }
+  }
+  var topArr = Object.keys(productoVentaMap).map(function(n) { return { nombre: n, cantidad: productoVentaMap[n].cantidad, monto: productoVentaMap[n].monto }; });
+  topArr.sort(function(a, b) { return b.monto - a.monto; });
+  // Daily income map
+  var dailyMap = {};
+  for (var di = 0; di < ventas.length; di++) {
+    var d = ventas[di].fecha || ventas[di].creado;
+    if (d) {
+      var day = d.substring(0, 10);
+      dailyMap[day] = (dailyMap[day] || 0) + (ventas[di].total || 0);
+    }
+  }
+  return {
+    totalIngresos: totalIngresos,
+    totalVentas: totalVentas,
+    totalItemsEnStock: totalItemsEnStock,
+    productosEnStock: productosEnStock,
+    ticketPromedio: totalVentas > 0 ? totalIngresos / totalVentas : 0,
+    topProductos: topArr,
+    dailyMap: dailyMap
+  };
+}
+
+function savePDVVenta(data) {
+  _ensureStructure();
+  if (!_db.pdvVentas) _db.pdvVentas = {};
+  data.id = nextId('pdvVentas');
+  data.creado = new Date().toISOString();
+  data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  // Deduct stock from PDV
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[data.puntoDeVentaId] : null;
+  if (!pdv) throw new Error('Punto de venta no encontrado');
+  if (!pdv.stock) pdv.stock = {};
+  var total = 0;
+  var items = data.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var stockKey = it.tipo + '_' + it.productoId + '_' + it.talla;
+    if ((pdv.stock[stockKey] || 0) < it.cantidad) {
+      throw new Error('Stock insuficiente de ' + (it.productoNombre || '') + ' (' + it.talla + ') en PDV');
+    }
+  }
+  for (var j = 0; j < items.length; j++) {
+    var it2 = items[j];
+    var sk = it2.tipo + '_' + it2.productoId + '_' + it2.talla;
+    pdv.stock[sk] = (pdv.stock[sk] || 0) - it2.cantidad;
+    it2.subtotal = (it2.precioUnitario || 0) * (it2.cantidad || 0);
+    total += it2.subtotal;
+  }
+  data.total = total;
+  // Also add to main ventas for global stats
+  var mainVenta = {
+    id: nextId('ventas'),
+    fecha: data.fecha,
+    creado: data.creado,
+    items: items.map(function(it) {
+      return { tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario, subtotal: it.subtotal, productoNombre: it.productoNombre || '' };
+    }),
+    total: total,
+    pdvId: data.puntoDeVentaId,
+    pdvNombre: data.puntoDeVentaNombre,
+    metodoPago: data.metodoPago || 'efectivo'
+  };
+  _db.ventas[mainVenta.id] = mainVenta;
+  _db.pdvVentas[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify('create', 'pdvVentas', data.id);
+  _notify('create', 'ventas', mainVenta.id);
+  return data;
+}
+
+/* ==================== COSTOS DE INSUMOS (FIREBASE SEPARATE) ==================== */
+var _COSTOS_DEFAULTS = { envaseChico: 0, envaseGrande: 0, bolsaChica: 0, bolsaGrande: 0, cinta: 0, stickerChico: 0, stickerGrande: 0, especias: {} };
+
+function getCostosInsumos() {
+  return _costosInsumos || Object.assign({}, _COSTOS_DEFAULTS);
+}
+
+function saveCostosInsumos(data) {
+  _costosInsumos = data;
+  try { localStorage.setItem('arcano_costos', JSON.stringify(data)); } catch (e) {}
+  if (_costosRef) {
+    _costosRef.set(data, function(error) {
+      if (error) {
+        console.error('[DB] Costos save error:', error);
+        alert('Error al guardar costos: ' + error.message);
+      }
+    });
+  }
+  for (var i = 0; i < _costosListeners.length; i++) {
+    try { _costosListeners[i](_costosInsumos); } catch (e) {}
+  }
+  _notify('update', 'costosInsumos', 'global');
+  return data;
+}
+
+function onCostosChange(callback) {
+  _costosListeners.push(callback);
+}
+
+function _startCostosListener() {
+  try {
+    var cached = JSON.parse(localStorage.getItem('arcano_costos'));
+    if (cached && typeof cached === 'object' && cached.especias) {
+      _costosInsumos = cached;
+      _costosReady = true;
+    }
+  } catch (e) {}
+  if (!_costosRef) return;
+  _costosRef.on('value', function(snap) {
+    var data = snap.val();
+    if (data && typeof data === 'object') {
+      _costosInsumos = data;
+      try { localStorage.setItem('arcano_costos', JSON.stringify(data)); } catch (e) {}
+    } else if (!_costosInsumos) {
+      _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
+    }
+    _costosReady = true;
+    for (var i = 0; i < _costosListeners.length; i++) {
+      try { _costosListeners[i](_costosInsumos); } catch (e) {}
+    }
+  });
+}
+
+/* ==================== COSTOS DE PRODUCCION POR PRODUCTO ==================== */
+
+/** Returns the production cost of a single unit (frasco) of a product */
+function getCostoProducto(tipo, productoId, talla) {
+  var costos = _costosInsumos || _COSTOS_DEFAULTS;
+  var pkgC = (Number(costos.envaseChico) || 0) + (Number(costos.bolsaChica) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerChico) || 0);
+  var pkgG = (Number(costos.envaseGrande) || 0) + (Number(costos.bolsaGrande) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerGrande) || 0);
+  var pkg = talla === 'grande' ? pkgG : pkgC;
+  if (tipo === 'especia') {
+    var esp = _db.especias[productoId];
+    if (!esp) return 0;
+    var gramos = talla === 'grande' ? (Number(esp.gramosGrande) || 0) : (Number(esp.gramosChico) || 0);
+    var costoGrs = (costos.especias && costos.especias[productoId]) || 0;
+    return gramos * costoGrs + pkg;
+  } else if (tipo === 'blend') {
+    var blend = _db.blends[productoId];
+    if (!blend) return 0;
+    var ings = blend.ingredientes || [];
+    var total = 0;
+    for (var i = 0; i < ings.length; i++) {
+      var g = talla === 'grande' ? (Number(ings[i].gramosGrande) || 0) : (Number(ings[i].gramosChico) || 0);
+      var cpg = (costos.especias && costos.especias[ings[i].especiaId]) || 0;
+      total += g * cpg;
+    }
+    return total + pkg;
+  }
+  return pkg;
+}
+
+/** Get all sales grouped by channel with production costs */
+function getCostosPorCanal() {
+  var costos = _costosInsumos || _COSTOS_DEFAULTS;
+  var pkgC = (Number(costos.envaseChico) || 0) + (Number(costos.bolsaChica) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerChico) || 0);
+  var pkgG = (Number(costos.envaseGrande) || 0) + (Number(costos.bolsaGrande) || 0) + (Number(costos.cinta) || 0) + (Number(costos.stickerGrande) || 0);
+
+  var channels = {
+    admin: { nombre: 'Ventas Admin', ventas: 0, ingreso: 0, costo: 0, productos: {} },
+    tienda: { nombre: 'Tienda Online', ventas: 0, ingreso: 0, costo: 0, productos: {} },
+    pdv: { nombre: 'Puntos de Venta', ventas: 0, ingreso: 0, costo: 0, productos: {}, pdvs: {} }
+  };
+
+  // 1. Admin ventas (sin pdvId)
+  var ventas = getVentas();
+  for (var i = 0; i < ventas.length; i++) {
+    var v = ventas[i];
+    var canal = v.pdvId ? 'pdv' : 'admin';
+    var ch = channels[canal];
+    ch.ventas++;
+    ch.ingreso += (v.total || 0);
+    var items = v.items || [];
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var tipo = it.tipo || 'especia';
+      var pid = it.productoId;
+      var talla = it.talla || 'chico';
+      var cant = it.cantidad || 0;
+      var costoUnit = getCostoProducto(tipo, pid, talla);
+      var costoTotal = costoUnit * cant;
+      ch.costo += costoTotal;
+      var key = (it.productoNombre || '?') + '|' + talla;
+      if (!ch.productos[key]) ch.productos[key] = { nombre: it.productoNombre || '?', tipo: tipo, talla: talla, cantidad: 0, ingreso: 0, costo: 0 };
+      ch.productos[key].cantidad += cant;
+      ch.productos[key].ingreso += (it.subtotal || 0);
+      ch.productos[key].costo += costoTotal;
+      if (canal === 'pdv' && v.pdvNombre) {
+        if (!ch.pdvs[v.pdvNombre]) ch.pdvs[v.pdvNombre] = { ventas: 0, ingreso: 0, costo: 0, productos: {} };
+        var pv = ch.pdvs[v.pdvNombre];
+        pv.ventas++;
+        pv.ingreso += (it.subtotal || 0);
+        pv.costo += costoTotal;
+        var pk2 = (it.productoNombre || '?') + '|' + talla;
+        if (!pv.productos[pk2]) pv.productos[pk2] = { nombre: it.productoNombre || '?', tipo: tipo, talla: talla, cantidad: 0, ingreso: 0, costo: 0 };
+        pv.productos[pk2].cantidad += cant;
+        pv.productos[pk2].ingreso += (it.subtotal || 0);
+        pv.productos[pk2].costo += costoTotal;
+      }
+    }
+  }
+
+  // 2. Tienda pedidos (entregados)
+  var pedidos = getPedidos();
+  for (var pi = 0; pi < pedidos.length; pi++) {
+    var p = pedidos[pi];
+    if (p.estado === 'cancelado') continue;
+    var ch2 = channels.tienda;
+    ch2.ventas++;
+    ch2.ingreso += (p.total || 0);
+    var pItems = p.items || [];
+    for (var pj = 0; pj < pItems.length; pj++) {
+      var pit = pItems[pj];
+      var ptipo = pit.tipo || 'especia';
+      var ppid = pit.productoId;
+      var ptalla = pit.talla || 'chico';
+      var pcant = pit.qty || pit.cantidad || 0;
+      var pcostoUnit = getCostoProducto(ptipo, ppid, ptalla);
+      var pcostoTotal = pcostoUnit * pcant;
+      ch2.costo += pcostoTotal;
+      var pkey = (pit.nombre || '?') + '|' + ptalla;
+      if (!ch2.productos[pkey]) ch2.productos[pkey] = { nombre: pit.nombre || '?', tipo: ptipo, talla: ptalla, cantidad: 0, ingreso: 0, costo: 0 };
+      ch2.productos[pkey].cantidad += pcant;
+      ch2.productos[pkey].ingreso += (pit.subtotal || pit.precio * pcant || 0);
+      ch2.productos[pkey].costo += pcostoTotal;
+    }
+  }
+
+  // 3. Stock costs per channel
+  channels.admin.stockCosto = 0;
+  channels.admin.stockDetalle = [];
+  var espKeys = Object.keys(_db.especias || {});
+  for (var ei = 0; ei < espKeys.length; ei++) {
+    var e = _db.especias[espKeys[ei]];
+    if (!e || typeof e !== 'object') continue;
+    var ecCh = getCostoProducto('especia', e.id, 'chico') * (e.stockChico || 0);
+    var ecGr = getCostoProducto('especia', e.id, 'grande') * (e.stockGrande || 0);
+    channels.admin.stockCosto += ecCh + ecGr;
+    if (ecCh + ecGr > 0) channels.admin.stockDetalle.push({ nombre: e.nombre, tipo: 'especia', chico: e.stockChico || 0, grande: e.stockGrande || 0, costoChico: getCostoProducto('especia', e.id, 'chico'), costoGrande: getCostoProducto('especia', e.id, 'grande'), costoTotal: ecCh + ecGr });
+  }
+  var blKeys = Object.keys(_db.blends || {});
+  for (var bi = 0; bi < blKeys.length; bi++) {
+    var b = _db.blends[blKeys[bi]];
+    if (!b || typeof b !== 'object') continue;
+    var bcCh = getCostoProducto('blend', b.id, 'chico') * (b.stockChico || 0);
+    var bcGr = getCostoProducto('blend', b.id, 'grande') * (b.stockGrande || 0);
+    channels.admin.stockCosto += bcCh + bcGr;
+    if (bcCh + bcGr > 0) channels.admin.stockDetalle.push({ nombre: b.nombre, tipo: 'blend', chico: b.stockChico || 0, grande: b.stockGrande || 0, costoChico: getCostoProducto('blend', b.id, 'chico'), costoGrande: getCostoProducto('blend', b.id, 'grande'), costoTotal: bcCh + bcGr });
+  }
+
+  // Tienda stock = same as admin stock but only enTienda products
+  channels.tienda.stockCosto = 0;
+  channels.tienda.stockDetalle = [];
+  for (var ti = 0; ti < espKeys.length; ti++) {
+    var te = _db.especias[espKeys[ti]];
+    if (!te || !te.enTienda) continue;
+    var tecCh = getCostoProducto('especia', te.id, 'chico') * (te.stockChico || 0);
+    var tecGr = getCostoProducto('especia', te.id, 'grande') * (te.stockGrande || 0);
+    channels.tienda.stockCosto += tecCh + tecGr;
+    if (tecCh + tecGr > 0) channels.tienda.stockDetalle.push({ nombre: te.nombre, tipo: 'especia', chico: te.stockChico || 0, grande: te.stockGrande || 0, costoChico: getCostoProducto('especia', te.id, 'chico'), costoGrande: getCostoProducto('especia', te.id, 'grande'), costoTotal: tecCh + tecGr });
+  }
+  for (var tbi = 0; tbi < blKeys.length; tbi++) {
+    var tb = _db.blends[blKeys[tbi]];
+    if (!tb || !tb.enTienda) continue;
+    var tbcCh = getCostoProducto('blend', tb.id, 'chico') * (tb.stockChico || 0);
+    var tbcGr = getCostoProducto('blend', tb.id, 'grande') * (tb.stockGrande || 0);
+    channels.tienda.stockCosto += tbcCh + tbcGr;
+    if (tbcCh + tbcGr > 0) channels.tienda.stockDetalle.push({ nombre: tb.nombre, tipo: 'blend', chico: tb.stockChico || 0, grande: tb.stockGrande || 0, costoChico: getCostoProducto('blend', tb.id, 'chico'), costoGrande: getCostoProducto('blend', tb.id, 'grande'), costoTotal: tbcCh + tbcGr });
+  }
+
+  // PDV stock
+  channels.pdv.stockCosto = 0;
+  channels.pdv.stockDetalle = [];
+  var pdvs = _filterValid(Object.values(_db.puntosDeVenta || {}));
+  for (var pi2 = 0; pi2 < pdvs.length; pi2++) {
+    var pdv = pdvs[pi2];
+    var pdvStock = pdv.stock || {};
+    var pdvCosto = 0;
+    var sks = Object.keys(pdvStock);
+    for (var si = 0; si < sks.length; si++) {
+      var cant = Number(pdvStock[sks[si]]) || 0;
+      if (cant <= 0) continue;
+      var parts = sks[si].split('_');
+      var stipo = parts[0], sprodId = Number(parts[1]), stalla = parts[2];
+      var cu = getCostoProducto(stipo, sprodId, stalla);
+      pdvCosto += cu * cant;
+    }
+    channels.pdv.stockCosto += pdvCosto;
+    if (pdvCosto > 0) channels.pdv.stockDetalle.push({ nombre: pdv.nombre || 'PDV', tipo: 'pdv', chico: 0, grande: 0, costoChico: 0, costoGrande: 0, costoTotal: pdvCosto, pdvId: pdv.id });
+  }
+
+  return channels;
+}
+
+/* ==================== PACKS DE BLENDS ==================== */
+
+function getPacks() {
+  return _filterValid(Object.values(_db.packs || {})).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+}
+
+function getPack(id) {
+  return (_db.packs || {})[id];
+}
+
+function producirPack(packId, cantidad) {
+  _ensureStructure();
+  var pack = _db.packs[packId];
+  if (!pack) throw new Error('Pack no encontrado');
+  cantidad = Number(cantidad) || 0;
+  if (cantidad <= 0) throw new Error('La cantidad debe ser mayor a 0');
+
+  var blendItems = pack.blendItems || [];
+  if (blendItems.length === 0) throw new Error('El pack no tiene blends asignados');
+
+  // Check and consume blend stock (frascos ya producidos)
+  var detalleBlends = [];
+  for (var i = 0; i < blendItems.length; i++) {
+    var bi = blendItems[i];
+    var blend = _db.blends[bi.blendId];
+    if (!blend) throw new Error('Blend #' + bi.blendId + ' no encontrado');
+    var talla = (bi.talla === 'grande') ? 'grande' : 'chico';
+    var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+    var disponible = blend[frascoKey] || 0;
+    if (disponible < cantidad) {
+      throw new Error('Stock insuficiente de ' + blend.nombre + ' (' + talla + '). Necesitas ' + cantidad + ' frascos, tienes ' + disponible);
+    }
+    blend[frascoKey] = disponible - cantidad;
+    detalleBlends.push({ blendId: blend.id, blendNombre: blend.nombre, talla: talla, cantidad: cantidad });
+    _notify('update', 'blends', blend.id);
+  }
+
+  // Store pack stock
+  pack.stock = (pack.stock || 0) + cantidad;
+  _notify('update', 'packs', pack.id);
+
+  // Create production record
+  var prodId = nextId('producciones');
+  var prod = {
+    id: prodId, tipo: 'pack', productoId: packId, productoNombre: pack.nombre,
+    categoria: 'Pack', talla: '-', cantidad: cantidad,
+    ingredientes: detalleBlends, gramosTotal: 0,
+    envasesConsumidos: 0, stickersConsumidos: 0, bolsasConsumidas: 0, cintasConsumidas: 0,
+    fecha: new Date().toISOString().slice(0, 10), creado: new Date().toISOString()
+  };
+  _db.producciones[prodId] = prod;
+  _notify('create', 'producciones', prodId);
+
+  _saveToFirebase(); _cacheLocal();
+  return { pack: pack, produccion: prod };
+}
+
+function savePack(data) {
+  var isNew = !data.id || !_db.packs[data.id];
+  if (isNew) {
+    data.id = nextId('packs');
+    data.creado = new Date().toISOString();
+  }
+  _db.packs[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'packs', data.id);
+  return data;
+}
+
+function deletePack(id) {
+  if (!_db.packs[id]) return false;
+  delete _db.packs[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'packs', id);
+  return true;
+}
+
+/* ==================== TIENDA CONFIG ==================== */
+
+function getTiendaConfig() {
+  return _db.tiendaConfig || { logoPago: '' };
+}
+
+function saveTiendaConfig(data) {
+  if (!_db.tiendaConfig) _db.tiendaConfig = {};
+  if (typeof data.logoPago === 'string') _db.tiendaConfig.logoPago = data.logoPago;
+  _saveToFirebase(); _cacheLocal();
+  return _db.tiendaConfig;
+}
+
 /* ==================== EXPORT ==================== */
 
 window.ArcanoDB = {
@@ -1169,8 +2032,9 @@ window.ArcanoDB = {
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
   getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
+  getGastos: getGastos, getGastosCategorias: getGastosCategorias, saveGasto: saveGasto, deleteGasto: deleteGasto, saveGastosCategorias: saveGastosCategorias,
   getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
-  getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, deletePedido: deletePedido, onPedidosChange: onPedidosChange,
+  getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, updatePedidoField: updatePedidoField, deletePedido: deletePedido, onPedidosChange: onPedidosChange,
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,
@@ -1182,8 +2046,21 @@ window.ArcanoDB = {
   importFromExcelData: importFromExcelData,
   getTiendaProductos: getTiendaProductos,
   toggleTienda: toggleTienda,
+  toggleEnBlend: toggleEnBlend,
   getProductTags: getProductTags, getTagsForCategoria: getTagsForCategoria,
   addProductTag: addProductTag, removeProductTag: removeProductTag,
+  getUsoOptions: getUsoOptions, addUsoOption: addUsoOption, removeUsoOption: removeUsoOption,
   compressImage: compressImage,
-  DB_KEY: DB_KEY, FB_PATH: FB_PATH
+  DB_KEY: DB_KEY, FB_PATH: FB_PATH,
+  getPuntosDeVenta: getPuntosDeVenta, getPuntoDeVenta: getPuntoDeVenta,
+  savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
+  moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
+  getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
+  getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, producirPack: producirPack,
+  getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
+  getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
+  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
+  saveNow: saveNow,
+  writeField: writeField,
+  getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount
 };
