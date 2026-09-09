@@ -4324,7 +4324,8 @@ const Pages = {
   },
 
   _generarImagenReceta: function(key, recetaOpt, apiKeyOpt, statusElOpt) {
-    // Genera una imagen con Gemini (Imagen 3 / gemini-2.5-flash-image-preview) y la sube a GitHub
+    // Genera una imagen con Google AI y la sube a GitHub.
+    // Fallback chain: Imagen 3 → Imagen 3 Fast → Gemini 2.0 Flash (image generation)
     var apiKey = apiKeyOpt || (localStorage.getItem('arcano_gemini_key') || '').trim();
     var statusEl = statusElOpt || document.getElementById('ra-gen-status');
     if (!apiKey) {
@@ -4345,49 +4346,125 @@ const Pages = {
         prompt = 'Professional food photography: ' + prompt + ' Appetizing, natural lighting, top-down angle, rustic wooden table, vibrant colors, high resolution, no text, no watermark.';
       }
       if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Generando imagen con IA...</span>';
-      // Modelo de generacion de imagenes de Gemini (gemini-2.5-flash-image-preview aka Nano Banana)
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=' + apiKey;
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ['IMAGE'] }
-        })
-      })
-      .then(function(res) {
-        if (!res.ok) return res.json().then(function(e) {
-          throw new Error((e.error && e.error.message) || ('Error ' + res.status));
-        });
-        return res.json();
-      })
-      .then(function(data) {
-        var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
-        var imgData = null;
-        for (var i = 0; i < parts.length; i++) {
-          if (parts[i].inlineData && parts[i].inlineData.data) { imgData = parts[i].inlineData.data; break; }
-          if (parts[i].inline_data && parts[i].inline_data.data) { imgData = parts[i].inline_data.data; break; }
+
+      // Catálogo de modelos con su endpoint y formato de request/response
+      var models = [
+        {
+          name: 'imagen-3.0-generate-002',
+          endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=' + apiKey,
+          buildBody: function(p) {
+            return {
+              instances: [{ prompt: p }],
+              parameters: { sampleCount: 1, aspectRatio: '1:1' }
+            };
+          },
+          extractImage: function(data) {
+            if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+              return { data: data.predictions[0].bytesBase64Encoded, mime: data.predictions[0].mimeType || 'image/png' };
+            }
+            return null;
+          }
+        },
+        {
+          name: 'imagen-3.0-fast-generate-001',
+          endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-fast-generate-001:predict?key=' + apiKey,
+          buildBody: function(p) {
+            return {
+              instances: [{ prompt: p }],
+              parameters: { sampleCount: 1, aspectRatio: '1:1' }
+            };
+          },
+          extractImage: function(data) {
+            if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+              return { data: data.predictions[0].bytesBase64Encoded, mime: data.predictions[0].mimeType || 'image/png' };
+            }
+            return null;
+          }
+        },
+        {
+          name: 'gemini-2.0-flash-preview-image-generation',
+          endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=' + apiKey,
+          buildBody: function(p) {
+            return {
+              contents: [{ parts: [{ text: p }] }],
+              generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+            };
+          },
+          extractImage: function(data) {
+            var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+            for (var i = 0; i < parts.length; i++) {
+              if (parts[i].inlineData && parts[i].inlineData.data) {
+                return { data: parts[i].inlineData.data, mime: parts[i].inlineData.mimeType || 'image/png' };
+              }
+              if (parts[i].inline_data && parts[i].inline_data.data) {
+                return { data: parts[i].inline_data.data, mime: parts[i].inline_data.mime_type || 'image/png' };
+              }
+            }
+            return null;
+          }
         }
-        if (!imgData) throw new Error('La IA no devolvio una imagen');
-        var dataUrl = 'data:image/png;base64,' + imgData;
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Imagen generada. Subiendo a GitHub...</span>';
-        var slug = Pages._titleToSlug(r.titulo) || ('receta-img-' + Date.now());
-        return Pages._uploadRecetaImageToGitHub(dataUrl, slug).then(function(url) {
-          return firebase.database().ref('arcano/db/recetas/' + key).update({ imagen_url: url }).then(function() {
-            return url;
-          });
-        }).then(function(url) {
-          if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Imagen generada y guardada ✓</span>';
-          Pages._loadRecetasAdmin();
-          // Re-publicar SEO con la nueva imagen
-          r.imagen_url = url;
-          Pages._publishRecipeSEO(r);
+      ];
+
+      function intentarCon(idx) {
+        if (idx >= models.length) {
+          throw new Error('Todos los modelos fallaron. Tu API Key quizas no tiene acceso a Imagen 3. Subi la imagen manualmente o activa Imagen 3 en aistudio.google.com.');
+        }
+        var m = models[idx];
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Generando con ' + m.name + '...</span>';
+        return fetch(m.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(m.buildBody(prompt))
+        })
+        .then(function(res) {
+          if (!res.ok) {
+            return res.json().then(function(e) {
+              var msg = (e.error && e.error.message) || ('HTTP ' + res.status);
+              var err = new Error(msg);
+              err._providerError = true;
+              throw err;
+            });
+          }
+          return res.json();
+        })
+        .then(function(data) {
+          var img = m.extractImage(data);
+          if (!img || !img.data) {
+            var err = new Error('Sin imagen en respuesta de ' + m.name);
+            err._providerError = true;
+            throw err;
+          }
+          return img;
+        })
+        .catch(function(err) {
+          if (err._providerError) {
+            console.warn('[Recetas] Modelo ' + m.name + ' fallo:', err.message, '→ probando siguiente...');
+            return intentarCon(idx + 1);
+          }
+          throw err;
         });
-      })
-      .catch(function(err) {
-        console.error('[Recetas] Error generando imagen:', err);
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error imagen: ' + (err.message || err) + '</span>';
-      });
+      }
+
+      intentarCon(0)
+        .then(function(img) {
+          var dataUrl = 'data:' + img.mime + ';base64,' + img.data;
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold)">Imagen generada. Subiendo a GitHub...</span>';
+          var slug = Pages._titleToSlug(r.titulo) || ('receta-img-' + Date.now());
+          return Pages._uploadRecetaImageToGitHub(dataUrl, slug).then(function(url) {
+            return firebase.database().ref('arcano/db/recetas/' + key).update({ imagen_url: url }).then(function() {
+              return url;
+            });
+          }).then(function(url) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">Imagen generada y guardada ✓</span>';
+            Pages._loadRecetasAdmin();
+            r.imagen_url = url;
+            Pages._publishRecipeSEO(r);
+          });
+        })
+        .catch(function(err) {
+          console.error('[Recetas] Error generando imagen:', err);
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Error imagen: ' + (err.message || err) + '</span>';
+        });
     });
   },
 
