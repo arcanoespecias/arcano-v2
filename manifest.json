@@ -1,7 +1,9 @@
 {
   "name": "Arcano Especias",
   "short_name": "Arcano",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#1b0b07",
   "theme_color": "#1b0b07",

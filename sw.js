@@ -1,9 +1,10 @@
-const CACHE_NAME = 'arcano-v4-8';
+const CACHE_NAME = 'arcano-v4-9';
 const STATIC_ASSETS = [
-  '/manifest.json',
-  '/icons/favicon.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  './manifest.json',
+  './icons/favicon.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './index.html'
 ];
 
 self.addEventListener('install', e => {

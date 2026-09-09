@@ -1,6 +1,5 @@
 {
-  "version": "v4.3-search-fix",
-  "build": "2026-07-17",
-  "notes": "Reescritura completa. Modelo simplificado: Productos, Insumos, Produccion, Ventas, Stock."
+  "version": "v4.9-pwa-fix",
+  "build": "2026-09-09",
+  "notes": "Fix PWA: start_url relativo (./) para que la app instalada abra en /arcano-v2/ y no en la raiz (tienda v1). SW: rutas cacheadas relativas + index.html offline."
 }
-
