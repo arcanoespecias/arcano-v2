@@ -485,8 +485,30 @@ select.input { cursor: pointer; }
 @media (max-width: 1100px) { .dash-kpi-row { grid-template-columns: repeat(2, 1fr); } .dash-kpi-row.dash-kpi-sm { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 600px) { .dash-kpi-row.dash-kpi-sm { grid-template-columns: repeat(2, 1fr); } }
 
-.dash-kpi-card { background: var(--bg2); border: 1px solid var(--bg4); border-radius: var(--radius); padding: 16px; display: flex; align-items: center; gap: 12px; transition: border-color 0.2s; }
+.dash-kpi-card { background: var(--bg2); border: 1px solid var(--bg4); border-radius: var(--radius); padding: 16px; display: flex; align-items: center; gap: 12px; transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s; }
 .dash-kpi-card:hover { border-color: var(--bg5); }
+.dash-clickable { cursor: pointer; position: relative; }
+.dash-clickable::after {
+  content: '→';
+  position: absolute; top: 8px; right: 10px;
+  font-size: 0.7rem; color: var(--text3);
+  opacity: 0; transition: opacity 0.2s, transform 0.2s;
+  transform: translateX(-4px);
+}
+.dash-clickable:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+.dash-clickable:hover::after {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--gold);
+}
+.dash-mini.dash-clickable:hover {
+  border-color: var(--gold);
+  background: var(--gold-dim);
+}
 .dash-kpi-gold { border-left: 3px solid var(--gold); }
 .dash-kpi-blue { border-left: 3px solid var(--blue); }
 .dash-kpi-green { border-left: 3px solid var(--green); }

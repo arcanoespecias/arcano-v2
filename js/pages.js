@@ -146,32 +146,32 @@ const Pages = {
     // === BUILD HTML ===
     var h = '';
 
-    // KPIs principales
+    // KPIs principales — todos clickeables, llevan a su seccion
     h += '<div class="dash-section-title"><span class="dash-dot" style="background:var(--gold)"></span>Resumen del Negocio</div>';
     h += '<div class="dash-kpi-row">';
-    h += '<div class="dash-kpi-card dash-kpi-gold"><div class="dash-kpi-icon">$</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosHoy.toLocaleString() + '</div><div class="dash-kpi-lbl">Ventas Hoy</div></div></div>';
-    h += '<div class="dash-kpi-card dash-kpi-blue"><div class="dash-kpi-icon">M</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Ingresos del Mes</div><div class="dash-kpi-sub">' + opsMes + ' operaciones</div></div></div>';
-    h += '<div class="dash-kpi-card dash-kpi-red"><div class="dash-kpi-icon" style="color:var(--red)">C</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:var(--red)">$' + comprasMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Compras del Mes</div><div class="dash-kpi-sub">Insumos adquiridos este mes</div></div></div>';
+    h += '<div class="dash-kpi-card dash-kpi-gold dash-clickable" onclick="App.navigate(\'ventas\')" title="Ver historial de ventas"><div class="dash-kpi-icon">$</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosHoy.toLocaleString() + '</div><div class="dash-kpi-lbl">Ventas Hoy</div></div></div>';
+    h += '<div class="dash-kpi-card dash-kpi-blue dash-clickable" onclick="App.navigate(\'ventas\')" title="Ver historial de ventas"><div class="dash-kpi-icon">M</div><div class="dash-kpi-body"><div class="dash-kpi-val">$' + ingresosMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Ingresos del Mes</div><div class="dash-kpi-sub">' + opsMes + ' operaciones</div></div></div>';
+    h += '<div class="dash-kpi-card dash-kpi-red dash-clickable" onclick="App.navigate(\'insumos\')" title="Ver historial de compras"><div class="dash-kpi-icon" style="color:var(--red)">C</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:var(--red)">$' + comprasMes.toLocaleString() + '</div><div class="dash-kpi-lbl">Compras del Mes</div><div class="dash-kpi-sub">Insumos adquiridos este mes</div></div></div>';
     var mClr = margenPct >= 0 ? 'var(--green)' : 'var(--red)';
-    h += '<div class="dash-kpi-card"><div class="dash-kpi-icon" style="color:var(--green)">%a</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:' + mClr + '">' + margenPct.toFixed(1) + '%</div><div class="dash-kpi-lbl">Margen Bruto</div><div class="dash-kpi-sub">Ingreso $' + totalIngresos.toLocaleString() + ' - Costos $' + totalCostos.toLocaleString() + '</div></div></div>';
-    h += '<div class="dash-kpi-card ' + (totalAlertas > 0 ? 'dash-kpi-red' : 'dash-kpi-green') + '"><div class="dash-kpi-icon">!</div><div class="dash-kpi-body"><div class="dash-kpi-val">' + totalAlertas + '</div><div class="dash-kpi-lbl">Alertas de Stock</div><div class="dash-kpi-sub">' + palaBaja.length + ' pala, ' + frascosBajos.length + ' frascos, ' + stickerBajos.length + ' stk</div></div></div>';
+    h += '<div class="dash-kpi-card dash-clickable" onclick="App.navigate(\'estadisticas\')" title="Ver estadisticas detalladas"><div class="dash-kpi-icon" style="color:var(--green)">%a</div><div class="dash-kpi-body"><div class="dash-kpi-val" style="color:' + mClr + '">' + margenPct.toFixed(1) + '%</div><div class="dash-kpi-lbl">Margen Bruto</div><div class="dash-kpi-sub">Ingreso $' + totalIngresos.toLocaleString() + ' - Costos $' + totalCostos.toLocaleString() + '</div></div></div>';
+    h += '<div class="dash-kpi-card ' + (totalAlertas > 0 ? 'dash-kpi-red' : 'dash-kpi-green') + ' dash-clickable" onclick="App.navigate(\'stock\')" title="Ver estado de stock"><div class="dash-kpi-icon">!</div><div class="dash-kpi-body"><div class="dash-kpi-val">' + totalAlertas + '</div><div class="dash-kpi-lbl">Alertas de Stock</div><div class="dash-kpi-sub">' + palaBaja.length + ' pala, ' + frascosBajos.length + ' frascos, ' + stickerBajos.length + ' stk</div></div></div>';
     h += '</div>';
 
-    // Segunda fila
+    // Segunda fila — todos clickeables
     h += '<div class="dash-kpi-row dash-kpi-sm">';
-    h += '<div class="dash-mini"><div class="dash-mini-val">' + totalUnidades + '</div><div class="dash-mini-lbl">Unidades Vendidas</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="dash-mini-lbl">Ticket Promedio</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val">' + prodMesCount + '</div><div class="dash-mini-lbl">Producciones Mes</div><div class="dash-mini-sub">' + prodMesUds + ' frascos</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalFrascos + '</div><div class="dash-mini-lbl">Frascos en Stock</div><div class="dash-mini-sub">' + stats.frascosChico + ' pq / ' + stats.frascosGrande + ' gr</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val">' + stats.totalProductos + '</div><div class="dash-mini-lbl">Productos Activos</div><div class="dash-mini-sub">' + stats.totalEspecias + ' esp + ' + stats.totalBlends + ' bl</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'ventas\')" title="Ver ventas"><div class="dash-mini-val">' + totalUnidades + '</div><div class="dash-mini-lbl">Unidades Vendidas</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'ventas\')" title="Ver ventas"><div class="dash-mini-val">$' + (totalOps > 0 ? Math.round(totalIngresos / totalOps) : 0).toLocaleString() + '</div><div class="dash-mini-lbl">Ticket Promedio</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'produccion\')" title="Ver produccion"><div class="dash-mini-val">' + prodMesCount + '</div><div class="dash-mini-lbl">Producciones Mes</div><div class="dash-mini-sub">' + prodMesUds + ' frascos</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'stock\')" title="Ver stock"><div class="dash-mini-val">' + stats.totalFrascos + '</div><div class="dash-mini-lbl">Frascos en Stock</div><div class="dash-mini-sub">' + stats.frascosChico + ' pq / ' + stats.frascosGrande + ' gr</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'productos\')" title="Ver productos"><div class="dash-mini-val">' + stats.totalProductos + '</div><div class="dash-mini-lbl">Productos Activos</div><div class="dash-mini-sub">' + stats.totalEspecias + ' esp + ' + stats.totalBlends + ' bl</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'pedidos\')" title="Ver pedidos"><div class="dash-mini-val">' + pedidosNuevos.length + '</div><div class="dash-mini-lbl">Pedidos Nuevos</div></div>';
     var gastosMes = 0;
     for (var gm = 0; gm < gastos.length; gm++) { if (gastos[gm].fecha && gastos[gm].fecha.startsWith(mes)) gastosMes += (gastos[gm].monto || 0); }
     // Ganancia neta del mes = ingresos del mes - compras del mes - gastos del mes
     // (NO usa totalCostos que es histórico y romperia el calculo mensual)
     var gananciaNeta = ingresosMes - comprasMes - gastosMes;
-    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:var(--red)">$' + gastosMes.toLocaleString() + '</div><div class="dash-mini-lbl">Gastos del Mes</div></div>';
-    h += '<div class="dash-mini"><div class="dash-mini-val" style="color:' + (gananciaNeta >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + gananciaNeta.toLocaleString() + '</div><div class="dash-mini-lbl">Ganancia Neta</div><div class="dash-mini-sub">ingresos - compras - gastos</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'gastos\')" title="Ver historial de gastos"><div class="dash-mini-val" style="color:var(--red)">$' + gastosMes.toLocaleString() + '</div><div class="dash-mini-lbl">Gastos del Mes</div></div>';
+    h += '<div class="dash-mini dash-clickable" onclick="App.navigate(\'estadisticas\')" title="Ver estadisticas"><div class="dash-mini-val" style="color:' + (gananciaNeta >= 0 ? 'var(--green)' : 'var(--red)') + '">$' + gananciaNeta.toLocaleString() + '</div><div class="dash-mini-lbl">Ganancia Neta</div><div class="dash-mini-sub">ingresos - compras - gastos</div></div>';
     h += '</div>';
 
     // Canal de venta + Composicion
