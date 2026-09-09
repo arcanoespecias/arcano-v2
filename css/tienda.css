@@ -109,6 +109,22 @@ textarea.form-input { min-height: 80px; resize: vertical; }
 
 /* === FOOTER === */
 .store-footer { text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: .8rem; border-top: 1px solid var(--border); margin-top: 20px; }
+.store-footer .footer-line { display: block; margin-bottom: 8px; }
+.store-footer .footer-crypto {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(247, 147, 26, 0.08);
+  border: 1px solid rgba(247, 147, 26, 0.25);
+  color: #f7a23a;
+  font-weight: 600;
+  font-size: .78rem;
+  letter-spacing: .01em;
+}
+.store-footer .footer-crypto .crypto-icon {
+  width: 16px; height: 16px; flex-shrink: 0;
+  display: inline-block; vertical-align: middle;
+}
 
 /* === EMPTY STATE === */
 .empty-state { text-align: center; padding: 60px 16px; color: var(--text-muted); }
