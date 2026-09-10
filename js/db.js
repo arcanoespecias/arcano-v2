@@ -150,6 +150,11 @@ var _carritos = [];
 var _carritosRef = null;
 var _carritosListeners = [];
 
+/* === OTP pendientes (path arcano/db/otpPendientes) === */
+var _otpPendientes = [];
+var _otpPendientesRef = null;
+var _otpPendientesListeners = [];
+
 /* === Costos de insumos (separate from _db to avoid sync overwrites) === */
 var _costosRef = null;
 var _costosInsumos = null;
@@ -167,6 +172,7 @@ function _initFirebase() {
     _clientesRef = _firebaseDb.ref('arcano/db/clientes');
     _promocionesRef = _firebaseDb.ref('arcano/db/promociones');
     _carritosRef = _firebaseDb.ref('arcano/db/carritos');
+    _otpPendientesRef = _firebaseDb.ref('arcano/db/otpPendientes');
     _costosRef = _firebaseDb.ref('arcano/db/costosInsumos');
   } catch (e) {
     console.error('[DB] Firebase init error:', e);
@@ -277,6 +283,7 @@ function initDB() {
       _startClientesListener();
       _startPromocionesListener();
       _startCarritosListener();
+      _startOtpPendientesListener();
       _startCostosListener();
       resolve();
       return;
@@ -304,6 +311,7 @@ function initDB() {
         _startClientesListener();
         _startPromocionesListener();
         _startCarritosListener();
+      _startOtpPendientesListener();
         _startCostosListener();
         resolve();
       }).catch(function() {
@@ -610,6 +618,56 @@ function deleteCarrito(key) {
 }
 
 function onCarritosChange(fn) { _carritosListeners.push(fn); }
+
+/* === OTP pendientes (cola de códigos a enviar a clientes) === */
+function _startOtpPendientesListener() {
+  if (!_otpPendientesRef) return;
+  _otpPendientesRef.on('value', function(snap) {
+    var data = snap.val();
+    _otpPendientes = [];
+    if (data) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        var o = data[keys[i]];
+        if (o && typeof o === 'object') {
+          o._key = keys[i];
+          _otpPendientes.push(o);
+        }
+      }
+    }
+    // Ordenar: no enviados primero, luego por creación desc
+    _otpPendientes.sort(function(a, b) {
+      var aPend = a.enviado ? 1 : 0;
+      var bPend = b.enviado ? 1 : 0;
+      if (aPend !== bPend) return aPend - bPend;
+      return (b.creado || '').localeCompare(a.creado || '');
+    });
+    for (var j = 0; j < _listeners.length; j++) { try { _listeners[j](); } catch(e) {} }
+    for (var op = 0; op < _otpPendientesListeners.length; op++) { try { _otpPendientesListeners[op](_otpPendientes); } catch(e) {} }
+  });
+}
+
+function getOtpPendientes() { return _otpPendientes.slice(); }
+
+function getOtpPendientesCount() {
+  var count = 0;
+  for (var i = 0; i < _otpPendientes.length; i++) {
+    if (!_otpPendientes[i].enviado) count++;
+  }
+  return count;
+}
+
+function markOtpEnviado(key) {
+  if (!_otpPendientesRef) return;
+  _otpPendientesRef.child(key).update({ enviado: true, enviadoEn: new Date().toISOString() });
+}
+
+function deleteOtpPendiente(key) {
+  if (!_otpPendientesRef) return;
+  _otpPendientesRef.child(key).remove();
+}
+
+function onOtpPendientesChange(fn) { _otpPendientesListeners.push(fn); }
 
 function updatePedidoEstado(pedidoKey, nuevoEstado) {
   if (!_pedidosRef) return;
@@ -2322,5 +2380,6 @@ window.ArcanoDB = {
   getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount,
   getClientes: getClientes, getClientesCount: getClientesCount, onClientesChange: onClientesChange, deleteCliente: deleteCliente, getPedidosByCliente: getPedidosByCliente,
   getPromociones: getPromociones, getPromocionesActivas: getPromocionesActivas, savePromocion: savePromocion, deletePromocion: deletePromocion, onPromocionesChange: onPromocionesChange,
-  getCarritos: getCarritos, getCarritosByEstado: getCarritosByEstado, deleteCarrito: deleteCarrito, onCarritosChange: onCarritosChange
+  getCarritos: getCarritos, getCarritosByEstado: getCarritosByEstado, deleteCarrito: deleteCarrito, onCarritosChange: onCarritosChange,
+  getOtpPendientes: getOtpPendientes, getOtpPendientesCount: getOtpPendientesCount, markOtpEnviado: markOtpEnviado, deleteOtpPendiente: deleteOtpPendiente, onOtpPendientesChange: onOtpPendientesChange
 };

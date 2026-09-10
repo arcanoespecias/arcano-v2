@@ -7451,6 +7451,44 @@ Pages.renderMensajes = function(el) {
 
   var h = '<div class="page-header"><h2>Mensajes WhatsApp</h2></div>';
 
+  // === SECCIÓN 0: Códigos OTP pendientes de enviar (clientes nuevos solicitando acceso) ===
+  var otpPendientes = ArcanoDB.getOtpPendientes();
+  var otpNoEnviados = otpPendientes.filter(function(o) { return !o.enviado; });
+  h += '<div class="card mt-16"><div class="card-header"><h3>🔐 Códigos OTP pendientes (' + otpNoEnviados.length + ')</h3><p class="text-xs text-muted">Clientes que solicitaron acceso a "Mi Cuenta". Envíales el código por WhatsApp para que puedan verificar su número.</p></div><div class="card-body">';
+  if (otpPendientes.length === 0) {
+    h += '<p class="text-center text-muted">No hay códigos pendientes. Cuando un cliente haga click en "Inscribirme" en la tienda, aparecerá aquí.</p>';
+  } else {
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>WhatsApp</th><th>Código</th><th>Solicitado</th><th>Estado</th><th></th></tr></thead><tbody>';
+    for (var oi = 0; oi < otpPendientes.length; oi++) {
+      var o = otpPendientes[oi];
+      var telNorm = o.telNorm || '';
+      var waLink = telNorm ? ('https://wa.me/' + telNorm + '?text=' + encodeURIComponent('Hola ' + (o.nombre || '') + '! Tu código de acceso a Arcano Especias es: ' + o.codigo + '. Ingrésalo en la tienda para activar tu cuenta.')) : '#';
+      var tiempoStr = o.creado ? Pages._formatearTiempo(Date.now() - new Date(o.creado).getTime()) : '-';
+      var estadoCls = o.enviado ? 'text-green' : 'text-yellow';
+      var estadoTxt = o.enviado ? 'Enviado' : 'Pendiente';
+      h += '<tr' + (o.enviado ? ' style="opacity:0.55"' : '') + '>' +
+        '<td class="fw7">' + esc(o.nombre || 'Cliente') + (o.esNuevo ? ' <span class="badge badge-blue" style="font-size:0.6rem">NUEVO</span>' : '') + '</td>' +
+        '<td>' + esc(o.telefono || '-') + '</td>' +
+        '<td><code style="background:var(--gold-light);padding:3px 10px;border-radius:6px;color:var(--gold);font-family:monospace;font-size:1.1rem;font-weight:700;letter-spacing:0.2em">' + esc(o.codigo || '') + '</code></td>' +
+        '<td class="text-sm text-muted">' + tiempoStr + '</td>' +
+        '<td><span class="' + estadoCls + ' fw7">' + estadoTxt + '</span></td>' +
+        '<td style="white-space:nowrap">' +
+          (o.enviado ?
+            '<button class="btn btn-sm btn-outline" onclick="Pages._reactivarOtp(\'' + o._key + '\')" title="Reenviar">↻</button>' :
+            '<a href="' + waLink + '" target="_blank" class="btn btn-sm btn-gold" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>' +
+              'Enviar' +
+            '</a> ' +
+            '<button class="btn btn-sm btn-outline" onclick="Pages._markOtpEnviado(\'' + o._key + '\')" title="Marcar como enviado">✓</button>'
+          ) +
+          ' <button class="btn btn-sm btn-red" onclick="Pages._deleteOtpPendiente(\'' + o._key + '\')" title="Eliminar">X</button>' +
+        '</td>' +
+      '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div></div>';
+
   // === SECCIÓN 1: Carrito abandonado automático ===
   h += '<div class="card mt-16"><div class="card-header"><h3>🔔 Carrito abandonado automático</h3><p class="text-xs text-muted">Cuando un cliente deja productos en el carrito sin completar el pedido, envíale un recordatorio automático por WhatsApp.</p></div><div class="card-body">';
   h += '<div class="g2">' +
@@ -7638,4 +7676,32 @@ Pages._formatearTiempo = function(ms) {
   if (horas < 24) return horas + 'h ' + (min % 60) + 'm';
   var dias = Math.floor(horas / 24);
   return dias + 'd ' + (horas % 24) + 'h';
+};
+
+/* === OTP pendientes - funciones auxiliares === */
+Pages._markOtpEnviado = function(key) {
+  ArcanoDB.markOtpEnviado(key);
+  toast('Marcado como enviado');
+};
+
+Pages._reactivarOtp = function(key) {
+  // Reabrir WhatsApp: abrir link wa.me y marcar como no enviado
+  // Buscar el OTP entre los pendientes
+  var pendientes = ArcanoDB.getOtpPendientes();
+  var otp = null;
+  for (var i = 0; i < pendientes.length; i++) {
+    if (pendientes[i]._key === key) { otp = pendientes[i]; break; }
+  }
+  if (!otp) return;
+  var waLink = 'https://wa.me/' + otp.telNorm + '?text=' + encodeURIComponent('Hola ' + (otp.nombre || '') + '! Tu código de acceso a Arcano Especias es: ' + otp.codigo + '. Ingrésalo en la tienda para activar tu cuenta.');
+  window.open(waLink, '_blank');
+  // Re-marcar como pendiente
+  try {
+    firebase.database().ref('arcano/db/otpPendientes/' + key).update({ enviado: false, enviadoEn: null });
+  } catch(e) {}
+};
+
+Pages._deleteOtpPendiente = function(key) {
+  if (!confirm('¿Eliminar este OTP pendiente?')) return;
+  ArcanoDB.deleteOtpPendiente(key);
 };
