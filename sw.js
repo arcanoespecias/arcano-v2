@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arcano-v4-9';
+const CACHE_NAME = 'arcano-v4-10';
 const STATIC_ASSETS = [
   './manifest.json',
   './icons/favicon.png',
@@ -19,6 +19,24 @@ self.addEventListener('activate', e => {
     )
   );
   self.clients.claim();
+});
+
+// Cuando el admin hace click en una notificación nativa → abrir la PWA
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Si ya hay una ventana abierta, enfocarla
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url.includes('arcano') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Si no hay ventana abierta, abrir nueva
+      if (clients.openWindow) return clients.openWindow('./');
+    })
+  );
 });
 
 self.addEventListener('fetch', e => {

@@ -150,8 +150,24 @@ const App = {
     // Clientes listener + sonido de bienvenida cuando un cliente se registra
     function _playWelcomeSound() {
       try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Sonido tipo "campana de bienvenida": 3 notas ascendentes (do-mi-sol)
+        // En mobile, vibrar además de sonar (si el dispositivo lo soporta)
+        if (navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 200]);
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        var ctx;
+        // Reutilizar contexto existente si está disponible (mejor performance)
+        if (window._arcanoWelcomeAudioCtx && window._arcanoWelcomeAudioCtx.state !== 'closed') {
+          ctx = window._arcanoWelcomeAudioCtx;
+        } else {
+          ctx = new AudioCtx();
+          window._arcanoWelcomeAudioCtx = ctx;
+        }
+        // En mobile, el contexto puede estar suspended hasta interacción del usuario
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(function() {});
+        }
+        // Sonido tipo "campana de bienvenida": 4 notas ascendentes (do-mi-sol-do)
+        var now = ctx.currentTime;
         var times = [0, 0.12, 0.24, 0.45];
         var freqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
         for (var i = 0; i < times.length; i++) {
@@ -161,12 +177,64 @@ const App = {
           gain.connect(ctx.destination);
           osc.frequency.value = freqs[i];
           osc.type = 'sine';
-          gain.gain.setValueAtTime(0, ctx.currentTime + times[i]);
-          gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + times[i] + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + 0.4);
-          osc.start(ctx.currentTime + times[i]);
-          osc.stop(ctx.currentTime + times[i] + 0.45);
+          gain.gain.setValueAtTime(0, now + times[i]);
+          gain.gain.linearRampToValueAtTime(0.25, now + times[i] + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.4);
+          osc.start(now + times[i]);
+          osc.stop(now + times[i] + 0.45);
         }
+      } catch (e) {
+        console.warn('[Audio] No se pudo reproducir sonido de bienvenida:', e);
+      }
+    }
+
+    // Notificación nativa del sistema (para cuando la PWA está en background)
+    function _showNativeNotification(title, body, tag) {
+      try {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        var options = {
+          body: body,
+          icon: 'icons/icon-192.png',
+          badge: 'icons/favicon.png',
+          tag: tag || 'arcano-notif',
+          vibrate: [120, 60, 120, 60, 200],
+          requireInteraction: false,
+          silent: true  // ya reproducimos nuestro propio sonido
+        };
+        // Usar registration del service worker si está disponible
+        // (necesario para que funcione en PWA instalada en background)
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(function(reg) {
+            reg.showNotification(title, options).catch(function() {
+              // Fallback: usar Notification API directa
+              try { new Notification(title, options); } catch(e) {}
+            });
+          });
+        } else {
+          try { new Notification(title, options); } catch(e) {}
+        }
+      } catch (e) {
+        console.warn('[Notif] No se pudo mostrar notificación nativa:', e);
+      }
+    }
+
+    // Wake Lock: mantener pantalla encendida por 8 segundos al llegar notificación
+    var _wakeLock = null;
+    function _requestWakeLock() {
+      try {
+        if (!('wakeLock' in navigator)) return;
+        if (_wakeLock) return;  // ya hay uno activo
+        navigator.wakeLock.request('screen').then(function(lock) {
+          _wakeLock = lock;
+          // Liberar después de 8 segundos
+          setTimeout(function() {
+            if (_wakeLock) {
+              _wakeLock.release();
+              _wakeLock = null;
+            }
+          }, 8000);
+        }).catch(function() {});
       } catch (e) {}
     }
 
@@ -175,16 +243,26 @@ const App = {
       var count = clientes.length;
       // Sonido solo si aumentó la cantidad (cliente nuevo) y no en carga inicial
       if (count > _lastClientesCount && _lastClientesCount >= 0) {
+        // Buscar el cliente nuevo (el último agregado)
+        var nuevoCliente = clientes[0];  // ya está ordenado por ultimoPedido desc
+        var nombreNuevo = nuevoCliente && nuevoCliente.nombre ? nuevoCliente.nombre : 'Nuevo cliente';
+
         _playWelcomeSound();
+        _requestWakeLock();
+        _showNativeNotification(
+          '🔔 Nuevo Cliente en Arcano',
+          nombreNuevo + ' acaba de registrarse',
+          'arcano-cliente-nuevo-' + Date.now()
+        );
         // Flash browser tab title
         var origTitle = document.title;
         var flashCount = 0;
         var flashInterval = setInterval(function() {
-          document.title = flashCount % 2 === 0 ? '\u{1F514} Nuevo Cliente!' : origTitle;
+          document.title = flashCount % 2 === 0 ? '🔔 Nuevo Cliente!' : origTitle;
           flashCount++;
           if (flashCount >= 10) { clearInterval(flashInterval); document.title = origTitle; }
         }, 800);
-        // Si está en la página de clientes, re-renderizar para que aparezca arriba
+        // Si está en la página de clientes, re-renderizar
         if (App.currentPage === 'clientes') {
           App.renderPage('clientes');
         }
@@ -196,6 +274,29 @@ const App = {
     setTimeout(function() {
       _lastClientesCount = ArcanoDB.getClientesCount();
     }, 3000);
+
+    // Pedir permiso de notificaciones nativas al entrar al admin
+    // (necesario para que funcione en PWA instalada en background)
+    function _requestNotifPermission() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(function(p) {
+          console.log('[Notif] Permiso:', p);
+        }).catch(function() {});
+      }
+    }
+    // Pedir permiso después de un breve delay (no interrumpir el login)
+    setTimeout(_requestNotifPermission, 2000);
+
+    // Detectar cuando la app vuelve a foreground (PWA instalada)
+    // para reanudar el AudioContext si estaba suspended
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        if (window._arcanoWelcomeAudioCtx && window._arcanoWelcomeAudioCtx.state === 'suspended') {
+          window._arcanoWelcomeAudioCtx.resume().catch(function() {});
+        }
+      }
+    });
 
     // Grandes Clientes badge listener + audio notification
     var _lastGCNuevoCount = -1;
