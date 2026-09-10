@@ -2251,7 +2251,32 @@ function getTiendaConfig() {
 
 function saveTiendaConfig(data) {
   if (!_db.tiendaConfig) _db.tiendaConfig = {};
-  if (typeof data.logoPago === 'string') _db.tiendaConfig.logoPago = data.logoPago;
+  // Merge profundo: soporta cualquier campo nuevo (incluido dinamico)
+  for (var key in data) {
+    if (!data.hasOwnProperty(key)) continue;
+    if (data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
+      // Merge de objetos anidados (ej: dinamico: { tipo, velocidad, ... })
+      if (!_db.tiendaConfig[key] || typeof _db.tiendaConfig[key] !== 'object') _db.tiendaConfig[key] = {};
+      for (var sub in data[key]) {
+        if (data[key].hasOwnProperty(sub)) _db.tiendaConfig[key][sub] = data[key][sub];
+      }
+    } else {
+      _db.tiendaConfig[key] = data[key];
+    }
+  }
+  _saveToFirebase(); _cacheLocal();
+  return _db.tiendaConfig;
+}
+
+function saveTiendaConfigField(path, value) {
+  if (!_db.tiendaConfig) _db.tiendaConfig = {};
+  var parts = path.split('/');
+  var target = _db.tiendaConfig;
+  for (var i = 0; i < parts.length - 1; i++) {
+    if (!target[parts[i]] || typeof target[parts[i]] !== 'object') target[parts[i]] = {};
+    target = target[parts[i]];
+  }
+  target[parts[parts.length - 1]] = value;
   _saveToFirebase(); _cacheLocal();
   return _db.tiendaConfig;
 }
@@ -2291,7 +2316,7 @@ window.ArcanoDB = {
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, producirPack: producirPack,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
-  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig,
+  getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig, saveTiendaConfigField: saveTiendaConfigField,
   saveNow: saveNow,
   writeField: writeField,
   getGrandesClientes: getGrandesClientes, updateGCEstado: updateGCEstado, deleteGC: deleteGC, onGCChange: onGCChange, getGCCount: getGCCount,

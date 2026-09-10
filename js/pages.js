@@ -2802,6 +2802,71 @@ const Pages = {
           '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-logo-pago\').click()"><span>+ Formas de Pago</span></div></div>' +
       '</div></div></div>';
 
+    // === DISEÑO DINÁMICO ===
+    var din = cfg.dinamico || {};
+    h += '<div class="card mt-16"><div class="card-header"><h3>Diseño Dinámico de Fondo</h3><p class="text-xs text-muted">Configura la transición del fondo de la tienda (crema → negro) y las partículas. Los cambios se aplican en tiempo real.</p></div><div class="card-body">';
+    h += '<div class="form-group" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:8px">' +
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">' +
+        '<input type="checkbox" id="din-habilitado" ' + (din.habilitado !== false ? 'checked' : '') + '> ' +
+        '<span>Habilitar fondo dinámico</span>' +
+      '</label></div>';
+
+    h += '<div class="g2 mt-12">' +
+      '<div class="form-group"><label>Tipo de partículas</label>' +
+        '<select class="input" id="din-tipo">' +
+          '<option value="dust"' + (din.tipoParticulas === 'dust' || !din.tipoParticulas ? ' selected' : '') + '>Polvo dorado (especias)</option>' +
+          '<option value="sparkles"' + (din.tipoParticulas === 'sparkles' ? ' selected' : '') + '>Destellos brillantes</option>' +
+          '<option value="snow"' + (din.tipoParticulas === 'snow' ? ' selected' : '') + '>Copos blancos</option>' +
+          '<option value="embers"' + (din.tipoParticulas === 'embers' ? ' selected' : '') + '>Brasas anaranjadas</option>' +
+          '<option value="stars"' + (din.tipoParticulas === 'stars' ? ' selected' : '') + '>Estrellas</option>' +
+        '</select></div>' +
+      '<div class="form-group"><label>Cantidad de partículas</label>' +
+        '<select class="input" id="din-cantidad">' +
+          '<option value="0"' + (din.cantidadParticulas === 0 ? ' selected' : '') + '>0 (sin partículas)</option>' +
+          '<option value="8"' + (din.cantidadParticulas === 8 ? ' selected' : '') + '>8 (mínimo)</option>' +
+          '<option value="18"' + (din.cantidadParticulas === 18 || !din.cantidadParticulas ? ' selected' : '') + '>18 (normal)</option>' +
+          '<option value="30"' + (din.cantidadParticulas === 30 ? ' selected' : '') + '>30 (denso)</option>' +
+        '</select></div>' +
+    '</div>';
+
+    h += '<div class="g2">' +
+      '<div class="form-group"><label>Velocidad de partículas</label>' +
+        '<select class="input" id="din-velocidad">' +
+          '<option value="slow"' + (din.velocidadParticulas === 'slow' ? ' selected' : '') + '>Lenta (relajante)</option>' +
+          '<option value="normal"' + (din.velocidadParticulas === 'normal' || !din.velocidadParticulas ? ' selected' : '') + '>Normal</option>' +
+          '<option value="fast"' + (din.velocidadParticulas === 'fast' ? ' selected' : '') + '>Rápida (energética)</option>' +
+        '</select></div>' +
+      '<div class="form-group"><label>Velocidad del mesh gradient</label>' +
+        '<select class="input" id="din-mesh">' +
+          '<option value="slow"' + (din.velocidadMesh === 'slow' ? ' selected' : '') + '>Lenta (120s)</option>' +
+          '<option value="normal"' + (din.velocidadMesh === 'normal' || !din.velocidadMesh ? ' selected' : '') + '>Normal (60s)</option>' +
+          '<option value="fast"' + (din.velocidadMesh === 'fast' ? ' selected' : '') + '>Rápida (25s)</option>' +
+          '<option value="none"' + (din.velocidadMesh === 'none' ? ' selected' : '') + '>Sin animación</option>' +
+        '</select></div>' +
+    '</div>';
+
+    h += '<div class="g2">' +
+      '<div class="form-group"><label>Intensidad de transición</label>' +
+        '<select class="input" id="din-intensidad">' +
+          '<option value="sutil"' + (din.intensidad === 'sutil' ? ' selected' : '') + '>Sutil (cambio lento, final claro)</option>' +
+          '<option value="normal"' + (din.intensidad === 'normal' || !din.intensidad ? ' selected' : '') + '>Normal (recomendado)</option>' +
+          '<option value="dramatico"' + (din.intensidad === 'dramatico' ? ' selected' : '') + '>Dramático (cambio rápido y oscuro)</option>' +
+        '</select></div>' +
+      '<div class="form-group"><label>Vignette (oscurecido de bordes)</label>' +
+        '<select class="input" id="din-vignette">' +
+          '<option value="true"' + (din.vignette !== false ? ' selected' : '') + '>Activado</option>' +
+          '<option value="false"' + (din.vignette === false ? ' selected' : '') + '>Desactivado</option>' +
+        '</select></div>' +
+    '</div>';
+
+    h += '<div class="mt-12" style="display:flex;gap:8px;align-items:center">' +
+      '<button class="btn btn-gold" onclick="Pages._guardarDisenoDinamico()">Guardar cambios</button>' +
+      '<button class="btn btn-outline" onclick="Pages._resetDisenoDinamico()">Restablecer defaults</button>' +
+      '<span id="din-status" class="text-sm text-muted ml-8"></span>' +
+    '</div>';
+    h += '<p class="text-xs text-muted mt-8">💡 Los textos se ajustan automáticamente para mantener contraste legible en todo el rango de scroll (curva de easing diferenciada para texto vs fondo).</p>';
+    h += '</div></div>';
+
     container.innerHTML = h;
   },
 
@@ -7326,4 +7391,38 @@ Pages._deleteCarrito = function(key) {
   if (!confirm('¿Eliminar este carrito del tracking?')) return;
   ArcanoDB.deleteCarrito(key);
   App.renderPage('carritos');
+};
+
+/* ==================== DISEÑO DINÁMICO (admin tienda config) ==================== */
+Pages._guardarDisenoDinamico = function() {
+  var data = {
+    habilitado: document.getElementById('din-habilitado').checked,
+    tipoParticulas: document.getElementById('din-tipo').value,
+    cantidadParticulas: parseInt(document.getElementById('din-cantidad').value, 10),
+    velocidadParticulas: document.getElementById('din-velocidad').value,
+    velocidadMesh: document.getElementById('din-mesh').value,
+    intensidad: document.getElementById('din-intensidad').value,
+    vignette: document.getElementById('din-vignette').value === 'true'
+  };
+  var status = document.getElementById('din-status');
+  if (status) status.innerHTML = '<span style="color:var(--gold)">Guardando...</span>';
+  ArcanoDB.saveTiendaConfig({ dinamico: data });
+  if (status) status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Visita la tienda para ver los cambios.</span>';
+  toast('Diseño dinámico guardado');
+};
+
+Pages._resetDisenoDinamico = function() {
+  if (!confirm('¿Restablecer la configuración de diseño a los valores por defecto?')) return;
+  var defaults = {
+    habilitado: true,
+    tipoParticulas: 'dust',
+    cantidadParticulas: 18,
+    velocidadParticulas: 'normal',
+    velocidadMesh: 'normal',
+    intensidad: 'normal',
+    vignette: true
+  };
+  ArcanoDB.saveTiendaConfig({ dinamico: defaults });
+  toast('Configuración restablecida');
+  App.renderPage('tienda');
 };
