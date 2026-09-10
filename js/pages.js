@@ -7426,3 +7426,216 @@ Pages._resetDisenoDinamico = function() {
   toast('Configuración restablecida');
   App.renderPage('tienda');
 };
+
+/* ==================== MENSAJES WHATSAPP (admin) ====================
+   Permite al admin:
+   1. Configurar mensaje automático para carritos abandonados (con tiempo).
+   2. Seleccionar clientes y enviarles mensajes manuales.
+   3. Ver carritos abandonados pendientes de notificar.
+   Config persistida en tiendaConfig.mensajesWhatsApp.
+   ================================================================== */
+Pages.renderMensajes = function(el) {
+  var cfg = ArcanoDB.getTiendaConfig();
+  var mw = cfg.mensajesWhatsApp || {};
+  var clientes = ArcanoDB.getClientes();
+  var carritos = ArcanoDB.getCarritos();
+  var ahora = Date.now();
+
+  // Carritos abandonados pendientes de notificar (no notificados aún)
+  var abandonadosPendientes = carritos.filter(function(c) {
+    if (c.estado !== 'abandonado') return false;
+    if (c.notificadoEn) return false;
+    if (!c.actualizado && !c.creado) return false;
+    return true;
+  });
+
+  var h = '<div class="page-header"><h2>Mensajes WhatsApp</h2></div>';
+
+  // === SECCIÓN 1: Carrito abandonado automático ===
+  h += '<div class="card mt-16"><div class="card-header"><h3>🔔 Carrito abandonado automático</h3><p class="text-xs text-muted">Cuando un cliente deja productos en el carrito sin completar el pedido, envíale un recordatorio automático por WhatsApp.</p></div><div class="card-body">';
+  h += '<div class="g2">' +
+    '<div class="form-group"><label>Tiempo de abandono (minutos)</label>' +
+      '<input class="input" id="mw-tiempo" type="number" min="5" max="1440" value="' + (mw.tiempoAbandonoMin || 30) + '" placeholder="30">' +
+      '<p class="text-xs text-muted mt-4">Después de X minutos sin actividad, el carrito se considera abandonado y se notifica al admin.</p>' +
+    '</div>' +
+    '<div class="form-group"><label>Activar notificación automática</label>' +
+      '<select class="input" id="mw-activo">' +
+        '<option value="true"' + (mw.notifActiva !== false ? ' selected' : '') + '>Activado</option>' +
+        '<option value="false"' + (mw.notifActiva === false ? ' selected' : '') + '>Desactivado</option>' +
+      '</select></div>' +
+  '</div>';
+
+  h += '<div class="form-group mt-12"><label>Mensaje automático (usa {nombre} y {total})</label>' +
+    '<textarea class="input" id="mw-mensaje" rows="4" placeholder="Hola {nombre}! Vimos que dejaste productos en tu carrito de Arcano Especias por ${total}. ¿Te ayudamos a completar tu pedido?">' + esc(mw.mensajeAbandono || '') + '</textarea>' +
+    '<p class="text-xs text-muted mt-4">Variables disponibles: <code>{nombre}</code>, <code>{total}</code>, <code>{items}</code></p>' +
+  '</div>';
+
+  h += '<div class="mt-8" style="display:flex;gap:8px;align-items:center">' +
+    '<button class="btn btn-gold" onclick="Pages._guardarMensajesWA()">Guardar configuración</button>' +
+    '<span id="mw-status" class="text-sm text-muted ml-8"></span>' +
+  '</div>';
+  h += '</div></div>';
+
+  // === SECCIÓN 2: Carritos abandonados pendientes ===
+  h += '<div class="card mt-16"><div class="card-header"><h3>🛒 Carritos abandonados pendientes (' + abandonadosPendientes.length + ')</h3></div><div class="card-body">';
+  if (abandonadosPendientes.length === 0) {
+    h += '<p class="text-center text-muted">No hay carritos abandonados pendientes de notificar.</p>';
+  } else {
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>WhatsApp</th><th>Items</th><th>Total</th><th>Abandonado hace</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < abandonadosPendientes.length; i++) {
+      var c = abandonadosPendientes[i];
+      var cliente = c.cliente || {};
+      var tiempoMs = ahora - new Date(c.actualizado || c.creado).getTime();
+      var tiempoStr = Pages._formatearTiempo(tiempoMs);
+      var telNorm = cliente.telefono ? ('57' + cliente.telefono.replace(/\D/g, '').replace(/^57/, '')) : '';
+      var nombreVar = cliente.nombre || 'Cliente';
+      var totalVar = (c.total || 0).toLocaleString();
+      var itemsVar = (c.items || []).map(function(it) { return (it.nombre || '?') + ' x' + (it.qty || 1); }).join(', ');
+      var mensaje = (mw.mensajeAbandono || 'Hola {nombre}! Vimos que dejaste productos en tu carrito de Arcano Especias por ${total}. ¿Te ayudamos a completar tu pedido?')
+        .replace(/\{nombre\}/g, nombreVar)
+        .replace(/\{total\}/g, '$' + totalVar)
+        .replace(/\{items\}/g, itemsVar);
+      var waLink = telNorm ? ('https://wa.me/' + telNorm + '?text=' + encodeURIComponent(mensaje)) : '#';
+      h += '<tr>' +
+        '<td class="fw7">' + esc(cliente.nombre || 'Invitado') + '</td>' +
+        '<td>' + esc(cliente.telefono || '-') + '</td>' +
+        '<td class="text-sm">' + ((c.items || []).length) + ' productos</td>' +
+        '<td class="fw7 text-gold">$' + (c.total || 0).toLocaleString() + '</td>' +
+        '<td class="text-sm text-muted">' + tiempoStr + '</td>' +
+        '<td>' +
+          '<a href="' + waLink + '" target="_blank" class="btn btn-sm btn-gold" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>' +
+            'Enviar' +
+          '</a> ' +
+          '<button class="btn btn-sm btn-outline" onclick="Pages._marcarNotificado(\'' + c._key + '\')" title="Marcar como notificado">✓</button>' +
+        '</td>' +
+      '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div></div>';
+
+  // === SECCIÓN 3: Envío manual a clientes seleccionados ===
+  h += '<div class="card mt-16"><div class="card-header"><h3>📤 Envío manual a clientes</h3><p class="text-xs text-muted">Selecciona clientes y envíales un mensaje personalizado por WhatsApp.</p></div><div class="card-body">';
+
+  h += '<div class="form-group"><label>Mensaje manual (usa {nombre})</label>' +
+    '<textarea class="input" id="mw-mensaje-manual" rows="3" placeholder="Hola {nombre}! Tenemos una promo especial para ti...">' + esc(mw.mensajeManual || '') + '</textarea>' +
+  '</div>';
+
+  h += '<div class="mt-8" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<button class="btn btn-outline btn-sm" onclick="Pages._selectAllClientesWA(true)">Seleccionar todos</button>' +
+    '<button class="btn btn-outline btn-sm" onclick="Pages._selectAllClientesWA(false)">Quitar selección</button>' +
+    '<span class="text-sm text-muted ml-8" id="mw-seleccionados-count">0 seleccionados</span>' +
+  '</div>';
+
+  if (clientes.length === 0) {
+    h += '<p class="text-center text-muted mt-12">No hay clientes registrados aún.</p>';
+  } else {
+    h += '<div class="table-wrap mt-12"><table class="table"><thead><tr><th><input type="checkbox" onchange="Pages._toggleAllClientesWA(this.checked)"></th><th>Nombre</th><th>WhatsApp</th><th>Pedidos</th><th>Total comprado</th><th>Último pedido</th></tr></thead><tbody>';
+    var totalPorCliente = {};
+    var pedidos = ArcanoDB.getPedidos();
+    for (var pi = 0; pi < pedidos.length; pi++) {
+      var p = pedidos[pi];
+      if (p.clienteId && p.estado !== 'cancelado') {
+        totalPorCliente[p.clienteId] = (totalPorCliente[p.clienteId] || 0) + (p.total || 0);
+      }
+    }
+    for (var ci = 0; ci < clientes.length; ci++) {
+      var c2 = clientes[ci];
+      var total = totalPorCliente[c2._key] || 0;
+      var ultimo = c2.ultimoPedido ? new Date(c2.ultimoPedido).toLocaleDateString('es-CO', {day:'2-digit',month:'short'}) : '-';
+      h += '<tr>' +
+        '<td><input type="checkbox" class="wa-cliente-check" data-key="' + c2._key + '" onchange="Pages._updateSeleccionadosWA()"></td>' +
+        '<td class="fw7">' + esc(c2.nombre || 'Sin nombre') + '</td>' +
+        '<td>' + esc(c2.telefono || '-') + '</td>' +
+        '<td><span class="badge badge-gold">' + (c2.totalPedidos || 0) + '</span></td>' +
+        '<td class="fw7 text-gold">$' + total.toLocaleString() + '</td>' +
+        '<td class="text-sm text-muted">' + ultimo + '</td>' +
+      '</tr>';
+    }
+    h += '</tbody></table></div>';
+
+    h += '<div class="mt-12" style="display:flex;gap:8px;align-items:center">' +
+      '<button class="btn btn-gold" onclick="Pages._enviarMensajesWA()">Enviar a seleccionados</button>' +
+      '<span id="mw-envio-status" class="text-sm text-muted ml-8"></span>' +
+    '</div>';
+    h += '<p class="text-xs text-muted mt-8">💡 Se abrirá una pestaña de WhatsApp por cada cliente seleccionado, con el mensaje personalizado pre-cargado. Solo tienes que enviar cada uno.</p>';
+  }
+  h += '</div></div>';
+
+  el.innerHTML = h;
+};
+
+Pages._guardarMensajesWA = function() {
+  var data = {
+    tiempoAbandonoMin: parseInt(document.getElementById('mw-tiempo').value, 10) || 30,
+    notifActiva: document.getElementById('mw-activo').value === 'true',
+    mensajeAbandono: document.getElementById('mw-mensaje').value.trim(),
+    mensajeManual: document.getElementById('mw-mensaje-manual').value.trim()
+  };
+  ArcanoDB.saveTiendaConfig({ mensajesWhatsApp: data });
+  var status = document.getElementById('mw-status');
+  if (status) status.innerHTML = '<span style="color:var(--green)">✓ Guardado</span>';
+  toast('Configuración de mensajes guardada');
+  setTimeout(function() { if (status) status.innerHTML = ''; }, 3000);
+};
+
+Pages._marcarNotificado = function(carritoKey) {
+  try {
+    firebase.database().ref('arcano/db/carritos/' + carritoKey).update({ notificadoEn: new Date().toISOString() });
+    toast('Marcado como notificado');
+    App.renderPage('mensajes');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+};
+
+Pages._selectAllClientesWA = function(select) {
+  var checks = document.querySelectorAll('.wa-cliente-check');
+  for (var i = 0; i < checks.length; i++) checks[i].checked = select;
+  Pages._updateSeleccionadosWA();
+};
+
+Pages._toggleAllClientesWA = function(checked) {
+  Pages._selectAllClientesWA(checked);
+};
+
+Pages._updateSeleccionadosWA = function() {
+  var checks = document.querySelectorAll('.wa-cliente-check:checked');
+  var countEl = document.getElementById('mw-seleccionados-count');
+  if (countEl) countEl.textContent = checks.length + ' seleccionado' + (checks.length !== 1 ? 's' : '');
+};
+
+Pages._enviarMensajesWA = function() {
+  var checks = document.querySelectorAll('.wa-cliente-check:checked');
+  if (checks.length === 0) { alert('Selecciona al menos un cliente'); return; }
+  var mensajeTemplate = (document.getElementById('mw-mensaje-manual').value || 'Hola {nombre}! Te escribimos desde Arcano Especias.').trim();
+  var clientes = ArcanoDB.getClientes();
+  var enviados = 0;
+  for (var i = 0; i < checks.length; i++) {
+    var key = checks[i].dataset.key;
+    var cliente = null;
+    for (var j = 0; j < clientes.length; j++) {
+      if (clientes[j]._key === key) { cliente = clientes[j]; break; }
+    }
+    if (!cliente) continue;
+    var telNorm = cliente.telefono ? ('57' + cliente.telefono.replace(/\D/g, '').replace(/^57/, '')) : '';
+    if (!telNorm) continue;
+    var msg = mensajeTemplate.replace(/\{nombre\}/g, cliente.nombre || 'Cliente');
+    var waLink = 'https://wa.me/' + telNorm + '?text=' + encodeURIComponent(msg);
+    window.open(waLink, '_blank');
+    enviados++;
+  }
+  var status = document.getElementById('mw-envio-status');
+  if (status) status.innerHTML = '<span style="color:var(--green)">' + enviados + ' mensaje(s) abiertos en WhatsApp. Envíalos manualmente.</span>';
+  toast(enviados + ' mensajes preparados en pestañas de WhatsApp');
+};
+
+Pages._formatearTiempo = function(ms) {
+  var min = Math.floor(ms / 60000);
+  if (min < 60) return min + ' min';
+  var horas = Math.floor(min / 60);
+  if (horas < 24) return horas + 'h ' + (min % 60) + 'm';
+  var dias = Math.floor(horas / 24);
+  return dias + 'd ' + (horas % 24) + 'h';
+};

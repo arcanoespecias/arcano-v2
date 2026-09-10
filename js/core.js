@@ -225,6 +225,8 @@ const App = {
               '<span class="nav-icon">🎁</span><span class="nav-label">Promociones</span></a>' +
             '<a class="nav-item" data-page="carritos" onclick="App.navigate(\'carritos\')">' +
               '<span class="nav-icon">🛒</span><span class="nav-label">Carritos</span></a>' +
+            '<a class="nav-item" data-page="mensajes" onclick="App.navigate(\'mensajes\')">' +
+              '<span class="nav-icon">💬</span><span class="nav-label">Mensajes WA</span></a>' +
             '<div style="border-top:1px solid var(--border);margin:8px 12px"></div>' +
             '<a class="nav-item" data-page="testing" onclick="App.navigate(\'testing\')">' +
               '<span class="nav-icon">🧪</span><span class="nav-label">Testing</span></a>' +
@@ -263,7 +265,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos'
+      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos', mensajes: 'Mensajes WhatsApp'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     // Cierra el drawer lateral en mobile al cambiar de pagina
@@ -334,6 +336,7 @@ const App = {
         case 'clientes': Pages.renderClientes(container); break;
         case 'promociones': Pages.renderPromociones(container); break;
         case 'carritos': Pages.renderCarritos(container); break;
+        case 'mensajes': Pages.renderMensajes(container); break;
         default: container.innerHTML = '<p>Pagina no encontrada</p>';
       }
     } catch (e) {
