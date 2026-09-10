@@ -7026,9 +7026,37 @@ Pages.renderClientes = function(el) {
   h += '</div>';
 
   if (totalClientes === 0) {
-    h += '<div class="card"><div class="card-body"><p class="text-center text-muted">Todavía no hay clientes registrados. Cuando un cliente haga su primer pedido en la tienda, se creará automáticamente aquí.</p></div></div>';
+    h += '<div class="card"><div class="card-body"><p class="text-center text-muted">Todavía no hay clientes registrados. Cuando un cliente haga click en "Mi Cuenta" en la tienda y se registre con su WhatsApp + nombre, aparecerá aquí automáticamente.</p></div></div>';
     el.innerHTML = h;
     return;
+  }
+
+  // === Clientes recién llegados (últimas 24h) ===
+  var hace24h = Date.now() - 24 * 60 * 60 * 1000;
+  var recientes = clientes.filter(function(c) {
+    var t = c.creado ? new Date(c.creado).getTime() : 0;
+    return t > hace24h;
+  }).sort(function(a, b) {
+    return (b.creado || '').localeCompare(a.creado || '');
+  });
+
+  if (recientes.length > 0) {
+    h += '<div class="card mb-16"><div class="card-header"><h3>🆕 Recién llegados (' + recientes.length + ')</h3><p class="text-xs text-muted">Clientes que se registraron en las últimas 24 horas</p></div><div class="card-body">';
+    h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>WhatsApp</th><th>Registrado hace</th><th></th></tr></thead><tbody>';
+    for (var ri = 0; ri < recientes.length; ri++) {
+      var r = recientes[ri];
+      var telNorm = r.telNorm || '';
+      var waLink = telNorm ? 'https://wa.me/' + telNorm : '#';
+      var tiempoStr = Pages._formatearTiempo(Date.now() - new Date(r.creado).getTime());
+      h += '<tr>' +
+        '<td class="fw7">' + esc(r.nombre || 'Sin nombre') + '</td>' +
+        '<td><a href="' + waLink + '" target="_blank" style="color:var(--gold)">' + esc(r.telefono || '-') + '</a></td>' +
+        '<td class="text-sm text-muted">' + tiempoStr + '</td>' +
+        '<td><a href="' + waLink + '?text=' + encodeURIComponent('¡Hola ' + (r.nombre || '') + '! Bienvenido a Arcano Especias. Ya estás registrado en nuestra tienda. Cualquier duda escríbenos por aquí 🌶️') + '" target="_blank" class="btn btn-sm btn-gold" style="text-decoration:none">Enviar bienvenida</a></td>' +
+      '</tr>';
+    }
+    h += '</tbody></table></div>';
+    h += '</div></div>';
   }
 
   // Input de búsqueda
