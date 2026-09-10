@@ -2804,7 +2804,7 @@ const Pages = {
 
     // === DISEÑO DINÁMICO ===
     var din = cfg.dinamico || {};
-    h += '<div class="card mt-16"><div class="card-header"><h3>Diseño Dinámico de Fondo</h3><p class="text-xs text-muted">Configura la transición del fondo de la tienda (crema → negro) y las partículas. Los cambios se aplican en tiempo real.</p></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Diseño Dinámico de Fondo</h3><p class="text-xs text-muted">Configura la transición del fondo de la tienda (crema → negro). El efecto se activa por <b>tiempo de navegación</b> del usuario, no por scroll. Los textos se ajustan automáticamente para mantener contraste legible.</p></div><div class="card-body">';
     h += '<div class="form-group" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:8px">' +
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">' +
         '<input type="checkbox" id="din-habilitado" ' + (din.habilitado !== false ? 'checked' : '') + '> ' +
@@ -2846,11 +2846,11 @@ const Pages = {
     '</div>';
 
     h += '<div class="g2">' +
-      '<div class="form-group"><label>Intensidad de transición</label>' +
+      '<div class="form-group"><label>Tiempo de transición (qué tan rápido llega al tema oscuro)</label>' +
         '<select class="input" id="din-intensidad">' +
-          '<option value="sutil"' + (din.intensidad === 'sutil' ? ' selected' : '') + '>Sutil (cambio lento, final claro)</option>' +
-          '<option value="normal"' + (din.intensidad === 'normal' || !din.intensidad ? ' selected' : '') + '>Normal (recomendado)</option>' +
-          '<option value="dramatico"' + (din.intensidad === 'dramatico' ? ' selected' : '') + '>Dramático (cambio rápido y oscuro)</option>' +
+          '<option value="sutil"' + (din.intensidad === 'sutil' ? ' selected' : '') + '>Sutil — 2 minutos (transición muy lenta)</option>' +
+          '<option value="normal"' + (din.intensidad === 'normal' || !din.intensidad ? ' selected' : '') + '>Normal — 1 minuto (recomendado)</option>' +
+          '<option value="dramatico"' + (din.intensidad === 'dramatico' ? ' selected' : '') + '>Dramático — 30 segundos (cambio rápido)</option>' +
         '</select></div>' +
       '<div class="form-group"><label>Vignette (oscurecido de bordes)</label>' +
         '<select class="input" id="din-vignette">' +
@@ -2864,7 +2864,7 @@ const Pages = {
       '<button class="btn btn-outline" onclick="Pages._resetDisenoDinamico()">Restablecer defaults</button>' +
       '<span id="din-status" class="text-sm text-muted ml-8"></span>' +
     '</div>';
-    h += '<p class="text-xs text-muted mt-8">💡 Los textos se ajustan automáticamente para mantener contraste legible en todo el rango de scroll (curva de easing diferenciada para texto vs fondo).</p>';
+    h += '<p class="text-xs text-muted mt-8">💡 El efecto empieza cuando el usuario carga la tienda y transiciona gradualmente según los segundos configurados. Los textos mantienen SIEMPRE buen contraste (curva de easing diferenciada).</p>';
     h += '</div></div>';
 
     container.innerHTML = h;
