@@ -147,6 +147,56 @@ const App = {
     // Initial badge update after a short delay to let pedidos load
     setTimeout(_updatePedidosBadge, 2000);
 
+    // Clientes listener + sonido de bienvenida cuando un cliente se registra
+    function _playWelcomeSound() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Sonido tipo "campana de bienvenida": 3 notas ascendentes (do-mi-sol)
+        var times = [0, 0.12, 0.24, 0.45];
+        var freqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        for (var i = 0; i < times.length; i++) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freqs[i];
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0, ctx.currentTime + times[i]);
+          gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + times[i] + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + 0.4);
+          osc.start(ctx.currentTime + times[i]);
+          osc.stop(ctx.currentTime + times[i] + 0.45);
+        }
+      } catch (e) {}
+    }
+
+    var _lastClientesCount = -1;
+    function _onClientesChange(clientes) {
+      var count = clientes.length;
+      // Sonido solo si aumentó la cantidad (cliente nuevo) y no en carga inicial
+      if (count > _lastClientesCount && _lastClientesCount >= 0) {
+        _playWelcomeSound();
+        // Flash browser tab title
+        var origTitle = document.title;
+        var flashCount = 0;
+        var flashInterval = setInterval(function() {
+          document.title = flashCount % 2 === 0 ? '\u{1F514} Nuevo Cliente!' : origTitle;
+          flashCount++;
+          if (flashCount >= 10) { clearInterval(flashInterval); document.title = origTitle; }
+        }, 800);
+        // Si está en la página de clientes, re-renderizar para que aparezca arriba
+        if (App.currentPage === 'clientes') {
+          App.renderPage('clientes');
+        }
+      }
+      _lastClientesCount = count;
+    }
+    ArcanoDB.onClientesChange(_onClientesChange);
+    // Inicializar count después de un delay para no disparar sonido en carga inicial
+    setTimeout(function() {
+      _lastClientesCount = ArcanoDB.getClientesCount();
+    }, 3000);
+
     // Grandes Clientes badge listener + audio notification
     var _lastGCNuevoCount = -1;
     function _updateGCBadge(gcs, isNew) {
