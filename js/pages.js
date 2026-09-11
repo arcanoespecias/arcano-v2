@@ -1175,24 +1175,25 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else {
-          // Tipo STICKER: mostrar tabla con todos los productos
+          // Tipo STICKER: mostrar tabla simple con todos los productos
           var allProds = [];
           for (var ei = 0; ei < esps.length; ei++) allProds.push({ nombre: esps[ei].nombre, tipo: 'especia', id: esps[ei].id });
           for (var bi = 0; bi < bls.length; bi++) allProds.push({ nombre: bls[bi].nombre, tipo: 'blend', id: bls[bi].id });
           allProds.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 
-          var stickerTable = '<label>Stickers por producto (ingresa cantidades)</label>' +
-            '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px">' +
-            '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr><th>Producto</th><th style="width:70px">Pequeño</th><th style="width:70px">Grande</th></tr></thead><tbody>';
+          var stickerTable = '<label>Stickers por producto</label>' +
+            '<p class="text-xs text-muted mt-4">Ingresa las cantidades de stickers que recibiste de cada producto.</p>' +
+            '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px">' +
+            '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr><th>Producto</th><th style="width:80px;text-align:center">Pequeño</th><th style="width:80px;text-align:center">Grande</th></tr></thead><tbody>';
           for (var si2 = 0; si2 < allProds.length; si2++) {
             stickerTable += '<tr>' +
-              '<td style="padding:6px 8px">' + esc(allProds[si2].nombre) + '</td>' +
-              '<td style="padding:4px"><input type="number" class="input ent-stk-chico" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:60px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
-              '<td style="padding:4px"><input type="number" class="input ent-stk-grande" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:60px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
+              '<td style="padding:6px 10px">' + esc(allProds[si2].nombre) + '</td>' +
+              '<td style="padding:4px;text-align:center"><input type="number" class="input ent-stk-chico" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
+              '<td style="padding:4px;text-align:center"><input type="number" class="input ent-stk-grande" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
             '</tr>';
           }
           stickerTable += '</tbody></table></div>';
-          stickerTable += '<div class="form-group mt-8" style="margin:0"><label>Costo Unit. Stickers (mismo para todos)</label><input type="number" class="input ent-cost" placeholder="0" min="0" style="width:120px"></div>';
+          stickerTable += '<div class="form-group mt-12" style="margin:0"><label>Costo por sticker (mismo para todos)</label><input type="number" class="input ent-cost" placeholder="$0" min="0" style="width:140px"></div>';
 
           detailDiv.innerHTML = stickerTable;
 
