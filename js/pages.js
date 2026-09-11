@@ -1372,12 +1372,12 @@ const Pages = {
   renderProduccion(container) {
     var prods = ArcanoDB.getProducciones();
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formProduccion()">+ Nueva Produccion</button></div>';
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial (' + prods.length + ')</h3></div><div class="card-body">';
     if (prods.length === 0) {
       h += '<p class="text-muted text-center">Sin producciones.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Talla</th><th>Cant.</th><th>Detalle</th></tr></thead><tbody>';
-      for (var i = 0; i < Math.min(prods.length, 30); i++) {
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Talla</th><th>Cant.</th><th>Detalle</th><th></th></tr></thead><tbody>';
+      for (var i = 0; i < Math.min(prods.length, 50); i++) {
         var p = prods[i];
         var det = p.tipo === 'blend' ?
           (p.ingredientes||[]).map(function(x){return x.especiaNombre+' '+x.gramosTotal+'g'}).join(', ') :
@@ -1387,7 +1387,8 @@ const Pages = {
           '<td class="fw7">' + (p.productoNombre||'') + '</td>' +
           '<td><span class="badge ' + ((p.talla||'chico')==='grande'?'badge-gold':'badge-blue') + '">' + (p.talla||'chico') + '</span></td>' +
           '<td class="fw7 text-green">' + (p.cantidad||0) + ' fr</td>' +
-          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + ' Bol:' + (p.bolsasConsumidas||0) + ' Cin:' + (p.cintasConsumidas||0) + '</td></tr>';
+          '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + ' Bol:' + (p.bolsasConsumidas||0) + ' Cin:' + (p.cintasConsumidas||0) + '</td>' +
+          '<td><button class="btn btn-sm btn-red" onclick="Pages.deleteProduccion(' + p.id + ')" title="Eliminar y revertir stock">X</button></td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -1398,6 +1399,18 @@ const Pages = {
   /** Produccion rapida desde Productos */
   formProduccionRapida(tipo, productoId) {
     Pages.formProduccion(tipo, productoId);
+  },
+
+  /** Elimina una producción y revierte el stock */
+  deleteProduccion(id) {
+    if (!confirm('¿Eliminar esta producción? Se revertirá todo el stock consumido (pala, envases, stickers, bolsas, cintas) y se restarán los frascos producidos.')) return;
+    try {
+      ArcanoDB.deleteProduccion(id);
+      toast('Producción eliminada. Stock revertido.');
+      App.renderPage('produccion');
+    } catch (e) {
+      toast('Error: ' + e.message, 'err');
+    }
   },
 
   /** Formulario de produccion — tipo y productoId son opcionales (pre-llenan) */
