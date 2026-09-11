@@ -1222,10 +1222,73 @@ function producirBlend(blendId, talla, cantidad) {
 }
 
 function deleteProduccion(id) {
-  if (!_db.producciones[id]) return false;
+  _ensureStructure();
+  var prod = _db.producciones && _db.producciones[id];
+  if (!prod) return false;
+  var talla = prod.talla || 'chico';
+  var cantidad = Number(prod.cantidad) || 0;
+  var frascoKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+
+  // 1. Restar los frascos producidos del producto
+  if (prod.tipo === 'especia') {
+    var esp = _db.especias[prod.productoId];
+    if (esp) {
+      esp[frascoKey] = (esp[frascoKey] || 0) - cantidad;
+      if (esp[frascoKey] < 0) esp[frascoKey] = 0;
+      // Devolver pala (gramos consumidos)
+      if (prod.gramosTotal) {
+        esp.stockBolsa = (esp.stockBolsa || 0) + prod.gramosTotal;
+      }
+    }
+  } else if (prod.tipo === 'blend') {
+    var blend = _db.blends[prod.productoId];
+    if (blend) {
+      blend[frascoKey] = (blend[frascoKey] || 0) - cantidad;
+      if (blend[frascoKey] < 0) blend[frascoKey] = 0;
+    }
+    // Devolver pala de cada ingrediente
+    if (prod.ingredientes) {
+      for (var i = 0; i < prod.ingredientes.length; i++) {
+        var ing = prod.ingredientes[i];
+        var espIng = _db.especias[ing.especiaId];
+        if (espIng && ing.gramosTotal) {
+          espIng.stockBolsa = (espIng.stockBolsa || 0) + ing.gramosTotal;
+        }
+      }
+    } else if (prod.gramosTotal) {
+      // Fallback: blend sin ingredientes detallados (producción vieja)
+      // No se puede devolver pala por especia, pero al menos registramos
+      console.warn('[deleteProduccion] Blend sin ingredientes detallados, no se puede devolver pala por especia');
+    }
+  }
+
+  // 2. Devolver envases
+  if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
+  _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) + cantidad;
+
+  // 3. Devolver bolsas
+  if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+  _db.stockBolsas[talla] = (_db.stockBolsas[talla] || 0) + cantidad;
+
+  // 4. Devolver cintas
+  if (!_db.stockCintas) _db.stockCintas = 0;
+  _db.stockCintas = (_db.stockCintas || 0) + cantidad;
+
+  // 5. Devolver stickers
+  if (prod.productoNombre) {
+    var stk = _findStickerByNombre(prod.productoNombre);
+    if (stk) {
+      var stkKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+      stk[stkKey] = (stk[stkKey] || 0) + cantidad;
+    }
+  }
+
+  // Eliminar el registro
   delete _db.producciones[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'producciones', id);
+  if (prod.tipo === 'especia') _notify('update', 'especias', prod.productoId);
+  else if (prod.tipo === 'blend') _notify('update', 'blends', prod.productoId);
   return true;
 }
 
