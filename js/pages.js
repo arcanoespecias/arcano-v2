@@ -2892,6 +2892,45 @@ const Pages = {
     h += '<p class="text-xs text-muted mt-8">💡 El efecto empieza cuando el usuario carga la tienda y transiciona gradualmente según los segundos configurados. Los textos mantienen SIEMPRE buen contraste (curva de easing diferenciada).</p>';
     h += '</div></div>';
 
+    // === POPUP LATERAL ===
+    var pp = cfg.popupTienda || {};
+    h += '<div class="card mt-16"><div class="card-header"><h3>📢 Popup Lateral</h3><p class="text-xs text-muted">Pestaña que asoma desde la derecha a los X segundos de visita. Ideal para promos y productos destacados.</p></div><div class="card-body">';
+    h += '<div class="form-group" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:8px">' +
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">' +
+        '<input type="checkbox" id="pp-activo" ' + (pp.activo !== false ? 'checked' : '') + '> ' +
+        '<span>Activar popup</span>' +
+      '</label></div>';
+
+    h += '<div class="g2 mt-12">' +
+      '<div class="form-group"><label>Segundos antes de mostrar</label>' +
+        '<input class="input" id="pp-segundos" type="number" min="3" max="120" value="' + (pp.segundos || 15) + '" placeholder="15"></div>' +
+      '<div class="form-group"><label>Título (opcional)</label>' +
+        '<input class="input" id="pp-titulo" value="' + esc(pp.titulo || '') + '" placeholder="Ej: ¡Promo especial!"></div>' +
+    '</div>';
+
+    h += '<div class="form-group"><label>Mensaje</label>' +
+      '<textarea class="input" id="pp-mensaje" rows="3" placeholder="Ej: Lleva 2 frascos y paga 1. Solo por hoy.">' + esc(pp.mensaje || '') + '</textarea></div>';
+
+    h += '<div class="g2">' +
+      '<div class="form-group"><label>Texto del botón (opcional)</label>' +
+        '<input class="input" id="pp-boton-texto" value="' + esc(pp.botonTexto || '') + '" placeholder="Ej: Ver promo"></div>' +
+      '<div class="form-group"><label>Link del botón (opcional)</label>' +
+        '<input class="input" id="pp-boton-link" value="' + esc(pp.botonLink || '') + '" placeholder="https://..."></div>' +
+    '</div>';
+
+    h += '<div class="form-group"><label>Imagen cuadrada (opcional, recomendado 400x400px)</label>' +
+      '<div class="img-upload-area" id="img-area-popup"><input type="file" accept="image/*" id="f-popup-img" style="display:none" onchange="Pages._handlePopupImg(this)">' +
+      (pp.imagen ? '<img src="' + pp.imagen + '" class="img-preview" id="img-preview-popup" style="width:120px;height:120px;object-fit:cover;border-radius:8px"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePopupImg()">Quitar imagen</button>' : '') +
+      '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-popup-img\').click()"><span>+ Imagen del popup</span></div></div>' +
+    '</div>';
+
+    h += '<div class="mt-12" style="display:flex;gap:8px;align-items:center">' +
+      '<button class="btn btn-gold" onclick="Pages._guardarPopup()">Guardar popup</button>' +
+      '<button class="btn btn-outline" onclick="Pages._desactivarPopup()">Desactivar</button>' +
+      '<span id="pp-status" class="text-sm text-muted ml-8"></span>' +
+    '</div>';
+    h += '</div></div>';
+
     container.innerHTML = h;
   },
 
@@ -7964,4 +8003,79 @@ Pages._deleteCostal = function(id) {
   ArcanoDB.deleteCostal(parseInt(id, 10));
   toast('Costal eliminado');
   App.renderPage('costales');
+};
+
+/* ==================== POPUP LATERAL (admin) ==================== */
+Pages._guardarPopup = function() {
+  var data = {
+    activo: document.getElementById('pp-activo').checked,
+    segundos: parseInt(document.getElementById('pp-segundos').value, 10) || 15,
+    titulo: document.getElementById('pp-titulo').value.trim(),
+    mensaje: document.getElementById('pp-mensaje').value.trim(),
+    botonTexto: document.getElementById('pp-boton-texto').value.trim(),
+    botonLink: document.getElementById('pp-boton-link').value.trim(),
+    imagen: ''
+  };
+  // Conservar imagen si ya existe
+  var imgPreview = document.getElementById('img-preview-popup');
+  if (imgPreview) data.imagen = imgPreview.src;
+  ArcanoDB.saveTiendaConfig({ popupTienda: data });
+  var status = document.getElementById('pp-status');
+  if (status) status.innerHTML = '<span style="color:var(--green)">✓ Guardado</span>';
+  toast('Popup guardado');
+  setTimeout(function() { if (status) status.innerHTML = ''; }, 3000);
+};
+
+Pages._desactivarPopup = function() {
+  ArcanoDB.saveTiendaConfig({ popupTienda: { activo: false } });
+  toast('Popup desactivado');
+  App.renderPage('tienda');
+};
+
+Pages._handlePopupImg = function(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) { alert('La imagen no debe superar 2MB. Recomendado: 400x400px.'); return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    // Comprimir imagen
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = 400; canvas.height = 400;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 400, 400);
+      var compressed = canvas.toDataURL('image/jpeg', 0.85);
+      var area = document.getElementById('img-area-popup');
+      if (area) {
+        var existing = area.querySelector('img');
+        if (existing) existing.remove();
+        var existingBtn = area.querySelector('button');
+        if (existingBtn) existingBtn.remove();
+        var imgEl = document.createElement('img');
+        imgEl.src = compressed;
+        imgEl.className = 'img-preview';
+        imgEl.id = 'img-preview-popup';
+        imgEl.style.cssText = 'width:120px;height:120px;object-fit:cover;border-radius:8px';
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm btn-red';
+        btn.style.marginTop = '6px';
+        btn.textContent = 'Quitar imagen';
+        btn.onclick = function() { Pages._removePopupImg(); };
+        area.insertBefore(imgEl, area.querySelector('.img-upload-placeholder'));
+        area.insertBefore(btn, area.querySelector('.img-upload-placeholder'));
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+Pages._removePopupImg = function() {
+  var area = document.getElementById('img-area-popup');
+  if (!area) return;
+  var img = area.querySelector('img');
+  if (img) img.remove();
+  var btn = area.querySelector('button');
+  if (btn) btn.remove();
 };
