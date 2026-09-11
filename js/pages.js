@@ -2221,7 +2221,7 @@ const Pages = {
 
     // === SECTION 1: ESPECIAS ===
     h += '<h3 style="color:var(--gold);margin:16px 0 12px;font-size:1.1rem">Especias</h3>';
-    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (g)</th><th>Ajuste</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th></tr></thead><tbody>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Pala (g)</th><th>Ajuste</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th><th></th></tr></thead><tbody>';
     for (var i = 0; i < especias.length; i++) {
       var e = especias[i];
       var palaCls = (e.stockBolsa||0)<=50?'text-red fw7':'';
@@ -2236,13 +2236,14 @@ const Pages = {
         '<td>' + adjInput('especia', 'chico', e.id, e.nombre, e.stockChico||0) + '</td>' +
         '<td class="' + grCls + '">' + (e.stockGrande||0) + '</td>' +
         '<td>' + adjInput('especia', 'grande', e.id, e.nombre, e.stockGrande||0) + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.delEspecia(' + e.id + ')" title="Eliminar especia">X</button></td>' +
         '</tr>';
     }
     h += '</tbody></table></div></div></div>';
 
     // === SECTION 2: BLENDS ===
     h += '<h3 style="color:var(--gold);margin:24px 0 12px;font-size:1.1rem">Blends</h3>';
-    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th></tr></thead><tbody>';
+    h += '<div class="card"><div class="card-body" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Cat.</th><th>Fr.Pequeño</th><th>Ajuste</th><th>Fr.Grande</th><th>Ajuste</th><th></th></tr></thead><tbody>';
     for (var i = 0; i < blends.length; i++) {
       var b = blends[i];
       var chCls = (b.stockChico||0)<=3?'text-red fw7':'text-green';
@@ -2254,6 +2255,7 @@ const Pages = {
         '<td>' + adjInput('blend', 'chico', b.id, b.nombre, b.stockChico||0) + '</td>' +
         '<td class="' + grCls + '">' + (b.stockGrande||0) + '</td>' +
         '<td>' + adjInput('blend', 'grande', b.id, b.nombre, b.stockGrande||0) + '</td>' +
+        '<td><button class="btn btn-sm btn-red" onclick="Pages.delBlend(' + b.id + ')" title="Eliminar blend">X</button></td>' +
         '</tr>';
     }
     h += '</tbody></table></div></div></div>';
@@ -2340,7 +2342,7 @@ const Pages = {
       for (var i = 0; i < allInputs.length; i++) {
         var inp = allInputs[i];
         var v = Number(inp.value);
-        if (inp.value === '' || v === 0) continue;
+        if (inp.value === '' || isNaN(v) || v === 0) continue;
         pending.push({
           categoria: inp.getAttribute('data-cat'),
           subtipo: inp.getAttribute('data-sub'),
@@ -2352,7 +2354,10 @@ const Pages = {
       if (pending.length === 0) return;
       var summary = pending.map(function(p) { return p.productoNombre + ' ' + p.subtipo + ': ' + (p.cantidad > 0 ? '+' : '') + p.cantidad; }).join('\n');
       if (!confirm('Aplicar ' + pending.length + ' ajustes?\n\n' + summary)) return;
+      batchBtn.disabled = true;
+      batchBtn.textContent = 'Guardando...';
       var errors = [];
+      var success = 0;
       for (var i = 0; i < pending.length; i++) {
         try {
           ArcanoDB.saveAjuste({
@@ -2364,9 +2369,16 @@ const Pages = {
             motivo: 'Ajuste rapido multiple',
             fecha: new Date().toISOString().slice(0, 10)
           });
-        } catch(err) { errors.push(pending[i].productoNombre + ': ' + err.message); }
+          success++;
+        } catch(err) { errors.push(pending[i].productoNombre + ' ' + pending[i].subtipo + ': ' + err.message); }
       }
-      if (errors.length) { alert('Errores:\n' + errors.join('\n')); }
+      // Forzar guardado inmediato antes de re-renderizar
+      if (ArcanoDB.saveNow) ArcanoDB.saveNow();
+      if (errors.length) {
+        alert('Se guardaron ' + success + ' de ' + pending.length + ' ajustes.\n\nErrores:\n' + errors.join('\n'));
+      } else {
+        toast(success + ' ajustes guardados correctamente');
+      }
       App.renderPage('stock');
     });
   },
