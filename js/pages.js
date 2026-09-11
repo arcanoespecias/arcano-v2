@@ -1175,30 +1175,51 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else {
-          detailDiv.innerHTML = '<label>Producto</label><select class="input ent-stk-nombre"><option value="">Seleccionar</option>' + buildProductoOpts() + '</select><input type="text" class="input ent-stk-new-nombre" placeholder="Nombre nuevo producto..." style="display:none;margin-top:6px"><select class="input ent-stk-new-tipo" style="display:none;margin-top:6px"><option value="especia">Especia</option><option value="blend">Blend</option></select><label class="mt-8" style="display:block">Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
-          var stkSel = detailDiv.querySelector('.ent-stk-nombre');
-          var stkNewNombre = detailDiv.querySelector('.ent-stk-new-nombre');
-          var stkNewTipo = detailDiv.querySelector('.ent-stk-new-tipo');
-          var stkTalla = detailDiv.querySelectorAll('.ent-talla')[0];
-          stkSel.addEventListener('change', function() {
-            if (this.value === '__new__') {
-              this.style.display = 'none';
-              stkNewTipo.style.display = 'block';
-              stkNewNombre.style.display = 'block';
-              stkNewNombre.focus();
+          // Tipo STICKER: mostrar tabla con todos los productos
+          var allProds = [];
+          for (var ei = 0; ei < esps.length; ei++) allProds.push({ nombre: esps[ei].nombre, tipo: 'especia', id: esps[ei].id });
+          for (var bi = 0; bi < bls.length; bi++) allProds.push({ nombre: bls[bi].nombre, tipo: 'blend', id: bls[bi].id });
+          allProds.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+
+          var stickerTable = '<label>Stickers por producto (ingresa cantidades)</label>' +
+            '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px">' +
+            '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr><th>Producto</th><th style="width:70px">Pequeño</th><th style="width:70px">Grande</th></tr></thead><tbody>';
+          for (var si2 = 0; si2 < allProds.length; si2++) {
+            stickerTable += '<tr>' +
+              '<td style="padding:6px 8px">' + esc(allProds[si2].nombre) + '</td>' +
+              '<td style="padding:4px"><input type="number" class="input ent-stk-chico" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:60px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
+              '<td style="padding:4px"><input type="number" class="input ent-stk-grande" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:60px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
+            '</tr>';
+          }
+          stickerTable += '</tbody></table></div>';
+          stickerTable += '<div class="form-group mt-8" style="margin:0"><label>Costo Unit. Stickers (mismo para todos)</label><input type="number" class="input ent-cost" placeholder="0" min="0" style="width:120px"></div>';
+
+          detailDiv.innerHTML = stickerTable;
+
+          // Ocultar el campo de cantidad individual (no se usa para stickers)
+          var cantInput = div.querySelector('.ent-cant');
+          if (cantInput) { cantInput.style.display = 'none'; cantInput.parentElement.style.display = 'none'; }
+
+          // Actualizar total cuando cambian las cantidades
+          var chicoInputs = detailDiv.querySelectorAll('.ent-stk-chico');
+          var grandeInputs = detailDiv.querySelectorAll('.ent-stk-grande');
+          var costInput2 = detailDiv.querySelector('.ent-cost');
+          function updateStickerTotal() {
+            var cost = Number(costInput2.value) || 0;
+            var totalCant = 0;
+            for (var ci2 = 0; ci2 < chicoInputs.length; ci2++) {
+              totalCant += Number(chicoInputs[ci2].value) || 0;
             }
-          });
-          stkNewNombre.addEventListener('blur', function() {
-            if (!this.value.trim()) {
-              this.style.display = 'none';
-              stkNewTipo.style.display = 'none';
-              stkSel.style.display = 'block';
-              stkSel.value = '';
+            for (var gi2 = 0; gi2 < grandeInputs.length; gi2++) {
+              totalCant += Number(grandeInputs[gi2].value) || 0;
             }
-          });
-          stkNewNombre.addEventListener('keydown', function(ev) {
-            if (ev.key === 'Escape') { this.value = ''; this.blur(); }
-          });
+            // Actualizar el campo oculto de cantidad para el total general
+            if (cantInput) cantInput.value = totalCant;
+            updateTotal();
+          }
+          for (var ci3 = 0; ci3 < chicoInputs.length; ci3++) chicoInputs[ci3].addEventListener('input', updateStickerTotal);
+          for (var gi3 = 0; gi3 < grandeInputs.length; gi3++) grandeInputs[gi3].addEventListener('input', updateStickerTotal);
+          if (costInput2) costInput2.addEventListener('input', updateStickerTotal);
         }
       }
       tipoSel.addEventListener('change', renderDetail);
@@ -1266,33 +1287,44 @@ const Pages = {
         } else if (tipo === 'bolsa') {
           item.talla = rows[i].querySelector('.ent-talla').value;
         } else if (tipo === 'sticker') {
-          var stkSel = rows[i].querySelector('.ent-stk-nombre');
-          var stkNewNombre = rows[i].querySelector('.ent-stk-new-nombre');
-          var stkNewTipo = rows[i].querySelector('.ent-stk-new-tipo');
-          if (stkSel && stkSel.style.display !== 'none') {
-            var stkVal = stkSel.value || '';
-            if (!stkVal || stkVal === '__new__') { alert('Falta producto de sticker en item ' + (i+1)); return; }
-            var stkParts = stkVal.split('|');
-            item.stickerTipo = stkParts[0];
-            var stkId = Number(stkParts[1]);
-            var stkObj = stkParts[0] === 'blend' ? ArcanoDB.getBlend(stkId) : ArcanoDB.getEspecia(stkId);
-            item.stickerNombre = stkObj ? stkObj.nombre : '?';
-          } else if (stkNewNombre && stkNewNombre.style.display !== 'none' && stkNewNombre.value.trim()) {
-            var newProdName = stkNewNombre.value.trim();
-            var newProdTipo = stkNewTipo ? stkNewTipo.value : 'especia';
-            item.stickerTipo = newProdTipo;
-            if (newProdTipo === 'blend') {
-              var newBl = ArcanoDB.saveBlend({ nombre: newProdName });
-              item.stickerNombre = newBl.nombre;
-            } else {
-              var newEsp2 = ArcanoDB.saveEspecia({ nombre: newProdName });
-              item.stickerNombre = newEsp2.nombre;
+          // Procesar tabla de stickers: múltiples productos en un solo item visual
+          var stkChicos = rows[i].querySelectorAll('.ent-stk-chico');
+          var stkGrandes = rows[i].querySelectorAll('.ent-stk-grande');
+          var detailCost = rows[i].querySelector('#ent-detail-placeholder .ent-cost') || rows[i].querySelector('.ent-cost');
+          var stkCost = Number(detailCost ? detailCost.value : 0) || 0;
+          var hasAnySticker = false;
+          for (var sci = 0; sci < stkChicos.length; sci++) {
+            var stkCh = Number(stkChicos[sci].value) || 0;
+            if (stkCh > 0) {
+              items.push({
+                tipo: 'sticker',
+                cantidad: stkCh,
+                costoUnitario: stkCost,
+                stickerNombre: stkChicos[sci].dataset.nombre,
+                stickerTipo: stkChicos[sci].dataset.tipo,
+                talla: 'chico'
+              });
+              total += stkCh * stkCost;
+              hasAnySticker = true;
             }
-          } else {
-            alert('Falta producto de sticker en item ' + (i+1)); return;
           }
-          if (!item.stickerNombre) { alert('Falta producto de sticker en item ' + (i+1)); return; }
-          item.talla = rows[i].querySelector('.ent-talla').value;
+          for (var sgi = 0; sgi < stkGrandes.length; sgi++) {
+            var stkGr = Number(stkGrandes[sgi].value) || 0;
+            if (stkGr > 0) {
+              items.push({
+                tipo: 'sticker',
+                cantidad: stkGr,
+                costoUnitario: stkCost,
+                stickerNombre: stkGrandes[sgi].dataset.nombre,
+                stickerTipo: stkGrandes[sgi].dataset.tipo,
+                talla: 'grande'
+              });
+              total += stkGr * stkCost;
+              hasAnySticker = true;
+            }
+          }
+          if (!hasAnySticker) { alert('Ingresa al menos una cantidad de stickers'); return; }
+          continue; // Saltar el items.push(item) del final, ya se agregaron arriba
         }
         items.push(item);
       }
