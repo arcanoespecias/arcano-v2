@@ -7733,3 +7733,210 @@ Pages._deleteOtpPendiente = function(key) {
   if (!confirm('¿Eliminar este OTP pendiente?')) return;
   ArcanoDB.deleteOtpPendiente(key);
 };
+
+/* ==================== COSTALES (admin) ====================
+   Costales = sacos/bolsas con mezcla de especias.
+   Se venden en PDV por "palas" (scoops).
+   ================================================================== */
+Pages.renderCostales = function(el) {
+  var costales = ArcanoDB.getCostales();
+  var especias = ArcanoDB.getEspecias();
+
+  // KPIs
+  var totalCostales = costales.length;
+  var abiertos = costales.filter(function(c) { return c.estado === 'abierto'; }).length;
+  var vacios = costales.filter(function(c) { return c.estado === 'vacio'; }).length;
+  var gramosTotales = 0;
+  for (var i = 0; i < costales.length; i++) {
+    gramosTotales += (Number(costales[i].gramosRestantes) || 0);
+  }
+
+  var h = '<div class="page-header"><h2>Costales</h2>';
+  h += '<button class="btn btn-gold" onclick="Pages._formCostal(null)">+ Nuevo Costal</button>';
+  h += '</div>';
+
+  h += '<div class="stats-grid mt-12" style="grid-template-columns: repeat(4, 1fr)">';
+  h += '<div class="stat-card"><div class="stat-value">' + totalCostales + '</div><div class="stat-label">Total</div></div>';
+  h += '<div class="stat-card" style="border-left-color:var(--green)"><div class="stat-value text-green">' + abiertos + '</div><div class="stat-label">Abiertos</div></div>';
+  h += '<div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-value text-gold">' + gramosTotales.toLocaleString() + 'g</div><div class="stat-label">Gramos disponibles</div></div>';
+  h += '<div class="stat-card" style="border-left-color:var(--red)"><div class="stat-value text-muted">' + vacios + '</div><div class="stat-label">Vacíos</div></div>';
+  h += '</div>';
+
+  if (totalCostales === 0) {
+    h += '<div class="card mt-16"><div class="card-body"><p class="text-center text-muted">No hay costales. Crea el primero con el botón de arriba.</p></div></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="card mt-16"><div class="card-header"><h3>Lista de Costales</h3></div><div class="card-body">';
+  h += '<div class="table-wrap"><table class="table"><thead><tr><th>Nombre</th><th>Especias</th><th>Gramos Totales</th><th>Disponible</th><th>Precio/Pala</th><th>g/Pala</th><th>Palas aprox.</th><th>Estado</th><th></th></tr></thead><tbody>';
+  for (var j = 0; j < costales.length; j++) {
+    var c = costales[j];
+    var especiasTxt = '';
+    if (c.items) {
+      var especiaNombres = [];
+      for (var k = 0; k < c.items.length; k++) {
+        especiaNombres.push(c.items[k].especiaNombre + ' (' + c.items[k].gramos + 'g)');
+      }
+      especiasTxt = especiaNombres.join(', ');
+    }
+    var palasAprox = c.gramosPorPala > 0 ? Math.floor((c.gramosRestantes || 0) / c.gramosPorPala) : 0;
+    var estadoCls = c.estado === 'abierto' ? 'text-green' : (c.estado === 'vacio' ? 'text-muted' : 'text-yellow');
+    h += '<tr' + (c.estado === 'vacio' ? ' style="opacity:0.5"' : '') + '>' +
+      '<td class="fw7">' + esc(c.nombre || 'Costal ' + c.id) + '</td>' +
+      '<td class="text-sm">' + esc(especiasTxt) + '</td>' +
+      '<td>' + (c.gramosTotal || 0) + 'g</td>' +
+      '<td class="fw7 ' + ((c.gramosRestantes || 0) <= 100 ? 'text-red' : 'text-green') + '">' + (c.gramosRestantes || 0) + 'g</td>' +
+      '<td class="text-gold fw7">$' + (c.precioPala || 0).toLocaleString() + '</td>' +
+      '<td>' + (c.gramosPorPala || 50) + 'g</td>' +
+      '<td>' + palasAprox + '</td>' +
+      '<td><span class="' + estadoCls + ' fw7">' + esc(c.estado || 'abierto') + '</span></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-sm btn-outline" onclick="Pages._formCostal(\'' + c.id + '\')" title="Editar">✎</button> ' +
+        '<button class="btn btn-sm btn-red" onclick="Pages._deleteCostal(\'' + c.id + '\')" title="Eliminar">X</button>' +
+      '</td>' +
+    '</tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '</div></div>';
+
+  el.innerHTML = h;
+};
+
+Pages._formCostal = function(id) {
+  var costal = null;
+  if (id) {
+    var costales = ArcanoDB.getCostales();
+    for (var i = 0; i < costales.length; i++) {
+      if (String(costales[i].id) === String(id)) { costal = costales[i]; break; }
+    }
+  }
+  var c = costal || { items: [] };
+  var especias = ArcanoDB.getEspecias();
+
+  // Construir lista de items actuales
+  var itemsHtml = '';
+  if (c.items && c.items.length > 0) {
+    for (var j = 0; j < c.items.length; j++) {
+      itemsHtml += '<div class="costal-item-row" data-especia="' + c.items[j].especiaId + '">' +
+        '<span class="costal-item-nombre">' + esc(c.items[j].especiaNombre) + '</span>' +
+        '<input type="number" class="input costal-item-gramos" value="' + (c.items[j].gramos || 0) + '" min="0" style="width:80px" data-especia-id="' + c.items[j].especiaId + '" data-especia-nombre="' + esc(c.items[j].especiaNombre) + '">' +
+        '<span>gramos</span>' +
+        '<button class="btn btn-sm btn-red" onclick="this.parentElement.remove();Pages._updateCostalTotal()">X</button>' +
+      '</div>';
+    }
+  }
+
+  // Opciones de especias disponibles
+  var especiasOpts = '<option value="">+ Agregar especia...</option>';
+  for (var k = 0; k < especias.length; k++) {
+    especiasOpts += '<option value="' + especias[k].id + '" data-nombre="' + esc(especias[k].nombre) + '">' + esc(especias[k].nombre) + ' (' + (especias[k].stockBolsa || 0) + 'g disp.)</option>';
+  }
+
+  var body =
+    '<div class="form-group"><label>Nombre del costal</label>' +
+      '<input class="input" id="ct-nombre" value="' + esc(c.nombre || '') + '" placeholder="Ej: Costal Caribe Costeño, Cúrcuma Pura..."></div>' +
+    '<div class="g2">' +
+      '<div class="form-group"><label>Precio por pala ($)</label>' +
+        '<input class="input" id="ct-precio" type="number" value="' + (c.precioPala || 2000) + '" min="0" step="500"></div>' +
+      '<div class="form-group"><label>Gramos por pala</label>' +
+        '<input class="input" id="ct-grampala" type="number" value="' + (c.gramosPorPala || 50) + '" min="1"></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Especias del costal</label>' +
+      '<select class="input" id="ct-especia-select" onchange="Pages._addCostalEspecia()">' + especiasOpts + '</select>' +
+    '</div>' +
+    '<div id="ct-items-list" style="margin-bottom:12px">' + itemsHtml + '</div>' +
+    '<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:12px">' +
+      '<span class="text-sm text-muted">Gramos totales: </span>' +
+      '<b id="ct-total-gramos" style="font-size:1.1rem;color:var(--gold)">' + (c.gramosTotal || 0) + 'g</b>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-gold" onclick="Pages._saveCostal(' + (id ? '\'' + id + '\'' : 'null') + ')">Guardar</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>' +
+    '</div>';
+  openModal(id ? 'Editar Costal' : 'Nuevo Costal', body);
+  // Actualizar total inicial
+  Pages._updateCostalTotal();
+};
+
+Pages._addCostalEspecia = function() {
+  var sel = document.getElementById('ct-especia-select');
+  if (!sel || !sel.value) return;
+  var especiaId = sel.value;
+  var especiaNombre = sel.options[sel.selectedIndex].dataset.nombre;
+  // Verificar que no esté ya agregada
+  var existing = document.querySelectorAll('.costal-item-gramos');
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].dataset.especiaId === especiaId) {
+      alert('Esta especia ya está en el costal');
+      sel.value = '';
+      return;
+    }
+  }
+  var list = document.getElementById('ct-items-list');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'costal-item-row';
+  row.dataset.especia = especiaId;
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:8px;margin-bottom:6px';
+  row.innerHTML =
+    '<span class="costal-item-nombre" style="flex:1;font-weight:600">' + esc(especiaNombre) + '</span>' +
+    '<input type="number" class="input costal-item-gramos" value="100" min="0" style="width:80px" data-especia-id="' + especiaId + '" data-especia-nombre="' + esc(especiaNombre) + '" oninput="Pages._updateCostalTotal()">' +
+    '<span style="font-size:0.85rem;color:var(--text-muted)">gramos</span>' +
+    '<button class="btn btn-sm btn-red" onclick="this.parentElement.remove();Pages._updateCostalTotal()">X</button>';
+  list.appendChild(row);
+  sel.value = '';
+  Pages._updateCostalTotal();
+};
+
+Pages._updateCostalTotal = function() {
+  var inputs = document.querySelectorAll('.costal-item-gramos');
+  var total = 0;
+  for (var i = 0; i < inputs.length; i++) {
+    total += Number(inputs[i].value) || 0;
+  }
+  var el = document.getElementById('ct-total-gramos');
+  if (el) el.textContent = total + 'g';
+};
+
+Pages._saveCostal = function(id) {
+  var nombre = document.getElementById('ct-nombre').value.trim();
+  var precioPala = parseInt(document.getElementById('ct-precio').value, 10) || 0;
+  var gramosPorPala = parseInt(document.getElementById('ct-grampala').value, 10) || 50;
+  if (!nombre) { alert('Ingresa un nombre para el costal'); return; }
+
+  // Recolectar items
+  var items = [];
+  var inputs = document.querySelectorAll('.costal-item-gramos');
+  for (var i = 0; i < inputs.length; i++) {
+    var gramos = parseInt(inputs[i].value, 10) || 0;
+    if (gramos > 0) {
+      items.push({
+        especiaId: parseInt(inputs[i].dataset.especiaId, 10),
+        especiaNombre: inputs[i].dataset.especiaNombre,
+        gramos: gramos
+      });
+    }
+  }
+  if (items.length === 0) { alert('Agrega al menos una especia al costal'); return; }
+
+  var data = {
+    nombre: nombre,
+    items: items,
+    precioPala: precioPala,
+    gramosPorPala: gramosPorPala
+  };
+  if (id) data.id = parseInt(id, 10);
+
+  ArcanoDB.saveCostal(data);
+  closeModal();
+  toast(id ? 'Costal actualizado' : 'Costal creado');
+  App.renderPage('costales');
+};
+
+Pages._deleteCostal = function(id) {
+  if (!confirm('¿Eliminar este costal?')) return;
+  ArcanoDB.deleteCostal(parseInt(id, 10));
+  toast('Costal eliminado');
+  App.renderPage('costales');
+};

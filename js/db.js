@@ -30,7 +30,7 @@ var _saveTimer = null;
 var _listeners = [];
 var _localDirty = false;  // prevents Firebase listener from overwriting pending saves
 
-var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosDeVenta: 1, pdvVentas: 1, packs: 1 };
+var DEFAULT_IDS = { especias: 1, blends: 1, producciones: 1, ventas: 1, entradas: 1, stickers: 1, ajustes: 1, puntosDeVenta: 1, pdvVentas: 1, packs: 1, costales: 1 };
 
 /* ==================== HELPERS ==================== */
 
@@ -72,6 +72,7 @@ function _ensureStructure() {
   if (!_db.entradas) _db.entradas = {};
   if (!_db.stickers) _db.stickers = {};
   if (!_db.ajustes) _db.ajustes = {};
+  if (!_db.costales) _db.costales = {};
   if (!_db.packs) _db.packs = {};
   // Migration: copy old etiquetas data to stickers
   if (_db.etiquetas && Object.keys(_db.etiquetas).length > 0 && Object.keys(_db.stickers).length === 0) {
@@ -98,7 +99,7 @@ function _ensureStructure() {
 function _emptyDB() {
   return {
     meta: { nextId: Object.assign({}, DEFAULT_IDS), version: DB_VERSION },
-    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosDeVenta: {}, pdvVentas: {}, packs: {},
+    especias: {}, blends: {}, producciones: {}, ventas: {}, entradas: {}, stickers: {}, ajustes: {}, puntosDeVenta: {}, pdvVentas: {}, packs: {}, costales: {},
     stockEnvases: { chico: 0, grande: 0 },
     stockBolsas: { chico: 0, grande: 0 },
     stockCintas: 0,
@@ -2301,6 +2302,184 @@ function deletePack(id) {
   return true;
 }
 
+/* ==================== COSTALES ====================
+   Un costal es un saco/bolsa que contiene una o varias especias
+   con gramos específicos. Se vende en PDV por "palas" (scoops).
+   Cada pala consume X gramos del costal (gramosPorPala).
+   El precio por pala lo define el admin.
+
+   Estructura:
+   costal = {
+     id, creado, nombre,
+     items: [{especiaId, especiaNombre, gramos}],
+     gramosTotal,       // suma de items.gramos
+     gramosRestantes,   // gramos disponibles para vender
+     precioPala,        // precio por pala (scoop)
+     gramosPorPala,     // gramos que consume 1 pala (default 50)
+     estado,            // 'abierto' | 'cerrado' | 'vacio'
+     nota
+   }
+   ================================================================== */
+
+function getCostales() {
+  return _filterValid(Object.values(_db.costales || {})).sort(function(a, b) {
+    return (b.creado || '').localeCompare(a.creado || '');
+  });
+}
+
+function getCostal(id) {
+  return _db.costales && _db.costales[id] ? _db.costales[id] : null;
+}
+
+function saveCostal(data) {
+  _ensureStructure();
+  var isNew = !data.id;
+  if (isNew) {
+    data.id = nextId('costales');
+    data.creado = new Date().toISOString();
+  }
+  // Calcular gramosTotal
+  var gramosTotal = 0;
+  if (data.items) {
+    for (var i = 0; i < data.items.length; i++) {
+      gramosTotal += Number(data.items[i].gramos) || 0;
+    }
+  }
+  data.gramosTotal = gramosTotal;
+  // Si es nuevo, gramosRestantes = gramosTotal. Si edit, solo actualizar si no tiene
+  if (isNew || data.gramosRestantes == null) {
+    data.gramosRestantes = gramosTotal;
+  }
+  // Defaults
+  if (!data.gramosPorPala) data.gramosPorPala = 50;
+  if (!data.estado) data.estado = gramosTotal > 0 ? 'abierto' : 'vacio';
+  if (data.gramosRestantes <= 0) data.estado = 'vacio';
+
+  _db.costales[data.id] = data;
+  _saveToFirebase(); _cacheLocal();
+  _notify(isNew ? 'create' : 'update', 'costales', data.id);
+  return data;
+}
+
+function deleteCostal(id) {
+  if (!_db.costales || !_db.costales[id]) return false;
+  delete _db.costales[id];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'costales', id);
+  return true;
+}
+
+/**
+ * Consume gramos de un costal (cuando se venden palas en PDV).
+ * Si gramosRestantes llega a 0, marca el costal como 'vacio'.
+ */
+function consumirCostal(costalId, gramos) {
+  if (!_db.costales || !_db.costales[costalId]) return false;
+  var costal = _db.costales[costalId];
+  var grsRestantes = (Number(costal.gramosRestantes) || 0) - (Number(gramos) || 0);
+  if (grsRestantes < 0) grsRestantes = 0;
+  costal.gramosRestantes = grsRestantes;
+  if (grsRestantes <= 0) costal.estado = 'vacio';
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'costales', costalId);
+  return true;
+}
+
+/**
+ * Mueve gramos de un costal a un PDV.
+ * El PDV guarda: pdv.stockCostales[costalId] = gramos
+ */
+function moverCostalAPDV(pdvId, costalId, gramos) {
+  var pdv = _db.puntosDeVenta && _db.puntosDeVenta[pdvId];
+  if (!pdv) throw new Error('PDV no encontrado');
+  var costal = _db.costales && _db.costales[costalId];
+  if (!costal) throw new Error('Costal no encontrado');
+  gramos = Number(gramos) || 0;
+  if (gramos <= 0) throw new Error('Gramos inválidos');
+  if ((Number(costal.gramosRestantes) || 0) < gramos) {
+    throw new Error('Gramos insuficientes en el costal. Disponibles: ' + (costal.gramosRestantes || 0) + 'g');
+  }
+  // Restar del costal
+  costal.gramosRestantes = (Number(costal.gramosRestantes) || 0) - gramos;
+  if (costal.gramosRestantes <= 0) costal.estado = 'vacio';
+  // Sumar al PDV
+  if (!pdv.stockCostales) pdv.stockCostales = {};
+  pdv.stockCostales[costalId] = (Number(pdv.stockCostales[costalId]) || 0) + gramos;
+  _saveToFirebase(); _cacheLocal();
+  return true;
+}
+
+/**
+ * Registra una venta de palas en un PDV.
+ * Cada pala consume gramosPorPala del costal.
+ */
+function savePDVVentaPala(data) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta && _db.puntosDeVenta[data.puntoDeVentaId];
+  if (!pdv) throw new Error('PDV no encontrado');
+  if (!pdv.stockCostales) pdv.stockCostales = {};
+
+  var total = 0;
+  var items = data.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var costal = _db.costales && _db.costales[item.costalId];
+    if (!costal) throw new Error('Costal no encontrado: ' + item.costalNombre);
+    var gramosNecesarios = item.palas * (Number(costal.gramosPorPala) || 50);
+    var disponiblePDV = Number(pdv.stockCostales[item.costalId]) || 0;
+    if (disponiblePDV < gramosNecesarios) {
+      throw new Error('Gramos insuficientes en PDV para ' + (costal.nombre || 'costal') + '. Necesitas ' + gramosNecesarios + 'g, tienes ' + disponiblePDV + 'g');
+    }
+    // Restar del PDV
+    pdv.stockCostales[item.costalId] = disponiblePDV - gramosNecesarios;
+    item.gramosConsumidos = gramosNecesarios;
+    item.precioUnitario = Number(costal.precioPala) || 0;
+    item.subtotal = item.palas * item.precioUnitario;
+    total += item.subtotal;
+  }
+
+  // Guardar venta de palas en pdvVentas
+  var ventaId = nextId('pdvVentas');
+  var venta = {
+    id: ventaId,
+    creado: new Date().toISOString(),
+    fecha: data.fecha || new Date().toISOString().slice(0, 10),
+    puntoDeVentaId: data.puntoDeVentaId,
+    puntoDeVentaNombre: pdv.nombre || '',
+    metodoPago: data.metodoPago || 'efectivo',
+    tipoVenta: 'palas',
+    items: items,
+    total: total
+  };
+  _db.pdvVentas[ventaId] = venta;
+
+  // También crear una entrada en ventas global para estadísticas
+  var ventaGlobalId = nextId('ventas');
+  _db.ventas[ventaGlobalId] = {
+    id: ventaGlobalId,
+    creado: venta.creado,
+    fecha: venta.fecha,
+    items: items.map(function(it) {
+      return {
+        tipo: 'costal',
+        productoId: it.costalId,
+        productoNombre: it.costalNombre + ' (x' + it.palas + ' palas)',
+        talla: '-',
+        cantidad: it.palas,
+        precioUnitario: it.precioUnitario,
+        subtotal: it.subtotal
+      };
+    }),
+    total: total,
+    pdvId: data.puntoDeVentaId,
+    pdvNombre: pdv.nombre || '',
+    metodoPago: data.metodoPago || 'efectivo'
+  };
+
+  _saveToFirebase(); _cacheLocal();
+  return venta;
+}
+
 /* ==================== TIENDA CONFIG ==================== */
 
 function getTiendaConfig() {
@@ -2372,6 +2551,7 @@ window.ArcanoDB = {
   moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, producirPack: producirPack,
+  getCostales: getCostales, getCostal: getCostal, saveCostal: saveCostal, deleteCostal: deleteCostal, consumirCostal: consumirCostal, moverCostalAPDV: moverCostalAPDV, savePDVVentaPala: savePDVVentaPala,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig, saveTiendaConfigField: saveTiendaConfigField,

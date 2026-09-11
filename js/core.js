@@ -346,6 +346,8 @@ const App = {
               '<span class="nav-icon">📦</span><span class="nav-label">Insumos</span></a>' +
             '<a class="nav-item" data-page="produccion" onclick="App.navigate(\'produccion\')">' +
               '<span class="nav-icon">🏭</span><span class="nav-label">Produccion</span></a>' +
+            '<a class="nav-item" data-page="costales" onclick="App.navigate(\'costales\')">' +
+              '<span class="nav-icon">🛍️</span><span class="nav-label">Costales</span></a>' +
             '<a class="nav-item" data-page="ventas" onclick="App.navigate(\'ventas\')">' +
               '<span class="nav-icon">💰</span><span class="nav-label">Ventas</span></a>' +
             '<a class="nav-item" data-page="gastos" onclick="App.navigate(\'gastos\')">' +
@@ -416,7 +418,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos', mensajes: 'Mensajes WhatsApp'
+      produccion: 'Produccion', costales: 'Costales', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos', mensajes: 'Mensajes WhatsApp'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     // Cierra el drawer lateral en mobile al cambiar de pagina
@@ -471,6 +473,7 @@ const App = {
         case 'productos': Pages.renderProductos(container); break;
         case 'insumos': Pages.renderInsumos(container); break;
         case 'produccion': Pages.renderProduccion(container); break;
+        case 'costales': Pages.renderCostales(container); break;
         case 'ventas': Pages.renderVentas(container); break;
         case 'gastos': Pages.renderGastos(container); break;
         case 'pedidos': Pages.renderPedidos(container); break;
