@@ -2894,7 +2894,7 @@ const Pages = {
 
     // === POPUP LATERAL ===
     var pp = cfg.popupTienda || {};
-    h += '<div class="card mt-16"><div class="card-header"><h3>📢 Popup Lateral</h3><p class="text-xs text-muted">Pestaña que asoma desde la derecha a los X segundos de visita. Ideal para promos y productos destacados.</p></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>📢 Popup Lateral</h3><p class="text-xs text-muted">Pestaña que se desliza desde la derecha. Configura colores, tiempos y contenido.</p></div><div class="card-body">';
     h += '<div class="form-group" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:8px">' +
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">' +
         '<input type="checkbox" id="pp-activo" ' + (pp.activo !== false ? 'checked' : '') + '> ' +
@@ -2904,21 +2904,36 @@ const Pages = {
     h += '<div class="g2 mt-12">' +
       '<div class="form-group"><label>Segundos antes de mostrar</label>' +
         '<input class="input" id="pp-segundos" type="number" min="3" max="120" value="' + (pp.segundos || 15) + '" placeholder="15"></div>' +
+      '<div class="form-group"><label>Duración visible (segundos)</label>' +
+        '<input class="input" id="pp-duracion" type="number" min="3" max="60" value="' + (pp.duracion || 8) + '" placeholder="8"></div>' +
+    '</div>';
+
+    h += '<div class="g2">' +
       '<div class="form-group"><label>Título (opcional)</label>' +
         '<input class="input" id="pp-titulo" value="' + esc(pp.titulo || '') + '" placeholder="Ej: ¡Promo especial!"></div>' +
+      '<div class="form-group"><label>Texto del botón (opcional)</label>' +
+        '<input class="input" id="pp-boton-texto" value="' + esc(pp.botonTexto || '') + '" placeholder="Ej: Ver promo"></div>' +
     '</div>';
 
     h += '<div class="form-group"><label>Mensaje</label>' +
       '<textarea class="input" id="pp-mensaje" rows="3" placeholder="Ej: Lleva 2 frascos y paga 1. Solo por hoy.">' + esc(pp.mensaje || '') + '</textarea></div>';
 
-    h += '<div class="g2">' +
-      '<div class="form-group"><label>Texto del botón (opcional)</label>' +
-        '<input class="input" id="pp-boton-texto" value="' + esc(pp.botonTexto || '') + '" placeholder="Ej: Ver promo"></div>' +
-      '<div class="form-group"><label>Link del botón (opcional)</label>' +
-        '<input class="input" id="pp-boton-link" value="' + esc(pp.botonLink || '') + '" placeholder="https://..."></div>' +
-    '</div>';
+    h += '<div class="form-group"><label>Link del botón (opcional)</label>' +
+      '<input class="input" id="pp-boton-link" value="' + esc(pp.botonLink || '') + '" placeholder="https://..."></div>';
 
-    h += '<div class="form-group"><label>Imagen cuadrada (opcional, recomendado 400x400px)</label>' +
+    // Colores configurables
+    h += '<div class="card mt-12" style="background:var(--bg);border:1px solid var(--border)"><div class="card-body" style="padding:12px">';
+    h += '<p class="fw7 mb-8" style="font-size:0.85rem">🎨 Colores del popup</p>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Fondo</label><input type="color" id="pp-color-fondo" value="' + (pp.colorFondo || '#1A130D') + '" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Texto</label><input type="color" id="pp-color-texto" value="' + (pp.colorTexto || '#F5E6D0') + '" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Acento (título)</label><input type="color" id="pp-color-acento" value="' + (pp.colorAcento || '#E8B84B') + '" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Botón fondo</label><input type="color" id="pp-color-boton" value="' + (pp.colorBoton || '#E8B84B') + '" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Botón texto</label><input type="color" id="pp-color-boton-texto" value="' + (pp.colorBotonTexto || '#0E0A07') + '" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>' +
+    '</div>';
+    h += '</div></div>';
+
+    h += '<div class="form-group mt-12"><label>Imagen cuadrada (opcional, recomendado 400x400px)</label>' +
       '<div class="img-upload-area" id="img-area-popup"><input type="file" accept="image/*" id="f-popup-img" style="display:none" onchange="Pages._handlePopupImg(this)">' +
       (pp.imagen ? '<img src="' + pp.imagen + '" class="img-preview" id="img-preview-popup" style="width:120px;height:120px;object-fit:cover;border-radius:8px"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePopupImg()">Quitar imagen</button>' : '') +
       '<div class="img-upload-placeholder" onclick="document.getElementById(\'f-popup-img\').click()"><span>+ Imagen del popup</span></div></div>' +
@@ -8010,10 +8025,16 @@ Pages._guardarPopup = function() {
   var data = {
     activo: document.getElementById('pp-activo').checked,
     segundos: parseInt(document.getElementById('pp-segundos').value, 10) || 15,
+    duracion: parseInt(document.getElementById('pp-duracion').value, 10) || 8,
     titulo: document.getElementById('pp-titulo').value.trim(),
     mensaje: document.getElementById('pp-mensaje').value.trim(),
     botonTexto: document.getElementById('pp-boton-texto').value.trim(),
     botonLink: document.getElementById('pp-boton-link').value.trim(),
+    colorFondo: document.getElementById('pp-color-fondo').value,
+    colorTexto: document.getElementById('pp-color-texto').value,
+    colorAcento: document.getElementById('pp-color-acento').value,
+    colorBoton: document.getElementById('pp-color-boton').value,
+    colorBotonTexto: document.getElementById('pp-color-boton-texto').value,
     imagen: ''
   };
   // Conservar imagen si ya existe
