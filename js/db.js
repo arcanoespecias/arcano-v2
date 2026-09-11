@@ -1811,6 +1811,19 @@ function deletePuntoDeVenta(id) {
       producto[frascoKey] = (producto[frascoKey] || 0) + cant;
     }
   }
+  // Return all costales to main inventory
+  var stockCostales = pdv.stockCostales || {};
+  var costalKeys = Object.keys(stockCostales);
+  for (var ci = 0; ci < costalKeys.length; ci++) {
+    var costalKey = costalKeys[ci];
+    var gramos = Number(stockCostales[costalKey]) || 0;
+    if (gramos <= 0) continue;
+    var costal = _db.costales && _db.costales[costalKey];
+    if (costal) {
+      costal.gramosRestantes = (Number(costal.gramosRestantes) || 0) + gramos;
+      if (costal.gramosRestantes > 0 && costal.estado === 'vacio') costal.estado = 'abierto';
+    }
+  }
   delete _db.puntosDeVenta[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'puntosDeVenta', id);
@@ -1892,6 +1905,34 @@ function devolverStockDePDV(pdvId, items) {
   }
   _saveToFirebase(); _cacheLocal();
   _notify('update', 'puntosDeVenta', pdvId);
+}
+
+/**
+ * Devuelve gramos de un costal desde el PDV al costal principal.
+ * Los gramos vuelven al costal.gramosRestantes.
+ */
+function devolverCostalDePDV(pdvId, costalId, gramos) {
+  _ensureStructure();
+  var pdv = _db.puntosDeVenta ? _db.puntosDeVenta[pdvId] : null;
+  if (!pdv) throw new Error('Punto de venta no encontrado');
+  if (!pdv.stockCostales) pdv.stockCostales = {};
+  gramos = Number(gramos) || 0;
+  if (gramos <= 0) throw new Error('Gramos inválidos');
+  var disponible = Number(pdv.stockCostales[costalId]) || 0;
+  if (disponible < gramos) {
+    throw new Error('Gramos insuficientes en PDV. Disponibles: ' + disponible + 'g');
+  }
+  // Restar del PDV
+  pdv.stockCostales[costalId] = disponible - gramos;
+  // Devolver al costal principal
+  var costal = _db.costales && _db.costales[costalId];
+  if (costal) {
+    costal.gramosRestantes = (Number(costal.gramosRestantes) || 0) + gramos;
+    if (costal.gramosRestantes > 0 && costal.estado === 'vacio') costal.estado = 'abierto';
+  }
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'puntosDeVenta', pdvId);
+  _notify('update', 'costales', costalId);
 }
 
 function getPDVVentas(pdvId) {
@@ -2548,7 +2589,7 @@ window.ArcanoDB = {
   DB_KEY: DB_KEY, FB_PATH: FB_PATH,
   getPuntosDeVenta: getPuntosDeVenta, getPuntoDeVenta: getPuntoDeVenta,
   savePuntoDeVenta: savePuntoDeVenta, deletePuntoDeVenta: deletePuntoDeVenta,
-  moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV,
+  moverStockAPDV: moverStockAPDV, devolverStockDePDV: devolverStockDePDV, devolverCostalDePDV: devolverCostalDePDV,
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, producirPack: producirPack,
   getCostales: getCostales, getCostal: getCostal, saveCostal: saveCostal, deleteCostal: deleteCostal, consumirCostal: consumirCostal, moverCostalAPDV: moverCostalAPDV, savePDVVentaPala: savePDVVentaPala,

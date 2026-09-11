@@ -378,10 +378,13 @@ var PDV = {
     var pdv = this.currentPDV;
     if (!pdv) return;
     var stock = pdv.stock || {};
+    var stockCostales = pdv.stockCostales || {};
     var keys = Object.keys(stock).filter(function(k) { return stock[k] > 0; });
-    if (keys.length === 0) { toast('No hay stock para devolver', 'err'); return; }
+    var costalKeys = Object.keys(stockCostales).filter(function(k) { return (stockCostales[k] || 0) > 0; });
+    if (keys.length === 0 && costalKeys.length === 0) { toast('No hay stock para devolver', 'err'); return; }
     var h = '<p class="text-muted text-sm" style="margin-bottom:12px">Selecciona cantidades a devolver al inventario principal</p>';
     h += '<div id="pdv-devolver-items">';
+    // Frascos
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       var parts = k.split('_');
@@ -395,6 +398,21 @@ var PDV = {
         '<span class="text-muted text-sm">En PDV: ' + stock[k] + '</span>' +
         '<input type="number" class="input" style="width:70px" min="0" max="' + stock[k] + '" placeholder="0" data-key="' + k + '" data-tipo="' + tipo + '" data-id="' + prodId + '" data-talla="' + talla + '"></div>';
     }
+    // Costales
+    if (costalKeys.length > 0) {
+      h += '<div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px"></div>';
+      h += '<p class="fw7" style="margin:0 0 4px;font-size:0.85em">🛍️ Costales</p>';
+      for (var ci = 0; ci < costalKeys.length; ci++) {
+        var costalKey = costalKeys[ci];
+        var costalObj = ArcanoDB.getCostal(parseInt(costalKey, 10));
+        if (!costalObj) continue;
+        var gramosPDV = stockCostales[costalKey] || 0;
+        h += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0">' +
+          '<span style="flex:1;font-size:0.85em">' + this.esc(costalObj.nombre || 'Costal') + '</span>' +
+          '<span class="text-muted text-sm">En PDV: ' + gramosPDV + 'g</span>' +
+          '<input type="number" class="input" style="width:70px" min="0" max="' + gramosPDV + '" placeholder="0" data-costal="true" data-costal-id="' + costalKey + '"></div>';
+      }
+    }
     h += '</div>';
     h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
       '<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>' +
@@ -406,15 +424,25 @@ var PDV = {
     var pdv = this.currentPDV;
     if (!pdv) return;
     var inputs = document.querySelectorAll('#pdv-devolver-items input[type=number]');
-    var items = [];
+    var frascoItems = [];
+    var costalItems = [];
     for (var i = 0; i < inputs.length; i++) {
-      var cant = Number(inputs[i].value) || 0;
-      if (cant <= 0) continue;
-      items.push({ tipo: inputs[i].dataset.tipo, productoId: Number(inputs[i].dataset.id), talla: inputs[i].dataset.talla, cantidad: cant });
+      var val = Number(inputs[i].value) || 0;
+      if (val <= 0) continue;
+      if (inputs[i].dataset.costal === 'true') {
+        costalItems.push({ costalId: parseInt(inputs[i].dataset.costalId, 10), gramos: val });
+      } else {
+        frascoItems.push({ tipo: inputs[i].dataset.tipo, productoId: Number(inputs[i].dataset.id), talla: inputs[i].dataset.talla, cantidad: val });
+      }
     }
-    if (items.length === 0) { toast('Selecciona al menos un producto', 'err'); return; }
+    if (frascoItems.length === 0 && costalItems.length === 0) { toast('Selecciona al menos un producto', 'err'); return; }
     try {
-      ArcanoDB.devolverStockDePDV(pdv.id, items);
+      if (frascoItems.length > 0) {
+        ArcanoDB.devolverStockDePDV(pdv.id, frascoItems);
+      }
+      for (var ci = 0; ci < costalItems.length; ci++) {
+        ArcanoDB.devolverCostalDePDV(pdv.id, costalItems[ci].costalId, costalItems[ci].gramos);
+      }
       closeModal();
       toast('Stock devuelto al inventario principal');
       this.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
