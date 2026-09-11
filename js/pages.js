@@ -2933,6 +2933,23 @@ const Pages = {
     '</div>';
     h += '</div></div>';
 
+    // Tipografía configurable
+    var estiloTitulo = pp.estiloTitulo || 'negrita';
+    var estiloTexto = pp.estiloTexto || 'normal';
+    h += '<div class="card mt-12" style="background:var(--bg);border:1px solid var(--border)"><div class="card-body" style="padding:12px">';
+    h += '<p class="fw7 mb-8" style="font-size:0.85rem">✏️ Tipografía</p>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Tamaño título</label>' +
+        '<select class="input" id="pp-tamano-titulo" style="padding:4px 8px"><option value="1rem"' + (pp.tamanoTitulo === '1rem' ? ' selected' : '') + '>Pequeño</option><option value="1.25rem"' + (!pp.tamanoTitulo || pp.tamanoTitulo === '1.25rem' ? ' selected' : '') + '>Mediano</option><option value="1.5rem"' + (pp.tamanoTitulo === '1.5rem' ? ' selected' : '') + '>Grande</option><option value="1.75rem"' + (pp.tamanoTitulo === '1.75rem' ? ' selected' : '') + '>Muy Grande</option></select></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Estilo título</label>' +
+        '<select class="input" id="pp-estilo-titulo" style="padding:4px 8px"><option value="negrita"' + (estiloTitulo === 'negrita' ? ' selected' : '') + '>Negrita</option><option value="subrayada"' + (estiloTitulo === 'subrayada' ? ' selected' : '') + '>Subrayada</option><option value="cursiva"' + (estiloTitulo === 'cursiva' ? ' selected' : '') + '>Cursiva</option><option value="negrita-subrayada"' + (estiloTitulo === 'negrita-subrayada' ? ' selected' : '') + '>Negrita + Subrayada</option><option value="negrita-cursiva"' + (estiloTitulo === 'negrita-cursiva' ? ' selected' : '') + '>Negrita + Cursiva</option></select></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Tamaño texto</label>' +
+        '<select class="input" id="pp-tamano-texto" style="padding:4px 8px"><option value="0.8rem"' + (pp.tamanoTexto === '0.8rem' ? ' selected' : '') + '>Pequeño</option><option value="0.9rem"' + (!pp.tamanoTexto || pp.tamanoTexto === '0.9rem' ? ' selected' : '') + '>Mediano</option><option value="1rem"' + (pp.tamanoTexto === '1rem' ? ' selected' : '') + '>Grande</option></select></div>' +
+      '<div><label style="display:block;font-size:0.78rem;margin-bottom:4px">Estilo texto</label>' +
+        '<select class="input" id="pp-estilo-texto" style="padding:4px 8px"><option value="normal"' + (estiloTexto === 'normal' ? ' selected' : '') + '>Normal</option><option value="negrita"' + (estiloTexto === 'negrita' ? ' selected' : '') + '>Negrita</option><option value="cursiva"' + (estiloTexto === 'cursiva' ? ' selected' : '') + '>Cursiva</option><option value="subrayada"' + (estiloTexto === 'subrayada' ? ' selected' : '') + '>Subrayada</option></select></div>' +
+    '</div>';
+    h += '</div></div>';
+
     h += '<div class="form-group mt-12"><label>Imagen cuadrada (opcional, recomendado 400x400px)</label>' +
       '<div class="img-upload-area" id="img-area-popup"><input type="file" accept="image/*" id="f-popup-img" style="display:none" onchange="Pages._handlePopupImg(this)">' +
       (pp.imagen ? '<img src="' + pp.imagen + '" class="img-preview" id="img-preview-popup" style="width:120px;height:120px;object-fit:cover;border-radius:8px"><button class="btn btn-sm btn-red" style="margin-top:6px" onclick="Pages._removePopupImg()">Quitar imagen</button>' : '') +
@@ -8035,6 +8052,10 @@ Pages._guardarPopup = function() {
     colorAcento: document.getElementById('pp-color-acento').value,
     colorBoton: document.getElementById('pp-color-boton').value,
     colorBotonTexto: document.getElementById('pp-color-boton-texto').value,
+    tamanoTitulo: document.getElementById('pp-tamano-titulo').value,
+    estiloTitulo: document.getElementById('pp-estilo-titulo').value,
+    tamanoTexto: document.getElementById('pp-tamano-texto').value,
+    estiloTexto: document.getElementById('pp-estilo-texto').value,
     imagen: ''
   };
   // Conservar imagen si ya existe
