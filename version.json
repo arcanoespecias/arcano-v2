@@ -1,5 +1,5 @@
 {
-  "version": "v4.11-sticker-bulk",
+  "version": "v4.12-sticker-split-cost",
   "build": "2026-09-12",
-  "notes": "Carga masiva de stickers: tabla con todos los productos (especias + blends) y columnas Pequeño/Grande. Un solo costo unitario aplica a todos. Un item por (producto, talla) con cantidad > 0."
+  "notes": "Tabla de stickers separada por secciones (Blends / Especias). Costos separados para chico y grande."
 }
