@@ -1,5 +1,5 @@
 {
-  "version": "v4.9-pwa-fix",
-  "build": "2026-09-09",
-  "notes": "Fix PWA: start_url relativo (./) para que la app instalada abra en /arcano-v2/ y no en la raiz (tienda v1). SW: rutas cacheadas relativas + index.html offline."
+  "version": "v4.10-sticker-form",
+  "build": "2026-09-12",
+  "notes": "Fix formulario de entrada de stickers: 1 item = Talla + Tipo (Especia/Blend) + Producto + Cantidad + Costo. Selectores en seccion full-width debajo de la grilla principal."
 }
