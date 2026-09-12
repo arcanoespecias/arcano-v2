@@ -1134,8 +1134,8 @@ const Pages = {
         '<div class="g4 mb-8">' +
           '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Frascos</option><option value="bolsa">Bolsas</option><option value="cinta">Cintas</option><option value="sticker">Stickers</option></select></div>' +
           '<div class="form-group" style="margin:0" id="ent-detail-placeholder"></div>' +
-          '<div class="form-group" style="margin:0"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
-          '<div class="form-group" style="margin:0"><label>Costo Unit.</label><input type="number" class="input ent-cost" placeholder="0" min="0"></div>' +
+          '<div class="form-group" style="margin:0;min-width:100px"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
+          '<div class="form-group" style="margin:0;min-width:100px"><label>Costo Unit.</label><input type="number" class="input ent-cost-gen" placeholder="0" min="0"></div>' +
         '</div>' +
         '<div style="text-align:right"><button class="btn btn-sm btn-red btn-rm-ent">Quitar</button></div>' +
         '</div>';
@@ -1147,6 +1147,12 @@ const Pages = {
 
       function renderDetail() {
         var t = tipoSel.value;
+        // Restaurar campos de cantidad y costo generales (por si venían de stickers)
+        var cantInput = div.querySelector('.ent-cant');
+        var costGenInput = div.querySelector('.ent-cost-gen');
+        if (cantInput) { cantInput.style.display = ''; cantInput.parentElement.style.display = ''; cantInput.value = ''; }
+        if (costGenInput) { costGenInput.style.display = ''; costGenInput.parentElement.style.display = ''; costGenInput.value = ''; }
+
         if (t === 'especia_grs') {
           detailDiv.innerHTML = '<label>Especia</label><select class="input ent-especia"><option value="">Seleccionar</option>' + buildEspOpts() + '</select><input type="text" class="input ent-especia-new" placeholder="Nombre nueva especia..." style="display:none;margin-top:6px">';
           var espSel2 = detailDiv.querySelector('.ent-especia');
@@ -1227,16 +1233,28 @@ const Pages = {
       renderDetail();
       div.querySelector('.btn-rm-ent').addEventListener('click', function() { div.remove(); updateTotal(); });
       div.querySelector('.ent-cant').addEventListener('input', updateTotal);
-      div.querySelector('.ent-cost').addEventListener('input', updateTotal);
+      var genCost = div.querySelector('.ent-cost-gen');
+      if (genCost) genCost.addEventListener('input', updateTotal);
     }
 
     function updateTotal() {
       var rows = itemsDiv.children;
       var total = 0;
       for (var i = 0; i < rows.length; i++) {
-        var c = Number(rows[i].querySelector('.ent-cant').value) || 0;
-        var co = Number(rows[i].querySelector('.ent-cost').value) || 0;
-        total += c * co;
+        var tipo = rows[i].querySelector('.ent-tipo').value;
+        if (tipo === 'sticker') {
+          // Para stickers, sumar desde la tabla
+          var stkChs = rows[i].querySelectorAll('.ent-stk-chico');
+          var stkGrs = rows[i].querySelectorAll('.ent-stk-grande');
+          var stkCostEl = rows[i].querySelector('.ent-cost');
+          var stkCost = Number(stkCostEl ? stkCostEl.value : 0) || 0;
+          for (var sci2 = 0; sci2 < stkChs.length; sci2++) total += (Number(stkChs[sci2].value) || 0) * stkCost;
+          for (var sgi2 = 0; sgi2 < stkGrs.length; sgi2++) total += (Number(stkGrs[sgi2].value) || 0) * stkCost;
+        } else {
+          var c = Number(rows[i].querySelector('.ent-cant').value) || 0;
+          var co = Number(rows[i].querySelector('.ent-cost-gen') ? rows[i].querySelector('.ent-cost-gen').value : 0) || 0;
+          total += c * co;
+        }
       }
       document.getElementById('ent-total').textContent = total.toLocaleString();
     }
@@ -1253,11 +1271,13 @@ const Pages = {
 
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
+        var costGenInput = rows[i].querySelector('.ent-cost-gen');
         var cant = Number(rows[i].querySelector('.ent-cant').value) || 0;
-        var cost = Number(rows[i].querySelector('.ent-cost').value) || 0;
-        if (cant <= 0) continue;
+        var cost = Number(costGenInput ? costGenInput.value : 0) || 0;
+        // Para stickers, saltar el check de cantidad individual (se procesa distinto)
+        if (tipo !== 'sticker' && cant <= 0) continue;
         var item = { tipo: tipo, cantidad: cant, costoUnitario: cost };
-        total += cant * cost;
+        if (tipo !== 'sticker') total += cant * cost;
         if (tipo === 'especia_grs') {
           var newEspInput = rows[i].querySelector('.ent-especia-new');
           var espSel = rows[i].querySelector('.ent-especia');
