@@ -1082,6 +1082,9 @@ const Pages = {
   /* ---------- Entrada Form ---------- */
   formEntrada() {
     var especias = ArcanoDB.getEspecias();
+    var esps = especias;
+    var blends = ArcanoDB.getBlends();
+    var bls = blends;
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = '<div class="modal modal-lg">' +

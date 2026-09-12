@@ -1,5 +1,5 @@
 {
-  "version": "v4.10-sticker-form",
+  "version": "v4.10.1-sticker-fix",
   "build": "2026-09-12",
-  "notes": "Fix formulario de entrada de stickers: 1 item = Talla + Tipo (Especia/Blend) + Producto + Cantidad + Costo. Selectores en seccion full-width debajo de la grilla principal."
+  "notes": "Fix ReferenceError: esps is not defined en buildStickerProductoOpts. Agregadas vars esps/bls al scope de formEntrada()."
 }
