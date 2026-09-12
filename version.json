@@ -1,5 +1,5 @@
 {
-  "version": "v4.10.1-sticker-fix",
+  "version": "v4.11-sticker-bulk",
   "build": "2026-09-12",
-  "notes": "Fix ReferenceError: esps is not defined en buildStickerProductoOpts. Agregadas vars esps/bls al scope de formEntrada()."
+  "notes": "Carga masiva de stickers: tabla con todos los productos (especias + blends) y columnas Pequeño/Grande. Un solo costo unitario aplica a todos. Un item por (producto, talla) con cantidad > 0."
 }

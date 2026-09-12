@@ -1153,24 +1153,47 @@ const Pages = {
       var costWrap = div.querySelector('.ent-cost-wrap');
       var stickerExtra = div.querySelector('.ent-sticker-extra');
 
-      function buildStickerProductoOpts(stickerTipo) {
-        var o = '<option value="">Seleccionar...</option>';
-        if (stickerTipo === 'especia') {
-          for (var i = 0; i < esps.length; i++) o += '<option value="' + esc(esps[i].nombre) + '">' + esc(esps[i].nombre) + '</option>';
-        } else if (stickerTipo === 'blend') {
-          for (var i = 0; i < bls.length; i++) o += '<option value="' + esc(bls[i].nombre) + '">' + esc(bls[i].nombre) + '</option>';
+      function buildStickerTable() {
+        // Lista combinada de especias + blends, cada uno con su tipo
+        var allProds = [];
+        for (var ei = 0; ei < esps.length; ei++) allProds.push({ nombre: esps[ei].nombre, tipo: 'especia' });
+        for (var bi = 0; bi < bls.length; bi++) allProds.push({ nombre: bls[bi].nombre, tipo: 'blend' });
+        allProds.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+
+        var html = '<label>Cantidades recibidas</label>' +
+          '<p class="text-xs text-muted" style="margin:4px 0">Cargá la cantidad en la columna correspondiente (Pequeño o Grande) para cada producto.</p>' +
+          '<div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px">' +
+          '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr>' +
+            '<th style="text-align:left;padding:6px 10px">Producto</th>' +
+            '<th style="width:90px;text-align:center;padding:6px">Pequeño</th>' +
+            '<th style="width:90px;text-align:center;padding:6px">Grande</th>' +
+          '</tr></thead><tbody>';
+        for (var si = 0; si < allProds.length; si++) {
+          html += '<tr>' +
+            '<td style="padding:6px 10px">' + esc(allProds[si].nombre) +
+              '<span class="text-xs text-muted" style="margin-left:6px">(' + allProds[si].tipo + ')</span>' +
+            '</td>' +
+            '<td style="padding:4px;text-align:center"><input type="number" class="input stk-cant" data-nombre="' + esc(allProds[si].nombre) + '" data-tipo="' + allProds[si].tipo + '" data-talla="chico" placeholder="0" min="0" style="width:70px;padding:4px 6px;text-align:center"></td>' +
+            '<td style="padding:4px;text-align:center"><input type="number" class="input stk-cant" data-nombre="' + esc(allProds[si].nombre) + '" data-tipo="' + allProds[si].tipo + '" data-talla="grande" placeholder="0" min="0" style="width:70px;padding:4px 6px;text-align:center"></td>' +
+          '</tr>';
         }
-        return o;
+        html += '</tbody></table></div>';
+        // Costo unitario unico para todos los stickers de esta entrada
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">' +
+          '<label style="margin:0;font-weight:600">Costo por sticker:</label>' +
+          '<input type="number" class="input stk-cost" placeholder="$0" min="0" step="0.01" style="width:140px">' +
+          '<span class="text-xs text-muted">(se aplica a chicos y grandes)</span>' +
+        '</div>';
+        return html;
       }
 
       function renderDetail() {
         var t = tipoSel.value;
-        // Restaurar campos generales (Cantidad y Costo Unit.) y limpiar valores
+        // Por defecto mostrar y limpiar campos generales
         cantWrap.style.display = '';
         costWrap.style.display = '';
         var ci = div.querySelector('.ent-cant'); if (ci) ci.value = '';
         var cg = div.querySelector('.ent-cost-gen'); if (cg) cg.value = '';
-        // Por defecto ocultar la sección extra (se muestra solo para sticker)
         stickerExtra.style.display = 'none';
         stickerExtra.innerHTML = '';
 
@@ -1192,22 +1215,19 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else if (t === 'sticker') {
-          // Stickers como 1 item simple.
-          // detailDiv queda vacio (la columna es muy angosta para 3 selects);
-          // los 3 selects (Talla / Tipo / Producto) van en la sección extra a ancho completo.
+          // Stickers en carga masiva: tabla con todos los productos (especias + blends)
+          // y columnas Pequeño / Grande. El admin carga cantidades en una sola pasada.
+          // Ocultar campos de cantidad y costo del grid (la tabla usa los suyos).
+          cantWrap.style.display = 'none';
+          costWrap.style.display = 'none';
           detailDiv.innerHTML = '<label>&nbsp;</label><span class="text-xs text-muted">Stickers ↓</span>';
           stickerExtra.style.display = '';
-          stickerExtra.innerHTML =
-            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">' +
-              '<div class="form-group" style="margin:0"><label>Talla</label><select class="input stk-talla"><option value="grande">Grande</option><option value="chico">Pequeño</option></select></div>' +
-              '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input stk-tipo"><option value="especia">Especia</option><option value="blend">Blend</option></select></div>' +
-              '<div class="form-group" style="margin:0;min-width:180px"><label>Producto</label><select class="input stk-prod">' + buildStickerProductoOpts('especia') + '</select></div>' +
-            '</div>';
-          var stkTipo = stickerExtra.querySelector('.stk-tipo');
-          var stkProd = stickerExtra.querySelector('.stk-prod');
-          stkTipo.addEventListener('change', function() {
-            stkProd.innerHTML = buildStickerProductoOpts(this.value);
-          });
+          stickerExtra.innerHTML = buildStickerTable();
+          // Listeners para recalcular total al tipear cantidades o costo
+          var stkInputs = stickerExtra.querySelectorAll('.stk-cant, .stk-cost');
+          for (var k = 0; k < stkInputs.length; k++) {
+            stkInputs[k].addEventListener('input', updateTotal);
+          }
         }
       }
       tipoSel.addEventListener('change', renderDetail);
@@ -1223,10 +1243,20 @@ const Pages = {
       var total = 0;
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
-        var c = Number(rows[i].querySelector('.ent-cant').value) || 0;
-        var coEl = rows[i].querySelector('.ent-cost-gen');
-        var co = Number(coEl ? coEl.value : 0) || 0;
-        total += c * co;
+        if (tipo === 'sticker') {
+          // Sumar cantidad × costo de cada sticker cargado en la tabla masiva
+          var stkCants = rows[i].querySelectorAll('.stk-cant');
+          var stkCostEl = rows[i].querySelector('.stk-cost');
+          var stkCost = Number(stkCostEl ? stkCostEl.value : 0) || 0;
+          for (var k = 0; k < stkCants.length; k++) {
+            total += (Number(stkCants[k].value) || 0) * stkCost;
+          }
+        } else {
+          var c = Number(rows[i].querySelector('.ent-cant').value) || 0;
+          var coEl = rows[i].querySelector('.ent-cost-gen');
+          var co = Number(coEl ? coEl.value : 0) || 0;
+          total += c * co;
+        }
       }
       document.getElementById('ent-total').textContent = total.toLocaleString();
     }
@@ -1243,6 +1273,33 @@ const Pages = {
 
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
+
+        // Sticker: procesar la tabla masiva (1 item por cada (producto, talla) con cantidad > 0)
+        if (tipo === 'sticker') {
+          var stkCants = rows[i].querySelectorAll('.stk-cant');
+          var stkCostEl = rows[i].querySelector('.stk-cost');
+          var stkCost = Number(stkCostEl ? stkCostEl.value : 0) || 0;
+          var hasAnySticker = false;
+          for (var k = 0; k < stkCants.length; k++) {
+            var stkCant = Number(stkCants[k].value) || 0;
+            if (stkCant > 0) {
+              items.push({
+                tipo: 'sticker',
+                cantidad: stkCant,
+                costoUnitario: stkCost,
+                stickerNombre: stkCants[k].dataset.nombre,
+                stickerTipo: stkCants[k].dataset.tipo,
+                talla: stkCants[k].dataset.talla
+              });
+              total += stkCant * stkCost;
+              hasAnySticker = true;
+            }
+          }
+          if (!hasAnySticker) { alert('Cargá al menos una cantidad de stickers (fila ' + (i+1) + ')'); return; }
+          if (stkCost <= 0) { alert('Falta el costo por sticker (fila ' + (i+1) + ')'); return; }
+          continue; // Ya se agregaron los items arriba, saltar el push del final
+        }
+
         var costGenInput = rows[i].querySelector('.ent-cost-gen');
         var cant = Number(rows[i].querySelector('.ent-cant').value) || 0;
         var cost = Number(costGenInput ? costGenInput.value : 0) || 0;
@@ -1278,16 +1335,6 @@ const Pages = {
           item.talla = rows[i].querySelector('.ent-talla').value;
         } else if (tipo === 'bolsa') {
           item.talla = rows[i].querySelector('.ent-talla').value;
-        } else if (tipo === 'sticker') {
-          // 1 item de sticker = 1 producto con talla + tipo + cantidad + costo
-          var stkTallaSel = rows[i].querySelector('.stk-talla');
-          var stkTipoSel = rows[i].querySelector('.stk-tipo');
-          var stkProdSel = rows[i].querySelector('.stk-prod');
-          if (!stkProdSel || !stkProdSel.value) { alert('Falta producto en sticker (item ' + (i+1) + ')'); return; }
-          if (!stkTallaSel || !stkTallaSel.value) { alert('Falta talla en sticker (item ' + (i+1) + ')'); return; }
-          item.talla = stkTallaSel.value;
-          item.stickerTipo = stkTipoSel ? stkTipoSel.value : 'especia';
-          item.stickerNombre = stkProdSel.value;
         }
         items.push(item);
       }
