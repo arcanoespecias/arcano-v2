@@ -1128,105 +1128,81 @@ const Pages = {
 
     function addEntRow() {
       var div = document.createElement('div');
-      div.className = 'card mb-8';
+      div.className = 'card mb-8 ent-row';
       div.style.background = 'var(--bg)';
       div.innerHTML = '<div class="card-body" style="padding:12px">' +
         '<div class="g4 mb-8">' +
           '<div class="form-group" style="margin:0"><label>Tipo</label><select class="input ent-tipo"><option value="especia_grs">Especia (grs)</option><option value="envase">Frascos</option><option value="bolsa">Bolsas</option><option value="cinta">Cintas</option><option value="sticker">Stickers</option></select></div>' +
-          '<div class="form-group" style="margin:0" id="ent-detail-placeholder"></div>' +
-          '<div class="form-group" style="margin:0;min-width:100px"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
-          '<div class="form-group" style="margin:0;min-width:100px"><label>Costo Unit.</label><input type="number" class="input ent-cost-gen" placeholder="0" min="0"></div>' +
+          '<div class="form-group ent-detail" style="margin:0"></div>' +
+          '<div class="form-group ent-cant-wrap" style="margin:0;min-width:100px"><label>Cantidad</label><input type="number" class="input ent-cant" placeholder="0" min="0"></div>' +
+          '<div class="form-group ent-cost-wrap" style="margin:0;min-width:100px"><label>Costo Unit.</label><input type="number" class="input ent-cost-gen" placeholder="0" min="0"></div>' +
         '</div>' +
         '<div style="text-align:right"><button class="btn btn-sm btn-red btn-rm-ent">Quitar</button></div>' +
         '</div>';
       itemsDiv.appendChild(div);
 
       var tipoSel = div.querySelector('.ent-tipo');
-      var detailDiv = div.querySelector('#ent-detail-placeholder');
-      detailDiv.removeAttribute('id');
+      var detailDiv = div.querySelector('.ent-detail');
+      var cantWrap = div.querySelector('.ent-cant-wrap');
+      var costWrap = div.querySelector('.ent-cost-wrap');
 
       function renderDetail() {
         var t = tipoSel.value;
-        // Restaurar campos de cantidad y costo generales (por si venían de stickers)
-        var cantInput = div.querySelector('.ent-cant');
-        var costGenInput = div.querySelector('.ent-cost-gen');
-        if (cantInput) { cantInput.style.display = ''; cantInput.parentElement.style.display = ''; cantInput.value = ''; }
-        if (costGenInput) { costGenInput.style.display = ''; costGenInput.parentElement.style.display = ''; costGenInput.value = ''; }
+        // Restaurar campos generales
+        cantWrap.style.display = '';
+        costWrap.style.display = '';
+        var ci = div.querySelector('.ent-cant'); if (ci) ci.value = '';
+        var cg = div.querySelector('.ent-cost-gen'); if (cg) cg.value = '';
 
         if (t === 'especia_grs') {
           detailDiv.innerHTML = '<label>Especia</label><select class="input ent-especia"><option value="">Seleccionar</option>' + buildEspOpts() + '</select><input type="text" class="input ent-especia-new" placeholder="Nombre nueva especia..." style="display:none;margin-top:6px">';
           var espSel2 = detailDiv.querySelector('.ent-especia');
           var newInput = detailDiv.querySelector('.ent-especia-new');
           espSel2.addEventListener('change', function() {
-            if (this.value === '__new__') {
-              this.style.display = 'none';
-              newInput.style.display = 'block';
-              newInput.focus();
-            }
+            if (this.value === '__new__') { this.style.display = 'none'; newInput.style.display = 'block'; newInput.focus(); }
           });
           newInput.addEventListener('blur', function() {
-            if (!this.value.trim()) {
-              this.style.display = 'none';
-              espSel2.style.display = 'block';
-              espSel2.value = '';
-            }
+            if (!this.value.trim()) { this.style.display = 'none'; espSel2.style.display = 'block'; espSel2.value = ''; }
           });
-          newInput.addEventListener('keydown', function(ev) {
-            if (ev.key === 'Escape') { this.value = ''; this.blur(); }
-          });
+          newInput.addEventListener('keydown', function(ev) { if (ev.key === 'Escape') { this.value = ''; this.blur(); } });
         } else if (t === 'envase') {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select>';
         } else if (t === 'bolsa') {
           detailDiv.innerHTML = '<label>Talla</label><select class="input ent-talla"><option value="chico">Chica</option><option value="grande">Grande</option></select>';
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
-        } else {
-          // Tipo STICKER: mostrar tabla simple con todos los productos
+        } else if (t === 'sticker') {
+          // Stickers: tabla con todos los productos, columnas Pequeño y Grande
+          cantWrap.style.display = 'none'; // no se usa cantidad individual
+          costWrap.style.display = 'none'; // el costo va dentro de la tabla
+
           var allProds = [];
-          for (var ei = 0; ei < esps.length; ei++) allProds.push({ nombre: esps[ei].nombre, tipo: 'especia', id: esps[ei].id });
-          for (var bi = 0; bi < bls.length; bi++) allProds.push({ nombre: bls[bi].nombre, tipo: 'blend', id: bls[bi].id });
+          for (var ei = 0; ei < esps.length; ei++) allProds.push({ nombre: esps[ei].nombre, tipo: 'especia' });
+          for (var bi = 0; bi < bls.length; bi++) allProds.push({ nombre: bls[bi].nombre, tipo: 'blend' });
           allProds.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
 
-          var stickerTable = '<label>Stickers por producto</label>' +
-            '<p class="text-xs text-muted mt-4">Ingresa las cantidades de stickers que recibiste de cada producto.</p>' +
-            '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px">' +
-            '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr><th>Producto</th><th style="width:80px;text-align:center">Pequeño</th><th style="width:80px;text-align:center">Grande</th></tr></thead><tbody>';
+          var stkHtml = '<label>Stickers recibidos</label>' +
+            '<p class="text-xs text-muted" style="margin:4px 0">Ingresa la cantidad de stickers de cada producto.</p>' +
+            '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px">' +
+            '<table class="table" style="margin:0;font-size:0.85rem"><thead><tr><th>Producto</th>' +
+            '<th style="width:80px;text-align:center">Pequeño</th>' +
+            '<th style="width:80px;text-align:center">Grande</th></tr></thead><tbody>';
           for (var si2 = 0; si2 < allProds.length; si2++) {
-            stickerTable += '<tr>' +
+            stkHtml += '<tr>' +
               '<td style="padding:6px 10px">' + esc(allProds[si2].nombre) + '</td>' +
-              '<td style="padding:4px;text-align:center"><input type="number" class="input ent-stk-chico" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
-              '<td style="padding:4px;text-align:center"><input type="number" class="input ent-stk-grande" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;font-size:0.85rem;text-align:center"></td>' +
+              '<td style="padding:4px;text-align:center"><input type="number" class="input stk-chico" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;text-align:center"></td>' +
+              '<td style="padding:4px;text-align:center"><input type="number" class="input stk-grande" data-nombre="' + esc(allProds[si2].nombre) + '" data-tipo="' + allProds[si2].tipo + '" placeholder="0" min="0" style="width:70px;padding:4px 6px;text-align:center"></td>' +
             '</tr>';
           }
-          stickerTable += '</tbody></table></div>';
-          stickerTable += '<div class="form-group mt-12" style="margin:0"><label>Costo por sticker (mismo para todos)</label><input type="number" class="input ent-cost" placeholder="$0" min="0" style="width:140px"></div>';
+          stkHtml += '</tbody></table></div>';
+          stkHtml += '<div style="margin-top:10px"><label>Costo por sticker</label><input type="number" class="input stk-cost" placeholder="$0" min="0" style="width:140px;margin-left:8px"></div>';
+          detailDiv.innerHTML = stkHtml;
 
-          detailDiv.innerHTML = stickerTable;
-
-          // Ocultar el campo de cantidad individual (no se usa para stickers)
-          var cantInput = div.querySelector('.ent-cant');
-          if (cantInput) { cantInput.style.display = 'none'; cantInput.parentElement.style.display = 'none'; }
-
-          // Actualizar total cuando cambian las cantidades
-          var chicoInputs = detailDiv.querySelectorAll('.ent-stk-chico');
-          var grandeInputs = detailDiv.querySelectorAll('.ent-stk-grande');
-          var costInput2 = detailDiv.querySelector('.ent-cost');
-          function updateStickerTotal() {
-            var cost = Number(costInput2.value) || 0;
-            var totalCant = 0;
-            for (var ci2 = 0; ci2 < chicoInputs.length; ci2++) {
-              totalCant += Number(chicoInputs[ci2].value) || 0;
-            }
-            for (var gi2 = 0; gi2 < grandeInputs.length; gi2++) {
-              totalCant += Number(grandeInputs[gi2].value) || 0;
-            }
-            // Actualizar el campo oculto de cantidad para el total general
-            if (cantInput) cantInput.value = totalCant;
-            updateTotal();
+          // Listeners para actualizar total
+          var stkInputs = detailDiv.querySelectorAll('.stk-chico, .stk-grande, .stk-cost');
+          for (var si3 = 0; si3 < stkInputs.length; si3++) {
+            stkInputs[si3].addEventListener('input', updateTotal);
           }
-          for (var ci3 = 0; ci3 < chicoInputs.length; ci3++) chicoInputs[ci3].addEventListener('input', updateStickerTotal);
-          for (var gi3 = 0; gi3 < grandeInputs.length; gi3++) grandeInputs[gi3].addEventListener('input', updateStickerTotal);
-          if (costInput2) costInput2.addEventListener('input', updateStickerTotal);
         }
       }
       tipoSel.addEventListener('change', renderDetail);
@@ -1243,10 +1219,9 @@ const Pages = {
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
         if (tipo === 'sticker') {
-          // Para stickers, sumar desde la tabla
-          var stkChs = rows[i].querySelectorAll('.ent-stk-chico');
-          var stkGrs = rows[i].querySelectorAll('.ent-stk-grande');
-          var stkCostEl = rows[i].querySelector('.ent-cost');
+          var stkChs = rows[i].querySelectorAll('.stk-chico');
+          var stkGrs = rows[i].querySelectorAll('.stk-grande');
+          var stkCostEl = rows[i].querySelector('.stk-cost');
           var stkCost = Number(stkCostEl ? stkCostEl.value : 0) || 0;
           for (var sci2 = 0; sci2 < stkChs.length; sci2++) total += (Number(stkChs[sci2].value) || 0) * stkCost;
           for (var sgi2 = 0; sgi2 < stkGrs.length; sgi2++) total += (Number(stkGrs[sgi2].value) || 0) * stkCost;
@@ -1309,10 +1284,10 @@ const Pages = {
           item.talla = rows[i].querySelector('.ent-talla').value;
         } else if (tipo === 'sticker') {
           // Procesar tabla de stickers: múltiples productos en un solo item visual
-          var stkChicos = rows[i].querySelectorAll('.ent-stk-chico');
-          var stkGrandes = rows[i].querySelectorAll('.ent-stk-grande');
-          var detailCost = rows[i].querySelector('#ent-detail-placeholder .ent-cost') || rows[i].querySelector('.ent-cost');
-          var stkCost = Number(detailCost ? detailCost.value : 0) || 0;
+          var stkChicos = rows[i].querySelectorAll('.stk-chico');
+          var stkGrandes = rows[i].querySelectorAll('.stk-grande');
+          var stkCostEl = rows[i].querySelector('.stk-cost');
+          var stkCost = Number(stkCostEl ? stkCostEl.value : 0) || 0;
           var hasAnySticker = false;
           for (var sci = 0; sci < stkChicos.length; sci++) {
             var stkCh = Number(stkChicos[sci].value) || 0;
