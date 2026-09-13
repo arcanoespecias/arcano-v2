@@ -1,5 +1,5 @@
 {
-  "version": "v4.12-sticker-split-cost",
+  "version": "v4.13-costos-por-producto",
   "build": "2026-09-12",
-  "notes": "Tabla de stickers separada por secciones (Blends / Especias). Costos separados para chico y grande."
+  "notes": "Nuevo sub-tab Costos por Producto en Estadisticas: cards individuales con costo total chico/grande por blend y especia. Filtros (todos/blends/especias) y orden (nombre/costo/margen)."
 }

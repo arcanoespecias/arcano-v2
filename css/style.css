@@ -604,3 +604,82 @@ select.input { cursor: pointer; }
 .cat-check { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; color: var(--text); }
 .cat-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
 .cat-check span { user-select: none; }
+
+/* === COSTOS POR PRODUCTO CARDS === */
+.costo-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.costo-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.costo-card-header {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.costo-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.costo-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  flex: 1;
+}
+.costo-card-col {
+  padding: 10px 12px;
+  border-right: 1px solid var(--border);
+}
+.costo-card-col:last-child { border-right: none; }
+.costo-card-talla {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text3);
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+.costo-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  padding: 3px 0;
+  color: var(--text);
+}
+.costo-card-subrow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  padding: 1px 0 1px 8px;
+  color: var(--text3);
+}
+.costo-card-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 0;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.costo-card-total span:first-child { color: var(--text); }
+
+@media (max-width: 480px) {
+  .costo-card-grid { grid-template-columns: 1fr; }
+  .costo-card-body { grid-template-columns: 1fr; }
+  .costo-card-col { border-right: none; border-bottom: 1px solid var(--border); }
+  .costo-card-col:last-child { border-bottom: none; }
+}
