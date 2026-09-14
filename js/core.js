@@ -356,6 +356,8 @@ const App = {
               '<span class="nav-icon">📦</span><span class="nav-label">Pedidos</span><span class="nav-badge" id="pedidos-badge" style="display:none"></span></a>' +
             '<a class="nav-item" data-page="stock" onclick="App.navigate(\'stock\')">' +
               '<span class="nav-icon">📋</span><span class="nav-label">Stock</span></a>' +
+            '<a class="nav-item" data-page="costos" onclick="App.navigate(\'costos\')">' +
+              '<span class="nav-icon">💲</span><span class="nav-label">Costos</span></a>' +
             '<a class="nav-item" data-page="tienda" onclick="App.navigate(\'tienda\')">' +
               '<span class="nav-icon">🛒</span><span class="nav-label">Tienda</span></a>' +
             '<a class="nav-item" data-page="tublend" onclick="App.navigate(\'tublend\')">' +
@@ -418,7 +420,7 @@ const App = {
     this.closeMobileSidebar();
     var titles = {
       dashboard: 'Dashboard', productos: 'Productos', insumos: 'Insumos', testing: 'Testing',
-      produccion: 'Produccion', costales: 'Costales', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos', mensajes: 'Mensajes WhatsApp'
+      produccion: 'Produccion', costales: 'Costales', ventas: 'Ventas', gastos: 'Gastos', pedidos: 'Pedidos', stock: 'Stock', costos: 'Costos', tienda: 'Tienda', tublend: 'Tu Blend', recetas: 'Recetas IA', blog: 'Blog IA', estadisticas: 'Estadisticas', usuarios: 'Usuarios', puntosdeventa: 'P. Venta', grandesClientes: 'Grandes Clientes', clientes: 'Clientes', promociones: 'Promociones', carritos: 'Carritos', mensajes: 'Mensajes WhatsApp'
     };
     document.getElementById('page-title').textContent = titles[page] || page;
     // Cierra el drawer lateral en mobile al cambiar de pagina
@@ -478,6 +480,7 @@ const App = {
         case 'gastos': Pages.renderGastos(container); break;
         case 'pedidos': Pages.renderPedidos(container); break;
         case 'stock': Pages.renderStock(container); break;
+        case 'costos': Pages.renderCostos(container); break;
         case 'tienda': Pages.renderTiendaAdmin(container); break;
         case 'tublend': Pages.renderTuBlend(container); break;
         case 'recetas': Pages.renderRecetasAdmin(container); break;

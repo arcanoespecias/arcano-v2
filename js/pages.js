@@ -2397,6 +2397,233 @@ const Pages = {
 
 
   /* ================================================================
+     COSTOS — Cards de costo total por blend/especia
+     Desglose: Especias + Frasco + Bolsa + Sticker + Cinta = Total
+     ================================================================ */
+  _costosFilter: 'todos',
+  _costosSort: 'nombre',
+
+  renderCostos(container) {
+    var especias = ArcanoDB.getEspecias();
+    var blends = ArcanoDB.getBlends();
+    var costos = ArcanoDB.getCostosInsumos();
+    var self = Pages;
+
+    // Componentes del empaque (separados para mostrar)
+    var envaseChico   = Number(costos.envaseChico)   || 0;
+    var envaseGrande  = Number(costos.envaseGrande)  || 0;
+    var bolsaChica    = Number(costos.bolsaChica)    || 0;
+    var bolsaGrande   = Number(costos.bolsaGrande)    || 0;
+    var cinta         = Number(costos.cinta)          || 0;
+    var stickerChico  = Number(costos.stickerChico)  || 0;
+    var stickerGrande = Number(costos.stickerGrande) || 0;
+
+    // Construir items unificados
+    var items = [];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var bl = blends[bi];
+      var ings = bl.ingredientes || [];
+      var espCh = 0, espGr = 0;
+      var detailCh = [], detailGr = [];
+      for (var ig = 0; ig < ings.length; ig++) {
+        var ing = ings[ig];
+        var cpg = (costos.especias && costos.especias[ing.especiaId]) || 0;
+        var gc = Number(ing.gramosChico)  || 0;
+        var gg = Number(ing.gramosGrande) || 0;
+        var cc = gc * cpg;
+        var cg = gg * cpg;
+        espCh += cc; espGr += cg;
+        if (gc > 0 || gg > 0) {
+          detailCh.push({ nombre: ing.especiaNombre || '?', gramos: gc, costo: cc });
+          detailGr.push({ nombre: ing.especiaNombre || '?', gramos: gg, costo: cg });
+        }
+      }
+      items.push({
+        tipo: 'blend', id: bl.id, nombre: bl.nombre || '?', categoria: bl.categoria || '',
+        espChico: espCh, espGrande: espGr,
+        envaseChico: envaseChico, envaseGrande: envaseGrande,
+        bolsaChico: bolsaChica, bolsaGrande: bolsaGrande,
+        stickerChico: stickerChico, stickerGrande: stickerGrande,
+        cinta: cinta,
+        totalChico: espCh + envaseChico + bolsaChica + stickerChico + cinta,
+        totalGrande: espGr + envaseGrande + bolsaGrande + stickerGrande + cinta,
+        precioChico: Number(bl.precioChico) || 0,
+        precioGrande: Number(bl.precioGrande) || 0,
+        detailChico: detailCh, detailGrande: detailGr
+      });
+    }
+    for (var ei = 0; ei < especias.length; ei++) {
+      var esp = especias[ei];
+      var cpg2 = (costos.especias && costos.especias[esp.id]) || 0;
+      var gc2 = Number(esp.gramosChico)  || 0;
+      var gg2 = Number(esp.gramosGrande) || 0;
+      var cc2 = gc2 * cpg2;
+      var cg2 = gg2 * cpg2;
+      items.push({
+        tipo: 'especia', id: esp.id, nombre: esp.nombre || '?', categoria: esp.categoria || '',
+        espChico: cc2, espGrande: cg2,
+        envaseChico: envaseChico, envaseGrande: envaseGrande,
+        bolsaChico: bolsaChica, bolsaGrande: bolsaGrande,
+        stickerChico: stickerChico, stickerGrande: stickerGrande,
+        cinta: cinta,
+        totalChico: cc2 + envaseChico + bolsaChica + stickerChico + cinta,
+        totalGrande: cg2 + envaseGrande + bolsaGrande + stickerGrande + cinta,
+        precioChico: Number(esp.precioChico) || 0,
+        precioGrande: Number(esp.precioGrande) || 0,
+        detailChico: cpg2 > 0 ? [{ nombre: esp.nombre, gramos: gc2, costo: cc2 }] : [],
+        detailGrande: cpg2 > 0 ? [{ nombre: esp.nombre, gramos: gg2, costo: cg2 }] : []
+      });
+    }
+
+    // Filtro
+    var filter = self._costosFilter || 'todos';
+    var sort = self._costosSort || 'nombre';
+    var filtered = items.filter(function(it) {
+      if (filter === 'blend')   return it.tipo === 'blend';
+      if (filter === 'especia') return it.tipo === 'especia';
+      return true;
+    });
+    filtered.sort(function(a, b) {
+      if (sort === 'costoChico')  return b.totalChico  - a.totalChico;
+      if (sort === 'costoGrande') return b.totalGrande - a.totalGrande;
+      if (sort === 'margenChico') {
+        var ma = a.precioChico > 0 ? (a.precioChico - a.totalChico) / a.precioChico : -1;
+        var mb = b.precioChico > 0 ? (b.precioChico - b.totalChico) / b.precioChico : -1;
+        return mb - ma;
+      }
+      return (a.nombre || '').localeCompare(b.nombre || '');
+    });
+
+    // Resumen arriba
+    var sumCh = 0, sumGr = 0, count = filtered.length;
+    var maxCh = 0, maxGr = 0, minCh = Infinity, minGr = Infinity;
+    for (var k = 0; k < filtered.length; k++) {
+      var tc = filtered[k].totalChico, tg = filtered[k].totalGrande;
+      sumCh += tc; sumGr += tg;
+      if (tc > maxCh) maxCh = tc;
+      if (tg > maxGr) maxGr = tg;
+      if (tc < minCh) minCh = tc;
+      if (tg < minGr) minGr = tg;
+    }
+    if (!isFinite(minCh)) minCh = 0;
+    if (!isFinite(minGr)) minGr = 0;
+    var promCh = count > 0 ? sumCh / count : 0;
+    var promGr = count > 0 ? sumGr / count : 0;
+
+    var h = '';
+    h += '<div class="page-header"><h2 style="font-size:22px;font-weight:700">Costos por Producto</h2>' +
+      '<button class="btn btn-outline" onclick="Pages.formCostosInsumos()">✏ Editar Costos Base</button></div>';
+
+    h += '<p class="text-sm text-muted mb-16">Costo total de cada producto = Especias + Frasco + Bolsa + Sticker + Cinta. ' +
+      'Los componentes del empaque son globales (se configuran en "Editar Costos Base"); las especias dependen de la receta del blend y el costo promedio ponderado por gramo.</p>';
+
+    // Panel de costos base (packaging)
+    h += '<div class="card mb-16"><div class="card-header"><h3>Costos Base de Empaque</h3></div><div class="card-body">';
+    h += '<div class="g2">';
+    h += '<div class="card" style="background:var(--bg);margin:0"><div class="card-body" style="padding:14px">' +
+      '<div class="fw7 mb-8" style="color:var(--blue)">Frasco Pequeño</div>' +
+      '<div class="text-sm mb-4">Envase: $' + envaseChico + '</div>' +
+      '<div class="text-sm mb-4">Bolsa: $' + bolsaChica + '</div>' +
+      '<div class="text-sm mb-4">Sticker: $' + stickerChico + '</div>' +
+      '<div class="text-sm mb-4">Cinta: $' + cinta + '</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px" class="fw7">Empaque total: $' + (envaseChico + bolsaChica + stickerChico + cinta) + '</div>' +
+    '</div></div>';
+    h += '<div class="card" style="background:var(--bg);margin:0"><div class="card-body" style="padding:14px">' +
+      '<div class="fw7 mb-8" style="color:var(--gold)">Frasco Grande</div>' +
+      '<div class="text-sm mb-4">Envase: $' + envaseGrande + '</div>' +
+      '<div class="text-sm mb-4">Bolsa: $' + bolsaGrande + '</div>' +
+      '<div class="text-sm mb-4">Sticker: $' + stickerGrande + '</div>' +
+      '<div class="text-sm mb-4">Cinta: $' + cinta + '</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px" class="fw7">Empaque total: $' + (envaseGrande + bolsaGrande + stickerGrande + cinta) + '</div>' +
+    '</div></div>';
+    h += '</div></div></div>';
+
+    // Filtros y orden
+    h += '<div class="card mb-16"><div class="card-body" style="padding:12px">';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
+    h += '<span class="text-xs text-muted" style="margin-right:4px">Filtrar:</span>';
+    h += '<button class="btn btn-sm ' + (filter === 'todos' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosFilter=\'todos\';App.renderPage(\'costos\')">Todos (' + items.length + ')</button>';
+    h += '<button class="btn btn-sm ' + (filter === 'blend' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosFilter=\'blend\';App.renderPage(\'costos\')">Blends (' + blends.length + ')</button>';
+    h += '<button class="btn btn-sm ' + (filter === 'especia' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosFilter=\'especia\';App.renderPage(\'costos\')">Especias (' + especias.length + ')</button>';
+    h += '<span class="text-xs text-muted" style="margin-left:16px;margin-right:4px">Ordenar:</span>';
+    h += '<button class="btn btn-sm ' + (sort === 'nombre' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosSort=\'nombre\';App.renderPage(\'costos\')">Nombre</button>';
+    h += '<button class="btn btn-sm ' + (sort === 'costoChico' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosSort=\'costoChico\';App.renderPage(\'costos\')">Costo Chico</button>';
+    h += '<button class="btn btn-sm ' + (sort === 'costoGrande' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosSort=\'costoGrande\';App.renderPage(\'costos\')">Costo Grande</button>';
+    h += '<button class="btn btn-sm ' + (sort === 'margenChico' ? 'btn-gold' : 'btn-outline') + '" onclick="Pages._costosSort=\'margenChico\';App.renderPage(\'costos\')">Margen Chico</button>';
+    h += '</div></div></div>';
+
+    // Cards
+    if (filtered.length === 0) {
+      h += '<p class="text-muted text-center" style="margin-top:24px">No hay productos para mostrar.</p>';
+    } else {
+      h += '<div class="costo-card-grid">';
+      for (var ci = 0; ci < filtered.length; ci++) {
+        var it = filtered[ci];
+        var margenC = it.precioChico - it.totalChico;
+        var margenG = it.precioGrande - it.totalGrande;
+        var pctC = it.precioChico > 0 ? (margenC / it.precioChico * 100) : 0;
+        var pctG = it.precioGrande > 0 ? (margenG / it.precioGrande * 100) : 0;
+        var tipoBadge = it.tipo === 'blend' ? '<span class="badge badge-blue">Blend</span>' : '<span class="badge badge-gold">Especia</span>';
+        var margenColorC = margenC >= 0 ? 'var(--green)' : 'var(--red)';
+        var margenColorG = margenG >= 0 ? 'var(--green)' : 'var(--red)';
+
+        h += '<div class="costo-card">';
+        h += '<div class="costo-card-header">';
+        h += '<div class="costo-card-name">' + esc(it.nombre) + '</div>' + tipoBadge + (it.categoria ? ' <span class="text-xs text-muted">' + esc(it.categoria) + '</span>' : '');
+        h += '</div>';
+        h += '<div class="costo-card-body">';
+
+        // Columna Chico
+        h += '<div class="costo-card-col">';
+        h += '<div class="costo-card-talla">Pequeño</div>';
+        h += '<div class="costo-card-row"><span>Especias</span><span>$' + it.espChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        if (it.detailChico.length > 0 && it.detailChico.length <= 4) {
+          for (var dc = 0; dc < it.detailChico.length; dc++) {
+            var d = it.detailChico[dc];
+            h += '<div class="costo-card-subrow"><span>' + esc(d.nombre) + ' ' + d.gramos + 'g</span><span>$' + d.costo.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+          }
+        }
+        h += '<div class="costo-card-row"><span>Frasco</span><span>$' + it.envaseChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Bolsa</span><span>$' + it.bolsaChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Sticker</span><span>$' + it.stickerChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Cinta</span><span>$' + it.cinta.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-total"><span>Total</span><span style="color:var(--red)">$' + it.totalChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        if (it.precioChico > 0) {
+          h += '<div class="costo-card-row"><span>Venta</span><span style="color:var(--gold)">$' + it.precioChico.toLocaleString() + '</span></div>';
+          h += '<div class="costo-card-row"><span>Margen</span><span style="color:' + margenColorC + '">$' + margenC.toLocaleString(undefined,{maximumFractionDigits:0}) + ' (' + pctC.toFixed(0) + '%)</span></div>';
+        }
+        h += '</div>';
+
+        // Columna Grande
+        h += '<div class="costo-card-col">';
+        h += '<div class="costo-card-talla">Grande</div>';
+        h += '<div class="costo-card-row"><span>Especias</span><span>$' + it.espGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        if (it.detailGrande.length > 0 && it.detailGrande.length <= 4) {
+          for (var dg = 0; dg < it.detailGrande.length; dg++) {
+            var d2 = it.detailGrande[dg];
+            h += '<div class="costo-card-subrow"><span>' + esc(d2.nombre) + ' ' + d2.gramos + 'g</span><span>$' + d2.costo.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+          }
+        }
+        h += '<div class="costo-card-row"><span>Frasco</span><span>$' + it.envaseGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Bolsa</span><span>$' + it.bolsaGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Sticker</span><span>$' + it.stickerGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-row"><span>Cinta</span><span>$' + it.cinta.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        h += '<div class="costo-card-total"><span>Total</span><span style="color:var(--red)">$' + it.totalGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</span></div>';
+        if (it.precioGrande > 0) {
+          h += '<div class="costo-card-row"><span>Venta</span><span style="color:var(--gold)">$' + it.precioGrande.toLocaleString() + '</span></div>';
+          h += '<div class="costo-card-row"><span>Margen</span><span style="color:' + margenColorG + '">$' + margenG.toLocaleString(undefined,{maximumFractionDigits:0}) + ' (' + pctG.toFixed(0) + '%)</span></div>';
+        }
+        h += '</div>';
+
+        h += '</div></div>';
+      }
+      h += '</div>';
+    }
+
+    container.innerHTML = h;
+  },
+
+  /* ================================================================
      STOCK
      ================================================================ */
   renderStock(container) {

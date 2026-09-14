@@ -1,5 +1,5 @@
 {
-  "version": "v4.14-produccion-mixta",
-  "build": "2026-09-12",
-  "notes": "Formulario de Produccion rediseñado: produce chico+grande en una sola carga. Calcula gramos por especia y muestra la 'Bolsa de Preparacion' con detalle a pesar."
+  "version": "v4.15-menu-costos",
+  "build": "2026-09-14",
+  "notes": "Nuevo menú 'Costos' en sidebar con cards individuales por blend/especia. Desglose: Especias + Frasco + Bolsa + Sticker + Cinta = Total."
 }
