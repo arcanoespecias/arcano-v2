@@ -1056,12 +1056,46 @@ const Pages = {
     h += '</div></div></div>';
 
     // Historial
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Entradas (' + entradas.length + ')</h3></div><div class="card-body">';
     if (entradas.length === 0) { h += '<p class="text-muted text-center">Sin entradas.</p>'; }
     else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
-      for (var i = 0; i < Math.min(entradas.length, 30); i++) {
-        var en = entradas[i];
+      // Input de búsqueda
+      h += '<div class="form-group" style="margin-bottom:12px">' +
+        '<input type="text" class="input" id="insumos-busqueda" placeholder="🔍 Buscar por fecha, proveedor o item..." style="width:100%">' +
+      '</div>';
+      h += '<div class="table-wrap"><table class="table" id="insumos-table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody id="insumos-tbody"></tbody></table></div>';
+      // Botón "ver más"
+      h += '<div style="text-align:center;margin-top:12px"><button class="btn btn-sm btn-outline" id="insumos-ver-mas" style="display:none">Ver más</button></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+
+    // Lógica de búsqueda y paginación para el historial de insumos
+    if (entradas.length > 0) {
+      var _insumosLimit = 10;
+      var _insumosFiltro = '';
+      var _insumosTbody = document.getElementById('insumos-tbody');
+      var _insumosVerMasBtn = document.getElementById('insumos-ver-mas');
+      var _insumosBusqueda = document.getElementById('insumos-busqueda');
+
+      function _insumosFiltradas() {
+        if (!_insumosFiltro) return entradas;
+        var q = _insumosFiltro.toLowerCase();
+        return entradas.filter(function(en) {
+          if ((en.fecha || '').toLowerCase().indexOf(q) >= 0) return true;
+          if ((en.proveedor || '').toLowerCase().indexOf(q) >= 0) return true;
+          var items = en.items || [];
+          for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            if (it.especiaNombre && it.especiaNombre.toLowerCase().indexOf(q) >= 0) return true;
+            if (it.stickerNombre && it.stickerNombre.toLowerCase().indexOf(q) >= 0) return true;
+            if (it.tipo && it.tipo.toLowerCase().indexOf(q) >= 0) return true;
+          }
+          return false;
+        });
+      }
+
+      function _insumosRowHtml(en) {
         var desc = (en.items||[]).map(function(it) {
           if (it.tipo==='especia_grs') return (it.especiaNombre||'?') + ' ' + it.cantidad + 'grs';
           if (it.tipo==='envase') return 'Frascos ' + (it.talla||'chico') + ' x' + it.cantidad;
@@ -1070,13 +1104,41 @@ const Pages = {
           if (it.tipo==='cinta') return 'Cintas x' + it.cantidad;
           return '?';
         }).join(' | ');
-        h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + (en.ajuste && en.ajuste !== 0 ? ' <span class="badge ' + (en.ajuste > 0 ? 'badge-green' : 'badge-red') + '" style="font-size:10px" title="Total calculado: $' + (en.totalCalculado||0).toLocaleString() + '">' + (en.ajuste > 0 ? '-' : '+') + '$' + Math.abs(en.ajuste).toLocaleString() + '</span>' : '') + '</td>' +
+        return '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + (en.ajuste && en.ajuste !== 0 ? ' <span class="badge ' + (en.ajuste > 0 ? 'badge-green' : 'badge-red') + '" style="font-size:10px" title="Total calculado: $' + (en.totalCalculado||0).toLocaleString() + '">' + (en.ajuste > 0 ? '-' : '+') + '$' + Math.abs(en.ajuste).toLocaleString() + '</span>' : '') + '</td>' +
           '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada(' + en.id + ')" title="Editar entrada">✏</button> <button class="btn btn-sm btn-red" onclick="Pages.delEntrada(' + en.id + ')" title="Eliminar entrada">X</button></td></tr>';
       }
-      h += '</tbody></table></div>';
+
+      function _insumosRender() {
+        var filtradas = _insumosFiltradas();
+        var html = '';
+        for (var i = 0; i < Math.min(filtradas.length, _insumosLimit); i++) {
+          html += _insumosRowHtml(filtradas[i]);
+        }
+        if (filtradas.length === 0) {
+          html = '<tr><td colspan="4" class="text-muted text-center" style="padding:16px">Sin resultados para "' + esc(_insumosFiltro) + '"</td></tr>';
+        }
+        _insumosTbody.innerHTML = html;
+        // Mostrar/ocultar botón "ver más"
+        if (_insumosLimit < filtradas.length) {
+          _insumosVerMasBtn.style.display = '';
+          var restantes = filtradas.length - _insumosLimit;
+          _insumosVerMasBtn.textContent = 'Ver más (' + restantes + ' restantes de ' + filtradas.length + ')';
+        } else {
+          _insumosVerMasBtn.style.display = 'none';
+        }
+      }
+
+      _insumosBusqueda.addEventListener('input', function() {
+        _insumosFiltro = this.value.trim();
+        _insumosLimit = 10;
+        _insumosRender();
+      });
+      _insumosVerMasBtn.addEventListener('click', function() {
+        _insumosLimit += 20;
+        _insumosRender();
+      });
+      _insumosRender();
     }
-    h += '</div></div>';
-    container.innerHTML = h;
   },
 
   /* ---------- Entrada Form ---------- */
@@ -1650,17 +1712,50 @@ const Pages = {
   renderProduccion(container) {
     var prods = ArcanoDB.getProducciones();
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formProduccion()">+ Nueva Produccion</button></div>';
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial (' + prods.length + ')</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Producciones (' + prods.length + ')</h3></div><div class="card-body">';
     if (prods.length === 0) {
       h += '<p class="text-muted text-center">Sin producciones.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Talla</th><th>Cant.</th><th>Detalle</th><th></th></tr></thead><tbody>';
-      for (var i = 0; i < Math.min(prods.length, 50); i++) {
-        var p = prods[i];
+      // Filtros por tipo + búsqueda
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">';
+      h += '<button class="btn btn-sm btn-gold" data-prod-filter="todos">Todos</button>';
+      h += '<button class="btn btn-sm btn-outline" data-prod-filter="blend">Blends</button>';
+      h += '<button class="btn btn-sm btn-outline" data-prod-filter="especia">Especias</button>';
+      h += '<input type="text" class="input" id="prod-busqueda" placeholder="🔍 Buscar por producto o fecha..." style="flex:1;min-width:200px">';
+      h += '</div>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Talla</th><th>Cant.</th><th>Detalle</th><th></th></tr></thead><tbody id="prod-tbody"></tbody></table></div>';
+      h += '<div style="text-align:center;margin-top:12px"><button class="btn btn-sm btn-outline" id="prod-ver-mas" style="display:none">Ver más</button></div>';
+    }
+    h += '</div></div>';
+    container.innerHTML = h;
+
+    if (prods.length > 0) {
+      var _prodLimit = 10;
+      var _prodFiltro = 'todos';
+      var _prodBusq = '';
+      var _prodTbody = document.getElementById('prod-tbody');
+      var _prodVerMas = document.getElementById('prod-ver-mas');
+      var _prodBusqueda = document.getElementById('prod-busqueda');
+      var _prodFilterBtns = container.querySelectorAll('[data-prod-filter]');
+
+      function _prodFiltradas() {
+        return prods.filter(function(p) {
+          if (_prodFiltro === 'blend' && p.tipo !== 'blend') return false;
+          if (_prodFiltro === 'especia' && p.tipo !== 'especia') return false;
+          if (_prodBusq) {
+            var q = _prodBusq.toLowerCase();
+            if ((p.productoNombre || '').toLowerCase().indexOf(q) < 0 &&
+                (p.fecha || '').toLowerCase().indexOf(q) < 0) return false;
+          }
+          return true;
+        });
+      }
+
+      function _prodRowHtml(p) {
         var det = p.tipo === 'blend' ?
           (p.ingredientes||[]).map(function(x){return x.especiaNombre+' '+x.gramosTotal+'g'}).join(', ') :
           (p.gramosTotal||0) + 'g consumidos';
-        h += '<tr><td>' + (p.fecha||'') + '</td>' +
+        return '<tr><td>' + (p.fecha||'') + '</td>' +
           '<td><span class="badge ' + (p.tipo==='blend'?'badge-blue':'badge-gold') + '">' + (p.tipo==='blend'?'Blend':'Especia') + '</span></td>' +
           '<td class="fw7">' + (p.productoNombre||'') + '</td>' +
           '<td><span class="badge ' + ((p.talla||'chico')==='grande'?'badge-gold':'badge-blue') + '">' + (p.talla||'chico') + '</span></td>' +
@@ -1668,10 +1763,49 @@ const Pages = {
           '<td class="text-sm">' + det + ' | Env:' + (p.envasesConsumidos||0) + ' Stk:' + (p.stickersConsumidos||0) + ' Bol:' + (p.bolsasConsumidas||0) + ' Cin:' + (p.cintasConsumidas||0) + '</td>' +
           '<td><button class="btn btn-sm btn-red" onclick="Pages.deleteProduccion(' + p.id + ')" title="Eliminar y revertir stock">X</button></td></tr>';
       }
-      h += '</tbody></table></div>';
+
+      function _prodRender() {
+        var filtradas = _prodFiltradas();
+        var html = '';
+        for (var i = 0; i < Math.min(filtradas.length, _prodLimit); i++) {
+          html += _prodRowHtml(filtradas[i]);
+        }
+        if (filtradas.length === 0) {
+          html = '<tr><td colspan="7" class="text-muted text-center" style="padding:16px">Sin resultados</td></tr>';
+        }
+        _prodTbody.innerHTML = html;
+        if (_prodLimit < filtradas.length) {
+          _prodVerMas.style.display = '';
+          var restantes = filtradas.length - _prodLimit;
+          _prodVerMas.textContent = 'Ver más (' + restantes + ' restantes de ' + filtradas.length + ')';
+        } else {
+          _prodVerMas.style.display = 'none';
+        }
+      }
+
+      _prodFilterBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          _prodFiltro = btn.getAttribute('data-prod-filter');
+          _prodFilterBtns.forEach(function(b) {
+            b.className = b.className.replace('btn-gold', 'btn-outline');
+            b.className = b.className.replace('  ', ' ');
+          });
+          btn.className = btn.className.replace('btn-outline', 'btn-gold');
+          _prodLimit = 10;
+          _prodRender();
+        });
+      });
+      _prodBusqueda.addEventListener('input', function() {
+        _prodBusq = this.value.trim();
+        _prodLimit = 10;
+        _prodRender();
+      });
+      _prodVerMas.addEventListener('click', function() {
+        _prodLimit += 20;
+        _prodRender();
+      });
+      _prodRender();
     }
-    h += '</div></div>';
-    container.innerHTML = h;
   },
 
   /** Produccion rapida desde Productos */
@@ -1983,21 +2117,75 @@ const Pages = {
     h += '<input type="file" id="qr-pago-input" accept="image/*" style="display:none">';
     h += '</div></div>';
 
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Ventas (' + ventas.length + ')</h3></div><div class="card-body">';
     if (ventas.length === 0) {
       h += '<p class="text-muted text-center">Sin ventas.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
-      for (var i = 0; i < Math.min(ventas.length, 30); i++) {
-        var v = ventas[i];
-        var desc = (v.items||[]).map(function(it){ return (it.productoNombre||'?')+' '+(it.talla||'chico')+' x'+(it.cantidad||0)+' ($'+(it.subtotal||0).toLocaleString()+')'; }).join(' | ');
-        h += '<tr><td>' + (v.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
-          '<td><button class="btn btn-sm btn-red" onclick="Pages.delVenta(' + v.id + ')">X</button></td></tr>';
-      }
-      h += '</tbody></table></div>';
+      h += '<div class="form-group" style="margin-bottom:12px">' +
+        '<input type="text" class="input" id="ventas-busqueda" placeholder="🔍 Buscar por fecha o producto..." style="width:100%">' +
+      '</div>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody id="ventas-tbody"></tbody></table></div>';
+      h += '<div style="text-align:center;margin-top:12px"><button class="btn btn-sm btn-outline" id="ventas-ver-mas" style="display:none">Ver más</button></div>';
     }
     h += '</div></div>';
     container.innerHTML = h;
+
+    if (ventas.length > 0) {
+      var _ventasLimit = 10;
+      var _ventasFiltro = '';
+      var _ventasTbody = document.getElementById('ventas-tbody');
+      var _ventasVerMas = document.getElementById('ventas-ver-mas');
+      var _ventasBusqueda = document.getElementById('ventas-busqueda');
+
+      function _ventasFiltradas() {
+        if (!_ventasFiltro) return ventas;
+        var q = _ventasFiltro.toLowerCase();
+        return ventas.filter(function(v) {
+          if ((v.fecha || '').toLowerCase().indexOf(q) >= 0) return true;
+          var items = v.items || [];
+          for (var i = 0; i < items.length; i++) {
+            if ((items[i].productoNombre || '').toLowerCase().indexOf(q) >= 0) return true;
+          }
+          return false;
+        });
+      }
+
+      function _ventasRowHtml(v) {
+        var desc = (v.items||[]).map(function(it){ return (it.productoNombre||'?')+' '+(it.talla||'chico')+' x'+(it.cantidad||0)+' ($'+(it.subtotal||0).toLocaleString()+')'; }).join(' | ');
+        return '<tr><td>' + (v.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (v.total||0).toLocaleString() + '</td>' +
+          '<td><button class="btn btn-sm btn-red" onclick="Pages.delVenta(' + v.id + ')">X</button></td></tr>';
+      }
+
+      function _ventasRender() {
+        var filtradas = _ventasFiltradas();
+        var html = '';
+        for (var i = 0; i < Math.min(filtradas.length, _ventasLimit); i++) {
+          html += _ventasRowHtml(filtradas[i]);
+        }
+        if (filtradas.length === 0) {
+          html = '<tr><td colspan="4" class="text-muted text-center" style="padding:16px">Sin resultados</td></tr>';
+        }
+        _ventasTbody.innerHTML = html;
+        if (_ventasLimit < filtradas.length) {
+          _ventasVerMas.style.display = '';
+          var restantes = filtradas.length - _ventasLimit;
+          _ventasVerMas.textContent = 'Ver más (' + restantes + ' restantes de ' + filtradas.length + ')';
+        } else {
+          _ventasVerMas.style.display = 'none';
+        }
+      }
+
+      _ventasBusqueda.addEventListener('input', function() {
+        _ventasFiltro = this.value.trim();
+        _ventasLimit = 10;
+        _ventasRender();
+      });
+      _ventasVerMas.addEventListener('click', function() {
+        _ventasLimit += 20;
+        _ventasRender();
+      });
+      _ventasRender();
+    }
   },
 
   formVenta() {
@@ -2177,20 +2365,72 @@ const Pages = {
     }
 
     // Tabla de gastos
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Gastos</h3></div><div class="card-body">';
+    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Gastos (' + gastos.length + ')</h3></div><div class="card-body">';
     if (gastos.length === 0) {
       h += '<p class="text-muted text-center">Sin gastos registrados.</p>';
     } else {
-      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Categoria</th><th>Descripcion</th><th>Monto</th><th></th></tr></thead><tbody>';
-      for (var i = 0; i < Math.min(gastos.length, 50); i++) {
-        var gasto = gastos[i];
-        h += '<tr><td>' + (gasto.fecha || '') + '</td><td><span class="badge badge-red" style="border:1px solid">' + (gasto.categoria || 'Otros') + '</span></td><td class="text-sm">' + (gasto.descripcion || '-') + '</td><td class="fw7" style="color:var(--red)">$' + (gasto.monto || 0).toLocaleString() + '</td>' +
-          '<td><button class="btn btn-sm btn-outline" onclick="Pages.formGasto(' + gasto.id + ')" style="margin-right:4px">Edit</button><button class="btn btn-sm btn-red" onclick="Pages.delGasto(' + gasto.id + ')">X</button></td></tr>';
-      }
-      h += '</tbody></table></div>';
+      h += '<div class="form-group" style="margin-bottom:12px">' +
+        '<input type="text" class="input" id="gastos-busqueda" placeholder="🔍 Buscar por fecha, categoría o descripción..." style="width:100%">' +
+      '</div>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Categoria</th><th>Descripcion</th><th>Monto</th><th></th></tr></thead><tbody id="gastos-tbody"></tbody></table></div>';
+      h += '<div style="text-align:center;margin-top:12px"><button class="btn btn-sm btn-outline" id="gastos-ver-mas" style="display:none">Ver más</button></div>';
     }
     h += '</div></div>';
     container.innerHTML = h;
+
+    if (gastos.length > 0) {
+      var _gastosLimit = 10;
+      var _gastosFiltro = '';
+      var _gastosTbody = document.getElementById('gastos-tbody');
+      var _gastosVerMas = document.getElementById('gastos-ver-mas');
+      var _gastosBusqueda = document.getElementById('gastos-busqueda');
+
+      function _gastosFiltrados() {
+        if (!_gastosFiltro) return gastos;
+        var q = _gastosFiltro.toLowerCase();
+        return gastos.filter(function(g) {
+          if ((g.fecha || '').toLowerCase().indexOf(q) >= 0) return true;
+          if ((g.categoria || '').toLowerCase().indexOf(q) >= 0) return true;
+          if ((g.descripcion || '').toLowerCase().indexOf(q) >= 0) return true;
+          return false;
+        });
+      }
+
+      function _gastosRowHtml(g) {
+        return '<tr><td>' + (g.fecha || '') + '</td><td><span class="badge badge-red" style="border:1px solid">' + (g.categoria || 'Otros') + '</span></td><td class="text-sm">' + (g.descripcion || '-') + '</td><td class="fw7" style="color:var(--red)">$' + (g.monto || 0).toLocaleString() + '</td>' +
+          '<td><button class="btn btn-sm btn-outline" onclick="Pages.formGasto(' + g.id + ')" style="margin-right:4px">Edit</button><button class="btn btn-sm btn-red" onclick="Pages.delGasto(' + g.id + ')">X</button></td></tr>';
+      }
+
+      function _gastosRender() {
+        var filtrados = _gastosFiltrados();
+        var html = '';
+        for (var i = 0; i < Math.min(filtrados.length, _gastosLimit); i++) {
+          html += _gastosRowHtml(filtrados[i]);
+        }
+        if (filtrados.length === 0) {
+          html = '<tr><td colspan="5" class="text-muted text-center" style="padding:16px">Sin resultados</td></tr>';
+        }
+        _gastosTbody.innerHTML = html;
+        if (_gastosLimit < filtrados.length) {
+          _gastosVerMas.style.display = '';
+          var restantes = filtrados.length - _gastosLimit;
+          _gastosVerMas.textContent = 'Ver más (' + restantes + ' restantes de ' + filtrados.length + ')';
+        } else {
+          _gastosVerMas.style.display = 'none';
+        }
+      }
+
+      _gastosBusqueda.addEventListener('input', function() {
+        _gastosFiltro = this.value.trim();
+        _gastosLimit = 10;
+        _gastosRender();
+      });
+      _gastosVerMas.addEventListener('click', function() {
+        _gastosLimit += 20;
+        _gastosRender();
+      });
+      _gastosRender();
+    }
   },
 
   formGasto(editId) {

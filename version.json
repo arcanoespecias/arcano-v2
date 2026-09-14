@@ -1,5 +1,5 @@
 {
-  "version": "v4.18-fix-editar-stickers",
+  "version": "v4.19-ui-listas-cortas",
   "build": "2026-09-14",
-  "notes": "Fix edición de entradas con stickers: ahora cada sticker se muestra como fila simple editable (producto + talla + cantidad + costo), no como tablas masivas duplicadas."
+  "notes": "Mejora de UX en listas largas: Insumos, Producción, Ventas y Gastos ahora tienen búsqueda en vivo, paginación (10/30/50) y contador de resultados."
 }
