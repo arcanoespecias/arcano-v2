@@ -1071,7 +1071,7 @@ const Pages = {
           return '?';
         }).join(' | ');
         h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + '</td>' +
-          '<td><button class="btn btn-sm btn-red" onclick="Pages.delEntrada(' + en.id + ')">X</button></td></tr>';
+          '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada(' + en.id + ')" title="Editar entrada">✏</button> <button class="btn btn-sm btn-red" onclick="Pages.delEntrada(' + en.id + ')" title="Eliminar entrada">X</button></td></tr>';
       }
       h += '</tbody></table></div>';
     }
@@ -1080,18 +1080,23 @@ const Pages = {
   },
 
   /* ---------- Entrada Form ---------- */
-  formEntrada() {
+  formEntrada(editId) {
     var especias = ArcanoDB.getEspecias();
     var esps = especias;
     var blends = ArcanoDB.getBlends();
     var bls = blends;
+    var isEdit = (editId != null);
+    var existingEntrada = isEdit ? ArcanoDB.getEntradas().find(function(e){return e.id === editId;}) : null;
+    if (isEdit && !existingEntrada) { alert('Entrada no encontrada'); return; }
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    var fechaDefault = isEdit ? (existingEntrada.fecha || new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10);
+    var provDefault = isEdit ? (existingEntrada.proveedor || '') : '';
     modal.innerHTML = '<div class="modal modal-lg">' +
-      '<div class="modal-header"><h3>Registrar Entrada</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
+      '<div class="modal-header"><h3>' + (isEdit ? 'Editar Entrada #' + editId : 'Registrar Entrada') + '</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label>Fecha</label><input type="date" class="input" id="f-ent-fecha" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
-        '<div class="form-group"><label>Proveedor (opcional)</label><input type="text" class="input" id="f-ent-prov" placeholder="Nombre"></div>' +
+        '<div class="form-group"><label>Fecha</label><input type="date" class="input" id="f-ent-fecha" value="' + fechaDefault + '"></div>' +
+        '<div class="form-group"><label>Proveedor (opcional)</label><input type="text" class="input" id="f-ent-prov" placeholder="Nombre" value="' + esc(provDefault) + '"></div>' +
         '<div class="form-group"><label>Items</label><div id="ent-items"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ent">+ Item</button></div>' +
         '<div class="venta-total-box mt-12">Total: $<span id="ent-total">0</span></div>' +
@@ -1131,7 +1136,7 @@ const Pages = {
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-    function addEntRow() {
+    function addEntRow(preload) {
       var div = document.createElement('div');
       div.className = 'card mb-8 ent-row';
       div.style.background = 'var(--bg)';
@@ -1254,11 +1259,64 @@ const Pages = {
         }
       }
       tipoSel.addEventListener('change', renderDetail);
+      // Si hay preload, setear el tipo y volver a renderizar para que detailDiv se construya
+      if (preload && preload.tipo) {
+        tipoSel.value = preload.tipo;
+      }
       renderDetail();
+      // Aplicar valores pre-cargados después de que renderDetail construyó el detalle
+      if (preload) {
+        _aplicarPreload(div, preload, stickerExtra);
+      }
       div.querySelector('.btn-rm-ent').addEventListener('click', function() { div.remove(); updateTotal(); });
       div.querySelector('.ent-cant').addEventListener('input', updateTotal);
       var genCost = div.querySelector('.ent-cost-gen');
       if (genCost) genCost.addEventListener('input', updateTotal);
+    }
+
+    /** Aplica los valores de un item existente a una fila recién creada. */
+    function _aplicarPreload(div, it, stickerExtra) {
+      try {
+        // Tipo (ya fue seteado antes de renderDetail, pero por las dudas)
+        var tipoSel2 = div.querySelector('.ent-tipo');
+        if (tipoSel2 && it.tipo) tipoSel2.value = it.tipo;
+        // Cantidad y costo generales (no aplica a stickers masivos)
+        if (it.tipo !== 'sticker') {
+          var cantInput = div.querySelector('.ent-cant');
+          if (cantInput && it.cantidad != null) cantInput.value = it.cantidad;
+          var costInput = div.querySelector('.ent-cost-gen');
+          if (costInput && it.costoUnitario != null) costInput.value = it.costoUnitario;
+        }
+        // Detalle según tipo
+        if (it.tipo === 'especia_grs') {
+          var espSel = div.querySelector('.ent-especia');
+          if (espSel && it.especiaId) espSel.value = String(it.especiaId);
+        } else if (it.tipo === 'envase' || it.tipo === 'bolsa') {
+          var tallaSel = div.querySelector('.ent-talla');
+          if (tallaSel && it.talla) tallaSel.value = it.talla;
+        } else if (it.tipo === 'sticker') {
+          // Sticker individual: el preload tiene stickerNombre + talla + cantidad + costoUnitario.
+          // Como la tabla masiva lista todos los productos, marcamos la cantidad en la fila
+          // correspondiente al (nombre, talla).
+          if (it.stickerNombre) {
+            var stkCants = stickerExtra.querySelectorAll('.stk-cant');
+            for (var s = 0; s < stkCants.length; s++) {
+              var sc = stkCants[s];
+              if (sc.dataset.nombre === it.stickerNombre && sc.dataset.talla === (it.talla || 'chico')) {
+                sc.value = it.cantidad;
+                break;
+              }
+            }
+            // Costos: si el item pre-cargado era chico, setear stk-cost-chico; si era grande, stk-cost-grande
+            var stkCostInput = stickerExtra.querySelector(it.talla === 'grande' ? '.stk-cost-grande' : '.stk-cost-chico');
+            if (stkCostInput && it.costoUnitario != null && stkCostInput.value === '') {
+              stkCostInput.value = it.costoUnitario;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[formEntrada] preload error:', e.message);
+      }
     }
 
     function updateTotal() {
@@ -1288,6 +1346,17 @@ const Pages = {
 
     addEntRow();
     document.getElementById('btn-add-ent').addEventListener('click', addEntRow);
+
+    // Si es edición, pre-cargar las filas con los items de la entrada existente
+    if (isEdit && existingEntrada.items && existingEntrada.items.length > 0) {
+      // Limpiar la fila default que addEntRow agregó
+      itemsDiv.innerHTML = '';
+      for (var ei2 = 0; ei2 < existingEntrada.items.length; ei2++) {
+        var it = existingEntrada.items[ei2];
+        addEntRow(it);
+      }
+      updateTotal();
+    }
 
     document.getElementById('btn-save-ent').addEventListener('click', function() {
       var rows = itemsDiv.children;
@@ -1378,7 +1447,11 @@ const Pages = {
       }
       if (items.length === 0) { alert('Agrega al menos un item'); return; }
       try {
-        ArcanoDB.saveEntrada({ fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
+        if (isEdit) {
+          ArcanoDB.updateEntrada(editId, { fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
+        } else {
+          ArcanoDB.saveEntrada({ fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
+        }
         modal.remove();
         App.renderPage('insumos');
       } catch (err) { alert('Error: ' + err.message); }
@@ -1386,8 +1459,13 @@ const Pages = {
   },
 
   delEntrada(id) {
-    if (!confirm('Eliminar esta entrada?')) return;
-    ArcanoDB.deleteEntrada(id);
+    if (!confirm('Eliminar esta entrada? Se revertirán los stocks que esta entrada sumó (especies, envases, bolsas, cintas, stickers).')) return;
+    try {
+      ArcanoDB.deleteEntrada(id);
+      toast('Entrada eliminada. Stocks revertidos.');
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
     App.renderPage('insumos');
   },
 

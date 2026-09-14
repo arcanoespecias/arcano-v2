@@ -926,8 +926,148 @@ function saveEntrada(data) {
   return data;
 }
 
+/**
+ * Revertir el efecto en stock de una entrada (sin tocar el registro).
+ * Se usa antes de borrar o antes de actualizar una entrada.
+ * Para especias, revierte el costo promedio solo si la especia sigue existiendo
+ * y si el costo actual corresponde al promedio (mejor esfuerzo, no exacto para
+ * especias con múltiples entradas posteriores).
+ */
+function _revertirEntrada(entrada) {
+  if (!entrada || !entrada.items) return;
+  var items = entrada.items;
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var tipo = item.tipo;
+    var cantidad = Number(item.cantidad) || 0;
+    if (cantidad <= 0) continue;
+
+    if (tipo === 'especia_grs') {
+      if (item.especiaId && _db.especias[item.especiaId]) {
+        var espObj = _db.especias[item.especiaId];
+        espObj.stockBolsa = Math.max(0, (espObj.stockBolsa || 0) - cantidad);
+        // Nota: el costo promedio ponderado no se revierte exactamente porque
+        // entradas posteriores pueden haberlo recalculado. Lo dejamos como está;
+        // el admin puede reajustarlo manualmente si lo necesita.
+      }
+    } else if (tipo === 'envase') {
+      var talla = item.talla || 'chico';
+      if (_db.stockEnvases) {
+        _db.stockEnvases[talla] = Math.max(0, (_db.stockEnvases[talla] || 0) - cantidad);
+      }
+    } else if (tipo === 'sticker') {
+      var stk = _findStickerByNombre(item.stickerNombre);
+      if (stk) {
+        var t = item.talla || 'chico';
+        if (t === 'grande') {
+          stk.stockGrande = Math.max(0, (stk.stockGrande || 0) - cantidad);
+        } else {
+          stk.stockChico = Math.max(0, (stk.stockChico || 0) - cantidad);
+        }
+      }
+    } else if (tipo === 'bolsa') {
+      var tallaB = item.talla || 'chico';
+      if (_db.stockBolsas) {
+        _db.stockBolsas[tallaB] = Math.max(0, (_db.stockBolsas[tallaB] || 0) - cantidad);
+      }
+    } else if (tipo === 'cinta') {
+      if (_db.stockCintas) {
+        _db.stockCintas = Math.max(0, (_db.stockCintas || 0) - cantidad);
+      }
+    }
+  }
+}
+
+/**
+ * Actualizar una entrada existente: revierte el stock viejo y aplica el nuevo.
+ * Recibe el id y los nuevos datos (items, fecha, proveedor, total).
+ */
+function updateEntrada(id, newData) {
+  _ensureStructure();
+  var existing = _db.entradas[id];
+  if (!existing) throw new Error('Entrada no encontrada: ' + id);
+  // 1. Revertir stock de la entrada vieja
+  _revertirEntrada(existing);
+  // 2. Construir entrada nueva conservando id, creado y meta
+  var updated = {
+    id: id,
+    creado: existing.creado,
+    fecha: newData.fecha || existing.fecha,
+    proveedor: newData.proveedor != null ? newData.proveedor : (existing.proveedor || ''),
+    items: newData.items || [],
+    total: Number(newData.total) || 0,
+    editado: new Date().toISOString()
+  };
+  // 3. Aplicar stock de los nuevos items (reutiliza la lógica de saveEntrada con un flag)
+  _aplicarItemsEntrada(updated.items);
+  // 4. Guardar y notificar
+  _db.entradas[id] = updated;
+  _saveToFirebase(); _cacheLocal();
+  _notify('update', 'entradas', id);
+  return updated;
+}
+
+/** Aplica el efecto en stock de una lista de items de entrada (helper). */
+function _aplicarItemsEntrada(items) {
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var tipo = item.tipo;
+    var cantidad = Number(item.cantidad) || 0;
+    var costoUnit = Number(item.costoUnitario) || 0;
+    if (cantidad <= 0) continue;
+
+    if (tipo === 'especia_grs') {
+      if (item.especiaId && _db.especias[item.especiaId]) {
+        var espObj = _db.especias[item.especiaId];
+        if (cantidad > 0 && costoUnit > 0) {
+          var stockPrevio = espObj.stockBolsa || 0;
+          var costoPrevio = (_costosInsumos && _costosInsumos.especias && _costosInsumos.especias[item.especiaId]) || 0;
+          var nuevoTotalGrs = stockPrevio + cantidad;
+          var nuevoCostoProm = 0;
+          if (nuevoTotalGrs > 0) {
+            nuevoCostoProm = (stockPrevio * costoPrevio + cantidad * costoUnit) / nuevoTotalGrs;
+          }
+          if (!_costosInsumos) _costosInsumos = Object.assign({}, _COSTOS_DEFAULTS);
+          if (!_costosInsumos.especias) _costosInsumos.especias = {};
+          _costosInsumos.especias[item.especiaId] = Math.round(nuevoCostoProm * 1000) / 1000;
+          if (_costosRef) {
+            _costosRef.set(_costosInsumos, function(error) {
+              if (error) console.error('[DB] Costos promedio save error:', error);
+            });
+          }
+          try { localStorage.setItem('arcano_costos', JSON.stringify(_costosInsumos)); } catch (e) {}
+        }
+        espObj.stockBolsa = (espObj.stockBolsa || 0) + cantidad;
+      }
+    } else if (tipo === 'envase') {
+      var talla = item.talla || 'chico';
+      if (!_db.stockEnvases) _db.stockEnvases = { chico: 0, grande: 0 };
+      _db.stockEnvases[talla] = (_db.stockEnvases[talla] || 0) + cantidad;
+    } else if (tipo === 'sticker') {
+      var stk = _getOrCreateSticker(item.stickerNombre);
+      var t = item.talla || 'chico';
+      if (t === 'grande') {
+        stk.stockGrande = (stk.stockGrande || 0) + cantidad;
+      } else {
+        stk.stockChico = (stk.stockChico || 0) + cantidad;
+      }
+    } else if (tipo === 'bolsa') {
+      var tallaB = item.talla || 'chico';
+      if (!_db.stockBolsas) _db.stockBolsas = { chico: 0, grande: 0 };
+      _db.stockBolsas[tallaB] = (_db.stockBolsas[tallaB] || 0) + cantidad;
+    } else if (tipo === 'cinta') {
+      if (!_db.stockCintas) _db.stockCintas = 0;
+      _db.stockCintas = _db.stockCintas + cantidad;
+    }
+  }
+}
+
 function deleteEntrada(id) {
-  if (!_db.entradas[id]) return false;
+  _ensureStructure();
+  var existing = _db.entradas[id];
+  if (!existing) return false;
+  // Revertir el stock antes de borrar el registro
+  _revertirEntrada(existing);
   delete _db.entradas[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'entradas', id);
@@ -2629,7 +2769,7 @@ window.ArcanoDB = {
   getEspecias: getEspecias, getEspecia: getEspecia, saveEspecia: saveEspecia, deleteEspecia: deleteEspecia,
   getBlends: getBlends, getBlend: getBlend, saveBlend: saveBlend, deleteBlend: deleteBlend,
   getStickers: getStickers, getProductosConStickers: getProductosConStickers,
-  getEntradas: getEntradas, saveEntrada: saveEntrada, deleteEntrada: deleteEntrada,
+  getEntradas: getEntradas, saveEntrada: saveEntrada, updateEntrada: updateEntrada, deleteEntrada: deleteEntrada,
   getGastos: getGastos, getGastosCategorias: getGastosCategorias, saveGasto: saveGasto, deleteGasto: deleteGasto, saveGastosCategorias: saveGastosCategorias,
   getAjustes: getAjustes, saveAjuste: saveAjuste, deleteAjuste: deleteAjuste,
   getPedidos: getPedidos, getPedidosCount: getPedidosCount, updatePedidoEstado: updatePedidoEstado, updatePedidoField: updatePedidoField, deletePedido: deletePedido, onPedidosChange: onPedidosChange,

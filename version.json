@@ -1,5 +1,5 @@
 {
-  "version": "v4.15-menu-costos",
+  "version": "v4.16-editar-entradas",
   "build": "2026-09-14",
-  "notes": "Nuevo menú 'Costos' en sidebar con cards individuales por blend/especia. Desglose: Especias + Frasco + Bolsa + Sticker + Cinta = Total."
+  "notes": "Admin puede editar entradas en Insumos: botón Editar (✏) abre el modal pre-cargado. updateEntrada revierte el stock viejo y aplica el nuevo. deleteEntrada ahora también revierte el stock."
 }
