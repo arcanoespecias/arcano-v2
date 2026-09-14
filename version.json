@@ -1,5 +1,5 @@
 {
-  "version": "v4.16-editar-entradas",
+  "version": "v4.17-ajuste-pagado",
   "build": "2026-09-14",
-  "notes": "Admin puede editar entradas en Insumos: botón Editar (✏) abre el modal pre-cargado. updateEntrada revierte el stock viejo y aplica el nuevo. deleteEntrada ahora también revierte el stock."
+  "notes": "Campo 'Total Pagado' en entrada de insumos: si difiere del calculado, se registra ajuste (descuento/recargo) y se refleja en compras."
 }

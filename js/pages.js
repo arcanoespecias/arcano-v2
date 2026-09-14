@@ -1070,7 +1070,7 @@ const Pages = {
           if (it.tipo==='cinta') return 'Cintas x' + it.cantidad;
           return '?';
         }).join(' | ');
-        h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + '</td>' +
+        h += '<tr><td>' + (en.fecha||'') + '</td><td class="text-sm">' + desc + '</td><td class="fw7 text-gold">$' + (en.total||0).toLocaleString() + (en.ajuste && en.ajuste !== 0 ? ' <span class="badge ' + (en.ajuste > 0 ? 'badge-green' : 'badge-red') + '" style="font-size:10px" title="Total calculado: $' + (en.totalCalculado||0).toLocaleString() + '">' + (en.ajuste > 0 ? '-' : '+') + '$' + Math.abs(en.ajuste).toLocaleString() + '</span>' : '') + '</td>' +
           '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada(' + en.id + ')" title="Editar entrada">✏</button> <button class="btn btn-sm btn-red" onclick="Pages.delEntrada(' + en.id + ')" title="Eliminar entrada">X</button></td></tr>';
       }
       h += '</tbody></table></div>';
@@ -1099,7 +1099,12 @@ const Pages = {
         '<div class="form-group"><label>Proveedor (opcional)</label><input type="text" class="input" id="f-ent-prov" placeholder="Nombre" value="' + esc(provDefault) + '"></div>' +
         '<div class="form-group"><label>Items</label><div id="ent-items"></div>' +
         '<button class="btn btn-sm btn-outline mt-8" id="btn-add-ent">+ Item</button></div>' +
-        '<div class="venta-total-box mt-12">Total: $<span id="ent-total">0</span></div>' +
+        '<div class="venta-total-box mt-12">Total calculado: $<span id="ent-total">0</span></div>' +
+        '<div class="form-group mt-12" style="background:var(--bg);padding:12px;border-radius:8px;border:1px solid var(--border)">' +
+          '<label style="font-weight:600">Total pagado (opcional)</label>' +
+          '<input type="number" class="input" id="f-ent-pagado" placeholder="Igual al total calculado" min="0" step="0.01" style="margin-top:6px">' +
+          '<p class="text-xs text-muted mt-4" id="f-ent-ajuste-info">Si el monto pagado difiere del total calculado, el ajuste se registrará como descuento o recargo.</p>' +
+        '</div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
         '<button class="btn btn-gold" id="btn-save-ent">Registrar</button>' +
@@ -1342,10 +1347,38 @@ const Pages = {
         }
       }
       document.getElementById('ent-total').textContent = total.toLocaleString();
+      updateAjusteInfo();
+    }
+
+    /** Actualiza el texto informativo del ajuste entre total calculado y total pagado. */
+    function updateAjusteInfo() {
+      var totalCalc = Number((document.getElementById('ent-total').textContent || '0').replace(/\./g, '').replace(/,/g, '.')) || 0;
+      var pagadoInput = document.getElementById('f-ent-pagado');
+      var infoEl = document.getElementById('f-ent-ajuste-info');
+      if (!pagadoInput || !infoEl) return;
+      var pagado = Number(pagadoInput.value) || 0;
+      if (pagadoInput.value === '' || pagadoInput.value == null) {
+        infoEl.textContent = 'Total calculado: $' + totalCalc.toLocaleString() + '. Dejá vacío si el pago coincide; o cargá el monto efectivamente pagado para registrar el ajuste.';
+        infoEl.style.color = '';
+      } else {
+        var ajuste = totalCalc - pagado;
+        if (ajuste > 0) {
+          infoEl.innerHTML = 'Descuento de <b style="color:var(--green)">-$' + ajuste.toLocaleString() + '</b> (pagaste menos que el cálculo). El total de compras reflejará $' + pagado.toLocaleString() + '.';
+        } else if (ajuste < 0) {
+          infoEl.innerHTML = 'Recargo de <b style="color:var(--red)">+$' + Math.abs(ajuste).toLocaleString() + '</b> (pagaste más que el cálculo). El total de compras reflejará $' + pagado.toLocaleString() + '.';
+        } else {
+          infoEl.textContent = 'El monto pagado coincide con el total calculado.';
+          infoEl.style.color = '';
+        }
+      }
     }
 
     addEntRow();
     document.getElementById('btn-add-ent').addEventListener('click', addEntRow);
+
+    // Listener del input de total pagado para recalcular el info en vivo
+    var pagadoInputEl = document.getElementById('f-ent-pagado');
+    if (pagadoInputEl) pagadoInputEl.addEventListener('input', updateAjusteInfo);
 
     // Si es edición, pre-cargar las filas con los items de la entrada existente
     if (isEdit && existingEntrada.items && existingEntrada.items.length > 0) {
@@ -1356,6 +1389,15 @@ const Pages = {
         addEntRow(it);
       }
       updateTotal();
+    }
+
+    // Pre-cargar el total pagado si la entrada existente tiene uno distinto al calculado
+    if (isEdit && existingEntrada.totalPagado != null && existingEntrada.totalPagado !== '') {
+      var pagadoPreEl = document.getElementById('f-ent-pagado');
+      if (pagadoPreEl) {
+        pagadoPreEl.value = existingEntrada.totalPagado;
+        updateAjusteInfo();
+      }
     }
 
     document.getElementById('btn-save-ent').addEventListener('click', function() {
@@ -1446,11 +1488,27 @@ const Pages = {
         items.push(item);
       }
       if (items.length === 0) { alert('Agrega al menos un item'); return; }
+
+      // Calcular total pagado y ajuste
+      var pagadoInput = document.getElementById('f-ent-pagado');
+      var pagadoValue = pagadoInput ? pagadoInput.value.trim() : '';
+      var totalPagado = pagadoValue === '' ? total : (Number(pagadoValue) || 0);
+      var ajuste = total - totalPagado;
+      var entradaData = {
+        fecha: document.getElementById('f-ent-fecha').value,
+        proveedor: document.getElementById('f-ent-prov').value.trim(),
+        items: items,
+        total: totalPagado,
+        totalCalculado: total,
+        totalPagado: totalPagado,
+        ajuste: ajuste
+      };
+
       try {
         if (isEdit) {
-          ArcanoDB.updateEntrada(editId, { fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
+          ArcanoDB.updateEntrada(editId, entradaData);
         } else {
-          ArcanoDB.saveEntrada({ fecha: document.getElementById('f-ent-fecha').value, proveedor: document.getElementById('f-ent-prov').value.trim(), items: items, total: total });
+          ArcanoDB.saveEntrada(entradaData);
         }
         modal.remove();
         App.renderPage('insumos');

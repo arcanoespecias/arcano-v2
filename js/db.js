@@ -866,6 +866,10 @@ function saveEntrada(data) {
     data.fecha = data.fecha || new Date().toISOString().slice(0, 10);
     data.items = data.items || [];
     data.total = Number(data.total) || 0;
+    // Persistir campos de ajuste si vienen (compat hacia atrás: si no vienen, se asume = total)
+    if (data.totalCalculado == null) data.totalCalculado = data.total;
+    if (data.totalPagado == null) data.totalPagado = data.total;
+    if (data.ajuste == null) data.ajuste = 0;
   }
   if (isNew) {
     for (var i = 0; i < data.items.length; i++) {
@@ -996,6 +1000,9 @@ function updateEntrada(id, newData) {
     proveedor: newData.proveedor != null ? newData.proveedor : (existing.proveedor || ''),
     items: newData.items || [],
     total: Number(newData.total) || 0,
+    totalCalculado: newData.totalCalculado != null ? Number(newData.totalCalculado) : (existing.totalCalculado != null ? Number(existing.totalCalculado) : Number(newData.total) || 0),
+    totalPagado: newData.totalPagado != null ? Number(newData.totalPagado) : (existing.totalPagado != null ? Number(existing.totalPagado) : Number(newData.total) || 0),
+    ajuste: newData.ajuste != null ? Number(newData.ajuste) : (existing.ajuste || 0),
     editado: new Date().toISOString()
   };
   // 3. Aplicar stock de los nuevos items (reutiliza la lógica de saveEntrada con un flag)
