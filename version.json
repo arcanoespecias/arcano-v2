@@ -1,5 +1,5 @@
 {
-  "version": "v4.20-stock-frascos-producidos",
+  "version": "v4.21-sugerencias-produccion",
   "build": "2026-09-14",
-  "notes": "Nueva sección destacada en Stock: 'Frascos Produccidos para la Venta' con tabla de blends en stock (pequeños/grandes), totales, valor de costo y valor de venta."
+  "notes": "Nuevo tab 'Sugerencias de Producción' en panel Producción: cálculo automático de blends a producir por menor costo + especias limitantes ordenadas por costo."
 }

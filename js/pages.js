@@ -1709,10 +1709,27 @@ const Pages = {
   /* ================================================================
      PRODUCCION
      ================================================================ */
+  _prodTab: 'historial',
+
   renderProduccion(container) {
+    var self = Pages;
     var prods = ArcanoDB.getProducciones();
     var h = '<div class="page-actions"><button class="btn btn-gold" onclick="Pages.formProduccion()">+ Nueva Produccion</button></div>';
-    h += '<div class="card mt-16"><div class="card-header"><h3>Historial de Producciones (' + prods.length + ')</h3></div><div class="card-body">';
+
+    // Tabs
+    h += '<div class="tabs mt-16" style="margin-bottom:0">';
+    h += '<button class="tab-btn ' + (self._prodTab === 'historial' ? 'active' : '') + '" onclick="Pages._prodTab=\'historial\';App.renderPage(\'produccion\')">Historial</button>';
+    h += '<button class="tab-btn ' + (self._prodTab === 'sugerencias' ? 'active' : '') + '" onclick="Pages._prodTab=\'sugerencias\';App.renderPage(\'produccion\')">Sugerencias de Producción</button>';
+    h += '</div>';
+
+    if (self._prodTab === 'sugerencias') {
+      h += self._renderProduccionSugerencias();
+      container.innerHTML = h;
+      return;
+    }
+
+    // Tab Historial (comportamiento existente)
+    h += '<div class="card"><div class="card-header"><h3>Historial de Producciones (' + prods.length + ')</h3></div><div class="card-body">';
     if (prods.length === 0) {
       h += '<p class="text-muted text-center">Sin producciones.</p>';
     } else {
@@ -1806,6 +1823,309 @@ const Pages = {
       });
       _prodRender();
     }
+  },
+
+  /* ---------- Sugerencias de Producción (tab nuevo) ---------- */
+  _renderProduccionSugerencias() {
+    var blends = ArcanoDB.getBlends();
+    var especias = ArcanoDB.getEspecias();
+    var db = ArcanoDB.getDB();
+    var costos = ArcanoDB.getCostosInsumos();
+
+    // Stock disponible de insumos globales
+    var envases = db.stockEnvases || { chico: 0, grande: 0 };
+    var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+    var cintas = db.stockCintas || 0;
+    var pkgC = (Number(costos.envaseChico)||0) + (Number(costos.bolsaChica)||0) + (Number(costos.cinta)||0) + (Number(costos.stickerChico)||0);
+    var pkgG = (Number(costos.envaseGrande)||0) + (Number(costos.bolsaGrande)||0) + (Number(costos.cinta)||0) + (Number(costos.stickerGrande)||0);
+
+    // Stickers por nombre de producto
+    function stkDisponible(nombre) {
+      var stkKeys = Object.keys(db.stickers || {});
+      for (var j = 0; j < stkKeys.length; j++) {
+        if (db.stickers[stkKeys[j]].nombre === nombre) {
+          return {
+            chico: Number(db.stickers[stkKeys[j]].stockChico) || 0,
+            grande: Number(db.stickers[stkKeys[j]].stockGrande) || 0
+          };
+        }
+      }
+      return { chico: 0, grande: 0 };
+    }
+
+    // ====== CÁLCULO 1: Blends ordenados por costo (menor a mayor) ======
+    // Para cada blend, calcular cuántos frascos chico y grande se pueden producir
+    // según el insumo más limitante, y el costo total de producir ese máximo.
+    var sugerenciasBlends = [];
+    for (var bi = 0; bi < blends.length; bi++) {
+      var b = blends[bi];
+      var ings = b.ingredientes || [];
+      if (ings.length === 0) continue;
+
+      // ---- Para frasco CHICO ----
+      var maxChico = Infinity;
+      var espChCost = 0;
+      var limitanteChico = '';
+      for (var ig = 0; ig < ings.length; ig++) {
+        var ing = ings[ig];
+        var esp = ArcanoDB.getEspecia(ing.especiaId);
+        if (!esp) { maxChico = 0; limitanteChico = (ing.especiaNombre || '?') + ' (no encontrada)'; break; }
+        var gpf = Number(ing.gramosChico) || 0;
+        if (gpf <= 0) continue;
+        var disponible = Number(esp.stockBolsa) || 0;
+        var maxPorEste = Math.floor(disponible / gpf);
+        if (maxPorEste < maxChico) {
+          maxChico = maxPorEste;
+          limitanteChico = esp.nombre;
+        }
+        var cpg = (costos.especias && costos.especias[ing.especiaId]) || 0;
+        espChCost += gpf * cpg;
+      }
+      // Limitantes adicionales (envases, bolsas, cintas, stickers)
+      var stk = stkDisponible(b.nombre);
+      var limitChicoEnvases = Math.floor(envases.chico / 1);
+      var limitChicoBolsas = Math.floor(bolsas.chico / 1);
+      var limitChicoCintas = Math.floor(cintas / 1);
+      var limitChicoStickers = stk.chico;
+      var limitChico = Math.min(maxChico, limitChicoEnvases, limitChicoBolsas, limitChicoCintas, limitChicoStickers);
+      if (limitChico < maxChico) {
+        if (limitChicoEnvases < maxChico) limitanteChico = 'Envases chico (' + envases.chico + ' disp.)';
+        else if (limitChicoBolsas < maxChico) limitanteChico = 'Bolsas chica (' + bolsas.chico + ' disp.)';
+        else if (limitChicoCintas < maxChico) limitanteChico = 'Cintas (' + cintas + ' disp.)';
+        else if (limitChicoStickers < maxChico) limitanteChico = 'Stickers chico de ' + b.nombre + ' (' + stk.chico + ' disp.)';
+      }
+
+      // ---- Para frasco GRANDE ----
+      var maxGrande = Infinity;
+      var espGrCost = 0;
+      var limitanteGrande = '';
+      for (var ig2 = 0; ig2 < ings.length; ig2++) {
+        var ing2 = ings[ig2];
+        var esp2 = ArcanoDB.getEspecia(ing2.especiaId);
+        if (!esp2) { maxGrande = 0; limitanteGrande = (ing2.especiaNombre || '?') + ' (no encontrada)'; break; }
+        var gpf2 = Number(ing2.gramosGrande) || 0;
+        if (gpf2 <= 0) continue;
+        var disponible2 = Number(esp2.stockBolsa) || 0;
+        var maxPorEste2 = Math.floor(disponible2 / gpf2);
+        if (maxPorEste2 < maxGrande) {
+          maxGrande = maxPorEste2;
+          limitanteGrande = esp2.nombre;
+        }
+        var cpg2 = (costos.especias && costos.especias[ing2.especiaId]) || 0;
+        espGrCost += gpf2 * cpg2;
+      }
+      var limitGrandeEnvases = Math.floor(envases.grande / 1);
+      var limitGrandeBolsas = Math.floor(bolsas.grande / 1);
+      var limitGrandeCintas = Math.floor(cintas / 1);
+      var limitGrandeStickers = stk.grande;
+      var limitGrande = Math.min(maxGrande, limitGrandeEnvases, limitGrandeBolsas, limitGrandeCintas, limitGrandeStickers);
+      if (limitGrande < maxGrande) {
+        if (limitGrandeEnvases < maxGrande) limitanteGrande = 'Envases grande (' + envases.grande + ' disp.)';
+        else if (limitGrandeBolsas < maxGrande) limitanteGrande = 'Bolsas grande (' + bolsas.grande + ' disp.)';
+        else if (limitGrandeCintas < maxGrande) limitanteGrande = 'Cintas (' + cintas + ' disp.)';
+        else if (limitGrandeStickers < maxGrande) limitanteGrande = 'Stickers grande de ' + b.nombre + ' (' + stk.grande + ' disp.)';
+      }
+
+      // Costos unitarios
+      var costoUnitChico = espChCost + pkgC;
+      var costoUnitGrande = espGrCost + pkgG;
+      // Costo total de producir el máximo posible
+      var costoTotalChico = limitChico * costoUnitChico;
+      var costoTotalGrande = limitGrande * costoUnitGrande;
+
+      // Ingreso potencial (precio × max)
+      var ventaTotalChico = limitChico * (Number(b.precioChico) || 0);
+      var ventaTotalGrande = limitGrande * (Number(b.precioGrande) || 0);
+      var margenTotalChico = ventaTotalChico - costoTotalChico;
+      var margenTotalGrande = ventaTotalGrande - costoTotalGrande;
+
+      sugerenciasBlends.push({
+        blend: b,
+        maxChico: limitChico, maxGrande: limitGrande,
+        limitanteChico: limitanteChico, limitanteGrande: limitanteGrande,
+        costoUnitChico: costoUnitChico, costoUnitGrande: costoUnitGrande,
+        costoTotalChico: costoTotalChico, costoTotalGrande: costoTotalGrande,
+        ventaTotalChico: ventaTotalChico, ventaTotalGrande: ventaTotalGrande,
+        margenTotalChico: margenTotalChico, margenTotalGrande: margenTotalGrande
+      });
+    }
+
+    // ====== CÁLCULO 2: Especias limitantes ordenadas por costo ======
+    // Para cada especia, cuántos blends la usan y cuántos frascos en total se podrían
+    // producir si esa especia tuviera stock suficiente (es decir, qué blends están
+    // frenados por esta especia). El "costo" es el costo por gramo de cada especia.
+    var especiasImpacto = {};
+    for (var bi2 = 0; bi2 < blends.length; bi2++) {
+      var b2 = blends[bi2];
+      var ings2 = b2.ingredientes || [];
+      for (var ig3 = 0; ig3 < ings2.length; ig3++) {
+        var ing3 = ings2[ig3];
+        var esp3 = ArcanoDB.getEspecia(ing3.especiaId);
+        if (!esp3) continue;
+        if (!especiasImpacto[esp3.id]) {
+          var cpg3 = (costos.especias && costos.especias[esp3.id]) || 0;
+          especiasImpacto[esp3.id] = {
+            especia: esp3,
+            costoPorGramo: cpg3,
+            stockActual: Number(esp3.stockBolsa) || 0,
+            blendsQueLaUsan: [],
+            totalFrascosFrenadosChico: 0,
+            totalFrascosFrenadosGrande: 0,
+            gramosNecesariosChico: 0,
+            gramosNecesariosGrande: 0
+          };
+        }
+        especiasImpacto[esp3.id].blendsQueLaUsan.push(b2.nombre);
+        // Para cada blend, calcular cuántos frascos podría producir si tuviera stock
+        // (limitado por las otras especias del blend, no por esta)
+        var ingsBlend = b2.ingredientes || [];
+        var maxChicoSinEsta = Infinity;
+        var maxGrandeSinEsta = Infinity;
+        for (var ig4 = 0; ig4 < ingsBlend.length; ig4++) {
+          if (ig4 === ig3) continue; // skip esta especia
+          var ing4 = ingsBlend[ig4];
+          var esp4 = ArcanoDB.getEspecia(ing4.especiaId);
+          if (!esp4) continue;
+          var gpfCh = Number(ing4.gramosChico) || 0;
+          var gpfGr = Number(ing4.gramosGrande) || 0;
+          if (gpfCh > 0) {
+            var mx = Math.floor((Number(esp4.stockBolsa) || 0) / gpfCh);
+            if (mx < maxChicoSinEsta) maxChicoSinEsta = mx;
+          }
+          if (gpfGr > 0) {
+            var mx2 = Math.floor((Number(esp4.stockBolsa) || 0) / gpfGr);
+            if (mx2 < maxGrandeSinEsta) maxGrandeSinEsta = mx2;
+          }
+        }
+        // Si las otras especias limitan a 5 chico y 3 grande, esta especia frenaría 5+3=8 frascos
+        if (isFinite(maxChicoSinEsta)) {
+          especiasImpacto[esp3.id].totalFrascosFrenadosChico += maxChicoSinEsta;
+          var gpfThisCh = Number(ing3.gramosChico) || 0;
+          especiasImpacto[esp3.id].gramosNecesariosChico += maxChicoSinEsta * gpfThisCh;
+        }
+        if (isFinite(maxGrandeSinEsta)) {
+          especiasImpacto[esp3.id].totalFrascosFrenadosGrande += maxGrandeSinEsta;
+          var gpfThisGr = Number(ing3.gramosGrande) || 0;
+          especiasImpacto[esp3.id].gramosNecesariosGrande += maxGrandeSinEsta * gpfThisGr;
+        }
+      }
+    }
+    var especiasLista = Object.values(especiasImpacto);
+    // Ordenar: de menor costo a mayor costo (el más barato primero — más rentable reponer primero)
+    especiasLista.sort(function(a, b) { return a.costoPorGramo - b.costoPorGramo; });
+
+    // ====== HTML ======
+    var h = '';
+    h += '<p class="text-sm text-muted mb-16">Sugerencias basadas en el stock actual de insumos y especias. Actualizá en tiempo real al cambiar stocks o costos.</p>';
+
+    // ===== SECCIÓN 1: BLENDS ORDENADOS POR COSTO =====
+    h += '<div class="card"><div class="card-header"><h3>1. Blends que podés producir ahora (ordenados por menor costo)</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Para cada blend, calcula el máximo de frascos chico y grande que se pueden producir con el stock actual. Ordenados de menor a mayor costo unitario (chico).</p>';
+
+    // Ordenar sugerenciasBlends por costo unitario chico ascendente
+    sugerenciasBlends.sort(function(a, b) { return a.costoUnitChico - b.costoUnitChico; });
+
+    if (sugerenciasBlends.length === 0) {
+      h += '<p class="text-muted text-center">No hay blends con receta definida. Agregá ingredientes a los blends primero.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr>';
+      h += '<th>Blend</th>';
+      h += '<th class="text-center">Máx Chico</th>';
+      h += '<th class="text-center">Limitante Chico</th>';
+      h += '<th class="text-right">Costo Unit. Ch</th>';
+      h += '<th class="text-right">$ Venta Ch</th>';
+      h += '<th class="text-right">$ Margen Ch</th>';
+      h += '<th class="text-center">Máx Grande</th>';
+      h += '<th class="text-center">Limitante Grande</th>';
+      h += '<th class="text-right">Costo Unit. Gr</th>';
+      h += '<th class="text-right">$ Venta Gr</th>';
+      h += '<th class="text-right">$ Margen Gr</th>';
+      h += '<th></th>';
+      h += '</tr></thead><tbody>';
+      for (var si = 0; si < sugerenciasBlends.length; si++) {
+        var s = sugerenciasBlends[si];
+        var mcCls = s.maxChico <= 0 ? 'text-red fw7' : (s.maxChico >= 10 ? 'text-green fw7' : 'fw7');
+        var mgCls = s.maxGrande <= 0 ? 'text-red fw7' : (s.maxGrande >= 10 ? 'text-green fw7' : 'fw7');
+        var margenChColor = s.margenTotalChico >= 0 ? 'var(--green)' : 'var(--red)';
+        var margenGrColor = s.margenTotalGrande >= 0 ? 'var(--green)' : 'var(--red)';
+        h += '<tr>' +
+          '<td class="fw7">' + esc(s.blend.nombre) + '</td>' +
+          '<td class="text-center ' + mcCls + '">' + s.maxChico + '</td>' +
+          '<td class="text-sm text-muted">' + esc(s.limitanteChico || '—') + '</td>' +
+          '<td class="text-right">$' + s.costoUnitChico.toLocaleString(undefined,{maximumFractionDigits:0}) + '</td>' +
+          '<td class="text-right text-gold">$' + s.ventaTotalChico.toLocaleString() + '</td>' +
+          '<td class="text-right fw7" style="color:' + margenChColor + '">$' + s.margenTotalChico.toLocaleString() + '</td>' +
+          '<td class="text-center ' + mgCls + '">' + s.maxGrande + '</td>' +
+          '<td class="text-sm text-muted">' + esc(s.limitanteGrande || '—') + '</td>' +
+          '<td class="text-right">$' + s.costoUnitGrande.toLocaleString(undefined,{maximumFractionDigits:0}) + '</td>' +
+          '<td class="text-right text-gold">$' + s.ventaTotalGrande.toLocaleString() + '</td>' +
+          '<td class="text-right fw7" style="color:' + margenGrColor + '">$' + s.margenTotalGrande.toLocaleString() + '</td>' +
+          '<td><button class="btn btn-sm btn-gold" onclick="Pages.formProduccion(\'blend\', ' + s.blend.id + ')">Producir</button></td>' +
+        '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // ===== SECCIÓN 2: ESPECIAS LIMITANTES ORDENADAS POR COSTO =====
+    h += '<div class="card mt-16"><div class="card-header"><h3>2. Especias e insumos para producir más blends (ordenados por menor costo)</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-12">Para cada especia que usan tus blends, muestra cuántos frascos en total están frenados por falta de esa especia. Ordenados de menor a mayor costo por gramo (los más baratos primero — reponerlos da más retorno por peso invertido).</p>';
+
+    if (especiasLista.length === 0) {
+      h += '<p class="text-muted text-center">No hay especias usadas en blends todavía.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr>';
+      h += '<th>Especia</th>';
+      h += '<th class="text-center">Stock Actual (g)</th>';
+      h += '<th class="text-right">Costo por gramo</th>';
+      h += '<th class="text-center">Blends que la usan</th>';
+      h += '<th class="text-center">Frascos Ch frenados</th>';
+      h += '<th class="text-center">Frascos Gr frenados</th>';
+      h += '<th class="text-right">g necesarios para max</th>';
+      h += '<th class="text-right">Costo de reponer</th>';
+      h += '<th></th>';
+      h += '</tr></thead><tbody>';
+      for (var ei = 0; ei < especiasLista.length; ei++) {
+        var e = especiasLista[ei];
+        var gramosNecesariosTotal = e.gramosNecesariosChico + e.gramosNecesariosGrande;
+        var gramosAReponer = Math.max(0, gramosNecesariosTotal - e.stockActual);
+        var costoReponer = gramosAReponer * e.costoPorGramo;
+        var stkCls = e.stockActual <= 50 ? 'text-red fw7' : 'text-green';
+        h += '<tr>' +
+          '<td class="fw7">' + esc(e.especia.nombre) + '</td>' +
+          '<td class="text-center ' + stkCls + '">' + e.stockActual + 'g</td>' +
+          '<td class="text-right">$' + e.costoPorGramo.toLocaleString(undefined,{maximumFractionDigits:3}) + '/g</td>' +
+          '<td class="text-center">' + e.blendsQueLaUsan.length + '</td>' +
+          '<td class="text-center fw7">' + (e.totalFrascosFrenadosChico || 0) + '</td>' +
+          '<td class="text-center fw7">' + (e.totalFrascosFrenadosGrande || 0) + '</td>' +
+          '<td class="text-right">' + gramosNecesariosTotal + 'g</td>' +
+          '<td class="text-right text-red fw7">$' + costoReponer.toLocaleString(undefined,{maximumFractionDigits:0}) + '</td>' +
+          '<td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td>' +
+        '</tr>';
+      }
+      h += '</tbody></table></div>';
+
+      // También insumos globales limitantes (envases, bolsas, cintas, stickers)
+      h += '<h4 style="margin:20px 0 8px;font-size:.95rem">Insumos globales (packaging)</h4>';
+      h += '<div class="table-wrap"><table class="table"><thead><tr><th>Insumo</th><th class="text-center">Stock</th><th class="text-center">Blends frenados por esto</th><th></th></tr></thead><tbody>';
+      var envChFrenados = 0, envGrFrenados = 0, bolChFrenados = 0, bolGrFrenados = 0, cinFrenados = 0;
+      for (var si2 = 0; si2 < sugerenciasBlends.length; si2++) {
+        var sb = sugerenciasBlends[si2];
+        if (sb.maxChico > 0 && sb.maxChico >= envases.chico) envChFrenados++;
+        if (sb.maxGrande > 0 && sb.maxGrande >= envases.grande) envGrFrenados++;
+        if (sb.maxChico > 0 && sb.maxChico >= bolsas.chico) bolChFrenados++;
+        if (sb.maxGrande > 0 && sb.maxGrande >= bolsas.grande) bolGrFrenados++;
+        if (sb.maxChico > 0 && sb.maxChico >= cintas) cinFrenados++;
+      }
+      h += '<tr><td class="fw7">Envases chico</td><td class="text-center ' + (envases.chico<=10?'text-red fw7':'') + '">' + envases.chico + '</td><td class="text-center">' + envChFrenados + '</td><td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td></tr>';
+      h += '<tr><td class="fw7">Envases grande</td><td class="text-center ' + (envases.grande<=10?'text-red fw7':'') + '">' + envases.grande + '</td><td class="text-center">' + envGrFrenados + '</td><td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td></tr>';
+      h += '<tr><td class="fw7">Bolsas chica</td><td class="text-center ' + (bolsas.chico<=10?'text-red fw7':'') + '">' + bolsas.chico + '</td><td class="text-center">' + bolChFrenados + '</td><td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td></tr>';
+      h += '<tr><td class="fw7">Bolsas grande</td><td class="text-center ' + (bolsas.grande<=10?'text-red fw7':'') + '">' + bolsas.grande + '</td><td class="text-center">' + bolGrFrenados + '</td><td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td></tr>';
+      h += '<tr><td class="fw7">Cintas</td><td class="text-center ' + (cintas<=10?'text-red fw7':'') + '">' + cintas + '</td><td class="text-center">' + cinFrenados + '</td><td><button class="btn btn-sm btn-outline" onclick="Pages.formEntrada()">Comprar</button></td></tr>';
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+    return h;
   },
 
   /** Produccion rapida desde Productos */
