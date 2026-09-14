@@ -1,5 +1,5 @@
 {
-  "version": "v4.19-ui-listas-cortas",
+  "version": "v4.20-stock-frascos-producidos",
   "build": "2026-09-14",
-  "notes": "Mejora de UX en listas largas: Insumos, Producción, Ventas y Gastos ahora tienen búsqueda en vivo, paginación (10/30/50) y contador de resultados."
+  "notes": "Nueva sección destacada en Stock: 'Frascos Produccidos para la Venta' con tabla de blends en stock (pequeños/grandes), totales, valor de costo y valor de venta."
 }
