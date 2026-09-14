@@ -1,5 +1,5 @@
 {
-  "version": "v4.17-ajuste-pagado",
+  "version": "v4.18-fix-editar-stickers",
   "build": "2026-09-14",
-  "notes": "Campo 'Total Pagado' en entrada de insumos: si difiere del calculado, se registra ajuste (descuento/recargo) y se refleja en compras."
+  "notes": "Fix edición de entradas con stickers: ahora cada sticker se muestra como fila simple editable (producto + talla + cantidad + costo), no como tablas masivas duplicadas."
 }

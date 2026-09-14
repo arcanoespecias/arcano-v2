@@ -1248,18 +1248,42 @@ const Pages = {
         } else if (t === 'cinta') {
           detailDiv.innerHTML = '';
         } else if (t === 'sticker') {
-          // Stickers en carga masiva: tabla con todos los productos (especias + blends)
-          // y columnas Pequeño / Grande. El admin carga cantidades en una sola pasada.
-          // Ocultar campos de cantidad y costo del grid (la tabla usa los suyos).
-          cantWrap.style.display = 'none';
-          costWrap.style.display = 'none';
-          detailDiv.innerHTML = '<label>&nbsp;</label><span class="text-xs text-muted">Stickers ↓</span>';
-          stickerExtra.style.display = '';
-          stickerExtra.innerHTML = buildStickerTable();
-          // Listeners para recalcular total al tipear cantidades o costo
-          var stkInputs = stickerExtra.querySelectorAll('.stk-cant, .stk-cost');
-          for (var k = 0; k < stkInputs.length; k++) {
-            stkInputs[k].addEventListener('input', updateTotal);
+          // Si la fila tiene preload de un sticker individual (edición), usar modo simple:
+          // inputs para producto (select de todos los productos) + talla + cantidad + costo.
+          // Si NO hay preload (alta nueva), usar el modo tabla masiva original.
+          if (preload && preload.tipo === 'sticker' && preload.stickerNombre) {
+            // Modo edición: fila simple con select de producto + talla
+            // Cantidad y costo van en los inputs generales (cantWrap + costWrap)
+            var allProdsOpts = '';
+            var blsSorted2 = bls.slice().sort(function(a, b) { return (a.nombre||'').localeCompare(b.nombre||''); });
+            var espsSorted2 = esps.slice().sort(function(a, b) { return (a.nombre||'').localeCompare(b.nombre||''); });
+            if (blsSorted2.length > 0) {
+              allProdsOpts += '<optgroup label="Blends">';
+              for (var sb = 0; sb < blsSorted2.length; sb++) allProdsOpts += '<option value="' + esc(blsSorted2[sb].nombre) + '">' + esc(blsSorted2[sb].nombre) + '</option>';
+              allProdsOpts += '</optgroup>';
+            }
+            if (espsSorted2.length > 0) {
+              allProdsOpts += '<optgroup label="Especias">';
+              for (var se = 0; se < espsSorted2.length; se++) allProdsOpts += '<option value="' + esc(espsSorted2[se].nombre) + '">' + esc(espsSorted2[se].nombre) + '</option>';
+              allProdsOpts += '</optgroup>';
+            }
+            detailDiv.innerHTML =
+              '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+                '<div class="form-group" style="margin:0;flex:1;min-width:160px"><label>Producto</label><select class="input stk-prod-simple">' + allProdsOpts + '</select></div>' +
+                '<div class="form-group" style="margin:0;min-width:110px"><label>Talla</label><select class="input stk-talla-simple"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
+              '</div>';
+          } else {
+            // Modo alta nueva: tabla masiva con todos los productos (comportamiento original)
+            cantWrap.style.display = 'none';
+            costWrap.style.display = 'none';
+            detailDiv.innerHTML = '<label>&nbsp;</label><span class="text-xs text-muted">Stickers ↓</span>';
+            stickerExtra.style.display = '';
+            stickerExtra.innerHTML = buildStickerTable();
+            // Listeners para recalcular total al tipear cantidades o costo
+            var stkInputs = stickerExtra.querySelectorAll('.stk-cant, .stk-cost');
+            for (var k = 0; k < stkInputs.length; k++) {
+              stkInputs[k].addEventListener('input', updateTotal);
+            }
           }
         }
       }
@@ -1300,24 +1324,26 @@ const Pages = {
           var tallaSel = div.querySelector('.ent-talla');
           if (tallaSel && it.talla) tallaSel.value = it.talla;
         } else if (it.tipo === 'sticker') {
-          // Sticker individual: el preload tiene stickerNombre + talla + cantidad + costoUnitario.
-          // Como la tabla masiva lista todos los productos, marcamos la cantidad en la fila
-          // correspondiente al (nombre, talla).
-          if (it.stickerNombre) {
-            var stkCants = stickerExtra.querySelectorAll('.stk-cant');
-            for (var s = 0; s < stkCants.length; s++) {
-              var sc = stkCants[s];
-              if (sc.dataset.nombre === it.stickerNombre && sc.dataset.talla === (it.talla || 'chico')) {
-                sc.value = it.cantidad;
+          // Sticker individual en modo edición: setear select de producto + talla + cantidad + costo
+          // (los inputs generales .ent-cant y .ent-cost-gen ya están visibles en este modo)
+          var stkProdSimple = div.querySelector('.stk-prod-simple');
+          var stkTallaSimple = div.querySelector('.stk-talla-simple');
+          if (stkProdSimple && it.stickerNombre) {
+            // Buscar la option que matchee el nombre (puede tener caracteres escapados)
+            for (var op = 0; op < stkProdSimple.options.length; op++) {
+              if (stkProdSimple.options[op].value === it.stickerNombre || stkProdSimple.options[op].text === it.stickerNombre) {
+                stkProdSimple.selectedIndex = op;
                 break;
               }
             }
-            // Costos: si el item pre-cargado era chico, setear stk-cost-chico; si era grande, stk-cost-grande
-            var stkCostInput = stickerExtra.querySelector(it.talla === 'grande' ? '.stk-cost-grande' : '.stk-cost-chico');
-            if (stkCostInput && it.costoUnitario != null && stkCostInput.value === '') {
-              stkCostInput.value = it.costoUnitario;
-            }
           }
+          if (stkTallaSimple && it.talla) stkTallaSimple.value = it.talla;
+          // Cantidad y costo van en los inputs generales (ya seteados arriba para no-sticker,
+          // pero como en edición sticker esos campos SÍ son visibles, los seteamos acá también)
+          var cantInputStk = div.querySelector('.ent-cant');
+          if (cantInputStk && it.cantidad != null) cantInputStk.value = it.cantidad;
+          var costInputStk = div.querySelector('.ent-cost-gen');
+          if (costInputStk && it.costoUnitario != null) costInputStk.value = it.costoUnitario;
         }
       } catch (e) {
         console.warn('[formEntrada] preload error:', e.message);
@@ -1330,14 +1356,22 @@ const Pages = {
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
         if (tipo === 'sticker') {
-          // Costos separados para chico y grande
-          var stkCostCh = Number(rows[i].querySelector('.stk-cost-chico') ? rows[i].querySelector('.stk-cost-chico').value : 0) || 0;
-          var stkCostGr = Number(rows[i].querySelector('.stk-cost-grande') ? rows[i].querySelector('.stk-cost-grande').value : 0) || 0;
-          var stkCants = rows[i].querySelectorAll('.stk-cant');
-          for (var k = 0; k < stkCants.length; k++) {
-            var cantK = Number(stkCants[k].value) || 0;
-            var costK = stkCants[k].dataset.talla === 'grande' ? stkCostGr : stkCostCh;
-            total += cantK * costK;
+          // Si la fila tiene el select de producto simple (modo edición), usar inputs generales
+          var stkProdSimpleCheck = rows[i].querySelector('.stk-prod-simple');
+          if (stkProdSimpleCheck) {
+            var cS = Number(rows[i].querySelector('.ent-cant').value) || 0;
+            var coS = Number(rows[i].querySelector('.ent-cost-gen') ? rows[i].querySelector('.ent-cost-gen').value : 0) || 0;
+            total += cS * coS;
+          } else {
+            // Modo tabla masiva: costos separados para chico y grande
+            var stkCostCh = Number(rows[i].querySelector('.stk-cost-chico') ? rows[i].querySelector('.stk-cost-chico').value : 0) || 0;
+            var stkCostGr = Number(rows[i].querySelector('.stk-cost-grande') ? rows[i].querySelector('.stk-cost-grande').value : 0) || 0;
+            var stkCants = rows[i].querySelectorAll('.stk-cant');
+            for (var k = 0; k < stkCants.length; k++) {
+              var cantK = Number(stkCants[k].value) || 0;
+              var costK = stkCants[k].dataset.talla === 'grande' ? stkCostGr : stkCostCh;
+              total += cantK * costK;
+            }
           }
         } else {
           var c = Number(rows[i].querySelector('.ent-cant').value) || 0;
@@ -1410,8 +1444,36 @@ const Pages = {
       for (var i = 0; i < rows.length; i++) {
         var tipo = rows[i].querySelector('.ent-tipo').value;
 
-        // Sticker: procesar la tabla masiva (1 item por cada (producto, talla) con cantidad > 0)
+        // Sticker: dos modos posibles
         if (tipo === 'sticker') {
+          // MODO EDICIÓN: fila simple con select de producto + talla + inputs generales
+          var stkProdSimpleEl = rows[i].querySelector('.stk-prod-simple');
+          if (stkProdSimpleEl) {
+            var stkProdVal = stkProdSimpleEl.value;
+            var stkTallaSimpleEl = rows[i].querySelector('.stk-talla-simple');
+            var stkTallaVal = stkTallaSimpleEl ? stkTallaSimpleEl.value : 'chico';
+            var stkCantSimple = Number(rows[i].querySelector('.ent-cant').value) || 0;
+            var stkCostSimpleEl = rows[i].querySelector('.ent-cost-gen');
+            var stkCostSimple = Number(stkCostSimpleEl ? stkCostSimpleEl.value : 0) || 0;
+            if (!stkProdVal) { alert('Falta producto de sticker (fila ' + (i+1) + ')'); return; }
+            if (stkCantSimple <= 0) { alert('Falta cantidad de stickers (fila ' + (i+1) + ')'); return; }
+            if (stkCostSimple <= 0) { alert('Falta costo del sticker (fila ' + (i+1) + ')'); return; }
+            // Determinar stickerTipo: buscar en blends y especias por nombre
+            var stkTipoDet = 'especia';
+            for (var sb2 = 0; sb2 < bls.length; sb2++) { if (bls[sb2].nombre === stkProdVal) { stkTipoDet = 'blend'; break; } }
+            items.push({
+              tipo: 'sticker',
+              cantidad: stkCantSimple,
+              costoUnitario: stkCostSimple,
+              stickerNombre: stkProdVal,
+              stickerTipo: stkTipoDet,
+              talla: stkTallaVal
+            });
+            total += stkCantSimple * stkCostSimple;
+            continue; // Saltar el push del final
+          }
+
+          // MODO ALTA NUEVA: tabla masiva con todos los productos (comportamiento original)
           var stkCants = rows[i].querySelectorAll('.stk-cant');
           var stkCostChEl = rows[i].querySelector('.stk-cost-chico');
           var stkCostGrEl = rows[i].querySelector('.stk-cost-grande');
