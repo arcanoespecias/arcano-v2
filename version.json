@@ -1,5 +1,5 @@
 {
-  "version": "v4.13-costos-por-producto",
+  "version": "v4.14-produccion-mixta",
   "build": "2026-09-12",
-  "notes": "Nuevo sub-tab Costos por Producto en Estadisticas: cards individuales con costo total chico/grande por blend y especia. Filtros (todos/blends/especias) y orden (nombre/costo/margen)."
+  "notes": "Formulario de Produccion rediseñado: produce chico+grande en una sola carga. Calcula gramos por especia y muestra la 'Bolsa de Preparacion' con detalle a pesar."
 }

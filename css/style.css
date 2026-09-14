@@ -186,6 +186,8 @@ select.input { cursor: pointer; }
   font-size: 0.85rem;
 }
 .list-row:last-child { border-bottom: none; }
+.list-row-grid { display: flex; flex-direction: column; gap: 0; }
+.list-row-grid > .list-row { padding: 6px 0; }
 
 /* ---------- STOCK BAR ---------- */
 .stock-bar {

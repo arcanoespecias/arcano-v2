@@ -1495,29 +1495,32 @@ const Pages = {
 
   /** Formulario de produccion — tipo y productoId son opcionales (pre-llenan) */
   formProduccion(presetTipo, presetProdId) {
+    var self = this;
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.innerHTML = '<div class="modal modal-lg">' +
+    modal.innerHTML = '<div class="modal modal-lg" style="max-width:760px">' +
       '<div class="modal-header"><h3>Nueva Produccion</h3><button class="btn btn-ghost" onclick="this.closest(\'.modal-overlay\').remove()">X</button></div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="especia">Especia</option><option value="blend">Blend</option></select></div>' +
+        '<div class="form-group"><label>Tipo</label><select class="input" id="f-prod-tipo"><option value="blend">Blend</option><option value="especia">Especia</option></select></div>' +
         '<div class="form-group"><label>Producto</label><select class="input" id="f-prod-prod"><option value="">Seleccionar</option></select></div>' +
-        '<div class="g2"><div class="form-group"><label>Talla</label><select class="input" id="f-prod-talla"><option value="chico">Pequeño</option><option value="grande">Grande</option></select></div>' +
-        '<div class="form-group"><label>Cantidad de frascos</label><input type="number" class="input" id="f-prod-cant" value="1" min="1"></div></div>' +
-        '<div id="f-prod-preview" class="mt-12"></div>' +
+        '<div class="g2 mb-8">' +
+          '<div class="form-group" style="margin:0"><label>Frascos pequenos</label><input type="number" class="input" id="f-prod-cant-chico" value="0" min="0" placeholder="0"></div>' +
+          '<div class="form-group" style="margin:0"><label>Frascos grandes</label><input type="number" class="input" id="f-prod-cant-grande" value="0" min="0" placeholder="0"></div>' +
+        '</div>' +
+        '<p class="text-xs text-muted mb-8">Carga cuantos frascos de cada talla queres producir. Dejando un campo en 0 se omite esa talla.</p>' +
+        '<div id="f-prod-preview"></div>' +
       '</div><div class="modal-footer">' +
         '<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>' +
-        '<button class="btn btn-gold" id="btn-prod">Producir</button>' +
+        '<button class="btn btn-gold" id="btn-prod" disabled>Producir</button>' +
       '</div></div>';
     document.body.appendChild(modal);
 
     var tipoSel = document.getElementById('f-prod-tipo');
     var prodSel = document.getElementById('f-prod-prod');
-    var tallaSel = document.getElementById('f-prod-talla');
-    var cantInput = document.getElementById('f-prod-cant');
+    var cantChicoInput = document.getElementById('f-prod-cant-chico');
+    var cantGrandeInput = document.getElementById('f-prod-cant-grande');
     var previewDiv = document.getElementById('f-prod-preview');
     var prodBtn = document.getElementById('btn-prod');
-    prodBtn.disabled = true;
 
     function loadProductos() {
       var tipo = tipoSel.value;
@@ -1530,101 +1533,222 @@ const Pages = {
       prodBtn.disabled = true;
     }
 
-    function updatePreview() {
+    /** Devuelve la lista de insumos requeridos para producir cantCh + cantGr
+     *  del producto elegido. Calcula gramos por especia, envases, stickers, etc.
+     *  Retorna {producto, tipo, tallas:[{talla, cant, items:[{tipo, label, needed, avail, ok, unit}]}], allOk} */
+    function calcularRequerimientos() {
       var tipo = tipoSel.value;
       var prodId = Number(prodSel.value);
-      var talla = tallaSel.value;
-      var cant = Number(cantInput.value) || 0;
-      if (!prodId || cant <= 0) { previewDiv.innerHTML = ''; prodBtn.disabled = true; return; }
-
+      var cantChico = Number(cantChicoInput.value) || 0;
+      var cantGrande = Number(cantGrandeInput.value) || 0;
+      if (!prodId || (cantChico <= 0 && cantGrande <= 0)) return null;
       var producto = tipo === 'blend' ? ArcanoDB.getBlend(prodId) : ArcanoDB.getEspecia(prodId);
-      if (!producto) { previewDiv.innerHTML = '<p class="text-red">Producto no encontrado</p>'; prodBtn.disabled = true; return; }
+      if (!producto) return null;
 
       var db = ArcanoDB.getDB();
       var envases = db.stockEnvases || { chico: 0, grande: 0 };
-      var allOk = true;
-      var h = '<div class="card"><div class="card-body">' +
-        '<p class="fw7 mb-8">Producir ' + cant + ' frasco' + (cant>1?'s':'') + ' ' + talla + ' de <span class="text-gold">' + producto.nombre + '</span></p>';
-
-      if (tipo === 'especia') {
-        var gpf = talla === 'grande' ? (Number(producto.gramosGrande)||0) : (Number(producto.gramosChico)||0);
-        var grsTotal = gpf * cant;
-        var bolsaOk = (producto.stockBolsa||0) >= grsTotal;
-        if (!bolsaOk) allOk = false;
-        h += '<div class="list-row"><span>Pala de ' + producto.nombre + '</span><span class="' + (bolsaOk?'text-green':'text-red fw7') + '">' + (producto.stockBolsa||0) + 'g disponible → necesita ' + grsTotal + 'g ' + (bolsaOk?'OK':'FALTA') + '</span></div>';
-      } else {
-        // Blend ingredients
-        var ings = producto.ingredientes || [];
-        if (ings.length === 0) {
-          h += '<p class="text-red">Este blend no tiene ingredientes definidos. Editalo primero.</p>';
-          allOk = false;
-        } else {
-          for (var i = 0; i < ings.length; i++) {
-            var esp = ArcanoDB.getEspecia(ings[i].especiaId);
-            var gpf2 = talla === 'grande' ? (Number(ings[i].gramosGrande)||0) : (Number(ings[i].gramosChico)||0);
-            var needed = gpf2 * cant;
-            var avail = esp ? (esp.stockBolsa||0) : 0;
-            var ok = avail >= needed;
-            if (!ok) allOk = false;
-            h += '<div class="list-row"><span>' + (esp?esp.nombre:'?') + ' (pala)</span><span class="' + (ok?'text-green':'text-red fw7') + '">' + avail + 'g → necesita ' + needed + 'g ' + (ok?'OK':'FALTA') + '</span></div>';
-          }
-        }
-      }
-
-      // Envases
-      var envAvail = envases[talla] || 0;
-      var envOk = envAvail >= cant;
-      if (!envOk) allOk = false;
-      h += '<div class="list-row"><span>Envases ' + talla + '</span><span class="' + (envOk?'text-green':'text-red fw7') + '">' + envAvail + ' → necesita ' + cant + ' ' + (envOk?'OK':'FALTA') + '</span></div>';
-
-      // Stickers
-      var stkAvail = 0;
+      var bolsas = db.stockBolsas || { chico: 0, grande: 0 };
+      var cintas = db.stockCintas || 0;
+      // Sticker por nombre de producto
+      var stkAvailChico = 0, stkAvailGrande = 0;
       var stkKeys = Object.keys(db.stickers || {});
       for (var j = 0; j < stkKeys.length; j++) {
         if (db.stickers[stkKeys[j]].nombre === producto.nombre) {
-          stkAvail = Number(db.stickers[stkKeys[j]][talla==='grande'?'stockGrande':'stockChico']) || 0;
+          stkAvailChico = Number(db.stickers[stkKeys[j]].stockChico) || 0;
+          stkAvailGrande = Number(db.stickers[stkKeys[j]].stockGrande) || 0;
           break;
         }
       }
-      var stkOk = stkAvail >= cant;
-      if (!stkOk) allOk = false;
-      h += '<div class="list-row"><span>Stickers ' + talla + '</span><span class="' + (stkOk?'text-green':'text-red fw7') + '">' + stkAvail + ' → necesita ' + cant + ' ' + (stkOk?'OK':'FALTA') + '</span></div>';
 
-      // Bolsas (packaging)
-      var bolsaAvail = (db.stockBolsas && db.stockBolsas[talla]) || 0;
-      var bolsaOk = bolsaAvail >= cant;
-      if (!bolsaOk) allOk = false;
-      h += '<div class="list-row"><span>Bolsas ' + talla + '</span><span class="' + (bolsaOk?'text-green':'text-red fw7') + '">' + bolsaAvail + ' → necesita ' + cant + ' ' + (bolsaOk?'OK':'FALTA') + '</span></div>';
+      var tallas = [];
+      var allOk = true;
 
-      // Cintas
-      var cintaAvail = db.stockCintas || 0;
-      var cintaOk = cintaAvail >= cant;
-      if (!cintaOk) allOk = false;
-      h += '<div class="list-row"><span>Cintas</span><span class="' + (cintaOk?'text-green':'text-red fw7') + '">' + cintaAvail + ' → necesita ' + cant + ' ' + (cintaOk?'OK':'FALTA') + '</span></div>';
+      function buildTalla(talla, cant) {
+        if (cant <= 0) return null;
+        var items = [];
+        // 1) Gramos por especia
+        var especiasDetalle = [];
+        if (tipo === 'especia') {
+          var gpf = talla === 'grande' ? (Number(producto.gramosGrande) || 0) : (Number(producto.gramosChico) || 0);
+          var needed = gpf * cant;
+          var avail = producto.stockBolsa || 0;
+          var ok = avail >= needed;
+          if (!ok) allOk = false;
+          especiasDetalle.push({ nombre: producto.nombre, gramosPorFrasco: gpf, gramosTotal: needed, avail: avail, ok: ok });
+          items.push({
+            tipo: 'especia', label: 'Pala de ' + producto.nombre,
+            needed: needed, avail: avail, ok: ok, unit: 'g',
+            sub: especiasDetalle
+          });
+        } else {
+          var ings = producto.ingredientes || [];
+          for (var i = 0; i < ings.length; i++) {
+            var ing = ings[i];
+            var esp = ArcanoDB.getEspecia(ing.especiaId);
+            var gpf2 = talla === 'grande' ? (Number(ing.gramosGrande) || 0) : (Number(ing.gramosChico) || 0);
+            var needed2 = gpf2 * cant;
+            var avail2 = esp ? (esp.stockBolsa || 0) : 0;
+            var ok2 = avail2 >= needed2;
+            if (!ok2) allOk = false;
+            especiasDetalle.push({ nombre: esp ? esp.nombre : '?', gramosPorFrasco: gpf2, gramosTotal: needed2, avail: avail2, ok: ok2 });
+            items.push({
+              tipo: 'especia', label: 'Pala de ' + (esp ? esp.nombre : '?'),
+              needed: needed2, avail: avail2, ok: ok2, unit: 'g',
+              sub: [{ nombre: esp ? esp.nombre : '?', gramosPorFrasco: gpf2, gramosTotal: needed2, avail: avail2, ok: ok2 }]
+            });
+          }
+        }
+        // 2) Envases
+        var envAvail = envases[talla] || 0;
+        var envOk = envAvail >= cant;
+        if (!envOk) allOk = false;
+        items.push({ tipo: 'envase', label: 'Envases ' + talla, needed: cant, avail: envAvail, ok: envOk, unit: 'u' });
+        // 3) Stickers
+        var stkAvail = talla === 'grande' ? stkAvailGrande : stkAvailChico;
+        var stkOk = stkAvail >= cant;
+        if (!stkOk) allOk = false;
+        items.push({ tipo: 'sticker', label: 'Stickers ' + talla, needed: cant, avail: stkAvail, ok: stkOk, unit: 'u' });
+        // 4) Bolsas
+        var bolsaAvail = bolsas[talla] || 0;
+        var bolsaOk = bolsaAvail >= cant;
+        if (!bolsaOk) allOk = false;
+        items.push({ tipo: 'bolsa', label: 'Bolsas ' + talla, needed: cant, avail: bolsaAvail, ok: bolsaOk, unit: 'u' });
+        // 5) Cintas
+        var cintaOk = cintas >= cant;
+        if (!cintaOk) allOk = false;
+        items.push({ tipo: 'cinta', label: 'Cintas', needed: cant, avail: cintas, ok: cintaOk, unit: 'u' });
+        return { talla: talla, cant: cant, items: items, especiasDetalle: especiasDetalle };
+      }
+
+      var tChico = buildTalla('chico', cantChico);
+      var tGrande = buildTalla('grande', cantGrande);
+      if (tChico) tallas.push(tChico);
+      if (tGrande) tallas.push(tGrande);
+      // Validar que tenga ingredientes (blends)
+      if (tipo === 'blend' && (producto.ingredientes || []).length === 0) {
+        allOk = false;
+      }
+      return { producto: producto, tipo: tipo, tallas: tallas, allOk: allOk, hasIngredientes: tipo !== 'blend' || ((producto.ingredientes || []).length > 0) };
+    }
+
+    function updatePreview() {
+      var calc = calcularRequerimientos();
+      if (!calc) { previewDiv.innerHTML = ''; prodBtn.disabled = true; return; }
+      var p = calc.producto;
+      var hasIng = calc.hasIngredientes;
+
+      var h = '';
+      // ====== SECCION 1: BOLSA — receta detallada por especia ======
+      h += '<div class="card mt-12"><div class="card-header"><h3>Bolsa de Preparacion — ' + esc(p.nombre) + '</h3></div><div class="card-body">';
+
+      if (!hasIng) {
+        h += '<p class="text-red fw7">Este blend no tiene ingredientes definidos. Editalo primero.</p>';
+      } else {
+        // Para cada talla, tabla de gramos por especia
+        for (var ti = 0; ti < calc.tallas.length; ti++) {
+          var t = calc.tallas[ti];
+          var tallaLabel = t.talla === 'grande' ? 'Grandes' : 'Pequenos';
+          h += '<h4 class="mb-8 mt-8" style="font-size:.95rem">' + tallaLabel + ' (' + t.cant + ' frascos)</h4>';
+          if (t.especiasDetalle.length === 0) {
+            h += '<p class="text-muted text-xs">Sin especias en la receta.</p>';
+          } else {
+            h += '<div class="table-wrap mb-12"><table class="table" style="font-size:.85rem"><thead><tr><th>Especia</th><th class="text-center">g/frasco</th><th class="text-center">g totales</th><th class="text-center">Pala dispon.</th><th></th></tr></thead><tbody>';
+            var grsTotalTalla = 0;
+            for (var ei = 0; ei < t.especiasDetalle.length; ei++) {
+              var d = t.especiasDetalle[ei];
+              grsTotalTalla += d.gramosTotal;
+              var stColor = d.ok ? 'var(--green)' : 'var(--red)';
+              var stTxt = d.ok ? 'OK' : 'FALTA';
+              h += '<tr>' +
+                '<td class="fw7">' + esc(d.nombre) + '</td>' +
+                '<td class="text-center">' + d.gramosPorFrasco + 'g</td>' +
+                '<td class="text-center fw7" style="color:var(--gold)">' + d.gramosTotal + 'g</td>' +
+                '<td class="text-center">' + d.avail + 'g</td>' +
+                '<td class="text-center fw7" style="color:' + stColor + '">' + stTxt + '</td>' +
+              '</tr>';
+            }
+            h += '<tr style="background:var(--bg)"><td colspan="2" class="fw7 text-right">Total de la bolsa:</td><td class="text-center fw7" style="color:var(--gold)">' + grsTotalTalla + 'g</td><td colspan="2"></td></tr>';
+            h += '</tbody></table></div>';
+          }
+        }
+        // Resumen de gramos totales por especia (suma de tallas)
+        if (calc.tallas.length > 1) {
+          h += '<h4 class="mb-8 mt-12" style="font-size:.95rem">Resumen total por especia (suma chico + grande)</h4>';
+          h += '<div class="table-wrap mb-12"><table class="table" style="font-size:.85rem"><thead><tr><th>Especia</th><th class="text-center">g chico</th><th class="text-center">g grande</th><th class="text-center">g TOTAL</th></tr></thead><tbody>';
+          var espMap = {};
+          for (var tt = 0; tt < calc.tallas.length; tt++) {
+            var t2 = calc.tallas[tt];
+            for (var ee = 0; ee < t2.especiasDetalle.length; ee++) {
+              var dd = t2.especiasDetalle[ee];
+              if (!espMap[dd.nombre]) espMap[dd.nombre] = { chico: 0, grande: 0 };
+              espMap[dd.nombre][t2.talla] += dd.gramosTotal;
+            }
+          }
+          var nombres = Object.keys(espMap);
+          var grsChicoTotal = 0, grsGrandeTotal = 0, grsTotalGeneral = 0;
+          for (var ni = 0; ni < nombres.length; ni++) {
+            var n = nombres[ni];
+            var gCh = espMap[n].chico, gGr = espMap[n].grande, gT = gCh + gGr;
+            grsChicoTotal += gCh; grsGrandeTotal += gGr; grsTotalGeneral += gT;
+            h += '<tr><td class="fw7">' + esc(n) + '</td><td class="text-center">' + gCh + 'g</td><td class="text-center">' + gGr + 'g</td><td class="text-center fw7" style="color:var(--gold)">' + gT + 'g</td></tr>';
+          }
+          h += '<tr style="background:var(--bg)"><td class="fw7 text-right">TOTAL</td><td class="text-center fw7">' + grsChicoTotal + 'g</td><td class="text-center fw7">' + grsGrandeTotal + 'g</td><td class="text-center fw7" style="color:var(--gold)">' + grsTotalGeneral + 'g</td></tr>';
+          h += '</tbody></table></div>';
+        }
+      }
 
       h += '</div></div>';
+
+      // ====== SECCION 2: STOCK A CONSUMIR (envases, stickers, bolsas, cintas) ======
+      h += '<div class="card mt-12"><div class="card-header"><h3>Insumos a Consumir</h3></div><div class="card-body">';
+      if (!hasIng) {
+        h += '<p class="text-red text-sm">No se puede producir hasta definir ingredientes.</p>';
+      } else {
+        for (var ti2 = 0; ti2 < calc.tallas.length; ti2++) {
+          var t3 = calc.tallas[ti2];
+          var tallaLabel3 = t3.talla === 'grande' ? 'Grandes' : 'Pequenos';
+          h += '<h4 class="mb-8 mt-8" style="font-size:.95rem">' + tallaLabel3 + ' (' + t3.cant + ' frascos)</h4>';
+          h += '<div class="list-row-grid">';
+          for (var ii = 0; ii < t3.items.length; ii++) {
+            if (t3.items[ii].tipo === 'especia') continue; // ya mostrado arriba
+            var it = t3.items[ii];
+            var itColor = it.ok ? 'var(--green)' : 'var(--red)';
+            var itTxt = it.ok ? 'OK' : 'FALTA';
+            h += '<div class="list-row"><span>' + esc(it.label) + '</span><span class="fw7" style="color:' + itColor + '">' + it.avail + ' ' + it.unit + ' &rarr; necesita ' + it.needed + ' ' + it.unit + ' · ' + itTxt + '</span></div>';
+          }
+          h += '</div>';
+        }
+      }
+      h += '</div></div>';
+
       previewDiv.innerHTML = h;
-      prodBtn.disabled = !allOk;
+      prodBtn.disabled = !calc.allOk;
     }
 
     tipoSel.addEventListener('change', function() { loadProductos(); });
     prodSel.addEventListener('change', updatePreview);
-    tallaSel.addEventListener('change', updatePreview);
-    cantInput.addEventListener('input', updatePreview);
+    cantChicoInput.addEventListener('input', updatePreview);
+    cantGrandeInput.addEventListener('input', updatePreview);
 
-    // PRODUCE BUTTON — the critical missing handler
+    // PRODUCE BUTTON — produce ambas tallas en secuencia con validacion previa
     prodBtn.addEventListener('click', function() {
+      var calc = calcularRequerimientos();
+      if (!calc || !calc.allOk) { alert('Faltan insumos para producir. Revisá el detalle en rojo.'); return; }
       var tipo = tipoSel.value;
       var prodId = Number(prodSel.value);
-      var talla = tallaSel.value;
-      var cant = Number(cantInput.value) || 0;
-      if (!prodId || cant <= 0) { alert('Selecciona producto y cantidad'); return; }
+      var cantChico = Number(cantChicoInput.value) || 0;
+      var cantGrande = Number(cantGrandeInput.value) || 0;
+      // Produccion: la DB valida de nuevo por las dudas (race condition)
       try {
         if (tipo === 'blend') {
-          ArcanoDB.producirBlend(prodId, talla, cant);
+          if (cantChico > 0) ArcanoDB.producirBlend(prodId, 'chico', cantChico);
+          if (cantGrande > 0) ArcanoDB.producirBlend(prodId, 'grande', cantGrande);
         } else {
-          ArcanoDB.producirEspecia(prodId, talla, cant);
+          if (cantChico > 0) ArcanoDB.producirEspecia(prodId, 'chico', cantChico);
+          if (cantGrande > 0) ArcanoDB.producirEspecia(prodId, 'grande', cantGrande);
         }
+        var total = cantChico + cantGrande;
+        toast('Produccion OK: ' + total + ' frasco' + (total > 1 ? 's' : '') + ' de ' + calc.producto.nombre);
         modal.remove();
         App.renderPage(App.currentPage);
       } catch (err) { alert('Error: ' + err.message); }
