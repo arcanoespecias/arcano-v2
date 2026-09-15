@@ -1,5 +1,5 @@
 {
-  "version": "v4.22-palas",
+  "version": "v4.23-palas-refinado",
   "build": "2026-09-14",
-  "notes": "Nuevo concepto Palas: tercera talla de producto que se arma al vender (descuenta gramos de Bodega). Nuevo panel Palas con tabs: Stock en Bodega, Palas Vendidas (reporte), Configuración."
+  "notes": "Refinamiento del modelo Palas: Bodega=stock granel, Costales=bolsas armadas, Palas=cucharadas con peso configurable por producto. Costo pala = peso × costo/g (sin bolsa)."
 }

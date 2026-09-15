@@ -2615,20 +2615,42 @@ const Pages = {
       div.style.borderRadius = '6px';
       div.dataset.itemType = 'pala';
       div.innerHTML =
-        '<div class="form-group" style="margin:0;min-width:160px"><label>Producto (Bodega)</label><select class="input vi-pala-prod">' + buildPalaProductoOpts() + '</select></div>' +
-        '<div class="form-group" style="margin:0;min-width:90px"><label>Peso pala</label><select class="input vi-pala-peso">' + buildPesoOpts() + '</select></div>' +
+        '<div class="form-group" style="margin:0;min-width:160px"><label>Producto</label><select class="input vi-pala-prod">' + buildPalaProductoOpts() + '</select></div>' +
+        '<div class="form-group" style="margin:0;min-width:120px"><label>Peso pala</label><input type="number" class="input vi-pala-peso" value="20" min="1" placeholder="g"></div>' +
         '<div class="form-group" style="margin:0"><label>Cantidad palas</label><input type="number" class="input vi-cant" value="1" min="1"></div>' +
         '<div class="form-group" style="margin:0"><label>Precio Unit.</label><input type="number" class="input vi-precio" placeholder="0"></div>' +
         '<div><button class="btn btn-sm btn-red btn-rm-vi">X</button></div>';
       itemsDiv.appendChild(div);
 
       var prodSel = div.querySelector('.vi-pala-prod');
-      var pesoSel = div.querySelector('.vi-pala-peso');
+      var pesoInp = div.querySelector('.vi-pala-peso');
       var cantInp = div.querySelector('.vi-cant');
       var precioInp = div.querySelector('.vi-precio');
 
+      function _cargarPesoYPrecio() {
+        var val = prodSel.value;
+        if (!val) return;
+        var parts = val.split('|');
+        var tipo = parts[0], pid = Number(parts[1]);
+        var prod = tipo === 'blend' ? ArcanoDB.getBlend(pid) : ArcanoDB.getEspecia(pid);
+        if (!prod) return;
+        // Cargar pesoPala configurado del producto (default 20)
+        pesoInp.value = Number(prod.pesoPala) || 20;
+        _calcPrecioSugerido();
+        _actualizarMaxPalas();
+      }
+
+      function _actualizarMaxPalas() {
+        var opt = prodSel.options[prodSel.selectedIndex];
+        var stockBodega = Number(opt.dataset.stock) || 0;
+        var peso = Number(pesoInp.value) || 0;
+        var maxPalas = peso > 0 ? Math.floor(stockBodega / peso) : 0;
+        cantInp.max = maxPalas;
+        if (Number(cantInp.value) > maxPalas) cantInp.value = maxPalas;
+        // También actualiza data-stock visible del opt
+      }
+
       function _calcPrecioSugerido() {
-        // Precio sugerido = (peso × costo por gramo) + costo bolsa pequeña
         var val = prodSel.value;
         if (!val) return;
         var parts = val.split('|');
@@ -2651,37 +2673,28 @@ const Pages = {
           }
           if (totalG > 0) cpg = cpg / totalG;
         }
-        var peso = Number(pesoSel.value) || 0;
-        var costoBolsaPala = Number(costos.bolsaChica) || 0;
-        var costoUnit = (peso * cpg) + costoBolsaPala;
-        // Sugerir precio con 100% de margen (ajustable)
+        var peso = Number(pesoInp.value) || 0;
+        var costoUnit = peso * cpg;  // SOLO especia, sin bolsa
+        // Sugerir precio con 100% de margen (redondeado a 50)
         var precioSugerido = Math.ceil(costoUnit * 2 / 50) * 50;
-        if (!precioInp.value) precioInp.value = precioSugerido;
+        if (costoUnit > 0) {
+          precioInp.value = precioSugerido;
+        }
       }
 
       prodSel.addEventListener('change', function() {
-        var opt = prodSel.options[prodSel.selectedIndex];
-        var stockBodega = Number(opt.dataset.stock) || 0;
-        var peso = Number(pesoSel.value) || 0;
-        var maxPalas = peso > 0 ? Math.floor(stockBodega / peso) : 0;
-        cantInp.max = maxPalas;
-        if (Number(cantInp.value) > maxPalas) cantInp.value = maxPalas;
-        _calcPrecioSugerido();
+        _cargarPesoYPrecio();
         updateTotal();
       });
-      pesoSel.addEventListener('change', function() {
-        var opt = prodSel.options[prodSel.selectedIndex];
-        var stockBodega = Number(opt.dataset.stock) || 0;
-        var peso = Number(pesoSel.value) || 0;
-        var maxPalas = peso > 0 ? Math.floor(stockBodega / peso) : 0;
-        cantInp.max = maxPalas;
-        if (Number(cantInp.value) > maxPalas) cantInp.value = maxPalas;
+      pesoInp.addEventListener('input', function() {
         _calcPrecioSugerido();
+        _actualizarMaxPalas();
         updateTotal();
       });
       cantInp.addEventListener('input', updateTotal);
       precioInp.addEventListener('input', updateTotal);
-      _calcPrecioSugerido();
+      // Cargar peso y precio inicial
+      _cargarPesoYPrecio();
       div.querySelector('.btn-rm-vi').addEventListener('click', function() { div.remove(); updateTotal(); });
     }
 
@@ -2714,7 +2727,7 @@ const Pages = {
           var productoTipo = partsP[0];
           var productoId = Number(partsP[1]);
           var peso = Number(rows[i].querySelector('.vi-pala-peso').value) || 0;
-          if (peso <= 0) { alert('Seleccioná el peso de la pala (fila ' + (i+1) + ')'); return; }
+          if (peso <= 0) { alert('Cargá el peso de la pala en gramos (fila ' + (i+1) + ')'); return; }
           items.push({
             tipo: 'pala',
             productoTipo: productoTipo,
@@ -3298,7 +3311,7 @@ const Pages = {
   /* ================================================================
      PALAS — Bodega, Ventas de Palas, Configuración
      ================================================================ */
-  _palasTab: 'bodega',
+  _palasTab: 'config',
 
   renderPalas(container) {
     var self = Pages;
@@ -3306,24 +3319,90 @@ const Pages = {
     var blends = ArcanoDB.getBlends();
     var costos = ArcanoDB.getCostosInsumos();
     var db = ArcanoDB.getDB();
-    var PESOS_PALAS = [8, 15, 30];
 
     var h = '';
-    // Tabs
+    // Tabs (sin Bodega — esa info vive en Stock)
     h += '<div class="tabs" style="margin-bottom:16px">';
-    h += '<button class="tab-btn ' + (self._palasTab === 'bodega' ? 'active' : '') + '" onclick="Pages._palasTab=\'bodega\';App.renderPage(\'palas\')">📦 Stock en Bodega</button>';
-    h += '<button class="tab-btn ' + (self._palasTab === 'ventas' ? 'active' : '') + '" onclick="Pages._palasTab=\'ventas\';App.renderPage(\'palas\')">💰 Palas Vendidas</button>';
     h += '<button class="tab-btn ' + (self._palasTab === 'config' ? 'active' : '') + '" onclick="Pages._palasTab=\'config\';App.renderPage(\'palas\')">⚙ Configuración</button>';
+    h += '<button class="tab-btn ' + (self._palasTab === 'ventas' ? 'active' : '') + '" onclick="Pages._palasTab=\'ventas\';App.renderPage(\'palas\')">💰 Palas Vendidas</button>';
+    h += '<button class="tab-btn ' + (self._palasTab === 'costales' ? 'active' : '') + '" onclick="Pages._palasTab=\'costales\';App.renderPage(\'palas\')">📦 Costales Armados</button>';
     h += '</div>';
 
-    if (self._palasTab === 'bodega') {
-      h += self._renderPalasBodega(especias, blends, costos);
-    } else if (self._palasTab === 'ventas') {
+    if (self._palasTab === 'ventas') {
       h += self._renderPalasVendidas();
-    } else if (self._palasTab === 'config') {
-      h += self._renderPalasConfig(especias, blends, costos, PESOS_PALAS);
+    } else if (self._palasTab === 'costales') {
+      h += self._renderPalasCostales(especias, blends, db);
+    } else {
+      h += self._renderPalasConfig(especias, blends, costos);
     }
     container.innerHTML = h;
+
+    // Wire up el botón Guardar de Configuración si está visible
+    var btnSavePalasConfig = document.getElementById('btn-save-palas-config');
+    if (btnSavePalasConfig) {
+      btnSavePalasConfig.addEventListener('click', function() {
+        var inputs = container.querySelectorAll('.pala-peso-input, .pala-precio-input');
+        var saved = 0;
+        var productosModificados = {};  // {id: {pesoPala, precioPala}}
+        for (var i = 0; i < inputs.length; i++) {
+          var inp = inputs[i];
+          var prodTipo = inp.getAttribute('data-prod-tipo');
+          var prodId = Number(inp.getAttribute('data-prod-id'));
+          var campo = inp.getAttribute('data-campo');
+          var val = Number(inp.value) || 0;
+          if (!productosModificados[prodId]) productosModificados[prodId] = { tipo: prodTipo, id: prodId };
+          productosModificados[prodId][campo] = val;
+        }
+        var ids = Object.keys(productosModificados);
+        for (var j = 0; j < ids.length; j++) {
+          var pm = productosModificados[ids[j]];
+          var prod = pm.tipo === 'blend' ? ArcanoDB.getBlend(pm.id) : ArcanoDB.getEspecia(pm.id);
+          if (!prod) continue;
+          if (pm.pesoPala != null) prod.pesoPala = pm.pesoPala;
+          if (pm.precioPala != null) prod.precioPala = pm.precioPala;
+          saved++;
+        }
+        ArcanoDB.saveNow();
+        toast(saved + ' productos actualizados.');
+        App.renderPage('palas');
+      });
+    }
+
+    // Wire up botones Armar costal
+    var btnsArmar = container.querySelectorAll('.btn-armar-costal');
+    for (var bi2 = 0; bi2 < btnsArmar.length; bi2++) {
+      btnsArmar[bi2].addEventListener('click', function() {
+        var prodTipo = this.getAttribute('data-prod-tipo');
+        var prodId = Number(this.getAttribute('data-prod-id'));
+        var prodNombre = this.getAttribute('data-prod-nombre');
+        var gramosInput = document.querySelector('.costal-gramos-' + prodTipo + '-' + prodId);
+        var gramos = Number(gramosInput ? gramosInput.value : 0) || 0;
+        if (gramos <= 0) { alert('Cargá los gramos para armar el costal'); return; }
+        try {
+          ArcanoDB.armarCostalDesdeBodega(prodTipo, prodId, gramos, 'Costal de ' + prodNombre);
+          toast('Costal armado: ' + gramos + 'g de ' + prodNombre);
+          App.renderPage('palas');
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
+
+    // Wire up botones Desarmar costal
+    var btnsDesarmar = container.querySelectorAll('.btn-desarmar-costal');
+    for (var di = 0; di < btnsDesarmar.length; di++) {
+      btnsDesarmar[di].addEventListener('click', function() {
+        var costalId = Number(this.getAttribute('data-costal-id'));
+        if (!confirm('Desarmar este costal? Los gramos restantes vuelven a Bodega.')) return;
+        try {
+          ArcanoDB.desarmarCostalABodega(costalId);
+          toast('Costal desarmado. Gramos devueltos a Bodega.');
+          App.renderPage('palas');
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
   },
 
   _renderPalasBodega(especias, blends, costos) {
@@ -3495,15 +3574,21 @@ const Pages = {
     return h;
   },
 
-  _renderPalasConfig(especias, blends, costos, PESOS_PALAS) {
+  _renderPalasConfig(especias, blends, costos) {
     var h = '';
     h += '<div class="card"><div class="card-header"><h3>Configuración de Palas</h3></div><div class="card-body">';
-    h += '<p class="text-sm text-muted mb-16">Configurá el precio de venta de cada tipo de pala. El peso de cada pala es fijo y predefinido: ' + PESOS_PALAS.join('g, ') + 'g. El sistema sugiere un precio basado en el costo de la especia/blend + bolsa pequeña, pero podés ajustarlo manualmente.</p>';
+    h += '<p class="text-sm text-muted mb-16">Para cada producto configurá: el <b>peso de la pala</b> (gramos) y el <b>precio de venta</b>. El costo se calcula automáticamente como: peso × costo por gramo de la especia (sin bolsa ni empaque). El margen sugerido es 100% sobre el costo.</p>';
 
-    // Para cada producto + peso, mostrar costo estimado y input de precio sugerido
     var allProductos = [];
     for (var ei = 0; ei < especias.length; ei++) {
-      allProductos.push({ tipo: 'especia', id: especias[ei].id, nombre: especias[ei].nombre, costoPorGramo: (costos.especias && costos.especias[especias[ei].id]) || 0 });
+      var e = especias[ei];
+      var cpg = (costos.especias && costos.especias[e.id]) || 0;
+      allProductos.push({
+        tipo: 'especia', id: e.id, nombre: e.nombre,
+        costoPorGramo: cpg,
+        pesoPala: Number(e.pesoPala) || 20,
+        precioPala: Number(e.precioPala) || 0
+      });
     }
     for (var bi = 0; bi < blends.length; bi++) {
       var b = blends[bi];
@@ -3518,36 +3603,137 @@ const Pages = {
         totalG += avg;
       }
       if (totalG > 0) cpg = cpg / totalG;
-      allProductos.push({ tipo: 'blend', id: b.id, nombre: b.nombre, costoPorGramo: cpg });
+      allProductos.push({
+        tipo: 'blend', id: b.id, nombre: b.nombre,
+        costoPorGramo: cpg,
+        pesoPala: Number(b.pesoPala) || 20,
+        precioPala: Number(b.precioPala) || 0
+      });
     }
     allProductos.sort(function(a, b2) { return a.nombre.localeCompare(b2.nombre); });
 
-    var costoBolsaPala = Number(costos.bolsaChica) || 0;
     h += '<div class="table-wrap"><table class="table"><thead><tr>';
     h += '<th>Producto</th><th>Tipo</th>';
-    for (var pi = 0; pi < PESOS_PALAS.length; pi++) {
-      h += '<th class="text-center">Pala ' + PESOS_PALAS[pi] + 'g</th>';
-    }
+    h += '<th class="text-right">Costo/g</th>';
+    h += '<th class="text-center">Peso pala (g)</th>';
+    h += '<th class="text-right">Costo pala</th>';
+    h += '<th class="text-center">Precio venta</th>';
+    h += '<th class="text-right">Margen</th>';
     h += '</tr></thead><tbody>';
     for (var i = 0; i < allProductos.length; i++) {
       var p = allProductos[i];
       var tipoBadge = p.tipo === 'blend' ? '<span class="badge badge-blue">Blend</span>' : '<span class="badge badge-gold">Especia</span>';
-      h += '<tr><td class="fw7">' + esc(p.nombre) + '</td><td>' + tipoBadge + '</td>';
-      for (var pi2 = 0; pi2 < PESOS_PALAS.length; pi2++) {
-        var peso = PESOS_PALAS[pi2];
-        var costoUnit = (peso * p.costoPorGramo) + costoBolsaPala;
-        var precioSugerido = Math.ceil(costoUnit * 2 / 50) * 50; // 100% margen
-        h += '<td class="text-center">';
-        h += '<div class="text-xs text-muted">Costo: $' + costoUnit.toLocaleString(undefined,{maximumFractionDigits:0}) + '</div>';
-        h += '<input type="number" class="input" style="width:90px;padding:4px 6px;text-align:center" value="' + precioSugerido + '" data-prod-tipo="' + p.tipo + '" data-prod-id="' + p.id + '" data-peso="' + peso + '">';
-        h += '</td>';
-      }
-      h += '</tr>';
+      var costoPala = p.pesoPala * p.costoPorGramo;
+      var margen = p.precioPala - costoPala;
+      var margenPct = p.precioPala > 0 ? (margen / p.precioPala * 100) : 0;
+      var margenColor = margen >= 0 ? 'var(--green)' : 'var(--red)';
+      h += '<tr>' +
+        '<td class="fw7">' + esc(p.nombre) + '</td>' +
+        '<td>' + tipoBadge + '</td>' +
+        '<td class="text-right">$' + p.costoPorGramo.toLocaleString(undefined,{maximumFractionDigits:3}) + '</td>' +
+        '<td class="text-center"><input type="number" class="input pala-peso-input" data-prod-tipo="' + p.tipo + '" data-prod-id="' + p.id + '" data-campo="pesoPala" value="' + p.pesoPala + '" min="1" style="width:80px;padding:4px 6px;text-align:center"></td>' +
+        '<td class="text-right text-red">$' + costoPala.toLocaleString(undefined,{maximumFractionDigits:0}) + '</td>' +
+        '<td class="text-center"><input type="number" class="input pala-precio-input" data-prod-tipo="' + p.tipo + '" data-prod-id="' + p.id + '" data-campo="precioPala" value="' + p.precioPala + '" min="0" placeholder="Sugerido" style="width:100px;padding:4px 6px;text-align:center"></td>' +
+        '<td class="text-right" style="color:' + margenColor + '">$' + margen.toLocaleString(undefined,{maximumFractionDigits:0}) + ' (' + margenPct.toFixed(0) + '%)</td>' +
+      '</tr>';
     }
     h += '</tbody></table></div>';
-    h += '<p class="text-xs text-muted mt-8">Los precios cargados acá se usan como sugerencia al vender palas. El admin puede ajustar el precio final en cada venta.</p>';
-    h += '<p class="text-xs text-muted">Costo de bolsa pequeña para palas: $' + costoBolsaPala + ' (configurable en Insumos → Editar Costos Base).</p>';
+    h += '<div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<button class="btn btn-gold" id="btn-save-palas-config">💾 Guardar Configuración</button>' +
+      '<span class="text-xs text-muted">El peso y precio se guardan en cada producto y se usan al vender palas.</span>' +
+    '</div>';
     h += '</div></div>';
+    return h;
+  },
+
+  _renderPalasCostales(especias, blends, db) {
+    var costales = ArcanoDB.getCostales();
+    var h = '';
+    h += '<div class="card"><div class="card-header"><h3>Costales Armados</h3></div><div class="card-body">';
+    h += '<p class="text-sm text-muted mb-16">Un <b>costal</b> es una bolsa armada con gramos tomados de la Bodega (stock a granel). Las palas se sirven de los costales abiertos; si no hay costal, se descuenta directo de Bodega.</p>';
+
+    // Formulario para armar costal nuevo
+    h += '<div class="card" style="background:var(--bg);margin-bottom:16px"><div class="card-body" style="padding:12px">';
+    h += '<h4 style="margin:0 0 8px;font-size:.95rem">Armar nuevo costal</h4>';
+    h += '<div class="g3" style="align-items:end">';
+    h += '<div class="form-group" style="margin:0"><label>Producto</label><select class="input" id="nuevo-costal-prod">';
+    var allProductos = [];
+    for (var ei2 = 0; ei2 < especias.length; ei2++) {
+      if ((Number(especias[ei2].stockBolsa) || 0) > 0) {
+        allProductos.push({ tipo: 'especia', id: especias[ei2].id, nombre: especias[ei2].nombre, stockBolsa: Number(especias[ei2].stockBolsa) || 0 });
+      }
+    }
+    for (var bi2 = 0; bi2 < blends.length; bi2++) {
+      if ((Number(blends[bi2].stockBolsa) || 0) > 0) {
+        allProductos.push({ tipo: 'blend', id: blends[bi2].id, nombre: blends[bi2].nombre, stockBolsa: Number(blends[bi2].stockBolsa) || 0 });
+      }
+    }
+    allProductos.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+    for (var i = 0; i < allProductos.length; i++) {
+      var p = allProductos[i];
+      h += '<option value="' + p.tipo + '|' + p.id + '" data-stock="' + p.stockBolsa + '" data-nombre="' + esc(p.nombre) + '">' + p.nombre + ' (Bodega: ' + p.stockBolsa + 'g)</option>';
+    }
+    h += '</select></div>';
+    h += '<div class="form-group" style="margin:0"><label>Gramos del costal</label><input type="number" class="input" id="nuevo-costal-gramos" placeholder="100" min="1"></div>';
+    h += '<div><button class="btn btn-gold" id="btn-armar-costal-nuevo">Armar Costal</button></div>';
+    h += '</div>';
+    h += '</div></div>';
+
+    // Tabla de costales existentes
+    if (costales.length === 0) {
+      h += '<p class="text-muted text-center">No hay costales armados. Cuando armes uno, aparecerá acá.</p>';
+    } else {
+      h += '<div class="table-wrap"><table class="table"><thead><tr>';
+      h += '<th>Costal</th><th>Producto</th><th class="text-center">Total</th>';
+      h += '<th class="text-center">Restante</th><th class="text-center">Palas posib.</th>';
+      h += '<th class="text-center">Estado</th><th></th>';
+      h += '</tr></thead><tbody>';
+      for (var ci = 0; ci < costales.length; ci++) {
+        var c = costales[ci];
+        var grTotal = Number(c.gramosTotal) || 0;
+        var grRest = Number(c.gramosRestantes) || 0;
+        var pesoPala = Number(c.pesoPala) || 20;
+        var palasPosib = pesoPala > 0 ? Math.floor(grRest / pesoPala) : 0;
+        var estadoBadge = c.estado === 'vacio' ? '<span class="badge badge-red">Vacío</span>' : (c.estado === 'abierto' ? '<span class="badge badge-green">Abierto</span>' : '<span class="badge badge-gray">' + esc(c.estado || '?') + '</span>');
+        h += '<tr>' +
+          '<td class="fw7">Costal #' + c.id + '</td>' +
+          '<td>' + esc(c.productoNombre || '?') + '</td>' +
+          '<td class="text-center">' + grTotal + 'g</td>' +
+          '<td class="text-center fw7 ' + (grRest <= 0 ? 'text-red' : 'text-green') + '">' + grRest + 'g</td>' +
+          '<td class="text-center">' + palasPosib + '</td>' +
+          '<td class="text-center">' + estadoBadge + '</td>' +
+          '<td><button class="btn btn-sm btn-outline btn-desarmar-costal" data-costal-id="' + c.id + '">Desarmar</button></td>' +
+        '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div></div>';
+
+    // Wire up del botón "Armar Costal" nuevo
+    setTimeout(function() {
+      var btnArmarNuevo = document.getElementById('btn-armar-costal-nuevo');
+      if (btnArmarNuevo) {
+        btnArmarNuevo.addEventListener('click', function() {
+          var sel = document.getElementById('nuevo-costal-prod');
+          var gramos = Number(document.getElementById('nuevo-costal-gramos').value) || 0;
+          if (gramos <= 0) { alert('Cargá los gramos para el costal'); return; }
+          var val = sel.value;
+          if (!val) { alert('Seleccioná un producto'); return; }
+          var parts = val.split('|');
+          var prodTipo = parts[0];
+          var prodId = Number(parts[1]);
+          var opt = sel.options[sel.selectedIndex];
+          var prodNombre = opt ? opt.getAttribute('data-nombre') : '';
+          try {
+            ArcanoDB.armarCostalDesdeBodega(prodTipo, prodId, gramos, 'Costal de ' + prodNombre);
+            toast('Costal armado: ' + gramos + 'g de ' + prodNombre);
+            App.renderPage('palas');
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        });
+      }
+    }, 100);
     return h;
   },
 

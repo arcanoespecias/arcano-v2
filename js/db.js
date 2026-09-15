@@ -1454,8 +1454,9 @@ function saveVenta(data) {
   if (isNew) {
     for (var i = 0; i < data.items.length; i++) {
       var item = data.items[i];
-      // PALAS: armado al vender, descuenta gramos de Bodega (stockBolsa) + bolsa pequeña.
-      // No toca envases, stickers, cintas, ni frascos producidos.
+      // PALAS: armado al vender.
+      // Costo = peso × costo por gramo (sin bolsa, sin envase).
+      // Descuento: primero del costal abierto del producto, si no hay, de la Bodega (stockBolsa).
       if (item.tipo === 'pala') {
         var productoPala;
         if (item.productoTipo === 'blend') {
@@ -1466,20 +1467,49 @@ function saveVenta(data) {
         if (!productoPala) throw new Error('Producto no encontrado para pala: ' + (item.productoNombre || item.productoId));
         item.productoNombre = productoPala.nombre;
         var cantP = Number(item.cantidad) || 0;
-        var pesoP = Number(item.peso) || 0;
+        var pesoP = Number(item.peso) || Number(productoPala.pesoPala) || 0;
         var grsNecesarios = cantP * pesoP;
-        if ((productoPala.stockBolsa || 0) < grsNecesarios) {
-          throw new Error('Bodega insuficiente de "' + productoPala.nombre + '". Necesitas ' + grsNecesarios + 'g, tienes ' + (productoPala.stockBolsa || 0) + 'g');
+        if (pesoP <= 0) throw new Error('El producto "' + productoPala.nombre + '" no tiene peso de pala configurado. Configuralo en Palas → Configuración.');
+
+        // Buscar costal abierto del producto
+        var costalAbierto = null;
+        var costalKeys = Object.keys(_db.costales || {});
+        for (var ci = 0; ci < costalKeys.length; ci++) {
+          var c = _db.costales[costalKeys[ci]];
+          if (c && c.productoId === item.productoId && c.productoTipo === item.productoTipo && c.estado === 'abierto' && (Number(c.gramosRestantes) || 0) > 0) {
+            costalAbierto = c;
+            break;
+          }
         }
-        productoPala.stockBolsa = (productoPala.stockBolsa || 0) - grsNecesarios;
+
+        var grsDisponibles = 0;
+        if (costalAbierto) {
+          grsDisponibles = Number(costalAbierto.gramosRestantes) || 0;
+        } else {
+          grsDisponibles = Number(productoPala.stockBolsa) || 0;
+        }
+
+        if (grsDisponibles < grsNecesarios) {
+          throw new Error('Stock insuficiente de "' + productoPala.nombre + '" para ' + cantP + ' palas de ' + pesoP + 'g. Necesitas ' + grsNecesarios + 'g, tienes ' + grsDisponibles + 'g ' + (costalAbierto ? 'en el costal abierto' : 'en Bodega') + '.');
+        }
+
+        // Descontar del costal abierto (si existe) o de Bodega
+        if (costalAbierto) {
+          costalAbierto.gramosRestantes = (Number(costalAbierto.gramosRestantes) || 0) - grsNecesarios;
+          if (costalAbierto.gramosRestantes <= 0) {
+            costalAbierto.gramosRestantes = 0;
+            costalAbierto.estado = 'vacio';
+          }
+          item.costalId = costalAbierto.id;
+          item.costalNombre = costalAbierto.nombre;
+        } else {
+          productoPala.stockBolsa = (Number(productoPala.stockBolsa) || 0) - grsNecesarios;
+        }
+
+        item.peso = pesoP;
         item.precioUnitario = Number(item.precioUnitario) || 0;
         item.subtotal = item.precioUnitario * cantP;
         item.talla = 'pala';
-        // Descuento de bolsa pequeña de palas (si hay stock configurado)
-        if (!_db.stockBolsaPalas) _db.stockBolsaPalas = 0;
-        if ((_db.stockBolsaPalas || 0) >= cantP) {
-          _db.stockBolsaPalas = (_db.stockBolsaPalas || 0) - cantP;
-        }
         continue;
       }
       // Venta normal (frascos chico/grande)
@@ -1526,13 +1556,16 @@ function deleteVenta(id) {
         } else {
           prod = _db.especias[item.productoId];
         }
-        if (prod) {
-          var grs = (Number(item.cantidad) || 0) * (Number(item.peso) || 0);
-          prod.stockBolsa = (prod.stockBolsa || 0) + grs;
-        }
-        // Revertir bolsa pequeña de palas
-        if (_db.stockBolsaPalas) {
-          _db.stockBolsaPalas = (_db.stockBolsaPalas || 0) + (Number(item.cantidad) || 0);
+        var grs = (Number(item.cantidad) || 0) * (Number(item.peso) || 0);
+        // Si la venta original descontó de un costal, revertir al costal; sino a Bodega
+        if (item.costalId && _db.costales && _db.costales[item.costalId]) {
+          var costal = _db.costales[item.costalId];
+          costal.gramosRestantes = (Number(costal.gramosRestantes) || 0) + grs;
+          if (costal.gramosRestantes > 0 && costal.estado === 'vacio') {
+            costal.estado = 'abierto';
+          }
+        } else if (prod) {
+          prod.stockBolsa = (Number(prod.stockBolsa) || 0) + grs;
         }
       } else {
         var producto;
@@ -2732,9 +2765,92 @@ function saveCostal(data) {
 
 function deleteCostal(id) {
   if (!_db.costales || !_db.costales[id]) return false;
+  // Si el costal tiene gramos restantes, devolverlos a la Bodega (stockBolsa) del producto
+  var costal = _db.costales[id];
+  if ((Number(costal.gramosRestantes) || 0) > 0 && costal.productoId && costal.productoTipo) {
+    var prod;
+    if (costal.productoTipo === 'blend') {
+      prod = _db.blends[costal.productoId];
+    } else {
+      prod = _db.especias[costal.productoId];
+    }
+    if (prod) {
+      prod.stockBolsa = (Number(prod.stockBolsa) || 0) + (Number(costal.gramosRestantes) || 0);
+    }
+  }
   delete _db.costales[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'costales', id);
+  return true;
+}
+
+/**
+ * Arma un costal desde la Bodega: descuenta gramos de stockBolsa del producto
+ * y crea un costal con esos gramos listos para servirse palas.
+ */
+function armarCostalDesdeBodega(productoTipo, productoId, gramos, nombreCostal) {
+  _ensureStructure();
+  if (!_db.costales) _db.costales = {};
+  gramos = Number(gramos) || 0;
+  if (gramos <= 0) throw new Error('Los gramos deben ser mayor a 0');
+
+  var prod;
+  if (productoTipo === 'blend') {
+    prod = _db.blends[productoId];
+  } else {
+    prod = _db.especias[productoId];
+  }
+  if (!prod) throw new Error('Producto no encontrado');
+
+  if ((Number(prod.stockBolsa) || 0) < gramos) {
+    throw new Error('Bodega insuficiente de "' + prod.nombre + '". Necesitas ' + gramos + 'g, tienes ' + (prod.stockBolsa || 0) + 'g');
+  }
+
+  // Descontar de Bodega
+  prod.stockBolsa = (Number(prod.stockBolsa) || 0) - gramos;
+
+  // Crear el costal
+  var id = nextId('costales');
+  var costal = {
+    id: id,
+    nombre: nombreCostal || ('Costal de ' + prod.nombre),
+    productoTipo: productoTipo,
+    productoId: productoId,
+    productoNombre: prod.nombre,
+    gramosTotal: gramos,
+    gramosRestantes: gramos,
+    pesoPala: Number(prod.pesoPala) || 50,  // peso de cada pala configurable en el producto
+    estado: 'abierto',
+    creado: new Date().toISOString()
+  };
+  _db.costales[id] = costal;
+  _saveToFirebase(); _cacheLocal();
+  _notify('create', 'costales', id);
+  return costal;
+}
+
+/**
+ * Desarma un costal y devuelve los gramos restantes a la Bodega (stockBolsa).
+ */
+function desarmarCostalABodega(costalId) {
+  _ensureStructure();
+  var costal = _db.costales && _db.costales[costalId];
+  if (!costal) throw new Error('Costal no encontrado');
+  var grsRestantes = Number(costal.gramosRestantes) || 0;
+  if (grsRestantes > 0 && costal.productoId && costal.productoTipo) {
+    var prod;
+    if (costal.productoTipo === 'blend') {
+      prod = _db.blends[costal.productoId];
+    } else {
+      prod = _db.especias[costal.productoId];
+    }
+    if (prod) {
+      prod.stockBolsa = (Number(prod.stockBolsa) || 0) + grsRestantes;
+    }
+  }
+  delete _db.costales[costalId];
+  _saveToFirebase(); _cacheLocal();
+  _notify('delete', 'costales', costalId);
   return true;
 }
 
@@ -2922,6 +3038,7 @@ window.ArcanoDB = {
   getPDVVentas: getPDVVentas, getPDVStats: getPDVStats, savePDVVenta: savePDVVenta,
   getPacks: getPacks, getPack: getPack, savePack: savePack, deletePack: deletePack, producirPack: producirPack,
   getCostales: getCostales, getCostal: getCostal, saveCostal: saveCostal, deleteCostal: deleteCostal, consumirCostal: consumirCostal, moverCostalAPDV: moverCostalAPDV, savePDVVentaPala: savePDVVentaPala,
+  armarCostalDesdeBodega: armarCostalDesdeBodega, desarmarCostalABodega: desarmarCostalABodega,
   getCostosInsumos: getCostosInsumos, saveCostosInsumos: saveCostosInsumos, onCostosChange: onCostosChange,
   getCostoProducto: getCostoProducto, getCostosPorCanal: getCostosPorCanal,
   getTiendaConfig: getTiendaConfig, saveTiendaConfig: saveTiendaConfig, saveTiendaConfigField: saveTiendaConfigField,
