@@ -1454,6 +1454,35 @@ function saveVenta(data) {
   if (isNew) {
     for (var i = 0; i < data.items.length; i++) {
       var item = data.items[i];
+      // PALAS: armado al vender, descuenta gramos de Bodega (stockBolsa) + bolsa pequeña.
+      // No toca envases, stickers, cintas, ni frascos producidos.
+      if (item.tipo === 'pala') {
+        var productoPala;
+        if (item.productoTipo === 'blend') {
+          productoPala = _db.blends[item.productoId];
+        } else {
+          productoPala = _db.especias[item.productoId];
+        }
+        if (!productoPala) throw new Error('Producto no encontrado para pala: ' + (item.productoNombre || item.productoId));
+        item.productoNombre = productoPala.nombre;
+        var cantP = Number(item.cantidad) || 0;
+        var pesoP = Number(item.peso) || 0;
+        var grsNecesarios = cantP * pesoP;
+        if ((productoPala.stockBolsa || 0) < grsNecesarios) {
+          throw new Error('Bodega insuficiente de "' + productoPala.nombre + '". Necesitas ' + grsNecesarios + 'g, tienes ' + (productoPala.stockBolsa || 0) + 'g');
+        }
+        productoPala.stockBolsa = (productoPala.stockBolsa || 0) - grsNecesarios;
+        item.precioUnitario = Number(item.precioUnitario) || 0;
+        item.subtotal = item.precioUnitario * cantP;
+        item.talla = 'pala';
+        // Descuento de bolsa pequeña de palas (si hay stock configurado)
+        if (!_db.stockBolsaPalas) _db.stockBolsaPalas = 0;
+        if ((_db.stockBolsaPalas || 0) >= cantP) {
+          _db.stockBolsaPalas = (_db.stockBolsaPalas || 0) - cantP;
+        }
+        continue;
+      }
+      // Venta normal (frascos chico/grande)
       var producto;
       if (item.tipo === 'especia') {
         producto = _db.especias[item.productoId];
@@ -1483,7 +1512,43 @@ function saveVenta(data) {
 }
 
 function deleteVenta(id) {
-  if (!_db.ventas[id]) return false;
+  _ensureStructure();
+  var existing = _db.ventas[id];
+  if (!existing) return false;
+  // Revertir stock de cada item
+  if (existing.items) {
+    for (var i = 0; i < existing.items.length; i++) {
+      var item = existing.items[i];
+      if (item.tipo === 'pala') {
+        var prod;
+        if (item.productoTipo === 'blend') {
+          prod = _db.blends[item.productoId];
+        } else {
+          prod = _db.especias[item.productoId];
+        }
+        if (prod) {
+          var grs = (Number(item.cantidad) || 0) * (Number(item.peso) || 0);
+          prod.stockBolsa = (prod.stockBolsa || 0) + grs;
+        }
+        // Revertir bolsa pequeña de palas
+        if (_db.stockBolsaPalas) {
+          _db.stockBolsaPalas = (_db.stockBolsaPalas || 0) + (Number(item.cantidad) || 0);
+        }
+      } else {
+        var producto;
+        if (item.tipo === 'especia') {
+          producto = _db.especias[item.productoId];
+        } else {
+          producto = _db.blends[item.productoId];
+        }
+        if (producto) {
+          var talla = item.talla || 'chico';
+          var stockKey = talla === 'grande' ? 'stockGrande' : 'stockChico';
+          producto[stockKey] = (producto[stockKey] || 0) + (Number(item.cantidad) || 0);
+        }
+      }
+    }
+  }
   delete _db.ventas[id];
   _saveToFirebase(); _cacheLocal();
   _notify('delete', 'ventas', id);
@@ -1644,6 +1709,59 @@ function getFrascosParaVender() {
     if ((b.stockGrande || 0) > 0) items.push({ tipo: 'blend', id: b.id, nombre: b.nombre, talla: 'grande', stock: b.stockGrande, precio: b.precioGrande || 0 });
   }
   return items.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+}
+
+/**
+ * Devuelve el histórico de palas vendidas, agregado por (productoId, productoTipo, peso).
+ * Filtra ventas con items tipo='pala' y suma cantidades, ingresos y conteo de ventas.
+ */
+function getPalasVendidas() {
+  _ensureStructure();
+  var ventas = getVentas();
+  var agregado = {};
+  var registros = [];
+  for (var i = 0; i < ventas.length; i++) {
+    var v = ventas[i];
+    if (!v.items) continue;
+    for (var j = 0; j < v.items.length; j++) {
+      var it = v.items[j];
+      if (it.tipo !== 'pala') continue;
+      var cant = Number(it.cantidad) || 0;
+      var sub = Number(it.subtotal) || 0;
+      var peso = Number(it.peso) || 0;
+      var key = (it.productoTipo || 'especia') + '|' + it.productoId + '|' + peso;
+      if (!agregado[key]) {
+        agregado[key] = {
+          productoNombre: it.productoNombre || '?',
+          productoId: it.productoId,
+          productoTipo: it.productoTipo || 'especia',
+          peso: peso,
+          totalVendidas: 0,
+          ingresos: 0,
+          numVentas: 0,
+          gramosConsumidos: 0
+        };
+      }
+      agregado[key].totalVendidas += cant;
+      agregado[key].ingresos += sub;
+      agregado[key].numVentas += 1;
+      agregado[key].gramosConsumidos += cant * peso;
+      registros.push({
+        ventaId: v.id,
+        fecha: v.fecha,
+        productoNombre: it.productoNombre,
+        productoTipo: it.productoTipo,
+        peso: peso,
+        cantidad: cant,
+        precioUnitario: Number(it.precioUnitario) || 0,
+        subtotal: sub
+      });
+    }
+  }
+  var listaAgregada = Object.values(agregado);
+  listaAgregada.sort(function(a, b) { return b.totalVendidas - a.totalVendidas; });
+  registros.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  return { agregado: listaAgregada, registros: registros };
 }
 
 /* ==================== TIENDA (STORE) ==================== */
@@ -2783,6 +2901,7 @@ window.ArcanoDB = {
   producirEspecia: producirEspecia, producirBlend: producirBlend,
   getProducciones: getProducciones, deleteProduccion: deleteProduccion,
   getFrascosParaVender: getFrascosParaVender,
+  getPalasVendidas: getPalasVendidas,
   getVentas: getVentas, saveVenta: saveVenta, deleteVenta: deleteVenta,
   getUsuarios: getUsuarios, saveUsuario: saveUsuario, deleteUsuario: deleteUsuario,
   authenticateUser: authenticateUser, getCurrentUser: getCurrentUser, logoutUser: logoutUser,

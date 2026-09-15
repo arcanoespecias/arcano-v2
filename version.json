@@ -1,5 +1,5 @@
 {
-  "version": "v4.21-sugerencias-produccion",
+  "version": "v4.22-palas",
   "build": "2026-09-14",
-  "notes": "Nuevo tab 'Sugerencias de Producción' en panel Producción: cálculo automático de blends a producir por menor costo + especias limitantes ordenadas por costo."
+  "notes": "Nuevo concepto Palas: tercera talla de producto que se arma al vender (descuenta gramos de Bodega). Nuevo panel Palas con tabs: Stock en Bodega, Palas Vendidas (reporte), Configuración."
 }
