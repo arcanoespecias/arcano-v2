@@ -92,6 +92,36 @@ function _ensureStructure() {
   };
   if (!_db.usoOptions) _db.usoOptions = ['Carnes', 'Pollo', 'Pescados y Mariscos', 'Cerdo', 'Arroces', 'Pastas', 'Sopas y Cremas', 'Ensaladas', 'Guisos y Estofados', 'Salsas', 'Marinadas y Adobos', 'Panaderia', 'Postres', 'Bebidas', 'Vegetales', 'Ceviches', 'Currys', 'Tacos y Burritos', 'Hamburguesas', 'Pizzas'];
   if (!_db.tiendaConfig) _db.tiendaConfig = { logoPago: '' };
+
+  // === MIGRACIÓN: reparar especiaNombre='?' en entradas históricas ===
+  // Bug: el handler de guardado comparaba IDs con === sin convertir tipos,
+  // entonces si la especia tenía ID string, no la encontraba y guardaba '?'.
+  // Esta migración busca los items con especiaNombre='?' y los repara buscando
+  // la especia por ID en la colección actual.
+  var entradasKeys = Object.keys(_db.entradas || {});
+  var reparadas = 0;
+  for (var ek = 0; ek < entradasKeys.length; ek++) {
+    var ent = _db.entradas[entradasKeys[ek]];
+    if (!ent || !ent.items) continue;
+    for (var ei = 0; ei < ent.items.length; ei++) {
+      var it = ent.items[ei];
+      if (it.tipo === 'especia_grs' && (it.especiaNombre === '?' || !it.especiaNombre) && it.especiaId != null) {
+        var espIdNum = Number(it.especiaId);
+        var espKeys = Object.keys(_db.especias || {});
+        for (var sk = 0; sk < espKeys.length; sk++) {
+          if (Number(_db.especias[espKeys[sk]].id) === espIdNum) {
+            it.especiaNombre = _db.especias[espKeys[sk]].nombre;
+            reparadas++;
+            break;
+          }
+        }
+      }
+    }
+  }
+  if (reparadas > 0) {
+    console.log('[DB] Migración: ' + reparadas + ' items de entrada con especiaNombre="?" reparados.');
+  }
+  // === FIN MIGRACIÓN ===
   _cleanNulls();
   return true;
 }

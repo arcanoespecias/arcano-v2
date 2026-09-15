@@ -1,5 +1,5 @@
 {
-  "version": "v4.24-pdv-palas",
-  "build": "2026-09-14",
-  "notes": "PDV: nueva sección '🥄 Palas' con cards para vender palas directo de Bodega o costal abierto. Costo de pala ahora incluye bolsa pequeña."
+  "version": "v4.25-fix-especia-nombre",
+  "build": "2026-09-15",
+  "notes": "Fix: items de entrada mostraban '?' como especiaNombre. Causa: comparación estricta === entre IDs string y number. Migración automática repara datos históricos."
 }

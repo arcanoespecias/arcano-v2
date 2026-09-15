@@ -696,7 +696,7 @@ const Pages = {
         var gg = Number(rows[r].querySelector('.ing-gg').value) || 0;
         if (!espId) continue;
         var espObj = null;
-        for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espObj = especias[s]; break; } }
+        for (var s = 0; s < especias.length; s++) { if (Number(especias[s].id) === Number(espId)) { espObj = especias[s]; break; } }
         ingredientes.push({ especiaId: espId, especiaNombre: espObj ? espObj.nombre : '', gramosChico: gc, gramosGrande: gg });
       }
       var data = {
@@ -748,7 +748,7 @@ const Pages = {
       costEspC += cC;
       costEspG += cG;
       var espName = '';
-      for (var s = 0; s < especias.length; s++) { if (especias[s].id === espId) { espName = especias[s].nombre; break; } }
+      for (var s = 0; s < especias.length; s++) { if (Number(especias[s].id) === Number(espId)) { espName = especias[s].nombre; break; } }
       if (gc > 0 || gg > 0) lines.push(espName + ': ' + gc + 'g=$' + cC.toFixed(0) + ' / ' + gg + 'g=$' + cG.toFixed(0));
     }
     var totalC = costEspC + pkgC;
@@ -1598,8 +1598,8 @@ const Pages = {
           } else if (espSel && espSel.value && espSel.value !== '__new__') {
             item.especiaId = Number(espSel.value);
             var espObj = null;
-            for (var s = 0; s < esps.length; s++) { if (esps[s].id === item.especiaId) { espObj = esps[s]; break; } }
-            item.especiaNombre = espObj ? espObj.nombre : '?';
+            for (var s = 0; s < esps.length; s++) { if (Number(esps[s].id) === item.especiaId) { espObj = esps[s]; break; } }
+            item.especiaNombre = espObj ? espObj.nombre : (espSel.options[espSel.selectedIndex] ? espSel.options[espSel.selectedIndex].text : '?');
           } else {
             alert('Falta especia en item ' + (i+1)); return;
           }
