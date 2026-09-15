@@ -3577,7 +3577,8 @@ const Pages = {
   _renderPalasConfig(especias, blends, costos) {
     var h = '';
     h += '<div class="card"><div class="card-header"><h3>Configuración de Palas</h3></div><div class="card-body">';
-    h += '<p class="text-sm text-muted mb-16">Para cada producto configurá: el <b>peso de la pala</b> (gramos) y el <b>precio de venta</b>. El costo se calcula automáticamente como: peso × costo por gramo de la especia (sin bolsa ni empaque). El margen sugerido es 100% sobre el costo.</p>';
+    h += '<p class="text-sm text-muted mb-16">Para cada producto configurá: el <b>peso de la pala</b> (gramos) y el <b>precio de venta</b>. El costo se calcula como: (peso × costo por gramo de la especia) <b>+ costo de bolsa pequeña</b>. El margen sugerido es 100% sobre el costo.</p>';
+    var costoBolsaPala = Number(costos.bolsaChica) || 0;
 
     var allProductos = [];
     for (var ei = 0; ei < especias.length; ei++) {
@@ -3623,7 +3624,7 @@ const Pages = {
     for (var i = 0; i < allProductos.length; i++) {
       var p = allProductos[i];
       var tipoBadge = p.tipo === 'blend' ? '<span class="badge badge-blue">Blend</span>' : '<span class="badge badge-gold">Especia</span>';
-      var costoPala = p.pesoPala * p.costoPorGramo;
+      var costoPala = (p.pesoPala * p.costoPorGramo) + costoBolsaPala;  // especia + bolsa pequeña
       var margen = p.precioPala - costoPala;
       var margenPct = p.precioPala > 0 ? (margen / p.precioPala * 100) : 0;
       var margenColor = margen >= 0 ? 'var(--green)' : 'var(--red)';
@@ -3642,6 +3643,7 @@ const Pages = {
       '<button class="btn btn-gold" id="btn-save-palas-config">💾 Guardar Configuración</button>' +
       '<span class="text-xs text-muted">El peso y precio se guardan en cada producto y se usan al vender palas.</span>' +
     '</div>';
+    h += '<p class="text-xs text-muted mt-8">Costo de bolsa pequeña para palas: $' + costoBolsaPala + ' (configurable en Insumos → Editar Costos Base).</p>';
     h += '</div></div>';
     return h;
   },

@@ -1,5 +1,5 @@
 {
-  "version": "v4.23-palas-refinado",
+  "version": "v4.24-pdv-palas",
   "build": "2026-09-14",
-  "notes": "Refinamiento del modelo Palas: Bodega=stock granel, Costales=bolsas armadas, Palas=cucharadas con peso configurable por producto. Costo pala = peso × costo/g (sin bolsa)."
+  "notes": "PDV: nueva sección '🥄 Palas' con cards para vender palas directo de Bodega o costal abierto. Costo de pala ahora incluye bolsa pequeña."
 }

@@ -585,6 +585,70 @@ var PDV = {
       h += '</div>';
     }
 
+    // === Sección de Palas (venta directa por producto, descuenta de Bodega o costal abierto) ===
+    var productosPalas = [];
+    for (var ek = 0; ek < especias.length; ek++) {
+      var eP = especias[ek];
+      var pesoPalaE = Number(eP.pesoPala) || 0;
+      if (pesoPalaE > 0 && (Number(eP.stockBolsa) || 0) > 0) {
+        productosPalas.push({
+          tipo: 'especia', id: eP.id, nombre: eP.nombre, pesoPala: pesoPalaE,
+          precioPala: Number(eP.precioPala) || 0,
+          bodega: Number(eP.stockBolsa) || 0,
+          palasDispBodega: pesoPalaE > 0 ? Math.floor((Number(eP.stockBolsa) || 0) / pesoPalaE) : 0
+        });
+      }
+    }
+    // También considerar costales abiertos
+    var costalesAbiertos = ArcanoDB.getCostales().filter(function(c) {
+      return c && c.estado === 'abierto' && (Number(c.gramosRestantes) || 0) > 0;
+    });
+    for (var ca = 0; ca < costalesAbiertos.length; ca++) {
+      var caObj = costalesAbiertos[ca];
+      var caPeso = Number(caObj.pesoPala) || 20;
+      var caRest = Number(caObj.gramosRestantes) || 0;
+      var caPalas = caPeso > 0 ? Math.floor(caRest / caPeso) : 0;
+      if (caPalas <= 0) continue;
+      // Verificar si ya agregamos el producto desde Bodega
+      var yaAgregado = false;
+      for (var pp2 = 0; pp2 < productosPalas.length; pp2++) {
+        if (productosPalas[pp2].tipo === caObj.productoTipo && productosPalas[pp2].id === caObj.productoId) {
+          productosPalas[pp2].palasDispBodega += caPalas;
+          productosPalas[pp2].palasEnCostal = caPalas;
+          productosPalas[pp2].costalId = caObj.id;
+          yaAgregado = true;
+          break;
+        }
+      }
+      if (!yaAgregado) {
+        var prodCA = caObj.productoTipo === 'blend' ? ArcanoDB.getBlend(caObj.productoId) : ArcanoDB.getEspecia(caObj.productoId);
+        if (prodCA) {
+          productosPalas.push({
+            tipo: caObj.productoTipo, id: caObj.productoId, nombre: prodCA.nombre, pesoPala: caPeso,
+            precioPala: Number(prodCA.precioPala) || 0,
+            bodega: 0,
+            palasDispBodega: caPalas,
+            palasEnCostal: caPalas,
+            costalId: caObj.id
+          });
+        }
+      }
+    }
+    if (productosPalas.length > 0) {
+      h += '<div style="border-top:2px solid var(--border);margin:16px 0 8px"></div>';
+      h += '<h4 style="margin:0 0 8px">🥄 Palas (vender directo de Bodega o Costal abierto)</h4>';
+      h += '<div id="pos-palas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">';
+      for (var pp3 = 0; pp3 < productosPalas.length; pp3++) {
+        var pp = productosPalas[pp3];
+        var onclickStr = "PDV.posAddPalaProducto('" + pp.tipo + "'," + pp.id + ",'" + this.esc(pp.nombre).replace(/'/g, "\\'") + "'," + pp.pesoPala + "," + (pp.precioPala || 0) + "," + pp.palasDispBodega + "," + (pp.costalId || 0) + ")";
+        h += '<div class="card pos-product" data-name="' + this.esc(pp.nombre).toLowerCase() + ' pala" style="cursor:pointer;padding:10px;border-left:3px solid var(--gold)" onclick="' + onclickStr + '">' +
+          '<div class="fw7" style="font-size:0.9em">🥄 ' + this.esc(pp.nombre) + ' (pala ' + pp.pesoPala + 'g)</div>' +
+          '<div class="text-muted text-sm">Palas: ' + pp.palasDispBodega + (pp.palasEnCostal ? ' (costal #' + pp.costalId + ')' : ' (Bodega)') + '</div>' +
+          '<div class="fw7" style="color:var(--gold)">$' + (pp.precioPala || 0).toLocaleString() + '/pala</div></div>';
+      }
+      h += '</div>';
+    }
+
     // Cart
     h += '<div style="border-top:2px solid var(--border);margin-top:12px;padding-top:12px">' +
       '<h4 style="margin:0 0 8px">Carrito <span id="pos-cart-count" class="badge badge-gold">0</span></h4>' +
@@ -621,7 +685,6 @@ var PDV = {
   },
 
   posAddPala(costalId, costalNombre, precioPala, maxPalas) {
-    // Buscar si ya está en el carrito
     for (var i = 0; i < this._posCart.length; i++) {
       var c = this._posCart[i];
       if (c.tipo === 'costal' && c.productoId === costalId) {
@@ -648,6 +711,37 @@ var PDV = {
     this._renderPosCart();
   },
 
+  /** Agrega una pala al carrito (vender directo de Bodega o costal abierto).
+   *  Tipo de item en carrito: 'pala' (NO 'costal').
+   *  Al confirmar la venta, se procesa con saveVenta directamente
+   *  (que descuenta de costal abierto o Bodega). */
+  posAddPalaProducto(productoTipo, productoId, nombre, pesoPala, precioPala, maxPalas, costalId) {
+    for (var i = 0; i < this._posCart.length; i++) {
+      var c = this._posCart[i];
+      if (c.tipo === 'pala' && c.productoId === productoId) {
+        if (c.cantidad >= maxPalas) { toast('Palas máximas alcanzadas: ' + maxPalas, 'err'); return; }
+        c.cantidad++;
+        c.subtotal = c.precioUnitario * c.cantidad;
+        this._renderPosCart();
+        return;
+      }
+    }
+    this._posCart.push({
+      tipo: 'pala',
+      productoTipo: productoTipo,
+      productoId: productoId,
+      productoNombre: nombre + ' (pala ' + pesoPala + 'g)',
+      talla: 'pala',
+      peso: pesoPala,
+      precioUnitario: precioPala,
+      cantidad: 1,
+      subtotal: precioPala,
+      maxPalas: maxPalas,
+      costalId: costalId || null
+    });
+    this._renderPosCart();
+  },
+
   posRemove(idx) {
     this._posCart.splice(idx, 1);
     this._renderPosCart();
@@ -662,6 +756,9 @@ var PDV = {
     if (item.tipo === 'costal') {
       // Para costales, el límite es maxPalas
       if (item.maxPalas && newQty > item.maxPalas) { toast('Palas maximas: ' + item.maxPalas, 'err'); return; }
+    } else if (item.tipo === 'pala') {
+      // Palas directas de Bodega/costal abierto: límite maxPalas
+      if (item.maxPalas && newQty > item.maxPalas) { toast('Palas máximas: ' + item.maxPalas, 'err'); return; }
     } else {
       var pdv = this.currentPDV;
       var key = item.tipo + '_' + item.productoId + '_' + item.talla;
@@ -693,7 +790,7 @@ var PDV = {
     for (var i = 0; i < this._posCart.length; i++) {
       var it = this._posCart[i];
       total += it.subtotal;
-      var tipoLabel = it.tipo === 'costal' ? '🛍️ Pala' : (it.talla === '-' ? 'Pack' : it.talla);
+      var tipoLabel = it.tipo === 'costal' ? '🛍️ Pala' : (it.tipo === 'pala' ? '🥄 Pala' : (it.talla === '-' ? 'Pack' : it.talla));
       h += '<tr><td>' + this.esc(it.productoNombre) + '</td><td>' + tipoLabel + '</td>' +
         '<td><button class="btn btn-sm btn-ghost" onclick="PDV.posChangeQty(' + i + ',-1)">-</button> ' + it.cantidad + ' <button class="btn btn-sm btn-ghost" onclick="PDV.posChangeQty(' + i + ',1)">+</button></td>' +
         '<td class="fw7">$' + it.subtotal.toLocaleString() + '</td>' +
@@ -771,20 +868,55 @@ var PDV = {
     if (!pdv) return;
     var self = this;
 
-    // Separar items de frascos (especia/blend/pack) de items de palas (costal)
+    // Separar items de frascos (especia/blend/pack) de items de palas (costal) y palas directas (pala)
     var frascosItems = [];
-    var palasItems = [];
+    var palasCostalItems = [];  // items tipo 'costal' (sistema viejo)
+    var palasDirectasItems = []; // items tipo 'pala' (sistema nuevo)
     for (var i = 0; i < this._posCart.length; i++) {
       var it = this._posCart[i];
       if (it.tipo === 'costal') {
-        palasItems.push({ costalId: it.costalId, costalNombre: it.costalNombre, palas: it.cantidad });
+        palasCostalItems.push({ costalId: it.costalId, costalNombre: it.costalNombre, palas: it.cantidad });
+      } else if (it.tipo === 'pala') {
+        palasDirectasItems.push({
+          tipo: 'pala',
+          productoTipo: it.productoTipo,
+          productoId: it.productoId,
+          peso: it.peso,
+          cantidad: it.cantidad,
+          precioUnitario: it.precioUnitario
+        });
       } else {
         frascosItems.push({ tipo: it.tipo, productoId: it.productoId, talla: it.talla, cantidad: it.cantidad, precioUnitario: it.precioUnitario });
       }
     }
+    var palasItems = palasCostalItems; // mantener compatibilidad con savePDVVentaPala
+    var hayPalasDirectas = palasDirectasItems.length > 0;
 
-    // Si solo hay palas, usar savePDVVentaPala
-    if (palasItems.length > 0 && frascosItems.length === 0) {
+    // Si hay palas directas (de Bodega/costal abierto), usar saveVenta (que descuenta de costal o Bodega)
+    if (hayPalasDirectas && frascosItems.length === 0 && palasCostalItems.length === 0) {
+      var saleDataPalaDirecta = {
+        puntoDeVentaId: pdv.id,
+        puntoDeVentaNombre: pdv.nombre,
+        fecha: new Date().toISOString().slice(0, 10),
+        items: palasDirectasItems
+      };
+      this._showPDVPagoModal(saleDataPalaDirecta, function(data) {
+        try {
+          var itemsConPago = data.items.map(function(it) {
+            return Object.assign({}, it, { metodoPago: data.metodoPago });
+          });
+          var venta = ArcanoDB.saveVenta({ fecha: data.fecha || new Date().toISOString().slice(0,10), items: itemsConPago, pdvId: pdv.id, pdvNombre: pdv.nombre, metodoPago: data.metodoPago });
+          self._posCart = [];
+          toast('Venta de palas registrada! #' + venta.id);
+          self.currentPDV = ArcanoDB.getPuntoDeVenta(pdv.id);
+          self.renderPos(document.getElementById('page-content'));
+        } catch (e) { toast(e.message, 'err'); }
+      });
+      return;
+    }
+
+    // Si solo hay palas (costales viejos), usar savePDVVentaPala
+    if (palasCostalItems.length > 0 && frascosItems.length === 0 && !hayPalasDirectas) {
       var saleDataPala = {
         puntoDeVentaId: pdv.id,
         puntoDeVentaNombre: pdv.nombre,
@@ -803,7 +935,7 @@ var PDV = {
     }
 
     // Si solo hay frascos, usar savePDVVenta (original)
-    if (frascosItems.length > 0 && palasItems.length === 0) {
+    if (frascosItems.length > 0 && palasCostalItems.length === 0 && !hayPalasDirectas) {
       var saleData = {
         puntoDeVentaId: pdv.id,
         puntoDeVentaNombre: pdv.nombre,
@@ -821,27 +953,33 @@ var PDV = {
       return;
     }
 
-    // Si hay MEZCLADOS (frascos + palas): hacer 2 ventas separadas
-    if (frascosItems.length > 0 && palasItems.length > 0) {
-      // Primero vender frascos
-      var saleDataF = { puntoDeVentaId: pdv.id, puntoDeVentaNombre: pdv.nombre, items: frascosItems };
-      // Segundo vender palas
-      var saleDataP = { puntoDeVentaId: pdv.id, puntoDeVentaNombre: pdv.nombre, items: palasItems };
-      // Combinar para mostrar total en el modal de pago
+    // Si hay MEZCLADOS (frascos + palas costal y/o palas directas): procesar todo
+    // Combinar todos los items para mostrar total en el modal de pago
+    var combinedItems = frascosItems.concat(palasDirectasItems);
+    if (combinedItems.length > 0 || palasCostalItems.length > 0) {
       var combinedData = {
         puntoDeVentaId: pdv.id,
         puntoDeVentaNombre: pdv.nombre,
-        items: frascosItems.concat(palasItems)
+        items: combinedItems.concat(palasCostalItems.map(function(p) {
+          return { tipo: 'costal_legacy', costalId: p.costalId, costalNombre: p.costalNombre, cantidad: p.palas, precioUnitario: 0 };
+        }))
       };
       this._showPDVPagoModal(combinedData, function(data) {
         try {
-          // Vender frascos
+          // Vender frascos (si hay)
           if (frascosItems.length > 0) {
             ArcanoDB.savePDVVenta({ puntoDeVentaId: pdv.id, puntoDeVentaNombre: pdv.nombre, items: frascosItems, metodoPago: data.metodoPago });
           }
-          // Vender palas
-          if (palasItems.length > 0) {
-            ArcanoDB.savePDVVentaPala({ puntoDeVentaId: pdv.id, puntoDeVentaNombre: pdv.nombre, items: palasItems, metodoPago: data.metodoPago });
+          // Vender palas directas (de Bodega o costal abierto) con saveVenta
+          if (palasDirectasItems.length > 0) {
+            var itemsPalaFinal = palasDirectasItems.map(function(it) {
+              return Object.assign({}, it, { metodoPago: data.metodoPago });
+            });
+            ArcanoDB.saveVenta({ fecha: data.fecha || new Date().toISOString().slice(0,10), items: itemsPalaFinal, pdvId: pdv.id, pdvNombre: pdv.nombre, metodoPago: data.metodoPago });
+          }
+          // Vender palas de costales viejos con savePDVVentaPala
+          if (palasCostalItems.length > 0) {
+            ArcanoDB.savePDVVentaPala({ puntoDeVentaId: pdv.id, puntoDeVentaNombre: pdv.nombre, items: palasCostalItems, metodoPago: data.metodoPago });
           }
           self._posCart = [];
           toast('Venta mixta registrada (frascos + palas)');
