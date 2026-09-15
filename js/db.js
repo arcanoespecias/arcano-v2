@@ -98,28 +98,39 @@ function _ensureStructure() {
   // entonces si la especia tenía ID string, no la encontraba y guardaba '?'.
   // Esta migración busca los items con especiaNombre='?' y los repara buscando
   // la especia por ID en la colección actual.
-  var entradasKeys = Object.keys(_db.entradas || {});
-  var reparadas = 0;
-  for (var ek = 0; ek < entradasKeys.length; ek++) {
-    var ent = _db.entradas[entradasKeys[ek]];
-    if (!ent || !ent.items) continue;
-    for (var ei = 0; ei < ent.items.length; ei++) {
-      var it = ent.items[ei];
-      if (it.tipo === 'especia_grs' && (it.especiaNombre === '?' || !it.especiaNombre) && it.especiaId != null) {
-        var espIdNum = Number(it.especiaId);
-        var espKeys = Object.keys(_db.especias || {});
-        for (var sk = 0; sk < espKeys.length; sk++) {
-          if (Number(_db.especias[espKeys[sk]].id) === espIdNum) {
-            it.especiaNombre = _db.especias[espKeys[sk]].nombre;
-            reparadas++;
-            break;
+  if (!window._arcanoMigracionReparada) {
+    var entradasKeys = Object.keys(_db.entradas || {});
+    var reparadas = 0;
+    for (var ek = 0; ek < entradasKeys.length; ek++) {
+      var ent = _db.entradas[entradasKeys[ek]];
+      if (!ent || !ent.items) continue;
+      for (var ei = 0; ei < ent.items.length; ei++) {
+        var it = ent.items[ei];
+        if (it.tipo === 'especia_grs' && (it.especiaNombre === '?' || !it.especiaNombre) && it.especiaId != null) {
+          var espIdNum = Number(it.especiaId);
+          var espKeys = Object.keys(_db.especias || {});
+          for (var sk = 0; sk < espKeys.length; sk++) {
+            if (Number(_db.especias[espKeys[sk]].id) === espIdNum) {
+              it.especiaNombre = _db.especias[espKeys[sk]].nombre;
+              reparadas++;
+              break;
+            }
           }
         }
       }
     }
-  }
-  if (reparadas > 0) {
-    console.log('[DB] Migración: ' + reparadas + ' items de entrada con especiaNombre="?" reparados.');
+    if (reparadas > 0) {
+      console.log('[DB] Migración: ' + reparadas + ' items de entrada con especiaNombre="?" reparados.');
+      window._arcanoMigracionReparada = true;
+      // Persistir los cambios a Firebase y localStorage
+      setTimeout(function() {
+        _saveToFirebase();
+        _cacheLocal();
+        console.log('[DB] Migración: cambios persistidos a Firebase y localStorage.');
+      }, 2000);
+    } else {
+      window._arcanoMigracionReparada = true;
+    }
   }
   // === FIN MIGRACIÓN ===
   _cleanNulls();
